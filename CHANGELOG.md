@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Explorer:** an Organizations group lists My organization, which opens the Organization view, then its teammates in no department and each department by its path, such as `DevOps › Infra`, with its teammates; a teammate's row opens its Organization chat and shows when it waits or works, and Organization chats no longer show under Chats (#402).
 - **Organization:** Show organization in the View menu opens the team's organization as its own view: you at the root, then each department with its count, its leader's card and its members' cards, nested to any depth, on a canvas you pan, zoom and fit, with an overview map (#317).
   The teammates in no department show first, under No department, in every view, so the count over the view matches the cards in it (#396).
   A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.

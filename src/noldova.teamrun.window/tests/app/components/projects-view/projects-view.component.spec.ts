@@ -26,17 +26,26 @@ import {
   ConversationListParams,
   ConversationMoveParams,
   ConversationRenameParams,
+  Department,
+  DepartmentMember,
   ErrorCode,
   EventName,
+  Harness,
+  Message,
+  MessageAuthor,
   MessagePageParams,
   MessageStatus,
   MethodName,
+  Organization,
+  OrganizationChat,
   Project,
   ProjectFolderChange,
   ProjectIdParams,
   ProjectOpenParams,
   ProjectsLayoutSaveParams,
-  QuestionOption
+  QuestionOption,
+  Teammate,
+  TeammateIdParams
 } from "@noldova/teamrun.protocol";
 import { AnnouncementPoliteness, Announcer, DefaultTheme, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme, PointerFixture } from "@noldova/ui.components.angular/testing";
@@ -45,9 +54,11 @@ import { userEvent } from "vitest/browser";
 import { ConversationComponent } from "../../../../src/app/components/conversation/conversation.component";
 import { ProjectsViewComponent } from "../../../../src/app/components/projects-view/projects-view.component";
 import { ChatAction } from "../../../../src/app/enums/chat-action";
+import { ProjectsGroup } from "../../../../src/app/enums/projects-group";
 import { BrowserAvailability } from "../../../../src/app/services/browser-availability";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { CommandTargetsService } from "../../../../src/app/services/command-targets.service";
+import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { ProjectsLayoutService } from "../../../../src/app/services/projects-layout.service";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { TeamRunCommands } from "../../../../src/app/teamrun-commands";
@@ -64,6 +75,37 @@ describe("ProjectsViewComponent", () => {
   const other = new Conversation("c3", "p2", "Other talk", "2026-09-12T08:00:00.000Z", "2026-09-12T08:00:00.000Z");
   const scratchOf = (id: string, title: string, at: string): Conversation => new Conversation(id, null, title, at, at, false, null, null, false, `/data/chats/${id}`);
   const scratch = scratchOf("c5", "Scratch", "2026-09-13T08:00:00.000Z");
+  const at = "2026-09-14T08:00:00.000Z";
+  const teammateOf = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
+  const grok = teammateOf("grok", "Grok");
+  const opus = teammateOf("opus", "Opus 1");
+  const agy = teammateOf("agy", "Agy");
+  const builder = teammateOf("builder", "Builder");
+  const sol = teammateOf("sol", "Sol");
+  const mia = teammateOf("mia", "Mia");
+  const organization = new Organization([
+    new Department("devops", "DevOps", null, "sol", 1, "c", "u"),
+    new Department("marketing", "Marketing", null, null, 0, "c", "u"),
+    new Department("infra", "Infra", "devops", null, 0, "c", "u")
+  ], [new DepartmentMember("sol", "devops"), new DepartmentMember("agy", "devops"), new DepartmentMember("builder", "devops"), new DepartmentMember("mia", "infra")]);
+  const organizationChatOf = (id: string, teammate: Teammate): Conversation =>
+    new Conversation(id, null, teammate.name, at, at, false, null, null, false, `/data/chats/${id}`, false, [], false, false, null, new OrganizationChat("default", teammate.id));
+  const grokChat = organizationChatOf("o1", grok);
+  const infra = `DevOps${Resources.departmentPathSeparator}Infra`;
+  const createOrganization = async (configure: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
+    await create(t => {
+      t.answer(MethodName.TeammateList, () => [grok, opus, agy, builder, sol, mia].map(u => u.toJson()))
+        .answer(MethodName.OrganizationList, () => organization.toJson());
+      configure(t);
+    });
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-teammate-row")).not.toBeNull());
+    await settle();
+  };
+  const names = (): string[] => texts(".nol-teamrun-organization-name, .nol-teamrun-teammate-name");
+  const organizationRow = (name: string): HTMLElement => find<HTMLElement>(".nol-teamrun-organization-row", name);
+  const teammateRow = (name: string): HTMLElement => find<HTMLElement>(".nol-teamrun-teammate-row", name);
+  const opened = (): string[] => context.openedDocuments.map(t => `${t.name} ${t.instance}`);
+
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<ProjectsViewComponent>;
   let store: ChatStoreService;
@@ -198,6 +240,7 @@ describe("ProjectsViewComponent", () => {
     BrowserAvailability.release(context);
     ProjectsLayoutService.release(context);
     ChatStoreService.release(context);
+    OrganizationStoreService.release(context);
     localStorage.removeItem(Resources.projectsLayoutStorageKey);
     vi.restoreAllMocks();
   });
@@ -2511,6 +2554,21 @@ describe("ProjectsViewComponent", () => {
       actions.focus();
       await Wait.until(() => expect(getComputedStyle(actions).opacity).toBe("1"));
     });
+
+    it("sets the Organizations group's organization as a project, a teammate in no department as a project's chat, and a department's teammate a step further, each a tree row high", async () => {
+      await createOrganization();
+      const project = projectRow(SampleData.project.name);
+      const chat = conversationRow(SampleData.conversation.title);
+      const top = organizationRow(Resources.myOrganizationName);
+      const step = AppearanceFixture.measureLook("icon") + AppearanceFixture.measureLook("space-1");
+      const nameLeft = (row: HTMLElement, selector: string): number => box(part(row, selector)).left;
+
+      AppearanceFixture.expectPixels(nameLeft(top, ".nol-teamrun-organization-name"), nameLeft(project, ".nol-teamrun-project-name"));
+      AppearanceFixture.expectPixels(nameLeft(teammateRow("Grok"), ".nol-teamrun-teammate-name"), nameLeft(chat, ".nol-teamrun-conversation-title"));
+      AppearanceFixture.expectPixels(nameLeft(teammateRow("Agy"), ".nol-teamrun-teammate-name"), nameLeft(chat, ".nol-teamrun-conversation-title") + step);
+      for (const row of [top, organizationRow("DevOps"), teammateRow("Grok"), teammateRow("Agy")])
+        AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
+    });
   });
 
   it("shows a row's actions without a fade, and rearranges rows during a drag without a transition, when the person prefers reduced motion", async () => {
@@ -2530,6 +2588,102 @@ describe("ProjectsViewComponent", () => {
     finally {
       await EmulatedMediaFixture.resetAsync();
     }
+  });
+
+  describe("the Organizations group", () => {
+    it("lists the teammates in no department first, then each department by its path with its teammates by name, and keeps Organization chats out of Chats", async () => {
+      conversations = [SampleData.conversation, scratch, grokChat];
+      await createOrganization();
+      const levels = [...element().querySelectorAll(".nol-teamrun-organization-list [role='treeitem']")].map(t => t.getAttribute("aria-level"));
+
+      expect(headers()).toEqual([Resources.projectsViewTitle, Resources.chatsTitle, Resources.organizationsTitle]);
+      expect(names()).toEqual([Resources.myOrganizationName, "Grok", "Opus 1", "Marketing", "DevOps", "Agy", "Builder", "Sol", "DevOps \u203a Infra", "Mia"]);
+      expect(levels).toEqual(["1", "2", "2", "2", "2", "3", "3", "3", "2", "3"]);
+      expect(chats()).toEqual([scratch.title]);
+    });
+
+    it("folds a department and the organization from their twisties, saving each", async () => {
+      await createOrganization();
+      part(organizationRow("DevOps"), ".nol-teamrun-twistie").click();
+      await settle();
+      const folded = [names(), organizationRow("DevOps").getAttribute("aria-expanded"), layout.layout().isProjectCollapsed("devops")];
+      part(organizationRow(Resources.myOrganizationName), ".nol-teamrun-twistie").click();
+      await settle();
+
+      expect(folded).toEqual([[Resources.myOrganizationName, "Grok", "Opus 1", "Marketing", "DevOps", infra, "Mia"], "false", true]);
+      await Wait.until(() => expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ProjectsLayoutSave))
+        .map(t => ProjectsLayoutSaveParams.fromJson(t.parameters).layout[Resources.collapsedProjectsField])).toEqual([["devops"], ["devops", Resources.myOrganizationKey]]));
+      expect(names()).toEqual([Resources.myOrganizationName]);
+    });
+
+    it("starts a department folded before a restart still folded", async () => {
+      await createOrganization(t => t.answer(MethodName.ProjectsLayoutRead, () => ({ [Resources.collapsedProjectsField]: ["infra"] })));
+
+      expect([names().slice(-2), organizationRow(infra).getAttribute("aria-expanded")]).toEqual([["Sol", infra], "false"]);
+    });
+
+    it("collapses the group from its title, saving it", async () => {
+      await createOrganization();
+      part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), ".nol-section-header-toggle").click();
+      await settle();
+
+      expect([names(), layout.layout().isGroupCollapsed(ProjectsGroup.Organizations)]).toEqual([[], true]);
+    });
+
+    it("opens a teammate's Organization chat from its row, asking the engine for one when the teammate has none yet", async () => {
+      conversations = [SampleData.conversation, grokChat];
+      await createOrganization(t => t.answer(MethodName.OrganizationChatOpen, () => organizationChatOf("o2", opus).toJson()));
+
+      part(teammateRow("Grok"), ".nol-teamrun-teammate-name").click();
+      await settle();
+      const existing = [opened(), context.count(MethodName.OrganizationChatOpen)];
+      teammateRow("Opus 1").focus();
+      await userEvent.keyboard("{Enter}");
+      await Wait.until(() => expect(opened()).toHaveLength(2));
+
+      expect(existing).toEqual([[`${Resources.conversationDocumentName} o1`], 0]);
+      expect([opened()[1], TeammateIdParams.fromJson(requestOf(MethodName.OrganizationChatOpen)).teammateId]).toEqual([`${Resources.conversationDocumentName} o2`, opus.id]);
+    });
+
+    it("opens nothing when the engine refuses a teammate's Organization chat", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationChatOpen, "No chat."));
+
+      part(teammateRow("Opus 1"), ".nol-teamrun-teammate-name").click();
+      await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
+      await settle();
+
+      expect(opened()).toEqual([]);
+    });
+
+    it("opens the Organization view from the organization's name, by Enter and from its row menu", async () => {
+      await createOrganization();
+      const view = `${Resources.organizationDocumentName} ${Resources.organizationDocumentInstance}`;
+
+      part(organizationRow(Resources.myOrganizationName), ".nol-teamrun-organization-name").click();
+      organizationRow(Resources.myOrganizationName).focus();
+      await userEvent.keyboard("{Enter}");
+      await choose(organizationRow(Resources.myOrganizationName), Resources.openOrganizationLabel);
+
+      expect(opened()).toEqual([view, view, view]);
+    });
+
+    it("marks a teammate whose Organization chat is shown, and shows the chat rows' spinner while its reply runs", async () => {
+      conversations = [SampleData.conversation, grokChat];
+      const running = new Message("m9", "o1", 1, MessageAuthor.Provider, "m8", MessageStatus.Running, [], SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+      await createOrganization(t => t.answer(MethodName.MessageListOpen, () => [running.toJson()]));
+      await store.conversationInView("o1");
+      await settle();
+
+      expect([teammateRow("Grok").getAttribute("aria-selected"), teammateRow("Grok").classList.contains("nol-teamrun-selected"), teammateRow("Opus 1").getAttribute("aria-selected")])
+        .toEqual(["true", true, "false"]);
+      expect([!Object.isNull(teammateRow("Grok").querySelector(".nol-teamrun-working nol-spinner")), teammateRow("Opus 1").querySelector(".nol-teamrun-working")]).toEqual([true, null]);
+    });
+
+    it("shows no Organizations group while the organization has no teammate and no department", async () => {
+      await create();
+
+      expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
+    });
   });
 
   describe("under forced colours and at 200% zoom", () => {

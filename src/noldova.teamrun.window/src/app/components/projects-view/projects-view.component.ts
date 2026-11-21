@@ -13,7 +13,7 @@ import { Component, DestroyRef, ElementRef, Injector, type Signal, type Writable
 
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import type { Conversation, Project } from "@noldova/teamrun.protocol";
+import type { Conversation, Project, Teammate } from "@noldova/teamrun.protocol";
 import {
   AnnouncementPoliteness,
   Announcer,
@@ -34,11 +34,13 @@ import { Resources } from "../../../resources";
 import { ChatAction } from "../../enums/chat-action";
 import { ProjectsGroup } from "../../enums/projects-group";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { OrganizationExplorer } from "../../models/organization-explorer";
 import { TreeFocus } from "../../models/tree-focus";
 import { BrowserAvailability } from "../../services/browser-availability";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ConversationActions } from "../../services/conversation-actions";
+import { OrganizationStoreService } from "../../services/organization-store.service";
 import { ProjectsLayoutService } from "../../services/projects-layout.service";
 import { TimeFormatService } from "../../services/time-format.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -49,7 +51,7 @@ import { TreeItemDirective } from "./tree-item.directive";
   selector: "nol-teamrun-projects-view",
   imports: [CdkDrag, CdkDragHandle, CdkDropList, ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent,
     MenuTriggerDirective, NgTemplateOutlet, SectionHeaderComponent, SpinnerComponent, TooltipDirective, TreeItemDirective],
-  providers: [ChatStoreService.provider, ProjectsLayoutService.provider],
+  providers: [ChatStoreService.provider, OrganizationStoreService.provider, ProjectsLayoutService.provider],
   templateUrl: "./projects-view.component.html",
   styleUrl: "./projects-view.component.css"
 })
@@ -58,6 +60,7 @@ export class ProjectsViewComponent {
   protected readonly beside: OverlaySide = OverlaySide.end;
   protected readonly store: ChatStoreService = inject(ChatStoreService);
   protected readonly layout: ProjectsLayoutService = inject(ProjectsLayoutService);
+  private readonly organizations: OrganizationStoreService = inject(OrganizationStoreService);
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly times: TimeFormatService = inject(TimeFormatService);
@@ -70,6 +73,7 @@ export class ProjectsViewComponent {
   protected readonly pinsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly projectsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly chatsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
+  protected readonly organizationsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly moveShortcuts: string = navigator.platform.startsWith(Resources.macPlatformPrefix) ? Resources.macTreeMoveShortcuts : Resources.treeMoveShortcuts;
   protected readonly groups: typeof ProjectsGroup = ProjectsGroup;
   protected readonly rowShortcuts: string = `${this.moveShortcuts} ${Resources.renameKey}`;
@@ -92,6 +96,19 @@ export class ProjectsViewComponent {
 
   protected readonly chats: Signal<readonly Conversation[]> = computed(() => this.orderedConversationsOf(null));
 
+  protected readonly organization: Signal<OrganizationExplorer> = computed(() => OrganizationExplorer.of(this.organizations.organization(), this.store.teammates()));
+
+  protected readonly hasOrganization: Signal<boolean> = computed(() =>
+    this.organization().unplaced.length > 0 || this.organization().departments.length > 0);
+
+  private readonly organizationChats: Signal<ReadonlyMap<string, Conversation>> = computed(() => {
+    const chats = new Map<string, Conversation>();
+    for (const chat of this.store.newestConversationsOf(null))
+      if (!Object.isNull(chat.organizationChat))
+        chats.set(chat.organizationChat.teammateId, chat);
+    return chats;
+  });
+
   protected readonly shownChats: Signal<readonly Conversation[]> = computed(() =>
     this.areChatsUnfolded() ? this.chats() : this.chats().slice(0, Resources.projectConversationCount));
 
@@ -104,6 +121,25 @@ export class ProjectsViewComponent {
     ConversationActions.open(this.context, this.store, conversation);
     if (conversation.id === this.store.shownConversationId())
       void this.store.selectConversation(conversation.id);
+  }
+
+  protected chatOf(teammate: Teammate): Conversation | null {
+    return this.organizationChats().get(teammate.id) ?? null;
+  }
+
+  protected async openTeammate(teammate: Teammate): Promise<void> {
+    const chat = this.chatOf(teammate) ?? await this.organizations.openOrganizationChat(teammate.id);
+    if (!Object.isNull(chat))
+      this.open(chat);
+  }
+
+  protected isChatMarked(teammate: Teammate): boolean {
+    const chat = this.chatOf(teammate);
+    return !Object.isNull(chat) && chat.id === this.store.markedConversationId();
+  }
+
+  protected openOrganization(): void {
+    this.context.openDocument(Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle);
   }
 
   protected isMarked(projectId: string): boolean {
@@ -364,7 +400,7 @@ export class ProjectsViewComponent {
 
   private orderedConversationsOf(projectId: string | null): readonly Conversation[] {
     const pinned = this.layout.pinnedConversations();
-    const newest = this.store.newestConversationsOf(projectId).filter(t => !pinned.includes(t.id));
+    const newest = this.store.newestConversationsOf(projectId).filter(t => !pinned.includes(t.id) && Object.isNull(t.organizationChat));
     const order = this.layout.layout().conversationOrderOf(projectId ?? Resources.chatsOrderKey);
     const named = order.map(id => newest.find(t => t.id === id)).filter((t): t is Conversation => !Object.isUndefined(t));
     return [...named, ...newest.filter(t => !order.includes(t.id))];
