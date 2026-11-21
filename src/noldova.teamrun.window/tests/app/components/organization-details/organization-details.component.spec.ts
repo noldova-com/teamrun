@@ -307,9 +307,10 @@ describe("OrganizationDetailsComponent", () => {
       const text = getComputedStyle(probe).color;
       probe.remove();
       const style = getComputedStyle(details);
+      const facts = getComputedStyle(one(".facts", details));
 
       AppearanceFixture.expectPixels(details.getBoundingClientRect().width, 18 * rem);
-      expect([style.backgroundColor, style.borderTopColor, style.borderBottomColor, style.color]).toEqual([surface, border, border, text]);
+      expect([style.backgroundColor, style.borderTopColor, style.borderBottomColor, facts.color]).toEqual([surface, border, border, text]);
     });
 
     it("cuts long last words to three lines, with the time since them on a line of its own under them", async () => {
