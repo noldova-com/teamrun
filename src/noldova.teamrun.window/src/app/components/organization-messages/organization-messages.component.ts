@@ -82,6 +82,12 @@ export class OrganizationMessagesComponent {
     const target = this.target();
     return Object.isNull(target) ? String.empty : this.titleOf(target, this.messages().at(-1) ?? null);
   });
+  protected readonly headTitle: Signal<string> = computed(() => {
+    const target = this.target();
+    if (this.shape() === OrganizationMessagesShape.Inbox || Object.isNull(target))
+      return this.title();
+    return target.kind === OrganizationTargetKind.Leaders ? Resources.organizationLeadersChat : Resources.formatOrganizationChat(this.title());
+  });
   protected readonly recipientCount: Signal<number> = computed(() => {
     const target = this.target();
     return Object.isNull(target) ? 0 : this.organizations.organization().recipientsOf(target, this.chats.teammates().map(t => t.id)).length;
@@ -144,11 +150,12 @@ export class OrganizationMessagesComponent {
   protected noteOf(target: OrganizationTarget): string {
     switch (target.kind) {
       case OrganizationTargetKind.Teammate:
-        return this.chats.teammate(target.id)?.role ?? Resources.organizationTeammateNote;
+        return this.shape() === OrganizationMessagesShape.Thread ? Resources.formatOrganizationOnlyNote(this.title())
+          : this.chats.teammate(target.id)?.role ?? Resources.organizationTeammateNote;
       case OrganizationTargetKind.Department:
         return Resources.formatOrganizationDepartmentNote(this.recipientCount());
       case OrganizationTargetKind.Leaders:
-        return Resources.organizationLeadersNote;
+        return Resources.formatOrganizationLeadersNote(this.recipientCount());
       case OrganizationTargetKind.Everyone:
         return Resources.formatOrganizationEveryoneNote(this.recipientCount());
     }

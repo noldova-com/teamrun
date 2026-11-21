@@ -143,11 +143,14 @@ describe("OrganizationMessagesComponent", () => {
     expect(one(".nol-teamrun-organization-thread-title").textContent?.trim()).toBe("Design");
   });
 
-  it("says when no message was sent yet", async () => {
+  it.each([
+    [OrganizationMessagesShape.Inbox, [Resources.organizationNoMessages, Resources.organizationInboxEmpty]],
+    [OrganizationMessagesShape.Thread, [Resources.organizationThreadEmpty]]
+  ])("says when no message was sent yet in the %s shape's words", async (shape, shown) => {
     messages = [];
-    await create(toAlice);
+    await create(toAlice, shape);
 
-    expect(texts(".nol-teamrun-organization-empty")).toEqual([Resources.organizationNoMessages, Resources.organizationThreadEmpty]);
+    expect(texts(".nol-teamrun-organization-empty")).toEqual(shown);
     expect(input().placeholder).toBe(Resources.formatOrganizationPlaceholder("Alice"));
   });
 
@@ -157,7 +160,7 @@ describe("OrganizationMessagesComponent", () => {
     ["a removed teammate never written to", OrganizationTarget.teammate("ghost"), Resources.organizationRemovedTeammate, Resources.organizationTeammateNote],
     ["a department", design, "Design", Resources.formatOrganizationDepartmentNote(2)],
     ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(0)],
-    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.organizationLeadersNote],
+    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.formatOrganizationLeadersNote(1)],
     ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(3)]
   ])("names %s in the thread's head, with how many teammates a message goes to in its note", async (_, target, title, note) => {
     await create(target);
@@ -336,6 +339,19 @@ describe("OrganizationMessagesComponent", () => {
     expect(all(".nol-teamrun-organization-conversation nol-chip")).toHaveLength(0);
   });
 
+  it.each([
+    ["a teammate", toAlice, Resources.formatOrganizationChat("Alice"), Resources.formatOrganizationOnlyNote("Alice")],
+    ["a department", design, Resources.formatOrganizationChat("Design"), Resources.formatOrganizationDepartmentNote(2)],
+    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersChat, Resources.formatOrganizationLeadersNote(1)],
+    ["everyone", OrganizationTarget.everyone, Resources.formatOrganizationChat(Resources.organizationEveryoneTitle), Resources.formatOrganizationEveryoneNote(3)]
+  ])("names the chat with %s in the thread shape's head", async (_, target, title, note) => {
+    await create(target, OrganizationMessagesShape.Thread);
+
+    expect(one(".nol-teamrun-organization-thread-title").textContent?.trim()).toBe(title);
+    expect(one(".nol-teamrun-organization-thread-note").textContent?.trim()).toBe(note);
+    expect(one(".nol-teamrun-organization-thread-wrap").getAttribute("aria-label")).toBe(title);
+  });
+
   it("shows only the thread and its field in the thread shape", async () => {
     await create(toAlice, OrganizationMessagesShape.Thread);
 
@@ -432,6 +448,16 @@ describe("OrganizationMessagesComponent", () => {
       AppearanceFixture.expectPixels(wrap.right - note.right, AppearanceFixture.measureLook("space-3"));
       AppearanceFixture.expectPixels(icon.width, AppearanceFixture.measureLook("icon"));
       AppearanceFixture.expectPixels(note.top + note.height / 2, title.top + title.height / 2);
+      await Wait.until(() => expect(all(".nol-teamrun-organization-thread > .nol-teamrun-organization-replying")).toHaveLength(1));
+      const thread = box(one(".nol-teamrun-organization-thread"));
+      const replying = box(one(".nol-teamrun-organization-replying"));
+      expect(replying.top).toBeGreaterThanOrEqual(thread.top);
+      expect(replying.bottom).toBeLessThanOrEqual(thread.bottom);
+
+      element().style.height = "8rem";
+      await settle();
+
+      AppearanceFixture.expectPixels(box(one(".nol-teamrun-organization-thread")).height, AppearanceFixture.measureLook("space-6") * 4);
     });
   });
 });

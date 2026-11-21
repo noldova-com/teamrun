@@ -11,7 +11,7 @@ LICENSE file in the root directory of this source tree.
     <h2 class="nol-teamrun-organization-inbox-title">{{ resources.organizationInboxTitle }}</h2>
     <span class="nol-teamrun-organization-unread">{{ unreadCount() === 0 ? resources.organizationAllRead : resources.formatOrganizationUnread(unreadCount()) }}</span>
   </div>
-  <ul class="nol-teamrun-organization-conversations" [attr.aria-label]="resources.organizationConversationsLabel">
+  <ul class="nol-teamrun-organization-conversations" [attr.aria-label]="resources.organizationChatsLabel">
     @for (row of rows(); track row.conversation.key) {
       <li>
         <button type="button" class="nol-teamrun-organization-conversation" [class.nol-teamrun-organization-conversation-selected]="row.conversation.key === selectedKey()"
@@ -38,13 +38,13 @@ LICENSE file in the root directory of this source tree.
     }
   </ul>
 }
-<section class="nol-teamrun-organization-thread-wrap" [attr.aria-label]="title() || resources.organizationChooseTarget">
+<section class="nol-teamrun-organization-thread-wrap" [attr.aria-label]="headTitle() || resources.organizationChooseTarget">
   @if (target(); as current) {
     <div class="nol-teamrun-organization-thread-head">
       @if (shape() === shapes.Thread) {
         <span class="nol-teamrun-organization-thread-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationGroupIcon }}</span>
       }
-      <h3 class="nol-teamrun-organization-thread-title">{{ title() }}</h3>
+      <h3 class="nol-teamrun-organization-thread-title">{{ headTitle() }}</h3>
       <span class="nol-teamrun-organization-thread-note">{{ noteOf(current) }}</span>
     </div>
   }
@@ -72,7 +72,7 @@ LICENSE file in the root directory of this source tree.
         }
       </article>
     } @empty {
-      <p class="nol-teamrun-organization-empty">{{ target() ? resources.organizationThreadEmpty : resources.organizationChooseTarget }}</p>
+      <p class="nol-teamrun-organization-empty">{{ !target() ? resources.organizationChooseTarget : shape() === shapes.Inbox ? resources.organizationInboxEmpty : resources.organizationThreadEmpty }}</p>
     }
     @if (replying()) {
       <p class="nol-teamrun-organization-replying" aria-live="polite">{{ replying() }}</p>

@@ -594,13 +594,14 @@ export class Resources {
   public static readonly historyWarmUpReply: string = "Warm up with `code`, **bold** and a list:\n\n- one\n- two";
   public static readonly youLabel: string = "You";
   public static readonly organizationInboxTitle: string = "Inbox";
-  public static readonly organizationConversationsLabel: string = "Conversations";
+  public static readonly organizationChatsLabel: string = "Chats";
   public static readonly organizationAllRead: string = "All read";
   public static readonly organizationNoMessages: string = "No messages yet";
+  public static readonly organizationInboxEmpty: string = "No messages yet. Write the first.";
   public static readonly organizationThreadEmpty: string = "No messages yet.";
   public static readonly organizationChooseTarget: string = "Choose whom to message.";
   public static readonly organizationLeadersTitle: string = "All leaders";
-  public static readonly organizationLeadersNote: string = "Every department's leader";
+  public static readonly organizationLeadersChat: string = "Chat with all leaders";
   public static readonly organizationEveryoneTitle: string = "Everyone";
   public static readonly organizationDeletedDepartment: string = "Deleted department";
   public static readonly organizationRemovedTeammate: string = "Removed teammate";
@@ -1759,6 +1760,18 @@ export class Resources {
 
   public static formatOrganizationUnread(count: number): string {
     return `${count} unread`;
+  }
+
+  public static formatOrganizationLeadersNote(count: number): string {
+    return `Every department's leader (${count})`;
+  }
+
+  public static formatOrganizationChat(name: string): string {
+    return `Chat with ${name}`;
+  }
+
+  public static formatOrganizationOnlyNote(name: string): string {
+    return `Only ${name}`;
   }
 
   public static formatOrganizationDepartmentNote(count: number): string {
