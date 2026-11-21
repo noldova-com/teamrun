@@ -210,6 +210,7 @@ export class SharedMcpLauncher {
       return;
     }
 
+    this.host.stderr.on("error", () => undefined);
     const input = this.host.stdin;
     let text = String();
     await new Promise<void>(resolve => {

@@ -575,6 +575,24 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
+  public async endsBothPowershellsWithinTheEndsTimeOnWindowsWhenItsErrorsCantBeWritten(): Promise<void> {
+    const host = new FakeLauncherHost();
+    Object.defineProperty(host, "stderr", { value: new Writable({ write: (_chunk, _encoding, done) => done(new Error("write EPIPE")) }) });
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.waiting());
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number): Promise<void> => {
+      limits.push(milliseconds);
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([2, SharedMcpLauncher.windowsEndMilliseconds, [true, true], [0]]),
+      JSON.stringify([recorder.starts.length, limits.reduce((total, t) => total + t, 0), recorder.children.map(t => t.killed), host.codes]));
+  }
+
+  @TestMethod
   @TestData(2000, "")
   @TestData(2001, "TeamRun's MCP watch: PowerShell 1 of 2 ended after 2001 ms.\n")
   public async writesAPowershellsTimeOnWindowsOnlyWhenItTakesOverTwoSeconds(elapsed: number, written: string): Promise<void> {
