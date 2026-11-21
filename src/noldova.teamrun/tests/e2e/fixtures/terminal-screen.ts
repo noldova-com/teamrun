@@ -12,8 +12,6 @@ import { TeamRunApp } from "./teamrun-app.fixture.ts";
 
 export class TerminalScreen {
   public static readonly PROMPT_END: RegExp = /[$#%>]$/u;
-  private static readonly ECHO_TIMEOUT: number = 5_000;
-  private static readonly TYPING_ATTEMPTS: number = 3;
   private static readonly SPACES: RegExp = /\s/gu;
 
   public static async rowsAsync(screen: Locator): Promise<readonly string[]> {
@@ -28,24 +26,19 @@ export class TerminalScreen {
     await expect.poll(() => TerminalScreen.isAtPromptAsync(screen), { ...TeamRunApp.pollOf(30_000), message: "the shell shows its prompt" }).toBe(true);
   }
 
-  public static async enterAsync(page: Page, screen: Locator, command: string, clearKey: string): Promise<void> {
+  public static async enterAsync(page: Page, screen: Locator, command: string): Promise<void> {
     await TerminalScreen.expectPromptAsync(screen);
-    for (let attempt = 1; attempt <= TerminalScreen.TYPING_ATTEMPTS; attempt++) {
-      await page.keyboard.type(command);
-      if (await TerminalScreen.isEchoedAsync(screen, command)) {
-        await page.keyboard.press("Enter");
-        return;
-      }
-      await page.keyboard.press(clearKey);
-    }
-    throw new Error(`The shell didn't echo the whole command in ${TerminalScreen.TYPING_ATTEMPTS} attempts: ${command}\nThe terminal shows:\n${await screen.innerText()}`);
+    await page.keyboard.type(command);
+    if (!await TerminalScreen.isEchoedAsync(screen, command))
+      throw new Error(`The shell didn't echo the whole command: ${command}\nThe terminal shows:\n${await screen.innerText()}`);
+    await page.keyboard.press("Enter");
   }
 
   private static async isEchoedAsync(screen: Locator, command: string): Promise<boolean> {
     const typed = command.replace(TerminalScreen.SPACES, "");
     const echoed = async (): Promise<boolean> => (await TerminalScreen.rowsAsync(screen)).join("").replace(TerminalScreen.SPACES, "").includes(typed);
     try {
-      await expect.poll(echoed, { ...TeamRunApp.pollOf(TerminalScreen.ECHO_TIMEOUT), message: "the shell echoes the whole command" }).toBe(true);
+      await expect.poll(echoed, { ...TeamRunApp.pollOf(30_000), message: "the shell echoes the whole command" }).toBe(true);
       return true;
     }
     catch {
