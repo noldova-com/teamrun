@@ -15,6 +15,7 @@ import {
   ChatFolderAttachParams,
   Conversation,
   ConversationListParams,
+  ConversationMoveParams,
   DetailKind,
   ErrorCode,
   EventName,
@@ -437,6 +438,32 @@ describe("ConversationComponent", () => {
 
     expect(context.updates.map(t => t.update)).toEqual([{ breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [Resources.chatsTitle, "/home/ada/notes/"] },
       { breadcrumb: [Resources.chatsTitle] }, { title: "Renamed" }]);
+  });
+
+  it("follows its chat's project in the tab's breadcrumb, once the chat moves into another project, and from Chats into one", async () => {
+    const loose = new Conversation("c1", null, SampleData.conversation.title, SampleData.timestamp, SampleData.timestamp);
+    context.answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project), SampleData.listed(SampleData.otherProject)])
+      .answer(MethodName.ChatFolderAttach, t => loose.withAttachedFolder(ChatFolderAttachParams.fromJson(t).folder, SampleData.timestamp).toJson())
+      .answer(MethodName.ConversationMove, t => {
+        const params = ConversationMoveParams.fromJson(t);
+        return new Conversation(params.chatId, params.projectId, SampleData.conversation.title, SampleData.timestamp, SampleData.timestamp).toJson();
+      });
+    await Wait.until(() => expect(store().loaded()).toBe(true));
+    await settle();
+
+    await store().moveConversation("c1", SampleData.otherProject.id);
+    await settle();
+    await store().moveConversation("c1", SampleData.project.id);
+    await settle();
+    await store().attachFolder("c1", "D:/work/site");
+    await settle();
+    await store().moveConversation("c1", SampleData.otherProject.id);
+    await settle();
+    await store().renameConversation("c1", "Renamed");
+    await settle();
+
+    expect(context.updates.map(t => t.update)).toEqual([{ breadcrumb: [SampleData.otherProject.name] }, { breadcrumb: [SampleData.project.name] },
+      { breadcrumb: [Resources.chatsTitle, "site"] }, { breadcrumb: [SampleData.otherProject.name] }, { title: "Renamed" }]);
   });
 
   it("selects whichever of two tabs side by side the person moves into, while each keeps its own messages in view", async () => {
