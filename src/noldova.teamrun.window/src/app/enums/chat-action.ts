@@ -47,6 +47,8 @@ export enum ChatAction {
   CancelInstall = "CancelInstall",
   RemoveProvider = "RemoveProvider",
   InstallTool = "InstallTool",
+  AddAcpAgent = "AddAcpAgent",
+  RemoveAcpAgent = "RemoveAcpAgent",
   OpenPage = "OpenPage",
   OpenBrowser = "OpenBrowser",
   SaveTeammate = "SaveTeammate",
