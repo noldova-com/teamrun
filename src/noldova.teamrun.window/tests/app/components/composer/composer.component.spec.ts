@@ -4873,6 +4873,21 @@ describe("ComposerComponent", () => {
       expect(alert()).toBe(Resources.formatDraftUnreadable("offline"));
     });
 
+    it("shows the unsent message a save's read finds after a failed read, in place of what was written, and saves nothing over it", async () => {
+      let readable = false;
+      context.answer(MethodName.DraftRead, () => readable
+        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new Error("unreadable")));
+      await prepare();
+      await render();
+      await type("ok");
+      readable = true;
+
+      await saveStep()();
+
+      await Wait.until(() => expect(box().value).toBe("a long unsent message"));
+      expect(context.count(MethodName.DraftSave)).toBe(0);
+    });
+
     it("keeps the field closed and takes no files until the unsent message is read", async () => {
       const response = new DeferredResponse();
       context.answer(MethodName.DraftRead, () => response.promise);
