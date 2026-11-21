@@ -33,7 +33,7 @@ LICENSE file in the root directory of this source tree.
   <nol-teamrun-organization-card class="leader" nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
     [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
     [nolPopoverAlignment]="detailsAlignment" (click)="choose(leader.id, $event)" (keydown.enter)="choose(leader.id, $event)" />
-  <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" /></ng-template>
+  <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node().department" /></ng-template>
 }
 @if (isOpen()) {
   @if (node().members.length > 0 || editing()) {
@@ -42,7 +42,7 @@ LICENSE file in the root directory of this source tree.
         <nol-teamrun-organization-card nolCanvasItem data-nol-canvas-no-pan tabindex="0" role="group" [attr.aria-label]="member.name" [teammate]="member" [editing]="editing()"
           [department]="node().department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
           [nolPopoverAlignment]="detailsAlignment" (click)="choose(member.id, $event)" (keydown.enter)="choose(member.id, $event)" />
-        <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" /></ng-template>
+        <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" [department]="node().department" /></ng-template>
       }
       @if (editing()) {
         <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="candidates().length === 0" [nolMenuTriggerFor]="candidatesMenu"><span

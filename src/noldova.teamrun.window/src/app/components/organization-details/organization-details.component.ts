@@ -38,19 +38,15 @@ export class OrganizationDetailsComponent {
   private readonly time: WritableSignal<number> = signal(this.clock.now());
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
+  public readonly department: InputSignal<Department> = input.required<Department>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly label: Signal<string> = computed(() => Resources.formatOrganizationDetailsLabel(this.teammate().name));
-  protected readonly department: Signal<Department | null> = computed(() =>
-    OrganizationDetailsComponent.departmentOf(this.organization.organization(), this.teammate().id));
   protected readonly place: Signal<string> = computed(() =>
-    [this.teammate().role, this.department()?.name ?? null].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
+    [this.teammate().role, this.department().name].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
   protected readonly reportsTo: Signal<string> = computed(() => {
-    const organization = this.organization.organization();
-    const teammateId = this.teammate().id;
-    const leaderId = OrganizationDetailsComponent.leaderAbove(organization, this.department(), teammateId);
-    return Object.isNull(leaderId) ? Resources.organizationOwnerName
-      : this.store.teammates().find(t => t.id === leaderId)?.name ?? Resources.organizationOwnerName;
+    const leader = OrganizationDetailsComponent.leaderAbove(this.organization.organization(), this.store.teammates(), this.department(), this.teammate().id);
+    return Object.isNull(leader) ? Resources.organizationOwnerName : leader.name;
   });
   protected readonly model: Signal<string> = computed(() => {
     const teammate = this.teammate();
@@ -86,17 +82,16 @@ export class OrganizationDetailsComponent {
     });
   }
 
-  private static departmentOf(organization: Organization, teammateId: string): Department | null {
-    const departmentId = organization.members.find(t => t.teammateId === teammateId)?.departmentId
-      ?? organization.departments.find(t => t.leaderId === teammateId)?.id;
-    return organization.departments.find(t => t.id === departmentId) ?? null;
-  }
-
-  private static leaderAbove(organization: Organization, department: Department | null, teammateId: string): string | null {
-    for (let current = department; !Object.isNull(current);
-      current = organization.departments.find(t => t.id === current?.parentId) ?? null)
-      if (!Object.isNull(current.leaderId) && current.leaderId !== teammateId)
-        return current.leaderId;
+  private static leaderAbove(organization: Organization, teammates: readonly Teammate[], department: Department, teammateId: string): Teammate | null {
+    let current: Department | undefined = department;
+    while (!Object.isUndefined(current)) {
+      const leaderId = current.leaderId;
+      const leader = leaderId === teammateId ? undefined : teammates.find(t => t.id === leaderId);
+      if (!Object.isUndefined(leader))
+        return leader;
+      const parentId = current.parentId;
+      current = organization.departments.find(t => t.id === parentId);
+    }
     return null;
   }
 }
