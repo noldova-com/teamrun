@@ -97,8 +97,8 @@ describe("OrganizationDetailsComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
-    element().style.width = "100rem";
-    element().style.height = "70rem";
+    element().style.width = "84rem";
+    element().style.height = "60rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
@@ -245,6 +245,8 @@ describe("OrganizationDetailsComponent", () => {
       await create(context => context
         .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("alice", "c1", "r0", "The header is done.", SampleData.timestamp).toJson()]));
       context.emit(EventName.MessageCreated, reply("r1", "c1", "2026-09-10T08:04:30.000Z", MessageStatus.Running).toJson());
+      element().style.width = "100rem";
+      element().style.height = "70rem";
       await settle();
       const details = await focus("Alice");
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
