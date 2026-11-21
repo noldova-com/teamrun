@@ -259,14 +259,13 @@ describe("OrganizationViewComponent", () => {
 
   it("shows the kept view checked among Tree, Board and Focus, and keeps the one chosen on the server", async () => {
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
-    const pills = (): string[][] => [...element().querySelectorAll<HTMLElement>(".top .views [role=radio]")]
-      .map(t => [t.textContent?.trim() ?? "", t.getAttribute("aria-checked") ?? ""]);
+    const pills = (): string[][] => all(".top .views [role=radio]").map(t => [t.textContent?.trim() ?? "", t.getAttribute("aria-checked") ?? ""]);
 
     expect([one(".top .views [role=radiogroup]").getAttribute("aria-label"), pills()])
       .toEqual(["View", [["Tree", "false"], ["Board", "true"], ["Focus", "false"]]]);
     expect(element().querySelectorAll(".chart > .tree")).toHaveLength(1);
 
-    [...element().querySelectorAll<HTMLElement>(".top .views [role=radio]")][2].click();
+    one(".top .views [role=radio]:last-of-type").click();
     await Wait.until(() => expect(saves).toHaveLength(1));
     await settle();
 
