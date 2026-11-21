@@ -1613,8 +1613,18 @@ export class Resources {
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
 
+  public static formatTeammateWorkSummary(pullRequests: number, documents: number, artifacts: number, branch: string | null): string {
+    const counts = [Resources.formatCount(pullRequests, "pull request", "pull requests"), Resources.formatCount(documents, "document", "documents"),
+      Resources.formatCount(artifacts, "artifact", "artifacts")].join(" · ");
+    return Object.isNull(branch) ? counts : `${counts} · on ${branch}`;
+  }
+
+  private static formatCount(count: number, one: string, many: string): string {
+    return `${count} ${count === 1 ? one : many}`;
+  }
+
   public static formatTeammateChanges(count: number): string {
-    return count === 1 ? "1 changed file" : `${count} changed files`;
+    return Resources.formatCount(count, "changed file", "changed files");
   }
 
   public static formatTeammateUpstream(ahead: number, behind: number, upstream: string): string {
