@@ -2638,6 +2638,38 @@ describe("ProvidersViewComponent", () => {
       AppearanceFixture.expectPixels(box(button(".nol-teamrun-dismiss")).height, AppearanceFixture.measureLook("button-height"));
     });
 
+    it("keeps Skip for now and Continue in a footer along the bottom of a short view, under the providers it scrolls, aligned with the welcome line", async () => {
+      await create();
+      store.welcome();
+      element().style.height = "20rem";
+      await settle();
+      const body = part(element(), ".nol-teamrun-providers-body");
+      const footer = part(element(), ".nol-teamrun-welcome-actions");
+      const [skip, next] = [button(".nol-teamrun-skip"), button(".nol-teamrun-continue")];
+      const border = Number.parseFloat(style(footer).borderTopWidth);
+
+      expect(body.scrollHeight).toBeGreaterThan(body.clientHeight);
+      expect([style(footer).borderTopStyle, border > 0]).toEqual(["solid", true]);
+      for (const scrolled of [body.scrollHeight, 0]) {
+        body.scrollTop = scrolled;
+        await settle();
+
+        expect(body.scrollTop > 0).toBe(scrolled > 0);
+        AppearanceFixture.expectPixels(box(footer).bottom, box(element()).bottom);
+        AppearanceFixture.expectPixels(box(footer).top, box(body).bottom);
+        AppearanceFixture.expectPixels(box(footer).left, box(element()).left);
+        AppearanceFixture.expectPixels(box(footer).right, box(element()).right);
+        AppearanceFixture.expectPixels(box(skip).top - box(footer).top - border, space(3));
+        AppearanceFixture.expectPixels(box(footer).bottom - box(next).bottom, space(3));
+        AppearanceFixture.expectPixels(box(next).height, AppearanceFixture.measureLook("button-height"));
+        AppearanceFixture.expectPixels(box(next).left - box(skip).right, space(2));
+        expect(Math.abs(box(skip).top - box(next).top)).toBeLessThanOrEqual(0.5);
+      }
+      body.scrollTop = 0;
+      await settle();
+      AppearanceFixture.expectPixels(box(next).right, box(part(element(), ".nol-teamrun-welcome")).right);
+    });
+
     it("puts the line that the providers failed to load above the table, with Retry at its end as a text button", async () => {
       await createWithoutProviders();
       context.emit(EventName.StateInvalidated, null);
