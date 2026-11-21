@@ -83,7 +83,7 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
     fixture.autoDetectChanges();
     await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
-    await Wait.until(() => expect(texts(".orow .short")).toContain("Waiting"));
+    await Wait.until(() => expect(texts(".orow .short")).toContain("Waiting for you"));
     await settle();
   };
   const click = async (view: HTMLElement): Promise<void> => {
@@ -105,7 +105,7 @@ describe("OrganizationFocusComponent", () => {
       ["Structure"], ["Organization"], ["5"], [["Design", ["1 need you"], ["2"]], ["UI", [], ["1"]], ["Build", ["1 need you"], ["2"]]]
     ]);
     expect(all(".orow.person").map(t => [text(one(".label", t)), texts(".tag", t), texts(".short", t), one(".dot", t).getAttribute("data-status")])).toEqual([
-      ["Alice", ["leads"], ["Idle"], "Idle"], ["Bob", [], ["Waiting"], "WaitingForYou"], ["Code Reviewer", ["leads"], ["Idle"], "Idle"],
+      ["Alice", ["leads"], ["Idle"], "Idle"], ["Bob", [], ["Waiting for you"], "WaitingForYou"], ["Code Reviewer", ["leads"], ["Idle"], "Idle"],
       ["Carol", [], ["Idle"], "Idle"], ["Offline", [], ["Stopped"], "Stopped"]
     ]);
     expect([indent("Design"), indent("UI"), indent("Build"), indent("Alice"), indent("Code Reviewer")]).toEqual([0.25, 1.75, 0.25, 2.25, 3.75]);

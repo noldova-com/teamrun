@@ -34,7 +34,7 @@ LICENSE file in the root directory of this source tree.
             @if (person.id === row.node.leader?.id) {
               <span class="note tag">{{ resources.organizationFocusLeads }}</span>
             }
-            <span class="spacer"></span><span class="note short">{{ resources.organizationFocusStatusShort[status(person)] }}</span></button>
+            <span class="spacer"></span><span class="note short">{{ resources.teammateStatusLabels[status(person)] }}</span></button>
         </div>
       }
     }

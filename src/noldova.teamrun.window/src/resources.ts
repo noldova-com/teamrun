@@ -1656,13 +1656,6 @@ export class Resources {
   public static readonly organizationFocusLeads: string = "leads";
   public static readonly organizationFocusUnitLabel: string = "Focused unit";
   public static readonly organizationFocusNobody: string = "Nobody here yet.";
-  public static readonly organizationFocusStatusShort: Readonly<Record<TeammateStatus, string>> = {
-    [TeammateStatus.Working]: "Working",
-    [TeammateStatus.WaitingForYou]: "Waiting",
-    [TeammateStatus.Idle]: "Idle",
-    [TeammateStatus.UsageLimit]: "Limit",
-    [TeammateStatus.Stopped]: "Stopped"
-  };
 
   public static formatSustainUnavailable(kind: string): string {
     return `TeamRun can't read ${kind}'s usage limits yet, so neither Sustain nor a hand-off can start for this teammate.`;
