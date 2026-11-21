@@ -15,7 +15,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { CaptureOutcome, ChangeStatus, CompareOutcome, PreviewOutcome, RestoreOutcome } from "@noldova/checkpoints.protocol";
-import { ApprovalAsk, ConversationEngine, QuestionAsk, RequestDispatcher, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
+import { ApprovalAsk, ConversationEngine, QuestionAsk, RequestDispatcher, Resources, TurnDetail, TurnOutcome, UsageLimit } from "@noldova/teamrun.core";
 import {
   Approval,
   AttachmentInput,
@@ -62,6 +62,7 @@ import {
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { GitRepository } from "../../fixtures/git-repository.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
+import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
 export class ConversationEngineTests {
@@ -504,6 +505,122 @@ export class ConversationEngineTests {
 
     Assert.areEqual(`A reply from fake with the provider ending in "${provider.id.slice(-Resources.loggedIdLength)}" ended in an error: TypeError.`,
       host.log.lines.filter(t => t.startsWith("A reply from")).join("\n"));
+  }
+
+  @TestMethod
+  public async runsTheGroupsOtherRepliesWhenOneReplysFailureEscapes(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    host.adapter.steps = [(): void => {
+      if (host.adapter.requests.length === 1)
+        throw new TypeError("Ana's turn broke.");
+    }];
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+    const [failed, answered] = await Promise.all(result.replies.map(t => host.messages.findAsync(t.id)));
+
+    Assert.areEqual(2, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [failed?.teammateId, answered?.teammateId].join());
+    Assert.areEqual(MessageStatus.Failed, failed?.status);
+    Assert.areEqual(Resources.formatTurnFailed("Ana's turn broke."), failed?.details.at(-1)?.text);
+    Assert.areEqual(MessageStatus.Completed, answered?.status);
+  }
+
+  @TestMethod
+  public async keepsAReplyStoppedWhileItsTurnIsPreparedCancelledWhenThePreparationFails(): Promise<void> {
+    const stops: Promise<unknown>[] = [];
+    let conversationId = String.empty;
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversationId)).catch((error: unknown) => error));
+      return Promise.reject(new RangeError("The command settings are locked."));
+    });
+    conversationId = (await host.createConversationAsync()).id;
+
+    const result = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversationId, "One"));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+    const stopped = await Promise.all(stops);
+    const reply = await host.messages.findAsync(result.replies[0]?.id ?? String.empty);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.isTrue(stopped[0] instanceof RangeError);
+    Assert.areEqual(0, host.adapter.requests.length);
+    Assert.areEqual(MessageStatus.Cancelled, reply?.status);
+    Assert.areEqual(`${DetailKind.Error} The command settings are locked.`, reply?.details.map(t => `${t.kind} ${t.text}`).join());
+  }
+
+  @TestMethod
+  public async failsAReplyWhosePreparationThrowsAValueThatIsNotAnErrorWithThatValuesText(): Promise<void> {
+    const failure = "The command settings are locked.";
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      throw failure;
+    });
+    const conversation = await host.createConversationAsync();
+
+    const result = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "One"));
+    const ended = await host.engine.waitForIdle().then(() => null, (error: unknown) => error);
+    const reply = await host.messages.findAsync(result.replies[0]?.id ?? String.empty);
+
+    Assert.areEqual(failure, ended);
+    Assert.areEqual(MessageStatus.Failed, reply?.status);
+    Assert.areEqual(`${DetailKind.Error} ${failure}`, reply?.details.map(t => `${t.kind} ${t.text}`).join());
+  }
+
+  @TestMethod
+  public async closesAReplysToolsBeforeNotingItsUsageLimitAndWhenThatFails(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
+    const conversation = await host.createConversationAsync();
+    host.adapter.limits.set((await host.providerOfAsync()).id, new UsageLimit(null));
+    const endsWhenNoted: number[] = [];
+    host.planUsage.list = (): never => {
+      endsWhenNoted.push(tools.opened[0]?.ends ?? 0);
+      throw new RangeError("The plan usage is unreadable.");
+    };
+
+    await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "One"));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+
+    Assert.areEqual(1, tools.opened.length);
+    Assert.areEqual(1, endsWhenNoted.at(-1));
+    Assert.areEqual(1, tools.opened[0]?.ends);
+  }
+
+  @TestMethod
+  public async runsTheGroupsOtherRepliesWhenWritingOneReplysFailureAlsoFails(): Promise<void> {
+    let reads = 0;
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      reads += 1;
+      return reads === 1 ? Promise.reject(new TypeError("The command settings are locked.")) : Promise.resolve(null);
+    });
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), TypeError);
+    const [failed, answered] = await Promise.all(result.replies.map(t => host.messages.findAsync(t.id)));
+
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [failed?.teammateId, answered?.teammateId].join());
+    Assert.areEqual(MessageStatus.Failed, failed?.status);
+    Assert.areEqual(MessageStatus.Completed, answered?.status);
   }
 
   @TestMethod

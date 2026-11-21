@@ -60,27 +60,29 @@ LICENSE file in the root directory of this source tree.
     <span class="note">{{ resources.organizationBoardDepartmentsNote }}</span>
   </div>
   <div class="lanes">
-    @for (node of departments(); track node.department.id) {
+    @for (node of departments(); track node.id) {
       <div class="lane" [class.selected]="isOpen(departmentTarget(node))">
         <div class="lane-head">
-          @if (editing()) {
-            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node.department.name"
-              (change)="rename(node, $event)" />
+          @if (editing() && node.department; as department) {
+            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="department.name"
+              (change)="rename(department, $event)" />
             <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
-              [label]="resources.formatOrganizationDeleteNamed(node.department.name)" (click)="deleteDepartment(node)"></button>
+              [label]="resources.formatOrganizationDeleteNamed(department.name)" (click)="deleteDepartment(department)"></button>
           } @else {
-            <span class="title lane-name">{{ node.department.name }}</span>
+            <span class="title lane-name">{{ node.name }}</span>
             <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
             <span class="spacer"></span>
-            <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
-              [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="chosen.emit(departmentTarget(node))"></button>
+            @if (!node.isUnplaced) {
+              <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
+                [label]="resources.formatOrganizationBoardMessage(node.name)" (click)="chosen.emit(departmentTarget(node))"></button>
+            }
           }
         </div>
         @if (summaryOf(node); as summary) {
           <span class="note lane-summary">{{ summary }}</span>
         }
         @if (node.members.length > 0) {
-          <nol-choice-pills class="lane-sort" [options]="sortOptions" [value]="sortOf(node)" [label]="resources.formatOrganizationBoardSort(node.department.name)"
+          <nol-choice-pills class="lane-sort" [options]="sortOptions" [value]="sortOf(node)" [label]="resources.formatOrganizationBoardSort(node.name)"
             (valueChange)="sort(node, $event)" />
         }
         @for (member of membersOf(node); track member.id) {
@@ -89,7 +91,7 @@ LICENSE file in the root directory of this source tree.
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
         }
-        @if (editing()) {
+        @if (editing() && !node.isUnplaced) {
           <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="addable(node).length === 0" [nolMenuTriggerFor]="addMenu"><span nolButtonIcon
             class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddMember }}</button>
           <ng-template #addMenu>
