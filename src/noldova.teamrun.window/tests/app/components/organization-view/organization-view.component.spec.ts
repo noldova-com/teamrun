@@ -14,7 +14,7 @@ import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAu
   PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
@@ -124,8 +124,12 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
     await settle();
   };
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
 
-  afterEach(() => {
+  beforeEach(() => page.viewport(1600, 1200));
+
+  afterEach(async () => {
+    await page.viewport(viewport.width, viewport.height);
     OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
@@ -373,11 +377,10 @@ describe("OrganizationViewComponent", () => {
   describe("with its messages beside the tree", () => {
     const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
 
-    beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
-
     afterEach(() => AppearanceFixture.reset());
 
     it("talks to the first department until a card is chosen, by a click on the card or Enter on it, but not by its own buttons or while editing", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
       const first = [one("aside.messages").getAttribute("aria-label"), heading()];
 

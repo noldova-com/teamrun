@@ -14,7 +14,7 @@ import { Department, DepartmentMember, EventName, Message, MessageAuthor, Messag
   TeammateLastReply } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
@@ -106,9 +106,15 @@ describe("OrganizationDetailsComponent", () => {
     await settle();
   };
 
-  beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
+  const viewport = { width: window.innerWidth, height: window.innerHeight };
 
-  afterEach(() => {
+  beforeEach(async () => {
+    await page.viewport(1600, 1200);
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+  });
+
+  afterEach(async () => {
+    await page.viewport(viewport.width, viewport.height);
     AppearanceFixture.reset();
     OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
