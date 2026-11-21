@@ -3260,6 +3260,20 @@ describe("ComposerComponent", () => {
       expect([edited(), editingNote()]).toEqual([["w1:first, changed:0"], undefined]);
     });
 
+    it("saves an edit with the teammates its new text mentions, not the ones the message first named", async () => {
+      new TeammateFixture(context);
+      await running();
+      await listed(new WaitingMessage("w1", MessageDelivery.Queue,
+        new MessageSendParams("c1", "@Bob check X", SampleData.provenance.requested, "a1", [], ["bob"]), SampleData.timestamp));
+      await key("ArrowUp");
+
+      await write("@Alice check X");
+
+      await Wait.until(() => expect(edited()).toEqual(["w1:@Alice check X:0"]));
+      const params = WaitingMessageEditParams.fromJson(context.parametersOf(MethodName.WaitingMessageEdit));
+      expect(params.message.mentionedTeammateIds).toEqual(["alice"]);
+    });
+
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
