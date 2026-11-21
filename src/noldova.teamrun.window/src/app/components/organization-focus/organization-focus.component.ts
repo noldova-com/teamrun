@@ -21,7 +21,7 @@ import { OrganizationCrumb } from "../../models/organization-crumb";
 import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationEdits } from "../../models/organization-edits";
 import { OrganizationFocus } from "../../models/organization-focus";
-import type { OrganizationNode } from "../../models/organization-node";
+import type { OrganizationNode } from "../../models/organization.node";
 import { OrganizationOutlineRow } from "../../models/organization-outline-row";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";

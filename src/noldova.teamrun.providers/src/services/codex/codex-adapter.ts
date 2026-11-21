@@ -179,7 +179,7 @@ export class CodexAdapter implements IProviderAdapter {
     log: ILog | null = null,
     platform: string = process.platform,
     sweep: IOrphanSweep = new ProcessTree(platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace, undefined,
-      PowershellSession.shared),
+      PowershellSession.shared, undefined, log),
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;

@@ -96,7 +96,7 @@ describe("TeammateStatusComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it("draws a round dot half a rem across, centred on the word and a small space before it, and cuts a long word short", async () => {
+    it("draws a round dot half a rem across, centred on the word and three eighths of a rem before it, and cuts a long word short", async () => {
       await render("alice");
       context.emit(EventName.MessageCreated, reply("r1", MessageStatus.AwaitingApproval).toJson());
       element().style.width = "4rem";
@@ -110,7 +110,7 @@ describe("TeammateStatusComponent", () => {
       AppearanceFixture.expectPixels(box.width, 0.5 * rem);
       AppearanceFixture.expectPixels(box.height, 0.5 * rem);
       AppearanceFixture.expectPixels(box.left, element().getBoundingClientRect().left);
-      AppearanceFixture.expectPixels(word.left - box.right, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(word.left - box.right, AppearanceFixture.measureLook("space-1") + AppearanceFixture.measureLook("space-half"));
       AppearanceFixture.expectPixels(box.top + box.height / 2, word.top + word.height / 2);
       AppearanceFixture.expectPixels(word.right, element().getBoundingClientRect().right);
       expect([label(), getComputedStyle(dot()).borderRadius, getComputedStyle(text).textOverflow, text.scrollWidth > text.clientWidth])

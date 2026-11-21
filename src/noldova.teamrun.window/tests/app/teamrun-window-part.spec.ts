@@ -92,23 +92,23 @@ describe("TeamRun's window part", () => {
     expect(context.lines).toEqual([]);
   });
 
-  it("registers the Projects view in the left dock, Changes, Plans, Sub-agents and Background tasks in the right and Activity at the bottom, each shown at first, Plans and Sub-agents unpadded so their lists scroll to the pane's edges, and no view for Teammates, Providers or MCP servers", async () => {
+  it("places Explorer on the left; Background tasks, Pages, Plans and Sub-agents on the right, in an upper and a lower group; and Activity and Changes at the bottom. Each view is shown at first and unpadded, so its list scrolls to the pane's edges, and there is no view for Teammates, Providers or MCP servers", async () => {
     const context = new RecordingWindowPartContext();
 
     await createPart().activateAsync(context);
 
-    expect(context.views.map(t => [t.name, t.title, t.icon, t.defaultSide, t.isShownByDefault])).toEqual([
-      ["teamrun.projects", "Explorer", "folder_open", DockSide.Left, true],
-      ["teamrun.changes", "Changes", "difference", DockSide.Right, true],
-      ["teamrun.plan", "Plans", "checklist", DockSide.Right, true],
-      ["teamrun.subAgents", "Sub-agents", "device_hub", DockSide.Right, true],
-      ["teamrun.backgroundTasks", "Background tasks", "pending_actions", DockSide.Right, true],
-      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, true],
-      ["teamrun.activity", "Activity", "list_alt", DockSide.Bottom, true]
+    expect(context.views.map(t => [t.name, t.title, t.icon, t.defaultSide, t.defaultGroup, t.defaultOrder, t.isShownByDefault])).toEqual([
+      ["teamrun.projects", "Explorer", "folder_open", DockSide.Left, 0, 10, true],
+      ["teamrun.backgroundTasks", "Background tasks", "pending_actions", DockSide.Right, 0, 10, true],
+      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, 0, 30, true],
+      ["teamrun.plan", "Plans", "checklist", DockSide.Right, 1, 10, true],
+      ["teamrun.subAgents", "Sub-agents", "device_hub", DockSide.Right, 1, 20, true],
+      ["teamrun.activity", "Activity", "list_alt", DockSide.Bottom, 0, 10, true],
+      ["teamrun.changes", "Changes", "difference", DockSide.Bottom, 0, 20, true]
     ]);
     expect(context.views.map(t => t.padding)).toEqual(Array.from({ length: 7 }, () => ContentPadding.None));
-    expect(await Promise.all(context.views.map(t => t.loadComponent()))).toEqual([ProjectsViewComponent, ChangesViewComponent, PlanViewComponent, SubAgentsViewComponent,
-      BackgroundTasksViewComponent, PagesViewComponent, ActivityViewComponent]);
+    expect(await Promise.all(context.views.map(t => t.loadComponent()))).toEqual([ProjectsViewComponent, BackgroundTasksViewComponent, PagesViewComponent, PlanViewComponent,
+      SubAgentsViewComponent, ActivityViewComponent, ChangesViewComponent]);
   });
 
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {

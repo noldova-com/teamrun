@@ -19,6 +19,7 @@ import type {
 
 export interface IProviderKindsService {
   list(): readonly ProviderKind[];
+  listAsync(): Promise<readonly ProviderKind[]>;
   listModelsAsync(params: ProviderListModelsParams): Promise<readonly string[]>;
   modelCatalogAsync(params: ProviderListModelsParams): Promise<ProviderModelList>;
   listInstallations(): Promise<readonly ProviderKindInstallation[]>;

@@ -6,9 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, OrganizationRecipientState, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
+import { TeammateStatus } from "../src/app/enums/teammate-status";
 import { Resources } from "../src/resources";
 
 describe("Resources", () => {
@@ -55,6 +56,16 @@ describe("Resources", () => {
       .toEqual(["Sign-in didn't finish: the terminal closed before cursor-agent login ended.", Resources.signInUnfinished]);
   });
 
+  it("says whom an organization message reached in each state, one name alone and the last after and", () => {
+    expect([OrganizationRecipientState.Started, OrganizationRecipientState.Queued, OrganizationRecipientState.Stopped, OrganizationRecipientState.Removed,
+      OrganizationRecipientState.Failed].map(t => Resources.formatOrganizationRecipients(t, ["Ada", "Bob", "Cid"]))).toEqual(["Sent to Ada, Bob and Cid",
+      "Waiting to start for Ada, Bob and Cid", "Stopped before it reached Ada, Bob and Cid", "Ada, Bob and Cid were removed before it arrived",
+      "Couldn't reach Ada, Bob and Cid"]);
+    expect(Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Ada"])).toBe("Ada was removed before it arrived");
+    expect([Resources.formatOrganizationLeadersNote(4), Resources.formatOrganizationChat("Ada"), Resources.formatOrganizationOnlyNote("Ada")])
+      .toEqual(["Every department's leader (4)", "Chat with Ada", "Only Ada"]);
+  });
+
   it("qualifies a TeamRun method or event name with the module's id", () => {
     expect(Resources.formatQualifiedName("MessagePage")).toBe("teamrun.messagePage");
     expect(Resources.formatQualifiedName("StateResyncRequested")).toBe("teamrun.stateResyncRequested");
@@ -75,11 +86,11 @@ describe("Resources", () => {
     expect(Resources.formatTeammateError("Alice", "Reply in progress")).toBe("@Alice: Reply in progress");
   });
 
-  it("never calls a provider an account in a text it holds or writes", () => {
+  it("never calls a provider an account in a text it holds or writes, leaving the organization chart's icon name alone", () => {
     const all = Object.getOwnPropertyNames(Resources).flatMap(t => texts((Resources as unknown as Record<string, unknown>)[t]));
 
     expect(all.length).toBeGreaterThan(400);
-    expect(all.filter(t => /account/i.test(t))).toEqual([]);
+    expect(all.filter(t => /account/i.test(t) && t !== Resources.organizationEditIcon)).toEqual([]);
   });
 
   it("names a provider choice once when its label repeats the kind's name", () => {
@@ -97,6 +108,23 @@ describe("Resources", () => {
       "Delete Web? Its departments and members move to Build.",
       "Remove Alice from Design? Alice stays on the team, in no department."
     ]);
+  });
+
+  it("counts the organization's teammates and departments, one in the singular", () => {
+    const counts: readonly (readonly [number, number])[] = [[0, 0], [1, 1], [2, 3]];
+    expect(counts.map(([teammates, departments]) => Resources.formatOrganizationHeadcount(teammates, departments)))
+      .toEqual(["0 teammates in 0 departments", "1 teammate in 1 department", "2 teammates in 3 departments"]);
+  });
+
+  it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
+    expect([Resources.formatOrganizationDepartmentSummary([TeammateStatus.Idle, TeammateStatus.Working, TeammateStatus.Idle, TeammateStatus.UsageLimit]),
+      Resources.formatOrganizationDepartmentSummary([])]).toEqual(["1 working · 2 idle · 1 usage limit", ""]);
+  });
+
+  it("says how long a card's work has run in seconds, minutes, or hours and minutes, with how many more run, and what share of usage is used", () => {
+    expect([Resources.formatOrganizationNowFor(-1, 0), Resources.formatOrganizationNowFor(59_999, 0), Resources.formatOrganizationNowFor(312_000, 2),
+      Resources.formatOrganizationNowFor(3_600_000, 0), Resources.formatOrganizationNowFor(5_520_000, 1), Resources.formatOrganizationUsage(0.544)])
+      .toEqual(["0 s", "59 s", "5 min +2", "1 h 0 min", "1 h 32 min +1", "54%"]);
   });
 
   it("writes the composer's accessible names and unavailable choices", () => {

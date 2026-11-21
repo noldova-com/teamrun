@@ -10,7 +10,7 @@ import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { ConfirmRequest } from "./confirm-request";
-import type { OrganizationNode } from "./organization-node";
+import type { OrganizationNode } from "./organization.node";
 
 export class OrganizationEdits {
   public static addable(node: OrganizationNode, teammates: readonly Teammate[]): readonly Teammate[] {

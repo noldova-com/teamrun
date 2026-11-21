@@ -25,6 +25,7 @@ import {
 } from "@noldova/teamrun.protocol";
 
 import type { IEventSink } from "../../interfaces/i-event-sink.js";
+import type { ILog } from "../../interfaces/i-log.js";
 import type { IPlanUsageService } from "../../interfaces/i-plan-usage.service.js";
 import type { IProvidersService } from "../../interfaces/i-providers.service.js";
 import type { IProviderKindInstallation } from "../../interfaces/i-provider-kind-installation.js";
@@ -42,22 +43,30 @@ export class ProviderKindsService implements IProviderKindsService {
   private readonly events: IEventSink;
   private readonly planUsage: IPlanUsageService;
   private readonly teammates: ITeammatesService | null;
+  private readonly log: ILog | null;
   private readonly installs: Map<string, ProviderKindInstallRun> = new Map();
   private readonly failures: Map<string, string> = new Map();
   private readonly versions: Map<string, ProviderKindVersions> = new Map();
   private readonly reads: Map<string, object> = new Map();
 
   public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink,
-    planUsage: IPlanUsageService = new PlanUsageService(events), teammates: ITeammatesService | null = null) {
+    planUsage: IPlanUsageService = new PlanUsageService(events), teammates: ITeammatesService | null = null, log: ILog | null = null) {
     this.registry = registry;
     this.providers = providers;
     this.events = events;
     this.planUsage = planUsage;
     this.teammates = teammates;
+    this.log = log;
   }
 
   public list(): readonly ProviderKind[] {
     return this.registry.all().map(t => t.descriptor.withNamesChats(!Object.isUndefined(t.askIsolated)));
+  }
+
+  public async listAsync(): Promise<readonly ProviderKind[]> {
+    await Promise.all(this.registry.all().map(t => t.refreshDescriptorAsync?.().catch((error: unknown) =>
+      this.log?.write(Resources.formatDescriptorNotRefreshed(t.descriptor.id, error instanceof Error ? error.name : typeof error)))));
+    return this.list();
   }
 
   public async listModelsAsync(params: ProviderListModelsParams): Promise<readonly string[]> {

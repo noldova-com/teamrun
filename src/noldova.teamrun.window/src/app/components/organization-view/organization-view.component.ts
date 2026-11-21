@@ -14,18 +14,19 @@ import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, Canva
 import { Resources } from "../../../resources";
 import { OrganizationViewMode } from "../../enums/organization-view-mode";
 import { OrganizationLayout } from "../../models/organization-layout";
-import { OrganizationNode } from "../../models/organization-node";
+import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
 import { OrganizationFocusComponent } from "../organization-focus/organization-focus.component";
+import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent,
-    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent],
+    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
@@ -42,13 +43,18 @@ export class OrganizationViewComponent {
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
-  protected readonly modes: typeof OrganizationViewMode = OrganizationViewMode;
   protected readonly editing: WritableSignal<boolean> = signal(false);
+  protected readonly modes: typeof OrganizationViewMode = OrganizationViewMode;
   protected readonly mode: Signal<OrganizationViewMode> = computed(() => this.layout.layout().view);
-  protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
-  protected readonly headcount: Signal<string> = computed(() => Resources.formatOrganizationHeadcount(this.store.teammates().length));
-  protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
   protected readonly viewOptions: readonly SelectOption[] = Object.values(OrganizationViewMode).map(t => new SelectOption(t, Resources.organizationViewLabels[t]));
+  protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
+  protected readonly headcount: Signal<string> = computed(() =>
+    Resources.formatOrganizationHeadcount(this.store.teammates().length, OrganizationNode.departmentsOf(this.organization.organization()).length));
+  protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
+
+  protected showView(value: string): void {
+    this.layout.showView(OrganizationLayout.viewOf(value));
+  }
 
   protected toggleEditing(): void {
     this.editing.update(t => !t);
@@ -56,9 +62,5 @@ export class OrganizationViewComponent {
 
   protected addDepartment(): void {
     void this.organization.createDepartment(Resources.organizationNewDepartment, null);
-  }
-
-  protected showView(value: string): void {
-    this.layout.showView(OrganizationLayout.viewOf(value));
   }
 }

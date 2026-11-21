@@ -9,7 +9,7 @@
 import "@noldova/context.core";
 import { OrganizationTarget, OrganizationTargetKind, type Teammate } from "@noldova/teamrun.protocol";
 
-import type { OrganizationNode } from "./organization-node";
+import type { OrganizationNode } from "./organization.node";
 
 export class OrganizationFocus {
   private static readonly separator: string = ":";

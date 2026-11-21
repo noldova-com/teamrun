@@ -1255,16 +1255,19 @@ export class ChatStoreService {
     await Promise.all(this.responderWrites.values());
   }
 
-  public async setResponder(conversationId: string, responder: ConversationResponder, chosen: boolean = false): Promise<void> {
+  public async setResponder(conversationId: string, responder: ConversationResponder, chosen: boolean = false, start: boolean = false): Promise<void> {
     const previous = this.findConversation(conversationId);
     if (Object.isNull(previous))
       return;
     this.storeConversation(previous.withResponder(responder));
     const write = (this.responderWrites.get(conversationId) ?? Promise.resolve(previous.responder)).then(async held => {
+      let stored: ConversationResponder | null = responder;
       const kept = await this.attempt(async () => {
-        await this.request(MethodName.ConversationResponderSet, new ConversationResponderParams(conversationId, responder, chosen).toJson());
+        const chat = await this.request(MethodName.ConversationResponderSet, new ConversationResponderParams(conversationId, responder, chosen, start).toJson());
+        if (!chosen)
+          stored = Conversation.fromJson(chat).responder;
       }, this.actionFailed(ChatAction.SetResponder, conversationId, conversationId));
-      return kept ? responder : held;
+      return kept ? stored : held;
     });
     this.responderWrites.set(conversationId, write);
     const held = await write;
@@ -1734,6 +1737,11 @@ export class ChatStoreService {
   public async signInProvider(providerId: string, report: (message: string) => void = this.providerFailed(ChatAction.SignIn, providerId),
     opensTab: boolean = true): Promise<void> {
     const provider = this.providersSignal().find(t => t.id === providerId);
+    const refreshing = Object.isUndefined(provider) ? null : this.refreshProfileOf(provider);
+    if (!Object.isNull(refreshing) && !await refreshing.then(() => true, () => false)) {
+      report(Resources.signInKindsNotRead);
+      return;
+    }
     const launch = Object.isUndefined(provider) ? null : this.terminalLaunchOf(provider, opensTab);
     if (!Object.isNull(launch)) {
       await this.followSignInTerminal(providerId, () => this.signInLaunchOf(providerId, launch), report);
@@ -1752,6 +1760,10 @@ export class ChatStoreService {
     }
     if (!Object.isNull(agentLaunch))
       await this.followSignInTerminal(providerId, agentLaunch, report);
+  }
+
+  public refreshProfileOf(provider: Provider): Promise<void> | null {
+    return (this.kindsSignal().find(t => t.id === provider.kind)?.profile?.personFolders.length ?? 0) > 0 ? this.loadKinds(true) : null;
   }
 
   public async openSignInLink(providerId: string, gesture: LinkGesture = LinkGesture.Plain,
@@ -3080,7 +3092,7 @@ export class ChatStoreService {
   private static profileEnvironment(profile: ProviderProfile, folder: string): Record<string, string> {
     const separator = folder.includes(Resources.backslash) ? Resources.backslash : Resources.slash;
     const root = folder.endsWith(separator) ? folder.slice(0, -separator.length) : folder;
-    return { ...profile.personFolders.includes(folder) ? {} : { [profile.variable]: folder }, ...Object.fromEntries(Object.entries(profile.signInVariables)
+    return { ...profile.personFolders.some(t => ProfileFolderPath.isSame(t, folder)) ? {} : { [profile.variable]: folder }, ...Object.fromEntries(Object.entries(profile.signInVariables)
       .map(([name, path]) => [name, [root, ...path.split(Resources.slash)].join(separator)])), ...profile.signInValues };
   }
 

@@ -16,7 +16,7 @@
   padding: var(--nol-space-3);
   border: 1px solid var(--nol-card-border);
   border-radius: var(--nol-radius-medium);
-  background: var(--nol-raised);
+  background: light-dark(var(--nol-panel), var(--nol-raised));
 }
 
 .head {
@@ -43,6 +43,11 @@
 .name {
   color: var(--nol-text-strong);
   font-weight: var(--nol-weight-emphasis);
+}
+
+.name-field {
+  width: 100%;
+  min-width: 0;
 }
 
 .role {
@@ -78,20 +83,19 @@
 .status {
   align-self: flex-start;
   max-width: 100%;
-  font-size: var(--nol-text-small);
 }
 
 .now {
   display: flex;
   align-items: flex-start;
-  gap: var(--nol-space-1);
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
   min-width: 0;
-  font-size: var(--nol-text-small);
 }
 
 .now-icon {
   flex: none;
   width: var(--nol-icon);
+  margin-top: 0.0625rem;
   overflow: hidden;
   color: var(--nol-text-muted);
   font-size: var(--nol-icon);
@@ -107,7 +111,30 @@
   flex: none;
   color: var(--nol-text-muted);
   font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
   white-space: nowrap;
+}
+
+.usage {
+  --nol-meter-height: var(--nol-space-1);
+  --nol-meter-gap: var(--nol-space-2);
+  --nol-meter: calc(100% - var(--nol-meter-gap) - 2rem);
+}
+
+.usage:not(.nol-meter-warning) {
+  --nol-meter-color: var(--nol-text-muted);
+}
+
+.last {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .model {

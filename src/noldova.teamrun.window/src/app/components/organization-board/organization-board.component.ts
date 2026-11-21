@@ -20,7 +20,7 @@ import { TeammateStatus } from "../../enums/teammate-status";
 import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import { OrganizationEdits } from "../../models/organization-edits";
-import type { OrganizationNode } from "../../models/organization-node";
+import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";

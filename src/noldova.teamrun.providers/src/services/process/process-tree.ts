@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 
 import "@noldova/context.core";
-import type { ITimer } from "@noldova/teamrun.core";
+import type { ILog, ITimer } from "@noldova/teamrun.core";
 
 import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IPowershellSession } from "../../interfaces/i-powershell-session.js";
@@ -17,6 +17,7 @@ import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import { ProcessCommand } from "../../models/process-command.js";
 import { Resources } from "../../resources.js";
 import type { CommandRunner } from "./command-runner.js";
+import { StopSession } from "./stop-session.js";
 
 export class ProcessTree implements IProcessTree, IOrphanSweep {
   private readonly platform: string;
@@ -28,10 +29,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   private readonly kill: (processId: number, signal: NodeJS.Signals | 0) => void;
   private readonly session: IPowershellSession | null;
   private readonly read: (path: string) => string;
+  private readonly log: ILog | null;
 
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
     kill: (processId: number, signal: NodeJS.Signals | 0) => void = (processId, signal) => { process.kill(processId, signal); },
-    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding)) {
+    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding), log: ILog | null = null) {
     this.platform = platform;
     this.runner = runner;
     this.environment = environment;
@@ -41,16 +43,18 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     this.kill = kill;
     this.session = session;
     this.read = read;
+    this.log = log;
   }
 
   public async endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
     const windows = this.platform === Resources.windowsPlatform;
-    const listing = await this.run().catch(() => null);
+    const stop = new StopSession(this.session);
+    const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
     const start = listing?.get(processId)?.start;
     if (Object.isNullOrUndefined(listing) || Object.isUndefined(start) || !(start <= startedBy) || !ProcessTree.descends(listing, processId, ancestorId))
       return false;
     if (windows) {
-      await this.endOnWindows(listing, new Map([[processId, start]]));
+      await this.endOnWindows(listing, new Map([[processId, start]]), stop);
       return true;
     }
     await this.end(await this.freeze(listing, new Map([[processId, start]])));
@@ -58,12 +62,13 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   }
 
   public async endOwnTree(processId: number, startedBy: number): Promise<boolean> {
-    const listing = await this.run().catch(() => null);
+    const stop = new StopSession(this.session);
+    const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
     const start = listing?.get(processId)?.start;
     if (Object.isNullOrUndefined(listing) || Object.isUndefined(start) || !(start <= startedBy))
       return false;
     if (this.platform === Resources.windowsPlatform) {
-      await this.endOnWindows(listing, new Map([[processId, start]]));
+      await this.endOnWindows(listing, new Map([[processId, start]]), stop);
       return true;
     }
     await this.end(await this.freeze(listing, new Map([[processId, start]])));
@@ -81,11 +86,12 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
 
   public async endLeftovers(processId: number, launched: number, exited: number): Promise<void> {
     if (this.platform === Resources.windowsPlatform) {
-      const listing = await this.run().catch(() => null);
+      const stop = new StopSession(this.session);
+      const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
       const left = new Map([...listing ?? []].filter(([, t]) => t.parent === processId && t.start >= launched && t.start <= exited)
         .map(([id, t]) => [id, t.start]));
       if (!Object.isNull(listing) && left.size > 0)
-        await this.endOnWindows(listing, left);
+        await this.endOnWindows(listing, left, stop);
       return;
     }
     const groups = await this.run(null, Resources.psProcessGroupArguments).catch(() => null);
@@ -181,28 +187,43 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     return frozen;
   }
 
-  private async endOnWindows(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>): Promise<void> {
-    const ended = new Map<number, number>();
+  private async endOnWindows(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>,
+    stop: StopSession): Promise<void> {
     let tree = new Map(known);
-    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> | null = listing;
-    for (let round = 0; !Object.isNull(current) && round < Resources.processTreeFreezeRounds; round++) {
+    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> = listing;
+    for (let round = 1; round <= Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found: [number, number][] = ProcessTree.listed(current, tree).filter(([id, started]) => ended.get(id) !== started);
+      const found: [number, number][] = ProcessTree.listed(current, tree);
       if (found.length === 0)
         return;
-      for (const [id, started] of found)
-        ended.set(id, started);
-      current = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1]))).catch(() => null);
+      const listed = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1])), Resources.psProcessListArguments, stop)
+        .catch((error: unknown) => error instanceof Error ? error.name : typeof error);
+      if (typeof listed === "string") {
+        this.log?.write(Resources.formatTreeEndRoundFailed(round, listed));
+        return;
+      }
+      current = listed;
     }
+    const left = ProcessTree.listed(current, ProcessTree.treeOf(current, tree));
+    if (left.length > 0)
+      this.log?.write(Resources.formatTreeLeftListed(left));
   }
 
-  private async run(endScript: string | null = null, listArguments: readonly string[] = Resources.psProcessListArguments)
-    : Promise<ReadonlyMap<number, { readonly parent: number; readonly start: number }>> {
+  private async run(endScript: string | null = null, listArguments: readonly string[] = Resources.psProcessListArguments,
+    stop: StopSession = new StopSession(null)): Promise<ReadonlyMap<number, { readonly parent: number; readonly start: number }>> {
     const windows = this.platform === Resources.windowsPlatform;
     const script = endScript ?? Resources.powershellProcessListScript;
-    const stdout = windows && !Object.isNull(this.session) ? await this.session.run(script, this.timeout)
-      : (await this.runner.run(windows ? new ProcessCommand(Resources.powershellExecutable, [...Resources.powershellCommandArguments, script])
-        : new ProcessCommand(Resources.psExecutable, listArguments), { ...this.environment, ...Resources.processListEnvironment }, this.timeout)).stdout;
+    const fresh = async (timeout: number): Promise<string> => {
+      const command = windows ? new ProcessCommand(Resources.powershellExecutable, [...Resources.powershellCommandArguments, script])
+        : new ProcessCommand(Resources.psExecutable, listArguments);
+      return (await this.runner.run(command, { ...this.environment, ...Resources.processListEnvironment }, timeout)).stdout;
+    };
+    const session = stop.session;
+    const limit = Math.min(Resources.powershellSessionAnswerLimit, Math.floor(this.timeout / 2));
+    const stdout = windows && !Object.isNull(session) ? await session.run(script, limit).catch(async () => {
+      stop.leave();
+      return fresh(this.timeout - limit);
+    }) : await fresh(this.timeout);
     return new Map([...stdout.matchAll(Resources.processParentPattern)]
       .map(t => [Number(t[1]), { parent: Number(t[2]), start: windows ? Number(t[3]) : Date.parse(t[3]!) }]));
   }

@@ -28,6 +28,7 @@ import { PagesViewComponent } from "./components/pages/pages-view/pages-view.com
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
 import { OrganizationLayoutService } from "./services/organization-layout.service";
+import { OrganizationMessagesStoreService } from "./services/organization-messages-store.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
 import { BrowserAvailability } from "./services/browser-availability";
 import { ChatPageAction } from "./services/chat-page-action";
@@ -81,19 +82,19 @@ export class TeamRunWindowPart implements IWindowPart {
       (starter, kept) => new InlineTerminals(starter, EmbeddedTerminal.open, kept));
     this.chatTerminals = terminals;
     context.registerView(new ViewContribution(Resources.projectsViewName, Resources.explorerTitle, Resources.projectsViewIcon, DockSide.Left, true,
-      () => import("./components/projects-view/projects-view.component").then(t => t.ProjectsViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Right, true,
-      () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.planViewName, Resources.plansTitle, Resources.planViewIcon, DockSide.Right, true,
-      () => import("./components/plan-view/plan-view.component").then(t => t.PlanViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.subAgentsViewName, Resources.subAgentsTitle, Resources.subAgentsViewIcon, DockSide.Right, true,
-      () => import("./components/sub-agents-view/sub-agents-view.component").then(t => t.SubAgentsViewComponent), ContentPadding.None));
+      () => import("./components/projects-view/projects-view.component").then(t => t.ProjectsViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.backgroundTasksViewName, Resources.backgroundTasksTitle, Resources.backgroundTasksViewIcon, DockSide.Right, true,
-      () => import("./components/background-tasks-view/background-tasks-view.component").then(t => t.BackgroundTasksViewComponent), ContentPadding.None));
+      () => import("./components/background-tasks-view/background-tasks-view.component").then(t => t.BackgroundTasksViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.pagesViewName, Resources.pagesTitle, Resources.pagesViewIcon, DockSide.Right, true,
-      () => Promise.resolve(PagesViewComponent), ContentPadding.None));
+      () => Promise.resolve(PagesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 30 }));
+    context.registerView(new ViewContribution(Resources.planViewName, Resources.plansTitle, Resources.planViewIcon, DockSide.Right, true,
+      () => import("./components/plan-view/plan-view.component").then(t => t.PlanViewComponent), ContentPadding.None, { defaultGroup: 1, defaultOrder: 10 }));
+    context.registerView(new ViewContribution(Resources.subAgentsViewName, Resources.subAgentsTitle, Resources.subAgentsViewIcon, DockSide.Right, true,
+      () => import("./components/sub-agents-view/sub-agents-view.component").then(t => t.SubAgentsViewComponent), ContentPadding.None, { defaultGroup: 1, defaultOrder: 20 }));
     context.registerView(new ViewContribution(Resources.activityViewName, Resources.activityTitle, Resources.activityViewIcon, DockSide.Bottom, true,
-      () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None));
+      () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
+    context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Bottom, true,
+      () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon,
       Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
@@ -166,6 +167,7 @@ export class TeamRunWindowPart implements IWindowPart {
       ChatPageAction.release(this.activeContext);
       PageDocuments.release(this.activeContext);
       BackgroundTaskStoreService.release(this.activeContext);
+      OrganizationMessagesStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
       OrganizationLayoutService.release(this.activeContext);
       TeammateStatusStoreService.release(this.activeContext);

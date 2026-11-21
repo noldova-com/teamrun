@@ -9,9 +9,17 @@
 :host {
   display: inline-flex;
   align-items: center;
-  gap: var(--nol-space-2);
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
   min-width: 0;
-  color: var(--nol-text-muted);
+  color: var(--nol-text);
+}
+
+:host(.waiting) {
+  color: var(--nol-warning);
+}
+
+:host(.stopped) {
+  color: var(--nol-status-failed);
 }
 
 .dot {

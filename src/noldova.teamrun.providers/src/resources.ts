@@ -1174,44 +1174,17 @@ export class Resources {
   public static readonly continueSignal: NodeJS.Signals = "SIGCONT";
   public static readonly killSignal: NodeJS.Signals = "SIGKILL";
   public static readonly processTreeFreezeRounds: number = 10;
+  public static readonly processExitWait: number = 2_000;
   public static readonly processListTimeout: number = 30_000;
+  public static readonly powershellSessionAnswerLimit: number = 5_000;
   public static readonly psExecutable: string = "ps";
   public static readonly psProcessListArguments: readonly string[] = ["-A", "-o", "pid=,ppid=,lstart="];
   public static readonly psProcessGroupArguments: readonly string[] = ["-A", "-o", "pid=,pgid=,lstart="];
   public static readonly psStartTolerance: number = 2000;
   public static readonly powershellExecutable: string = "powershell.exe";
   public static readonly powershellCommandArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-Command"];
-  public static readonly powershellCimProcessListScript: string = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, " +
+  public static readonly powershellProcessListScript: string = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, " +
     "$_.ParentProcessId, $(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 'unknown' }) }";
-  public static readonly powershellProcessListType: string = "TeamRunProcessList";
-  public static readonly powershellProcessListSource: string = "using System; using System.Collections.Generic; using System.Runtime.InteropServices; using System.Text; " +
-    `public static class ${Resources.powershellProcessListType} { ` +
-    "[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct Entry { public uint Size; public uint Usage; public uint ProcessId; " +
-    "public IntPtr HeapId; public uint ModuleId; public uint Threads; public uint ParentId; public int Priority; public uint Flags; " +
-    "[MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string Name; } " +
-    `[DllImport("kernel32.dll")] private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId); ` +
-    `[DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern bool Process32FirstW(IntPtr snapshot, ref Entry entry); ` +
-    `[DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern bool Process32NextW(IntPtr snapshot, ref Entry entry); ` +
-    `[DllImport("kernel32.dll")] private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId); ` +
-    `[DllImport("kernel32.dll")] private static extern bool GetProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user); ` +
-    `[DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle); ` +
-    "private static List<Entry> Snapshot() { IntPtr snapshot = CreateToolhelp32Snapshot(2, 0); if (snapshot == new IntPtr(-1)) throw new InvalidOperationException(); " +
-    "List<Entry> entries = new List<Entry>(); Entry entry = new Entry(); entry.Size = (uint)Marshal.SizeOf(typeof(Entry)); bool more = Process32FirstW(snapshot, ref entry); " +
-    "if (!more) { CloseHandle(snapshot); throw new InvalidOperationException(); } " +
-    "while (more) { entries.Add(entry); more = Process32NextW(snapshot, ref entry); } CloseHandle(snapshot); return entries; } " +
-    "public static string List() { List<Entry> listed = Snapshot(); string[] starts = new string[listed.Count]; for (int i = 0; i < listed.Count; i++) { " +
-    `starts[i] = "unknown"; IntPtr process = OpenProcess(0x1000, false, listed[i].ProcessId); long created, exited, kernel, user; ` +
-    "if (process != IntPtr.Zero) { if (GetProcessTimes(process, out created, out exited, out kernel, out user)) " +
-    "starts[i] = ((created - 116444736000000000L) / 10000).ToString(); CloseHandle(process); } } " +
-    "Dictionary<uint, uint> parents = new Dictionary<uint, uint>(); foreach (Entry again in Snapshot()) parents[again.ProcessId] = again.ParentId; " +
-    "StringBuilder text = new StringBuilder(); for (int i = 0; i < listed.Count; i++) { uint parent; " +
-    "bool kept = parents.TryGetValue(listed[i].ProcessId, out parent) && parent == listed[i].ParentId; " +
-    `text.Append(listed[i].ProcessId).Append(" ").Append(listed[i].ParentId).Append(" ").Append(kept ? starts[i] : "unknown").Append((char)10); } ` +
-    "return text.ToString(); } }";
-  public static readonly powershellProcessListScript: string = `if (-not ('${Resources.powershellProcessListType}' -as [type])) { ` +
-    `try { Add-Type -TypeDefinition '${Resources.powershellProcessListSource}' -ErrorAction Stop } catch { } }; $listed = $null; ` +
-    `if ('${Resources.powershellProcessListType}' -as [type]) { try { $listed = [${Resources.powershellProcessListType}]::List() } catch { } }; ` +
-    `if (-not $listed) { ${Resources.powershellCimProcessListScript} } else { $listed }`;
   public static readonly powershellProcessListArguments: readonly string[] = [...Resources.powershellCommandArguments, Resources.powershellProcessListScript];
   public static readonly powershellSessionArguments: readonly string[] = [...Resources.powershellCommandArguments, "-"];
   public static readonly powershellSessionIdle: number = 30_000;
@@ -3534,6 +3507,15 @@ export class Resources {
     return `TeamRun runs ${providerName}'s commands only inside the chat's folder, not in ${directory}.`;
   }
 
+  public static formatTreeEndRoundFailed(round: number, failure: string): string {
+    return `Ending a process tree on Windows stopped at round ${String(round)}, whose script failed (${failure}); the tree may still run.`;
+  }
+
+  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string {
+    return `Ending a process tree on Windows ran its ${String(Resources.processTreeFreezeRounds)} rounds and still listed ` +
+      `${processes.map(([id, start]) => `${String(id)} (started ${new Date(start).toISOString()})`).join(", ")}.`;
+  }
+
   public static formatTaskProcessGone(providerName: string): string {
     return `TeamRun couldn't confirm that this task's process still runs under ${providerName}, so it stopped nothing.`;
   }
@@ -3548,8 +3530,10 @@ export class Resources {
 
   public static formatProcessEndScript(processIds: readonly number[], starts: readonly number[]): string {
     return `$ids = @(${processIds.join(", ")}); $starts = @(${starts.join(", ")}); ` +
+      `$deadline = [DateTime]::UtcNow.AddMilliseconds(${Resources.processExitWait}); ` +
       "for ($i = 0; $i -lt $ids.Count; $i++) { try { $p = [System.Diagnostics.Process]::GetProcessById($ids[$i]); $null = $p.Handle; " +
-      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill() } } catch { } }; " +
+      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill(); " +
+      "$null = $p.WaitForExit([int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)) } } catch { } }; " +
       Resources.powershellProcessListScript;
   }
 

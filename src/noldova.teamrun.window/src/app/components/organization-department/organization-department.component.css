@@ -16,13 +16,13 @@
 .department {
   display: flex;
   flex-direction: column;
-  gap: var(--nol-space-1);
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
   box-sizing: border-box;
   width: 15rem;
   padding: var(--nol-space-3);
   border: 1px solid var(--nol-card-border);
   border-radius: var(--nol-radius-medium);
-  background: var(--nol-raised);
+  background: light-dark(var(--nol-panel), var(--nol-raised));
 }
 
 .department-row {
@@ -41,6 +41,21 @@
   font-weight: var(--nol-weight-emphasis);
   line-height: var(--nol-line-title);
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: 1.25rem;
+  padding: 0 calc(var(--nol-space-1) + var(--nol-space-half));
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-badge);
+  color: var(--nol-badge-text);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-emphasis);
   white-space: nowrap;
 }
 

@@ -7,15 +7,24 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <header class="top">
-  <h1 class="title">{{ resources.organizationTitle }}</h1>
-  <span class="headcount">{{ headcount() }}</span>
+  <div class="heading">
+    <h1 class="title">{{ resources.organizationTitle }}</h1>
+    <span class="headcount">{{ headcount() }}</span>
+  </div>
   <span class="spacer"></span>
-  <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
-  <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
-    aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
-  <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" (click)="toggleEditing()"><span nolButtonIcon
-    class="material-symbols-rounded" aria-hidden="true">{{ editing() ? resources.organizationDoneIcon : resources.organizationEditIcon }}</span>{{ editing()
-    ? resources.organizationDoneEditing : resources.organizationEditStructure }}</button>
+  <div class="tools">
+    <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
+    <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
+      @for (status of resources.organizationStatusKey; track status) {
+        <nol-teamrun-teammate-status [status]="status" />
+      }
+    </div>
+    <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
+    <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" [attr.aria-pressed]="editing()" (click)="toggleEditing()"><span
+      nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationEditIcon }}</span>{{ editing() ? resources.organizationDoneEditing
+      : resources.organizationEditStructure }}</button>
+  </div>
 </header>
 <ng-template #cardsShowMenu>
   <nol-menu>

@@ -783,6 +783,39 @@ describe("ChatStoreService", () => {
     });
   });
 
+  it("keeps the responder the runtime holds when a starting choice finds the chat already answered", async () => {
+    await store.initialize();
+    const alice = new ConversationResponder("alice");
+    context.answer(MethodName.ConversationResponderSet, () => SampleData.conversation.withResponder(alice).toJson());
+    const responder = new ConversationResponder(null, new RequestedSettings("claude", "sonnet", null), "a1");
+
+    await store.setResponder("c1", responder, false, true);
+
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    expect(JSON.stringify(context.parametersOf(MethodName.ConversationResponderSet))).toBe(JSON.stringify(new ConversationResponderParams("c1", responder, false, true).toJson()));
+    expect(context.noticeText()).toBeNull();
+  });
+
+  it("takes the responder the runtime holds for every write the person didn't choose, so one queued behind a held starting write doesn't keep its own", async () => {
+    await store.initialize();
+    const start = new DeferredResponse();
+    const alice = new ConversationResponder("alice");
+    let call = 0;
+    context.answer(MethodName.ConversationResponderSet, () => call++ === 0 ? start.promise : SampleData.conversation.withResponder(alice).toJson());
+    const fallback = (model: string): ConversationResponder => new ConversationResponder(null, new RequestedSettings("claude", model, null), "a1");
+
+    const first = store.setResponder("c1", fallback("sonnet"), false, true);
+    const second = store.setResponder("c1", fallback("opus"));
+    await Wait.until(() => expect(context.count(MethodName.ConversationResponderSet)).toBe(1));
+    expect(store.conversation("c1")?.responder?.requested?.model).toBe("opus");
+    start.resolve(SampleData.conversation.withResponder(alice).toJson());
+    await Promise.all([first, second]);
+
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationResponderSet))
+      .map(t => ConversationResponderParams.fromJson(t.parameters).start)).toEqual([true, false]);
+  });
+
   it("shows a chat's new chosen responder at once, while the runtime keeps it, and leaves an unknown chat alone", async () => {
     await store.initialize();
     const kept = new DeferredResponse();
@@ -805,12 +838,12 @@ describe("ChatStoreService", () => {
     const answers = [new DeferredResponse(), new DeferredResponse(), new DeferredResponse(), new DeferredResponse()];
     const refused = [true, false, false, true];
     let call = 0;
-    context.answer(MethodName.ConversationResponderSet, () => {
+    context.answer(MethodName.ConversationResponderSet, t => {
       const index = call++;
-      return answers[index]!.promise.then(t => {
+      return answers[index]!.promise.then(() => {
         if (refused[index])
           throw new Error("Refused");
-        return t;
+        return SampleData.conversation.withResponder(ConversationResponderParams.fromJson(t).responder).toJson();
       });
     });
     const [alice, bob, carol, dave] = ["alice", "bob", "carol", "dave"].map(t => new ConversationResponder(t));
@@ -3466,6 +3499,67 @@ describe("ChatStoreService", () => {
           XDG_STATE_HOME: "D:\\profiles\\opencode\\Work\\home\\.local\\state", OPENCODE_CONFIG: "", OPENCODE_DISABLE_PROJECT_CONFIG: "1" }, "opencode auth login"],
         ["/home/person/profiles/opencode/Work", { XDG_DATA_HOME: "/home/person/profiles/opencode/Work", XDG_CONFIG_HOME: "/home/person/profiles/opencode/Work/config",
           XDG_STATE_HOME: "/home/person/profiles/opencode/Work/home/.local/state", OPENCODE_CONFIG: "", OPENCODE_DISABLE_PROJECT_CONFIG: "1" }, "opencode auth login"]]);
+    });
+
+    it("reads Claude Code's person folder again when signing in, so a folder the environment names after the listing signs in without the variable, " +
+      "trailing separator and all", async () => {
+      let usual = "/person/.claude";
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", usual, null, {}, {}, [usual])).toJson()]);
+      const folders = new Map([["c1", "/person/.claude"], ["c2", "/person/claude-work"]]);
+      context.answer(MethodName.ProviderList, () => [...folders].map(([id, folder]) => provider(id, "claude", folder).toJson()));
+      context.answer(MethodName.ProviderCheck, t => {
+        const id = (t as { readonly providerId: string }).providerId;
+        return provider(id, "claude", folders.get(id) ?? String.empty, AuthStatus.LoggedIn).toJson();
+      });
+      await store.initialize();
+      usual = "/person/claude-work/";
+
+      for (const [index, id] of ["c1", "c2"].entries()) {
+        const signIn = store.signInProvider(id);
+        await Wait.until(() => expect(terminals.launches).toHaveLength(index + 1));
+        terminals.end(index);
+        await signIn;
+      }
+
+      expect(terminals.launches.map(({ request }) => request.environment)).toEqual([{ CLAUDE_CONFIG_DIR: "/person/.claude" }, {}]);
+    });
+
+    it("reports a sign-in whose read of the provider types fails, opening no terminal", async () => {
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"])).toJson()]);
+      context.answer(MethodName.ProviderList, () => [provider("c1", "claude", "/person/.claude").toJson()]);
+      await store.initialize();
+      context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+      const reported: string[] = [];
+
+      await store.signInProvider("c1", t => reported.push(t));
+
+      expect(reported).toEqual([Resources.signInKindsNotRead]);
+      expect(terminals.launches).toHaveLength(0);
+    });
+
+    it("signs Claude Code in its usual folder in with the person's own environment, and one with its own folder with its folder named", async () => {
+      const usual = new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"]));
+      context.answer(MethodName.ProviderKindList, () => [usual.toJson()]);
+      const folders = new Map([["c1", "/person/.claude"], ["c2", "/person/profiles/claude/Work"]]);
+      context.answer(MethodName.ProviderList, () => [...folders].map(([id, folder]) => provider(id, "claude", folder).toJson()));
+      context.answer(MethodName.ProviderCheck, t => {
+        const id = (t as { readonly providerId: string }).providerId;
+        return provider(id, "claude", folders.get(id) ?? String.empty, AuthStatus.LoggedIn).toJson();
+      });
+      await store.initialize();
+
+      for (const [index, id] of ["c1", "c2"].entries()) {
+        const signIn = store.signInProvider(id);
+        await Wait.until(() => expect(terminals.launches).toHaveLength(index + 1));
+        terminals.end(index);
+        await signIn;
+      }
+
+      expect(terminals.launches.map(({ request }) => [request.environment, request.command])).toEqual([[{}, "claude auth login"],
+        [{ CLAUDE_CONFIG_DIR: "/person/profiles/claude/Work" }, "claude auth login"]]);
     });
 
     it("leaves the kind's variable to the person's own environment for a provider in one of the person's folders, so the sign-in lands where its turns look", async () => {

@@ -6,19 +6,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, effect, inject, type InputSignal, input, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
+import { Component, ElementRef, computed, effect, inject, type InputSignal, input, type Signal, signal, untracked, viewChild, type WritableSignal } from "@angular/core";
 
-import type { Department, Teammate } from "@noldova/teamrun.protocol";
+import { type Department, type Teammate, type TeammateLastReply, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
-  MeterComponent, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
+  MeterComponent, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
-import { UsageLevel } from "../../enums/usage-level";
 import { ConfirmRequest } from "../../models/confirm-request";
-import { OrganizationNode } from "../../models/organization-node";
+import { OrganizationNode } from "../../models/organization.node";
 import type { UsageMeter } from "../../models/usage-meter";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
@@ -33,7 +32,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
-    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent],
+    SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row" },
   templateUrl: "./organization-card.component.html",
@@ -47,6 +46,7 @@ export class OrganizationCardComponent {
   private readonly statuses: TeammateStatusStoreService = inject(TeammateStatusStoreService);
   private readonly clock: ClockService = inject(ClockService);
   private readonly time: WritableSignal<number> = signal(this.clock.now());
+  private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("nameField", { read: ElementRef });
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
   public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
@@ -80,6 +80,8 @@ export class OrganizationCardComponent {
       lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length) };
   });
 
+  protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
+
   protected readonly editsIn: Signal<Department | null> = computed(() => this.editing() ? this.department() : null);
   protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() =>
     OrganizationNode.departmentsOf(this.organization.organization()).map(t => new SelectOption(t.id, t.name)));
@@ -91,6 +93,23 @@ export class OrganizationCardComponent {
       untracked(() => this.time.set(this.clock.now()));
       onCleanup(this.clock.every(Resources.clockIntervalMilliseconds, () => this.time.set(this.clock.now())));
     });
+  }
+
+  protected async rename(): Promise<void> {
+    const field = this.nameField().nativeElement;
+    const teammate = this.teammate();
+    this.organization.clearActionError();
+    let params: TeammateUpdateParams | null;
+    try {
+      params = TeammateUpdateParams.changing(teammate, { name: field.value.trim() });
+    }
+    catch {
+      field.value = teammate.name;
+      this.organization.fail(Resources.organizationTeammateNameRule);
+      return;
+    }
+    if (!await this.store.updateTeammate(teammate.id, params, message => this.organization.fail(message)))
+      field.value = this.teammate().name;
   }
 
   protected move(departmentId: string): void {
@@ -107,9 +126,5 @@ export class OrganizationCardComponent {
       if (confirmed)
         void this.organization.setMember(teammate.id, null);
     });
-  }
-
-  protected isWarning(meter: UsageMeter): boolean {
-    return meter.level !== UsageLevel.Normal;
   }
 }

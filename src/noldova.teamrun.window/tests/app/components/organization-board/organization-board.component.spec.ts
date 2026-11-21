@@ -15,7 +15,7 @@ import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
-import { OrganizationNode } from "../../../../src/app/models/organization-node";
+import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";

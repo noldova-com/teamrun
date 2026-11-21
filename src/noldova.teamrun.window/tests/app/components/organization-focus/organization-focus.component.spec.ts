@@ -16,7 +16,7 @@ import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
 import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
-import { OrganizationNode } from "../../../../src/app/models/organization-node";
+import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
