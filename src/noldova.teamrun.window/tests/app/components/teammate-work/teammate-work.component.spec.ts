@@ -276,7 +276,7 @@ describe("TeammateWorkComponent", () => {
         const probe = document.createElement("span");
         probe.style.color = "var(--nol-status-failed)";
         element.append(probe);
-        expect(getComputedStyle(dot).backgroundColor).toBe(getComputedStyle(probe).color);
+        expect([getComputedStyle(dot).backgroundColor, getComputedStyle(one(element, ".work-ci")).color]).toEqual([getComputedStyle(probe).color, getComputedStyle(probe).color]);
         expect(getComputedStyle(one(element, ".work-muted")).color).not.toBe(getComputedStyle(one(element, ".work-title")).color);
         probe.remove();
       }

@@ -94,6 +94,10 @@
   background: var(--nol-status-ok);
 }
 
+.ci-failed {
+  color: var(--nol-status-failed);
+}
+
 .ci-failed .work-dot {
   background: var(--nol-status-failed);
 }
