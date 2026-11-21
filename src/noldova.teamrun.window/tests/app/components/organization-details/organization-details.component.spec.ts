@@ -115,33 +115,52 @@ describe("OrganizationDetailsComponent", () => {
 
   it("PROBE", async () => {
     await create();
-    const r = (e: Element | null): string => { if (e === null) return "none"; const b = e.getBoundingClientRect(); return `${b.left.toFixed(0)},${b.top.toFixed(0)} ${b.width.toFixed(0)}x${b.height.toFixed(0)}`; };
-    const tag = (e: Element | null): string => e === null ? "null" : `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}`;
-    const at = (e: Element): string => { const b = e.getBoundingClientRect(); return tag(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)); };
-    const state = (step: string): void => console.log(`PROBE ${step} menu=${document.querySelectorAll("button[nol-menu-item]").length} pops=${popovers().length} active=${tag(document.activeElement)} overlays=${document.querySelectorAll(".cdk-overlay-pane").length}`);
+    const tag = (e: EventTarget | null): string => e instanceof Element ? `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}` : String(e);
     const wait = (ms: number): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, ms));
-    console.log(`PROBE vp ${window.innerWidth}x${window.innerHeight} host ${r(element())} canvas ${r(element().querySelector(".chart nol-canvas"))} map ${r(element().querySelector("nol-canvas-map"))} zoom ${texts(".chart .nol-canvas-zoom-value").join("|")}`);
-    for (const name of ["Alice", "Code Reviewer", "Bob", "Offline"])
-      console.log(`PROBE card ${name} ${r(card(name))} tune ${r(card(name).querySelector(".tune"))} at-tune ${at(one(".tune", card(name)))}`);
-    await focus("Alice");
-    state("focused");
-    console.log(`PROBE pop ${r(popover())} tune ${r(one(".tune", card("Alice")))} at-tune ${at(one(".tune", card("Alice")))}`);
+    const log: string[] = [];
+    const t0 = performance.now();
+    const note = (s: string): void => { log.push(`${(performance.now() - t0).toFixed(0)} ${s}`); };
+    for (const type of ["pointerdown", "pointerup", "mousedown", "click", "focusin", "focusout", "pointerenter"])
+      document.addEventListener(type, e => note(`${type} ${tag(e.target)}${e.defaultPrevented ? " prevented" : ""}`), { capture: true });
+    new MutationObserver(() => note(`dom menu=${document.querySelectorAll("button[nol-menu-item]").length} pops=${popovers().length}`))
+      .observe(document.body, { childList: true, subtree: true });
+    note("A fresh click on Alice's tune");
     await userEvent.click(one(".tune", card("Alice")));
-    for (const ms of [0, 100, 300, 700, 1200]) { await wait(ms === 0 ? 0 : 200); await settle(); state(`click+${ms}`); }
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await wait(300); await settle(); state("escape");
-    await userEvent.click(one(".name", card("Bob")));
-    await wait(900); await settle(); state("bob-name+900");
-    one(".tune", card("Bob")).click();
-    await wait(300); await settle(); state("bob-tune");
-    await wait(900); await settle(); state("bob-tune+900");
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await wait(300); await settle(); state("bob-escape");
-    one(".top .edit").click();
-    await settle();
+    await wait(400); await settle();
+    note(`A after menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
+    await userEvent.keyboard("{Escape}");
+    await wait(300); await settle();
+    note(`A escaped menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
+    await userEvent.unhover(card("Alice"));
     await wait(300);
-    const select = one(".move-choice .nol-select-button", card("Bob"));
-    console.log(`PROBE edit bob ${r(card("Bob"))} select ${r(select)} at-select ${at(select)} map ${r(element().querySelector("nol-canvas-map"))} canvas ${r(element().querySelector(".chart nol-canvas"))}`);
+    note("B keyboard focus on Alice, then click its tune");
+    await focus("Alice");
+    note("B focused");
+    await userEvent.click(one(".tune", card("Alice")));
+    await wait(400); await settle();
+    note(`B after menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
+    await userEvent.keyboard("{Escape}");
+    await wait(300); await settle();
+    note("C real click on Bob's name, then programmatic tune click, then a document Escape");
+    await userEvent.click(one(".name", card("Bob")));
+    await wait(300); await settle();
+    one(".tune", card("Bob")).click();
+    await wait(300); await settle();
+    note(`C menu=${document.querySelectorAll("button[nol-menu-item]").length} active=${tag(document.activeElement)}`);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await wait(300); await settle();
+    note(`C doc-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
+    await userEvent.keyboard("{Escape}");
+    await wait(300); await settle();
+    note(`C key-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
+    note("D programmatic tune click on Alice, no pointer on the cards first, then a document Escape");
+    await userEvent.unhover(card("Bob"));
+    one(".tune", card("Alice")).click();
+    await wait(300); await settle();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await wait(300); await settle();
+    note(`D doc-escape menu=${document.querySelectorAll("button[nol-menu-item]").length}`);
+    console.log(log.map(t => `PROBE ${t}`).join("\n"));
   });
 
   it("opens a card's details when the card takes the keyboard focus: its status, whom it reports to, its model, usage and last words, and what runs now", async () => {
