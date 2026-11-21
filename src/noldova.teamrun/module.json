@@ -20,7 +20,7 @@
       "teamrun.conversationSearch", "teamrun.messageList", "teamrun.messageListOpen", "teamrun.messagePage", "teamrun.messageActivityPage",
       "teamrun.messageChangesPage", "teamrun.messagePlanPage", "teamrun.messageSubAgentsPage", "teamrun.messageSummary", "teamrun.messageDetails", "teamrun.messageSend", "teamrun.messageCancel", "teamrun.messageApprovePlan",
       "teamrun.conversationCancel", "teamrun.approvalList", "teamrun.approvalListPending", "teamrun.approvalDecide", "teamrun.planUsageList",
-      "teamrun.planUsageRead", "teamrun.teammateUsageList", "teamrun.backgroundTaskList", "teamrun.backgroundTaskStop", "teamrun.chatFind", "teamrun.messageSearch", "teamrun.subAgentStart", "teamrun.subAgentStop", "teamrun.subAgentWait", "teamrun.commandStart",
+      "teamrun.planUsageRead", "teamrun.teammateUsageList", "teamrun.teammateLastReplyList", "teamrun.backgroundTaskList", "teamrun.backgroundTaskStop", "teamrun.chatFind", "teamrun.messageSearch", "teamrun.subAgentStart", "teamrun.subAgentStop", "teamrun.subAgentWait", "teamrun.commandStart",
       "teamrun.backgroundTaskClearFinished", "teamrun.backgroundTaskRead", "teamrun.windowFocused", "teamrun.windowClosed", "teamrun.windowReload",
       "teamrun.panelAnswered", "teamrun.providerOwnMcpServerList", "teamrun.sharedMcpServerList", "teamrun.sharedMcpServerCreate", "teamrun.sharedMcpServerUpdate",
       "teamrun.sharedMcpServerDelete", "teamrun.sharedMcpProviderSet", "teamrun.sharedMcpTeammateSet", "teamrun.sharedMcpSecretSet",
