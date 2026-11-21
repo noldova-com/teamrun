@@ -18,5 +18,6 @@ export enum ChangeEntity {
   SharedMcpServer = "SharedMcpServer",
   AcpAgent = "AcpAgent",
   Department = "Department",
-  DepartmentMember = "DepartmentMember"
+  DepartmentMember = "DepartmentMember",
+  OrganizationMessage = "OrganizationMessage"
 }

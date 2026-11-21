@@ -125,6 +125,9 @@ export class MethodNameTests {
     Assert.areEqual("DepartmentMove", MethodName.DepartmentMove);
     Assert.areEqual("DepartmentDelete", MethodName.DepartmentDelete);
     Assert.areEqual("DepartmentMemberSet", MethodName.DepartmentMemberSet);
+    Assert.areEqual("OrganizationMessageSend", MethodName.OrganizationMessageSend);
+    Assert.areEqual("OrganizationMessageStop", MethodName.OrganizationMessageStop);
+    Assert.areEqual("OrganizationMessageList", MethodName.OrganizationMessageList);
   }
 
   @TestMethod
