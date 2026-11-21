@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { parseSync } from "vite";
 import { defineConfig } from "vitest/config";
 
+import { BrowserSessionDiagnostics } from "../scripts/angular/browser-session-diagnostics.ts";
 import { ClassMetadataCoverage } from "../scripts/angular/class-metadata-coverage.ts";
 import { PreBundleCheck } from "../scripts/angular/pre-bundle-check.ts";
 import { PreBundleRun } from "../scripts/angular/pre-bundle-run.ts";
@@ -24,6 +25,7 @@ export default defineConfig({
   plugins: [
     new PreBundleRun(fileURLToPath(new URL("..", import.meta.url)), process.env),
     new ClassMetadataCoverage(),
+    new BrowserSessionDiagnostics(),
     new PreBundleCheck((file, code) => parseSync(file, code, { sourceType: "module" }).errors,
       fileURLToPath(new URL("../_build/angular-pre-bundle.json", import.meta.url))),
     ...new SpecTransformCheck(fileURLToPath(new URL("../_build/angular-spec-transforms", import.meta.url))).plugins
@@ -35,7 +37,7 @@ export default defineConfig({
     alias: Object.fromEntries(Object.entries(compilerOptions.paths).map(([name, targets]) => [name, fileURLToPath(new URL(String(targets[0]), import.meta.url))]))
   },
   test: {
-    api: { port: 24315 },
+    api: { port: 24315, host: "127.0.0.1" },
     browser: { commands: { __vitest_screenshot: new ShortScreenshotNames().screenshot } },
     coverage: {
       reportsDirectory: fileURLToPath(new URL("../_build/angular-coverage", import.meta.url))

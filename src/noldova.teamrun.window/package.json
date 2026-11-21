@@ -43,7 +43,7 @@
     "@noldova/git.protocol": "0.0.6",
     "@noldova/git.window": "0.0.6",
     "@noldova/terminal.window": "0.0.3",
-    "@noldova/ui.components.angular": ">=0.0.22 <0.1.0"
+    "@noldova/ui.components.angular": ">=0.0.23 <0.1.0"
   },
   "peerDependenciesMeta": {
     "@angular/cdk": {
