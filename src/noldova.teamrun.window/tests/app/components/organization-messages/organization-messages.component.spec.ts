@@ -163,7 +163,7 @@ describe("OrganizationMessagesComponent", () => {
     ["a department without a leader", OrganizationTarget.department("d2"), "Docs", Resources.formatOrganizationDepartmentNote(null, ["Offline"])],
     ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(null, [])],
     ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.formatOrganizationLeadersNote(["Alice"])],
-    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(["Bob", "Alice", "Offline"])]
+    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(["Alice", "Bob", "Offline"])]
   ])("names %s in the thread's head, with the teammates a message reaches in its note", async (_, target, title, note) => {
     await create(target);
     await Wait.until(() => expect(texts(".nol-teamrun-organization-conversation-title")).toHaveLength(3));
@@ -346,7 +346,7 @@ describe("OrganizationMessagesComponent", () => {
     ["a department", design, Resources.formatOrganizationChat("Design"), Resources.formatOrganizationDepartmentNote("Alice", ["Bob"])],
     ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersChat, Resources.formatOrganizationLeadersNote(["Alice"])],
     ["everyone", OrganizationTarget.everyone, Resources.formatOrganizationChat(Resources.organizationEveryoneTitle),
-      Resources.formatOrganizationEveryoneNote(["Bob", "Alice", "Offline"])]
+      Resources.formatOrganizationEveryoneNote(["Alice", "Bob", "Offline"])]
   ])("names the chat with %s in the thread shape's head", async (_, target, title, note) => {
     await create(target, OrganizationMessagesShape.Thread);
 
