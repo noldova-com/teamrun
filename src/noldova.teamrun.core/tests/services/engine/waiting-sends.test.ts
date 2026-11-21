@@ -927,6 +927,33 @@ export class WaitingSendsTests {
   }
 
   @TestMethod
+  public async refusesAnEditWhoseMentionsArentThoseOfItsNewTextAndKeepsTheMessageAsItWas(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const alice = await host.teammates.createAsync(new TeammateCreateParams("Alice", null, provider.id, Harness.Provider, null, null));
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const send = (text: string, mentioned: readonly string[]): MessageSendParams => new MessageSendParams(chat.id, text, null, null, [], mentioned);
+    const waiting = await host.engine.addWaitingAsync(new WaitingMessageAddParams(send("@Bob check X", [bob.id]), MessageDelivery.Queue));
+
+    const refused = await Assert.throwsAsync(() => host.engine.editWaitingAsync(new WaitingMessageEditParams(waiting.id, send("@Alice check X", [bob.id]))),
+      ServiceException);
+    const kept = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.map(t => `${t.message.text}:${t.message.mentionedTeammateIds.join(",")}`);
+    await host.engine.editWaitingAsync(new WaitingMessageEditParams(waiting.id, send("@Alice check X", [alice.id])));
+    release();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.editMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
+    Assert.areEqual(`@Bob check X:${bob.id}`, kept.join("|"));
+    Assert.areEqual("First,@Alice check X", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+  }
+
+  @TestMethod
   public async editsAWaitingMessageInItsPlaceRemovesOneAndRefusesUnknownOnesAndAnotherChat(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.createConversationAsync();
