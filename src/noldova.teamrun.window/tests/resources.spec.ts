@@ -99,6 +99,10 @@ describe("Resources", () => {
     ]);
   });
 
+  it("counts the organization's teammates, one in the singular", () => {
+    expect([0, 1, 2].map(t => Resources.formatOrganizationHeadcount(t))).toEqual(["0 teammates", "1 teammate", "2 teammates"]);
+  });
+
   it("writes the composer's accessible names and unavailable choices", () => {
     expect(Resources.formatRemoveAttachment("notes.txt")).toBe("Remove attachment: notes.txt");
     expect(Resources.formatChatPermissions("Accept edits")).toBe("Permissions in this chat: Accept edits");

@@ -14,7 +14,7 @@ import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, Canva
 import { Resources } from "../../../resources";
 import { OrganizationViewMode } from "../../enums/organization-view-mode";
 import { OrganizationLayout } from "../../models/organization-layout";
-import { OrganizationNode } from "../../models/organization-node";
+import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";

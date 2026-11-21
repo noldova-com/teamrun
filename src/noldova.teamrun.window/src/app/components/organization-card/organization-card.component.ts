@@ -17,7 +17,7 @@ import { OrganizationCardField } from "../../enums/organization-card-field";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { UsageLevel } from "../../enums/usage-level";
 import { ConfirmRequest } from "../../models/confirm-request";
-import { OrganizationNode } from "../../models/organization-node";
+import { OrganizationNode } from "../../models/organization.node";
 import type { UsageMeter } from "../../models/usage-meter";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";

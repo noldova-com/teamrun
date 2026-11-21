@@ -7,7 +7,7 @@
  */
 import { Department, DepartmentMember, Harness, Organization, Teammate } from "@noldova/teamrun.protocol";
 
-import { OrganizationNode } from "../../../src/app/models/organization-node";
+import { OrganizationNode } from "../../../src/app/models/organization.node";
 
 describe("OrganizationNode", () => {
   const teammate = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");

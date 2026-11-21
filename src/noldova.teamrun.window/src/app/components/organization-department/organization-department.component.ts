@@ -14,7 +14,7 @@ import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, Dia
 
 import { Resources } from "../../../resources";
 import { ConfirmRequest } from "../../models/confirm-request";
-import type { OrganizationNode } from "../../models/organization-node";
+import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
