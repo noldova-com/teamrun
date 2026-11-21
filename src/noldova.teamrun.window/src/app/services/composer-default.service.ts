@@ -33,6 +33,7 @@ export class ComposerDefaultService {
   private edits: number = 0;
   private received: number = 0;
   private saving: number = 0;
+  private isBehind: boolean = false;
   private saved: Promise<void> = Promise.resolve();
 
   public readonly defaultChoice: Signal<ComposerSettings | null> = this.current.asReadonly();
@@ -45,6 +46,8 @@ export class ComposerDefaultService {
         this.latest = ComposerSettings.fromJson(t);
         if (this.saving === 0)
           this.current.set(this.held ?? this.latest);
+        else
+          this.isBehind = true;
       }),
       context.onEvent(Resources.formatQualifiedName(EventName.StateResyncRequested), () => void this.load())
     ];
@@ -89,7 +92,7 @@ export class ComposerDefaultService {
     else if (Object.isNull(kept) && !Object.isNull(this.stored)) {
       const moved = await this.save(this.stored.toJson(), true);
       if (!Object.isUndefined(moved)) {
-        base = ComposerSettings.fromJson(moved);
+        base = this.latest ?? ComposerSettings.fromJson(moved);
         ComposerDefaultService.removeStored();
       }
     }
@@ -117,9 +120,17 @@ export class ComposerDefaultService {
     this.saving++;
     const done = this.saved.then(() => this.request(MethodName.ComposerDefaultSave, new ComposerDefaultSaveParams(choice, onlyIfNone).toJson()))
       .catch(() => undefined)
-      .finally(() => this.saving--);
+      .finally(() => this.settle());
     this.saved = done.then(() => undefined);
     return done;
+  }
+
+  private settle(): void {
+    this.saving--;
+    if (this.saving > 0 || !this.isBehind)
+      return;
+    this.isBehind = false;
+    this.current.set(this.held ?? this.latest);
   }
 
   private request(method: MethodName, parameters: JsonValue): Promise<JsonValue> {
