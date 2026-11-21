@@ -295,7 +295,7 @@ describe("OrganizationViewComponent", () => {
     const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet];
     let asked: [string, JsonValue][];
 
-    const editAsync = async (answer: () => unknown = () => null): Promise<void> => {
+    const editAsync = async (answer: () => JsonValue | Promise<JsonValue> = () => null): Promise<void> => {
       asked = [];
       await create(context => {
         for (const method of changes)
@@ -533,10 +533,14 @@ describe("OrganizationViewComponent", () => {
       const inset = AppearanceFixture.measureLook("space-3") + 1;
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const design = department("Design");
-      const [unit, name, remove, leader] = [":scope > .department", ":scope > .department .department-field", ":scope > .department .delete",
-        ":scope > .department .leader-choice"].map(t => box(one(t, design)));
+      const unit = box(one(":scope > .department", design));
+      const name = box(one(":scope > .department .department-field", design));
+      const remove = box(one(":scope > .department .delete", design));
+      const leader = box(one(":scope > .department .leader-choice", design));
       const bob = box(card("Bob"));
-      const [move, drop, tune] = [".move", ".remove", ".tune"].map(t => box(one(t, card("Bob"))));
+      const move = box(one(".move", card("Bob")));
+      const drop = box(one(".remove", card("Bob")));
+      const tune = box(one(".tune", card("Bob")));
 
       for (const [actual, expected] of [[unit.width, 15 * rem], [bob.width, 13.25 * rem], [name.left, unit.left + inset], [remove.right, unit.right - inset],
         [leader.left, unit.left + inset], [leader.right, unit.right - inset], [move.left, bob.left + inset], [move.right, bob.right - inset],
