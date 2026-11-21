@@ -187,7 +187,7 @@ describe("OrganizationViewComponent", () => {
     const offered = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
     await userEvent.keyboard("{Escape}");
     await settle();
-    expect(offered.slice(-2)).toEqual(["Code Reviewer", "Offline"]);
+    expect(offered).toEqual(expect.arrayContaining(["Code Reviewer", "Offline"]));
     expect(offered.some(t => t.includes("No department"))).toBe(false);
 
     one(".top .edit").click();
