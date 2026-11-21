@@ -1182,8 +1182,9 @@ export declare enum MethodName {
   WaitingMessageList = "WaitingMessageList",
   /**
    * Replaces a waiting message's send, keeping its place and clearing a failure, and publishes `WaitingMessagesChanged`. Parameters:
-   * `WaitingMessageEditParams`. Result: `WaitingMessage`; an unknown waiting message is `NotFound`, and a send to another chat is
-   * `InvalidParams`.
+   * `WaitingMessageEditParams`. Result: `WaitingMessage`; an unknown waiting message is `NotFound`, a send to another chat is
+   * `InvalidParams`, and a send whose `mentionedTeammateIds` aren't the teammates its new text mentions, as `MessageSend` resolves them, is
+   * `Conflict`: the engine resolves none, so the caller resolves them from the new text.
    */
   WaitingMessageEdit = "WaitingMessageEdit",
   /**

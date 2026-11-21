@@ -1,0 +1,127 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+}
+
+.details {
+  --nol-popover-preferred-width: 18rem;
+  --nol-popover-surface: var(--nol-hover-widget);
+  --nol-popover-border: var(--nol-hover-widget-border);
+  --nol-popover-text: var(--nol-text);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.place {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.place {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--nol-space-1) var(--nol-space-3);
+  margin: 0;
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+}
+
+.facts dt {
+  color: var(--nol-text-muted);
+}
+
+.facts dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.last {
+  display: flex;
+  flex-direction: column;
+}
+
+.said {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.ago {
+  color: var(--nol-text-muted);
+}
+
+.now-label {
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-label);
+}
+
+.running {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+  list-style: none;
+}
+
+.act {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+}
+
+.act-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.act-for {
+  flex: none;
+  color: var(--nol-text-muted);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  white-space: nowrap;
+}
+
+.idle {
+  color: var(--nol-text-muted);
+}

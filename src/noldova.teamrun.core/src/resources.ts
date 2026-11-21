@@ -44,6 +44,7 @@ export class Resources {
   public static readonly hexadecimalRadix: number = 16;
   public static readonly databaseVersionUnsupported: string = "This data belongs to a newer or incompatible TeamRun database version. Reopen it with that version; no migrations were applied.";
   public static readonly mentionsChanged: string = "Teammates changed while this message was sent, so its mentions no longer match. Send it again.";
+  public static readonly editMentionsMismatch: string = "The edit's mentions don't match its text, so it wasn't saved. Edit it again.";
   public static readonly instructionsParameterName: string = "instructions";
   public static readonly freshPromptParameterName: string = "freshPrompt";
   public static readonly joinPreambleMaximumCharacters: number = 24_000;

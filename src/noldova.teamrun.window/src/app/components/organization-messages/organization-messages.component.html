@@ -48,6 +48,7 @@ LICENSE file in the root directory of this source tree.
       <span class="nol-teamrun-organization-thread-note">{{ noteOf(current) }}</span>
     </div>
   }
+  <ng-content select="[nolTeamrunOrganizationTo]" />
   <div class="nol-teamrun-organization-thread">
     @for (entry of entries(); track entry.message.id) {
       <article class="nol-teamrun-organization-entry">
