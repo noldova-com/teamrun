@@ -62,8 +62,13 @@ describe("Resources", () => {
       "Waiting to start for Ada, Bob and Cid", "Stopped before it reached Ada, Bob and Cid", "Ada, Bob and Cid were removed before it arrived",
       "Couldn't reach Ada, Bob and Cid"]);
     expect(Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Ada"])).toBe("Ada was removed before it arrived");
-    expect([Resources.formatOrganizationLeadersNote(4), Resources.formatOrganizationChat("Ada"), Resources.formatOrganizationOnlyNote("Ada")])
-      .toEqual(["Every department's leader (4)", "Chat with Ada", "Only Ada"]);
+    expect([Resources.formatOrganizationChat("Ada"), Resources.formatOrganizationOnlyNote("Ada")]).toEqual(["Chat with Ada", "Only Ada"]);
+    expect([Resources.formatOrganizationLeadersNote(["Agy"]), Resources.formatOrganizationLeadersNote(["Agy", "Bob"]), Resources.formatOrganizationLeadersNote([])])
+      .toEqual(["1 leader: Agy", "2 leaders: Agy and Bob", "No department has a leader yet"]);
+    expect([Resources.formatOrganizationDepartmentNote("Agy", ["Bob"]), Resources.formatOrganizationDepartmentNote(null, ["Bob", "Cid"]),
+      Resources.formatOrganizationDepartmentNote(null, [])]).toEqual(["Leader: Agy · 1 member: Bob", "No leader · 2 members: Bob and Cid", "No leader, no members"]);
+    expect([Resources.formatOrganizationEveryoneNote(["Agy"]), Resources.formatOrganizationEveryoneNote(["Agy", "Bob", "Cid"]),
+      Resources.formatOrganizationEveryoneNote([])]).toEqual(["1 teammate: Agy", "3 teammates: Agy, Bob and Cid", "No teammates yet"]);
   });
 
   it("qualifies a TeamRun method or event name with the module's id", () => {

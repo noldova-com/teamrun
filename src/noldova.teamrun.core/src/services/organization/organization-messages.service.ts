@@ -12,7 +12,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
-  ErrorCode, Event, EventName, type Message, MessageIdParams, MessageStatus, type Organization, OrganizationMessage, type OrganizationMessageSendParams,
+  ErrorCode, Event, EventName, type Message, MessageIdParams, MessageStatus, type Organization, OrganizationChat, OrganizationMessage, type OrganizationMessageSendParams,
   OrganizationRecipient, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind, type Teammate
 } from "@noldova/teamrun.protocol";
 
@@ -51,7 +51,8 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
   }
 
   public async sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage> {
-    const message = await this.context.database.connection.runInTransactionAsync(async transaction => {
+    type Started = readonly [OrganizationMessage, readonly (readonly [string, string])[]];
+    const [message, starts] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<Started> => {
       const organization = await this.organization.listAsync(transaction);
       const teammates = await this.teammates.listAsync(transaction);
       OrganizationMessagesService.requireTarget(params.target, organization, teammates);
@@ -63,10 +64,11 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
       const json = JSON.stringify(message.toJson());
       await transaction.executeAsync(new SqlQuery(Resources.insertOrganizationMessage, [message.id, json, now]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.OrganizationMessage, message.id, ChangeOperation.Insert, json, transaction);
-      return message;
+      return [message, recipients.map((t): readonly [string, string] => [t.teammateId,
+        OrganizationMessagesService.promptOf(t.teammateId, params.text, organization, teammates)])];
     });
     this.events.publish(new Event(EventName.OrganizationMessageUpdated, message.toJson()));
-    await Promise.all(message.recipients.map(t => this.startAsync(message.id, t.teammateId, params.text)));
+    await Promise.all(starts.map(([teammateId, prompt]) => this.startAsync(message.id, teammateId, params.text, prompt)));
     return await this.requireAsync(message.id);
   }
 
@@ -95,11 +97,11 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
           ? t.with(OrganizationRecipientState.Failed, undefined, undefined, Resources.organizationSendInterrupted) : t);
   }
 
-  private async startAsync(messageId: string, teammateId: string, text: string): Promise<void> {
+  private async startAsync(messageId: string, teammateId: string, text: string, prompt: string): Promise<void> {
     const change = (state: OrganizationRecipientState, chatId: string | null, sentId: string | null, reason: string | null) =>
       this.changeAsync(messageId, t => t.teammateId === teammateId && t.state === OrganizationRecipientState.Queued ? t.with(state, chatId, sentId, reason) : t);
     try {
-      const result = await this.sender.startOutsideAsync(teammateId, text, Resources.organizationMessageLabel);
+      const result = await this.sender.startAsPersonAsync(new OrganizationChat(Resources.defaultOrganizationId, teammateId), text, prompt);
       const message = await change(OrganizationRecipientState.Started, result.sent.chatId, result.sent.id, null);
       if (message.recipients.some(t => t.teammateId === teammateId && t.state === OrganizationRecipientState.Started))
         return;
@@ -131,6 +133,15 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
   private async requireAsync(messageId: string): Promise<OrganizationMessage> {
     const [record] = await this.context.database.connection.queryAsync(new SqlQuery(Resources.selectOrganizationMessage, [messageId]));
     return OrganizationMessagesService.read(OrganizationMessagesService.require(record, messageId));
+  }
+
+  private static promptOf(teammateId: string, text: string, organization: Organization, teammates: readonly Teammate[]): string {
+    const department = organization.departments.find(t => t.id === organization.departmentOf(teammateId));
+    const place = Object.isUndefined(department) ? Resources.organizationNoDepartment
+      : department.leaderId === teammateId ? Resources.formatOrganizationLeader(department.name) : Resources.formatOrganizationMember(department.name);
+    const managerId = organization.managerOf(teammateId);
+    const manager = teammates.find(t => t.id === managerId)?.name ?? Resources.organizationReportsToPerson;
+    return Resources.formatOrganizationMessagePrompt(place, manager, text);
   }
 
   private static requireTarget(target: OrganizationTarget, organization: Organization, teammates: readonly Teammate[]): void {

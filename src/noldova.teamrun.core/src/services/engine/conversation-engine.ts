@@ -22,6 +22,7 @@ import {
   type ApprovalDecideParams,
   BackgroundTaskStatus,
   type Conversation,
+  ConversationCreateParams,
   type ConversationResponder,
   type ConversationResponderParams,
   ConversationIdParams,
@@ -43,6 +44,7 @@ import {
   MessageSender,
   MessageStatus,
   ObservedSettings,
+  type OrganizationChat,
   Provenance,
   type ProviderMode,
   type McpToolCallParams,
@@ -413,12 +415,19 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
   }
 
-  public async startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
-    const teammate = await this.requireTeammateAsync(teammateId);
+  public async startAsPersonAsync(chat: OrganizationChat, text: string, prompt: string): Promise<MessageSendResult> {
+    const teammate = await this.requireTeammateAsync(chat.teammateId);
     const provider = await this.providers.findAsync(teammate.providerId);
     if (!this.canReply(provider))
-      throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammateId]);
-    return this.outside.startOutsideAsync(teammateId, text, label);
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammate.id]);
+    const [chatId, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [string, boolean]> => {
+      const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
+      return Object.isNull(known) ? [(await this.conversations.createAsync(new ConversationCreateParams(null, Resources.formatOrganizationChatTitle(teammate.name),
+        teammate.id), transaction, chat)).id, true] : [known.id, false];
+    });
+    if (made)
+      this.events.publish(new Event(EventName.StateInvalidated, null));
+    return this.sendMessageAsync(new MessageSendParams(chatId, text, null, null, [], [], teammate.id), prompt, null, undefined, null, true);
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {

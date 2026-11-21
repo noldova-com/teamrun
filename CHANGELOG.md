@@ -17,6 +17,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization messages:** a message from Organization is now your own message in the teammate's Organization chat, `Organization · <name>`, not one from outside TeamRun, and tells the teammate its department, whether it leads it, and who it reports to; before you send, the thread names who it reaches, and says when a department has no leader (#397).
 - **Stop as an answer lands:** Stop pressed just as a teammate's answer arrives stops the change comparison, shows the reply as stopped and lists it among what Stop stopped; a teammate it addressed isn't started, and the reply notes whom it would have handed off to (#142).
 - **The focus after a delete:** deleting a teammate, a chat or a shared MCP server moves the keyboard focus to the next row, or the one before for the last, and to Add, or New chat for a chat whose group is gone, once none is left or the next row went meanwhile, rather than dropping it to the window; a focus the person moved while the delete ran stays where it is (#155).
 - **The focus after removing a provider:** a focus the person moved while the removal ran, such as to Add provider, stays where it is, rather than jumping back to a provider row (#388).

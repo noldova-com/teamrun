@@ -21,7 +21,7 @@ import { FakeOrganizationSender } from "../../fixtures/fake-organization-sender.
 @TestClass
 export class OrganizationMessagesServiceTests {
   @TestMethod
-  public async sendsADepartmentMessageToItsLeaderThenItsDirectMembersThroughTheEngineAndStoresEachStarted(): Promise<void> {
+  public async sendsADepartmentMessageAsThePersonToItsLeaderThenItsDirectMembersEachInItsOrganizationChatTellingItsPlace(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
     const bob = await OrganizationMessagesServiceTests.teammateAsync(host, "Bob");
@@ -36,12 +36,21 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Bob:Started,Ada:Started", OrganizationMessagesServiceTests.states(sent));
     Assert.isTrue(sent.recipients.every(t => !Object.isNull(t.chatId) && !Object.isNull(t.messageId)));
-    Assert.areEqual(`${MessageAuthor.User} ${Resources.organizationMessageLabel} ${sent.recipients[0]?.chatId}`,
-      `${first?.author} ${first?.sender?.name} ${first?.chatId}`);
+    const chat = await host.conversations.findAsync(String(first?.chatId));
+    const prompts = [Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationLeader("Design"), Resources.organizationReportsToPerson, "Status?"),
+      Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationMember("Design"), "Bob", "Status?")];
+    Assert.areEqual(`${MessageAuthor.User} null Status? ${Resources.formatOrganizationChatTitle("Bob")} ${Resources.defaultOrganizationId} ${bob.id}`,
+      `${first?.author} ${first?.sender} ${first?.details[0]?.text} ${chat?.title} ${chat?.organizationChat?.organizationId} ${chat?.organizationChat?.teammateId}`);
     Assert.areEqual(2, host.adapter.requests.length);
+    Assert.areEqual(JSON.stringify([true, true]), JSON.stringify(prompts.map(t => host.adapter.requests.some(u => u.prompt.includes(t)))));
     Assert.areEqual(JSON.stringify([sent.toJson()]), JSON.stringify((await host.organizationMessages.listAsync()).map(t => t.toJson())));
     Assert.areEqual("Insert,Update,Update", await OrganizationMessagesServiceTests.feedAsync(host));
     Assert.areEqual(updated + 3, host.listener.count(EventName.OrganizationMessageUpdated));
+
+    const again = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate(bob.id), "Again"));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(sent.recipients[0]?.chatId, again.recipients[0]?.chatId);
   }
 
   @TestMethod
@@ -62,7 +71,10 @@ export class OrganizationMessagesServiceTests {
 
     Assert.areEqual("Bob:Started|Ada:Started|Ada:Started,Bob:Started,Carol:Started|",
       [one, leaders, everyone, nobody].map(t => OrganizationMessagesServiceTests.states(t)).join("|"));
-    Assert.areEqual(`${bob.id}:${Resources.organizationMessageLabel}:One`, sender.sends[0]);
+    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One:${Resources.formatOrganizationMessagePrompt(Resources.formatOrganizationMember("Design"), "Ada", "One")}`,
+      sender.sends[0]);
+    Assert.areEqual(`${carol.id}:All:${Resources.formatOrganizationMessagePrompt(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, "All")}`,
+      sender.sends.find(t => t.includes(`:${carol.id}:`))?.slice(Resources.defaultOrganizationId.length + 1));
     Assert.areEqual(5, sender.sends.length);
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate("gone"), "Hi")));
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.department("gone"), "Hi")));

@@ -33,7 +33,8 @@ import { Wait } from "../../../fixtures/wait.fixture";
 describe("OrganizationMessagesComponent", () => {
   const design = OrganizationTarget.department("d1");
   const toAlice = OrganizationTarget.teammate("alice");
-  const organization = new Organization([new Department("d1", "Design", null, "alice", 0, "c", "u")], [new DepartmentMember("alice", "d1"), new DepartmentMember("bob", "d1")]);
+  const organization = new Organization([new Department("d1", "Design", null, "alice", 0, "c", "u"), new Department("d2", "Docs", null, null, 1, "c", "u")],
+    [new DepartmentMember("alice", "d1"), new DepartmentMember("bob", "d1"), new DepartmentMember("offline", "d2")]);
   const recipient = (teammateId: string, name: string, state: OrganizationRecipientState, messageId: string | null = null, reason: string | null = null) =>
     new OrganizationRecipient(teammateId, name, state, Object.isNull(messageId) ? null : `chat-${teammateId}`, messageId, reason);
   const aliceMessage = new OrganizationMessage("o1", toAlice, "Ready?", "2026-11-20T09:00:00.000Z",
@@ -158,11 +159,12 @@ describe("OrganizationMessagesComponent", () => {
     ["a teammate with a role", toAlice, "Alice", "Review"],
     ["a teammate without one", OrganizationTarget.teammate("bob"), "Bob", Resources.organizationTeammateNote],
     ["a removed teammate never written to", OrganizationTarget.teammate("ghost"), Resources.organizationRemovedTeammate, Resources.organizationTeammateNote],
-    ["a department", design, "Design", Resources.formatOrganizationDepartmentNote(2)],
-    ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(0)],
-    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.formatOrganizationLeadersNote(1)],
-    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(3)]
-  ])("names %s in the thread's head, with how many teammates a message goes to in its note", async (_, target, title, note) => {
+    ["a department", design, "Design", Resources.formatOrganizationDepartmentNote("Alice", ["Bob"])],
+    ["a department without a leader", OrganizationTarget.department("d2"), "Docs", Resources.formatOrganizationDepartmentNote(null, ["Offline"])],
+    ["a deleted department", OrganizationTarget.department("gone"), Resources.organizationDeletedDepartment, Resources.formatOrganizationDepartmentNote(null, [])],
+    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersTitle, Resources.formatOrganizationLeadersNote(["Alice"])],
+    ["everyone", OrganizationTarget.everyone, Resources.organizationEveryoneTitle, Resources.formatOrganizationEveryoneNote(["Bob", "Alice", "Offline"])]
+  ])("names %s in the thread's head, with the teammates a message reaches in its note", async (_, target, title, note) => {
     await create(target);
     await Wait.until(() => expect(texts(".nol-teamrun-organization-conversation-title")).toHaveLength(3));
 
@@ -341,9 +343,10 @@ describe("OrganizationMessagesComponent", () => {
 
   it.each([
     ["a teammate", toAlice, Resources.formatOrganizationChat("Alice"), Resources.formatOrganizationOnlyNote("Alice")],
-    ["a department", design, Resources.formatOrganizationChat("Design"), Resources.formatOrganizationDepartmentNote(2)],
-    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersChat, Resources.formatOrganizationLeadersNote(1)],
-    ["everyone", OrganizationTarget.everyone, Resources.formatOrganizationChat(Resources.organizationEveryoneTitle), Resources.formatOrganizationEveryoneNote(3)]
+    ["a department", design, Resources.formatOrganizationChat("Design"), Resources.formatOrganizationDepartmentNote("Alice", ["Bob"])],
+    ["every leader", OrganizationTarget.leaders, Resources.organizationLeadersChat, Resources.formatOrganizationLeadersNote(["Alice"])],
+    ["everyone", OrganizationTarget.everyone, Resources.formatOrganizationChat(Resources.organizationEveryoneTitle),
+      Resources.formatOrganizationEveryoneNote(["Bob", "Alice", "Offline"])]
   ])("names the chat with %s in the thread shape's head", async (_, target, title, note) => {
     await create(target, OrganizationMessagesShape.Thread);
 

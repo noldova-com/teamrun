@@ -10,7 +10,8 @@ import { Component, type InputSignal, type ModelSignal, type Signal, type Writab
   from "@angular/core";
 
 import "@noldova/context.core";
-import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind }
+import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind,
+  type Teammate }
   from "@noldova/teamrun.protocol";
 import { AvatarSize, ChipComponent, IconButtonComponent, MessageAuthor as Author, MessageAuthorKind, MessageComponent, MessageStatus as Status, MessageText,
   TextFieldComponent } from "@noldova/ui.components.angular";
@@ -88,9 +89,11 @@ export class OrganizationMessagesComponent {
       return this.title();
     return target.kind === OrganizationTargetKind.Leaders ? Resources.organizationLeadersChat : Resources.formatOrganizationChat(this.title());
   });
-  protected readonly recipientCount: Signal<number> = computed(() => {
+  protected readonly recipients: Signal<readonly Teammate[]> = computed(() => {
     const target = this.target();
-    return Object.isNull(target) ? 0 : this.organizations.organization().recipientsOf(target, this.chats.teammates().map(t => t.id)).length;
+    const teammates = this.chats.teammates();
+    const ids = Object.isNull(target) ? [] : this.organizations.organization().recipientsOf(target, teammates.map(t => t.id));
+    return teammates.filter(t => ids.includes(t.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
   });
   protected readonly messages: Signal<readonly OrganizationMessage[]> = computed(() =>
     this.store.conversations().find(t => t.key === this.selectedKey())?.messages ?? []);
@@ -99,7 +102,7 @@ export class OrganizationMessagesComponent {
     const names = this.entries().flatMap(t => t.waiting);
     return names.length === 0 ? String.empty : Resources.formatOrganizationReplying([...new Set(names)]);
   });
-  protected readonly canSend: Signal<boolean> = computed(() => !this.sending() && this.recipientCount() > 0 && this.draft().trim().length > 0);
+  protected readonly canSend: Signal<boolean> = computed(() => !this.sending() && this.recipients().length > 0 && this.draft().trim().length > 0);
 
   public constructor() {
     effect(() => {
@@ -152,12 +155,16 @@ export class OrganizationMessagesComponent {
       case OrganizationTargetKind.Teammate:
         return this.shape() === OrganizationMessagesShape.Thread ? Resources.formatOrganizationOnlyNote(this.title())
           : this.chats.teammate(target.id)?.role ?? Resources.organizationTeammateNote;
-      case OrganizationTargetKind.Department:
-        return Resources.formatOrganizationDepartmentNote(this.recipientCount());
+      case OrganizationTargetKind.Department: {
+        const leaderId = this.organizations.organization().departments.find(t => t.id === target.id)?.leaderId;
+        const recipients = this.recipients();
+        return Resources.formatOrganizationDepartmentNote(recipients.find(t => t.id === leaderId)?.name ?? null,
+          recipients.filter(t => t.id !== leaderId).map(t => t.name));
+      }
       case OrganizationTargetKind.Leaders:
-        return Resources.formatOrganizationLeadersNote(this.recipientCount());
+        return Resources.formatOrganizationLeadersNote(this.recipients().map(t => t.name));
       case OrganizationTargetKind.Everyone:
-        return Resources.formatOrganizationEveryoneNote(this.recipientCount());
+        return Resources.formatOrganizationEveryoneNote(this.recipients().map(t => t.name));
     }
   }
 
