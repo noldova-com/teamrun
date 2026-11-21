@@ -10,6 +10,13 @@
   display: block;
 }
 
+.details {
+  --nol-popover-preferred-width: 18rem;
+  --nol-popover-surface: var(--nol-hover-widget);
+  --nol-popover-border: var(--nol-hover-widget-border);
+  --nol-popover-text: var(--nol-text);
+}
+
 .head {
   display: flex;
   align-items: center;
