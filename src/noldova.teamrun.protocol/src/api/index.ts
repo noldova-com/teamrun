@@ -194,6 +194,12 @@ export { DepartmentUpdateParams } from "../models/methods/department-update-para
 export { DepartmentMoveParams } from "../models/methods/department-move-params.js";
 export { DepartmentIdParams } from "../models/methods/department-id-params.js";
 export { DepartmentMemberSetParams } from "../models/methods/department-member-set-params.js";
+export { OrganizationTargetKind } from "../enums/organization-target-kind.js";
+export { OrganizationRecipientState } from "../enums/organization-recipient-state.js";
+export { OrganizationTarget } from "../models/organization-target.js";
+export { OrganizationRecipient } from "../models/organization-recipient.js";
+export { OrganizationMessage } from "../models/organization-message.js";
+export { OrganizationMessageSendParams } from "../models/methods/organization-message-send-params.js";
 export { ChatMemberParams, ChatMemberParams as ConversationMemberParams } from "../models/methods/chat-member-params.js";
 export { ChatMemberModeParams } from "../models/methods/chat-member-mode-params.js";
 export { ChatMemberSettingsParams } from "../models/methods/chat-member-settings-params.js";

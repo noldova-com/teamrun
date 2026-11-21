@@ -47,9 +47,9 @@
     "@noldova/context.data.sql.sqlite": ">=0.0.10 <0.1.0",
     "@noldova/context.exceptions": ">=0.0.10 <0.1.0",
     "@noldova/context.json": ">=0.0.10 <0.1.0",
-    "@noldova/desktop.cli": ">=0.0.10 <0.1.0",
-    "@noldova/desktop.protocol": ">=0.0.10 <0.1.0",
-    "@noldova/desktop.runtime": ">=0.0.10 <0.1.0",
+    "@noldova/desktop.cli": ">=0.0.11 <0.1.0",
+    "@noldova/desktop.protocol": ">=0.0.11 <0.1.0",
+    "@noldova/desktop.runtime": ">=0.0.11 <0.1.0",
     "@noldova/terminal.protocol": "0.0.3"
   }
 }

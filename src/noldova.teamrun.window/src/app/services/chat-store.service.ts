@@ -141,6 +141,7 @@ import { LinkGesture } from "@noldova/ui.components.angular";
 import { Resources } from "../../resources";
 import { ChatAction } from "../enums/chat-action";
 import { SendKey } from "../enums/send-key";
+import { TeammateStopReason } from "../enums/teammate-stop-reason";
 import { TerminalStep } from "../enums/terminal-step";
 import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
@@ -257,6 +258,7 @@ export class ChatStoreService {
   private readonly rewoundDraftSignal: WritableSignal<RewoundDraft | null> = signal(null);
   private readonly workingSignal: WritableSignal<ReadonlyMap<string, Message>> = signal(new Map());
   private readonly replyChatsSignal: WritableSignal<ReadonlyMap<string, string>> = signal(new Map());
+  private readonly replyTeammatesSignal: WritableSignal<ReadonlyMap<string, string | null>> = signal(new Map());
   private readonly resolvingChats: Set<string> = new Set();
   private readonly arrivedMessages: Map<string, string> = new Map();
   private readonly waitingReplies: Signal<readonly string[]> = computed(() => {
@@ -361,6 +363,11 @@ export class ChatStoreService {
   public readonly recentConversations: Signal<readonly Conversation[]> = computed(() =>
     ChatStoreService.newestFirst([...this.conversationsByProjectSignal().values()].flat()).slice(0, Resources.recentCount));
   public readonly pendingApprovals: Signal<readonly Approval[]> = computed(() => this.approvalsSignal().filter(t => t.status === ApprovalStatus.Pending));
+  public readonly waitingTeammates: Signal<ReadonlySet<string>> = computed(() => {
+    const teammates = this.replyTeammatesSignal();
+    const asking = [...this.workingSignal().values()].filter(t => t.status === MessageStatus.AwaitingApproval).map(t => t.id);
+    return new Set([...asking, ...this.pendingApprovals().map(t => t.messageId)].map(t => teammates.get(t)).filter(t => Object.isString(t)));
+  });
   public readonly workingReplies: Signal<readonly Message[]> = computed(() => [...this.workingSignal().values()]);
   public readonly thinkingReplies: Signal<ReadonlySet<string>> = this.thinkingSignal.asReadonly();
   public readonly savingCheckpointReplies: Signal<ReadonlySet<string>> = this.savingCheckpointSignal.asReadonly();
@@ -960,9 +967,22 @@ export class ChatStoreService {
   }
 
   public isTeammateUnavailable(id: string): boolean {
-    const teammate = this.teammate(id);
-    const provider = this.providers().find(t => t.id === teammate?.providerId);
-    return Object.isUndefined(provider) || !provider.enabled || provider.authStatus === AuthStatus.LoggedOut || !this.hasKind(provider.kind);
+    return !Object.isNull(this.teammateStopReason(id));
+  }
+
+  public teammateStopReason(id: string): TeammateStopReason | null {
+    return this.providerStopReason(this.teammate(id)?.providerId ?? null);
+  }
+
+  public providerStopReason(providerId: string | null): TeammateStopReason | null {
+    const provider = this.providers().find(t => t.id === providerId);
+    if (Object.isUndefined(provider))
+      return TeammateStopReason.ProviderDeleted;
+    if (!provider.enabled)
+      return TeammateStopReason.ProviderTurnedOff;
+    if (provider.authStatus === AuthStatus.LoggedOut)
+      return TeammateStopReason.SignedOut;
+    return this.hasKind(provider.kind) ? null : TeammateStopReason.KindMissing;
   }
 
   public isTeammateProviderDisabled(id: string): boolean {
@@ -2454,17 +2474,30 @@ export class ChatStoreService {
       this.replyChatsSignal.update(t => new Map([...t, ...learned]));
   }
 
+  private learnTeammates(replies: readonly Message[]): void {
+    const learned = replies.filter(t => !this.replyTeammatesSignal().has(t.id));
+    if (learned.length > 0)
+      this.replyTeammatesSignal.update(t => new Map([...t, ...learned.map(u => [u.id, u.teammateId] as const)]));
+  }
+
   private resolveChat(messageId: string): void {
-    if (this.replyChatsSignal().has(messageId) || this.resolvingChats.has(messageId))
+    if ((this.replyChatsSignal().has(messageId) && this.replyTeammatesSignal().has(messageId)) || this.resolvingChats.has(messageId))
       return;
     this.resolvingChats.add(messageId);
     void this.request(MethodName.MessageSummary, new MessageIdParams(messageId).toJson())
-      .then(value => this.learnChats(Object.isNull(value) ? [] : [[messageId, ReplySummary.fromJson(value).preview.conversationId] as const]), () => undefined)
+      .then(value => {
+        if (Object.isNull(value))
+          return;
+        const preview = ReplySummary.fromJson(value).preview;
+        this.learnChats([[messageId, preview.conversationId]]);
+        this.learnTeammates([preview]);
+      }, () => undefined)
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
   private setWorking(working: ReadonlyMap<string, Message>): void {
     this.learnChats([...working.values()].map(t => [t.id, t.conversationId] as const));
+    this.learnTeammates([...working.values()]);
     this.workingSignal.set(working);
     const conversationIds = new Set([...working.values()].map(t => t.conversationId));
     for (const [conversationId, clear] of this.workingTabs) {
@@ -2639,6 +2672,7 @@ export class ChatStoreService {
       this.markLoaded(Resources.formatNoticeKey(Resources.chatLoad, conversationId));
       const listed = ChatStoreService.readArray(listedApprovals, Approval.fromJson);
       this.learnChats(listed.map(t => [t.messageId, conversationId] as const));
+      this.learnTeammates(page.messages.filter(t => listed.some(u => u.messageId === t.id)));
       for (const approval of listed)
         this.upsertApproval(approval);
       for (const message of page.messages)
@@ -2745,6 +2779,8 @@ export class ChatStoreService {
 
   private applyDeleted(conversationId: string): void {
     this.forgetContexts(conversationId);
+    const chats = this.replyChatsSignal();
+    this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending || chats.get(u.messageId) !== conversationId));
     this.steersSignal.update(t => t.filter(u => u.conversationId !== conversationId));
     this.conversationsByProjectSignal.update(t => {
       const next = new Map(t);

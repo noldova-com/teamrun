@@ -154,7 +154,9 @@ import type {
   DepartmentMemberSetParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
-  Organization
+  Organization,
+  OrganizationMessage,
+  OrganizationMessageSendParams
 } from "@noldova/teamrun.protocol";
 
 /**
@@ -203,7 +205,9 @@ export declare enum ChangeEntity {
   /** A `Department`. */
   Department = "Department",
   /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id. */
-  DepartmentMember = "DepartmentMember"
+  DepartmentMember = "DepartmentMember",
+  /** An `OrganizationMessage` with each recipient's state. */
+  OrganizationMessage = "OrganizationMessage"
 }
 
 /**
@@ -2993,6 +2997,22 @@ export declare class Resources {
   public static readonly insertDepartmentMember: string;
   /** Takes a teammate out of its department. */
   public static readonly deleteDepartmentMember: string;
+  /** The organization messages migration's fixed id: `20261121090000_OrganizationMessages`. */
+  public static readonly organizationMessagesMigrationId: string;
+  /** The organization messages table. */
+  public static readonly organizationMessagesTable: string;
+  /** Lists every organization message, the oldest first. */
+  public static readonly selectOrganizationMessages: string;
+  /** Reads one organization message by id. */
+  public static readonly selectOrganizationMessage: string;
+  /** Adds an organization message. */
+  public static readonly insertOrganizationMessage: string;
+  /** Replaces an organization message's JSON. */
+  public static readonly updateOrganizationMessage: string;
+  /** The label an organization message's text carries in each recipient's outside chat. */
+  public static readonly organizationMessageLabel: string;
+  /** Why a recipient still queued when TeamRun stopped failed. */
+  public static readonly organizationSendInterrupted: string;
   public static readonly selectHandoverSummary: string;
   public static readonly upsertHandoverSummary: string;
   public static readonly deleteHandoverSummaries: string;
@@ -4540,6 +4560,12 @@ export declare class Resources {
 
   /** Missing department diagnostic. */
   public static formatDepartmentNotFound(id: string): string;
+
+  /** Missing organization message diagnostic. */
+  public static formatOrganizationMessageNotFound(id: string): string;
+
+  /** Why a teammate whose account can't reply, or is deleted, gets no outside message. */
+  public static formatAccountCannotReply(teammate: string, account: string | null): string;
 
   /** Why a teammate outside a department can't lead it. */
   public static formatDepartmentLeaderNotMember(teammate: string, department: string): string;
@@ -9171,7 +9197,7 @@ export declare class ReplyRun implements ITurnListener {
  * the replies already queued, in mention order, until the chain reaches the hop limit. A failed or
  * cancelled reply, or one after a stop, hands off to no one, and a stop cancels every reply of the chain.
  */
-export declare class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export declare class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   /**
    * Initializes the engine.
    * @param context The context of the data directory, for the transaction that records a send.
@@ -9319,6 +9345,11 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
    * @inheritdoc
    */
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId?: string | null): Promise<string>;
+
+  /**
+   * @inheritdoc
+   */
+  public startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
 
   /**
    * @inheritdoc
@@ -9522,6 +9553,7 @@ export declare class RequestDispatcher {
    * @param sharedServers The shared MCP server methods; without them the `SharedMcp` methods are unknown.
    * @param acpAgents The added ACP agents' methods; without them the `AcpAgent` and `AcpLocalCommand` methods are unknown.
    * @param organization The organization's methods; without them `OrganizationList` and the `Department` methods are unknown.
+   * @param organizationMessages The organization's messages; without them the `OrganizationMessage` methods are unknown.
    */
   public constructor(
     kinds: IProviderKindsService,
@@ -9542,7 +9574,8 @@ export declare class RequestDispatcher {
     sharedServers?: ISharedMcpServersService | null,
     computerUseGrants?: IComputerUseGrantsService | null,
     acpAgents?: IAcpAgentsService | null,
-    organization?: IOrganizationService | null);
+    organization?: IOrganizationService | null,
+    organizationMessages?: IOrganizationMessagesService | null);
 
   /**
    * Answers one request; never throws.
@@ -9887,6 +9920,64 @@ export interface IOrganizationService {
    * @returns Whether the teammate was in a department.
    */
   removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+}
+
+/** Starts a teammate's reply to a message from outside its chats, and stops a reply. */
+export interface IOrganizationSender {
+  /**
+   * Sends the text to the teammate's outside chat and starts its replies without waiting for them; while the chat answers an earlier
+   * message, the new replies wait as Pending behind it and start when it ends.
+   * @throws ServiceException `NotFound` for a teammate that no longer exists, `Conflict` with `Resources.formatAccountCannotReply` when its account
+   * can't reply.
+   */
+  startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+
+  /** Stops a reply that hasn't finished. */
+  cancelAsync(params: MessageIdParams): Promise<Message>;
+}
+
+/** Messages the person sends to a teammate, a department, the leaders or everyone, with each recipient's state. */
+export interface IOrganizationMessagesService {
+  /** Returns every organization message, the oldest first. */
+  listAsync(): Promise<readonly OrganizationMessage[]>;
+
+  /**
+   * Stores the message with its recipients queued, then starts every recipient at once and returns the message with their states.
+   * A department goes to its leader and direct members; a recipient that is gone by its turn is `Removed`, and one whose send fails is `Failed`.
+   * @throws ServiceException `NotFound` for an unknown teammate or department.
+   */
+  sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
+
+  /**
+   * Stops the recipients not yet started and the replies still waiting to start when Stop arrives, cancelling those replies together,
+   * and marks them `Stopped`.
+   * @throws ServiceException `NotFound` for an unknown message.
+   */
+  stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /**
+   * After a restart, marks every recipient still `Queued` `Failed` with `Resources.organizationSendInterrupted`; run once the engine has reconciled.
+   */
+  reconcileAsync(): Promise<void>;
+}
+
+/** Keeps organization messages in the `organizationMessages` table, recording each change in the change feed and publishing it. */
+export declare class OrganizationMessagesService implements IOrganizationMessagesService {
+  /** Creates the service over the database, the organization, the teammates, their messages, the sender and the event sink. */
+  public constructor(context: DatabaseContext, organization: IOrganizationService, teammates: ITeammatesService, messages: IMessagesService,
+    sender: IOrganizationSender, events: IEventSink);
+
+  /** @inheritdoc */
+  public listAsync(): Promise<readonly OrganizationMessage[]>;
+
+  /** @inheritdoc */
+  public sendAsync(params: OrganizationMessageSendParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public stopAsync(params: MessageIdParams): Promise<OrganizationMessage>;
+
+  /** @inheritdoc */
+  public reconcileAsync(): Promise<void>;
 }
 
 /** Keeps the organization in the `departments` and `departmentMembers` tables, recording each change in the change feed. */
@@ -11030,6 +11121,15 @@ export declare class HandoverSummaryKindsMigration extends SqlMigration {
   /**
    * Adds the column with `Resources.addHandoverSummaryKind`.
    */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Adds the `organizationMessages` table, each message kept as its JSON. */
+export declare class OrganizationMessagesMigration extends SqlMigration {
+  /** Uses the fixed organization messages migration id. */
+  public constructor();
+
+  /** Creates the table keyed by the message's id. */
   public override apply(builder: MigrationBuilder): void;
 }
 
