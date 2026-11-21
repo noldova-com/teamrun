@@ -36,11 +36,7 @@ export class ProtocolApiTests {
     Assert.isDefined(api.DepartmentIdParams);
     Assert.isDefined(api.DepartmentMemberSetParams);
     Assert.isDefined(api.OrganizationTargetKind);
-    Assert.isDefined(api.OrganizationRecipientState);
     Assert.isDefined(api.OrganizationTarget);
-    Assert.isDefined(api.OrganizationRecipient);
-    Assert.isDefined(api.OrganizationMessage);
-    Assert.isDefined(api.OrganizationMessageSendParams);
     Assert.isDefined(api.ChatMemberParams);
     Assert.isDefined(api.ChatMember);
     Assert.isDefined(api.TeammateMention);
@@ -225,27 +221,19 @@ export class ProtocolApiTests {
 
   @TestMethod
   public keepsEachEarlierChatNameAsTheSameExport(): void {
-    const pairs: readonly (readonly [unknown, unknown])[] = [
-      [api.Conversation, api.Chat],
-      [api.ConversationResponder, api.ChatResponder],
-      [api.ConversationCreateParams, api.ChatCreateParams],
-      [api.ConversationIdParams, api.ChatIdParams],
-      [api.ConversationListParams, api.ChatListParams],
-      [api.ConversationMoveParams, api.ChatMoveParams],
-      [api.ConversationRenameParams, api.ChatRenameParams],
-      [api.ConversationResponderParams, api.ChatResponderParams],
-      [api.ConversationRewindParams, api.ChatRewindParams],
-      [api.ConversationRewindResult, api.ChatRewindResult],
-      [api.ConversationSearchHit, api.ChatSearchHit],
-      [api.ConversationSearchParams, api.ChatSearchParams],
-      [api.ConversationSearchResult, api.ChatSearchResult],
-      [api.ConversationRewoundPayload, api.ChatRewoundPayload],
-      [api.ConversationPosition, api.ChatPosition],
-      [api.ConversationMemberParams, api.ChatMemberParams],
-      [api.ConversationMember, api.ChatMember]
+    const same = (earlier: unknown, current: unknown): boolean => earlier === current && !Object.isUndefined(current);
+    const kept = [
+      same(api.Conversation, api.Chat), same(api.ConversationResponder, api.ChatResponder), same(api.ConversationCreateParams, api.ChatCreateParams),
+      same(api.ConversationIdParams, api.ChatIdParams), same(api.ConversationListParams, api.ChatListParams),
+      same(api.ConversationMoveParams, api.ChatMoveParams), same(api.ConversationRenameParams, api.ChatRenameParams),
+      same(api.ConversationResponderParams, api.ChatResponderParams), same(api.ConversationRewindParams, api.ChatRewindParams),
+      same(api.ConversationRewindResult, api.ChatRewindResult), same(api.ConversationSearchHit, api.ChatSearchHit),
+      same(api.ConversationSearchParams, api.ChatSearchParams), same(api.ConversationSearchResult, api.ChatSearchResult),
+      same(api.ConversationRewoundPayload, api.ChatRewoundPayload), same(api.ConversationPosition, api.ChatPosition),
+      same(api.ConversationMemberParams, api.ChatMemberParams), same(api.ConversationMember, api.ChatMember)
     ];
 
-    Assert.areEqual(pairs.length, pairs.filter(([earlier, current]) => earlier === current && current !== undefined).length);
+    Assert.areEqual(kept.length, kept.filter(t => t).length);
     Assert.areEqual(api.Resources.invalidChatResponder, api.Resources.invalidConversationResponder);
     Assert.areEqual(api.Resources.panelChatMismatch, api.Resources.panelConversationMismatch);
     Assert.areEqual("chatId,shownChatId,chat", [api.Resources.conversationIdField, api.Resources.shownConversationIdField, api.Resources.conversationField].join(","));
@@ -253,8 +241,8 @@ export class ProtocolApiTests {
 
   @TestMethod
   public readsEachEarlierChatFieldFromItsNewName(): void {
-    const earlier = (type: { prototype: object }, name: string, field: string): unknown =>
-      Object.getOwnPropertyDescriptor(type.prototype, name)?.get?.call({ [field]: "c1" });
+    const earlier = (prototype: object, name: string, field: string): unknown =>
+      Object.getOwnPropertyDescriptor(prototype, name)?.get?.call({ [field]: "c1" });
     const models = [
       api.AttachmentReadParams, api.BackgroundTask, api.BackgroundTaskOutputPayload, api.BackgroundTasksClearedPayload, api.ChatIdParams, api.ChatMember,
       api.ChatMemberParams, api.ChatMoveParams, api.ChatPosition, api.ChatRenameParams, api.ChatResponderParams, api.ChatRewindParams, api.ChatRewoundPayload,
@@ -262,8 +250,8 @@ export class ProtocolApiTests {
       api.MessageSendParams, api.PanelRequestedPayload, api.TeammateUsage, api.WrittenImageReadParams
     ];
 
-    Assert.areEqual(models.map(() => "c1").join(","), models.map(t => String(earlier(t, "conversationId", "chatId"))).join(","));
-    Assert.areEqual("c1", earlier(api.WindowFocusedParams, "shownConversationId", "shownChatId"));
-    Assert.areEqual("c1", earlier(api.ChatRewindResult, "conversation", "chat"));
+    Assert.areEqual(models.map(() => "c1").join(","), models.map(t => String(earlier(t.prototype, "conversationId", "chatId"))).join(","));
+    Assert.areEqual("c1", earlier(api.WindowFocusedParams.prototype, "shownConversationId", "shownChatId"));
+    Assert.areEqual("c1", earlier(api.ChatRewindResult.prototype, "conversation", "chat"));
   }
 }

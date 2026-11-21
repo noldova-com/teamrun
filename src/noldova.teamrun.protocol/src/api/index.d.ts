@@ -593,24 +593,6 @@ export declare enum MethodName {
    */
   OrganizationLayoutSave = "OrganizationLayoutSave",
   /**
-   * Sends a message to one teammate, a department's leader and members, every department's leader, or every teammate, starting
-   * each at once in its own chat, and publishes `OrganizationMessageUpdated` as each starts. Parameters:
-   * `OrganizationMessageSendParams`. Result: `OrganizationMessage`.
-   */
-  OrganizationMessageSend = "OrganizationMessageSend",
-  /**
-   * Stops an organization message: each recipient not yet started is Stopped, and a reply still pending is cancelled.
-   * Parameters: `MessageIdParams`, the organization message's id. Result: `OrganizationMessage`.
-   */
-  OrganizationMessageStop = "OrganizationMessageStop",
-  /** Lists the organization messages, oldest first. Result: `OrganizationMessage[]`. */
-  OrganizationMessageList = "OrganizationMessageList",
-  /**
-   * Lists the replies to one organization message: for each recipient its message reached, the replies in its chat that answer the message it was
-   * sent, in chat order. Parameters: `MessageIdParams`, the organization message's id. Result: `Message[]`.
-   */
-  OrganizationMessageReplyList = "OrganizationMessageReplyList",
-  /**
    * Finds a teammate's Organization chat, or makes it when there is none yet, without sending anything.
    * Parameters: `TeammateIdParams`. Result: `Chat`.
    */
@@ -1360,9 +1342,7 @@ export declare enum EventName {
   /**
    * The Organization view's layout was saved. Payload: the layout's JSON object.
    */
-  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
-  /** An organization message or one of its recipients changed. Payload: `OrganizationMessage`, the whole message. */
-  OrganizationMessageUpdated = "OrganizationMessageUpdated"
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
 }
 
 /**
@@ -11980,7 +11960,7 @@ export declare class Organization {
   public toJson(): JsonObject;
 }
 
-/** Whom an organization message goes to. */
+/** Whom the person writes to in the Organization view. */
 export declare enum OrganizationTargetKind {
   /** One teammate. */
   Teammate = "Teammate",
@@ -11992,21 +11972,7 @@ export declare enum OrganizationTargetKind {
   Everyone = "Everyone"
 }
 
-/** Where an organization message stands for one recipient. */
-export declare enum OrganizationRecipientState {
-  /** Not started yet. */
-  Queued = "Queued",
-  /** Its chat has the message and its reply started. */
-  Started = "Started",
-  /** The person stopped the message before it started. */
-  Stopped = "Stopped",
-  /** The teammate was deleted before it started. */
-  Removed = "Removed",
-  /** It couldn't start; the reason says why. */
-  Failed = "Failed"
-}
-
-/** Whom an organization message goes to. */
+/** Whom the person writes to in the Organization view. */
 export declare class OrganizationTarget {
   /** Every department's leader. */
   public static readonly leaders: OrganizationTarget;
@@ -12033,67 +11999,6 @@ export declare class OrganizationTarget {
   public toJson(): JsonObject;
 }
 
-/** One teammate an organization message goes to, and where it stands. */
-export declare class OrganizationRecipient {
-  /** The teammate's id. */
-  public readonly teammateId: string;
-  /** The teammate's name when the message was sent. */
-  public readonly teammateName: string;
-  /** Where it stands. */
-  public readonly state: OrganizationRecipientState;
-  /** The chat it went to, once started. */
-  public readonly chatId: string | null;
-  /** The message in that chat, once started; its reply answers it. */
-  public readonly messageId: string | null;
-  /** Why it failed, or null. */
-  public readonly reason: string | null;
-  /** Creates a validated immutable value. */
-  public constructor(
-    teammateId: string,
-    teammateName: string,
-    state: OrganizationRecipientState,
-    chatId?: string | null,
-    messageId?: string | null,
-    reason?: string | null);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationRecipient;
-  /** Returns a copy in another state, keeping the fields not given. */
-  public with(state: OrganizationRecipientState, chatId?: string | null, messageId?: string | null, reason?: string | null): OrganizationRecipient;
-  /** Returns the wire representation. */
-  public toJson(): JsonObject;
-}
-
-/** A message sent from the organization view, and each of its recipients. */
-export declare class OrganizationMessage {
-  /** The id. */
-  public readonly id: string;
-  /** Whom it went to. */
-  public readonly target: OrganizationTarget;
-  /** The text. */
-  public readonly text: string;
-  /** When it was sent. */
-  public readonly createdAt: string;
-  /** The teammates it went to, in the order the target lists them. */
-  public readonly recipients: readonly OrganizationRecipient[];
-  /**
-   * Creates a validated immutable value.
-   * @throws ArgumentException when the text is blank or a teammate is a recipient twice.
-   */
-  public constructor(
-    id: string,
-    target: OrganizationTarget,
-    text: string,
-    createdAt: string,
-    recipients: readonly OrganizationRecipient[]);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationMessage;
-  /** Returns a copy with one recipient replaced, by its teammate. */
-  public withRecipient(recipient: OrganizationRecipient): OrganizationMessage;
-  /** Returns the wire representation. */
-  public toJson(): JsonObject;
-}
-
-/** Parameters for sending an organization message. */
 /**
  * The key of a teammate's Organization chat: the organization and the teammate it talks with.
  */
@@ -12128,21 +12033,6 @@ export declare class OrganizationChat {
    * Renders the JSON object `fromJson` accepts.
    * @returns The object with `organizationId` and `teammateId`.
    */
-  public toJson(): JsonObject;
-}
-
-export declare class OrganizationMessageSendParams {
-  /** Whom it goes to. */
-  public readonly target: OrganizationTarget;
-  /** The text. */
-  public readonly text: string;
-  /** Creates a validated immutable value. */
-  public constructor(
-    target: OrganizationTarget,
-    text: string);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationMessageSendParams;
-  /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
 

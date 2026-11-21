@@ -5,14 +5,15 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
+import { Conversation, Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
+  OrganizationLayoutSaveParams, PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
 import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
@@ -21,7 +22,6 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -106,7 +106,11 @@ describe("OrganizationViewComponent", () => {
     saves = [];
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
-      .answer(MethodName.OrganizationMessageList, () => [])
+      .answer(MethodName.OrganizationChatOpen, t => {
+        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        return new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
+          null, new OrganizationChat("my-organization", teammateId)).toJson();
+      })
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayoutSaveParams.fromJson(t).layout);
         return null;
@@ -114,7 +118,8 @@ describe("OrganizationViewComponent", () => {
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
     configure(context);
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
+      { provide: WindowPartTokens.shown, useValue: signal(true).asReadonly() }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
     element().style.width = "100rem";
     element().style.height = "76rem";
@@ -132,7 +137,6 @@ describe("OrganizationViewComponent", () => {
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
     AppearanceFixture.reset();
-    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -421,38 +425,38 @@ describe("OrganizationViewComponent", () => {
       .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"], 0]);
   });
 
-  it("talks in a thread beside the Tree and in an inbox beside the Board, whose leaders and department buttons open their conversations", async () => {
+  it("talks in the Organization chat panel beside the Tree under To, and beside the Board under its chat list, whose leaders and department buttons choose whom", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
-    const panel = (): unknown[] => [one("aside.messages > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"),
-      texts("aside.messages .nol-teamrun-organization-thread-title"), all("aside.messages .to").length];
+    const panel = (): unknown[] => [all("aside.messages > nol-teamrun-organization-chats").length,
+      texts("aside.messages > nol-teamrun-organization-chat .nol-teamrun-organization-chat-title"), all("aside.messages nol-teamrun-organization-chat > .to").length];
 
-    expect(panel()).toEqual([true, ["Design"], 0]);
+    expect(panel()).toEqual([1, ["Chat with Design"], 0]);
     await userEvent.click(one(".message-leaders"));
     await settle();
-    expect(panel()).toEqual([true, ["All leaders"], 0]);
+    expect(panel()).toEqual([1, ["Chat with all leaders"], 0]);
     await userEvent.click(one(".lane:nth-child(1) .message-department"));
     await settle();
-    expect(panel()).toEqual([true, ["Design"], 0]);
+    expect(panel()).toEqual([1, ["Chat with Design"], 0]);
 
     one(".top .views [role=radio]:first-of-type").click();
     await settle();
-    expect(panel()).toEqual([false, ["Chat with Design"], 1]);
+    expect(panel()).toEqual([0, ["Chat with Design"], 1]);
   });
 
   it("talks with the kept focus until another conversation is chosen, and keeps that one when the organization changes", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ focus: "Department:build" })));
-    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Chat with Build"]));
-    const kept = texts("aside.messages .nol-teamrun-organization-thread-title");
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual(["Chat with Build"]));
+    const kept = texts("aside.messages .nol-teamrun-organization-chat-title");
     await userEvent.click(one(":scope > .department .message", department("Design")));
     await settle();
-    const chosen = texts("aside.messages .nol-teamrun-organization-thread-title");
+    const chosen = texts("aside.messages .nol-teamrun-organization-chat-title");
 
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-thread-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
+    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-chat-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
@@ -472,7 +476,7 @@ describe("OrganizationViewComponent", () => {
   });
 
   describe("with its messages beside the tree", () => {
-    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
+    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-chat-title");
 
     afterEach(() => AppearanceFixture.reset());
 
@@ -861,14 +865,14 @@ describe("OrganizationViewComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
-    it("sets To under the messages' head over a select as wide as their padding allows, above the thread, a department's Message under its summary at its start, and a name as plain text", async () => {
+    it("sets To under the chat's head over a select as wide as the panel's padding allows, above the composer, a department's Message under its summary at its start, and a name as plain text", async () => {
       await create();
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const aside = one("aside.messages");
       const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
-      const [head, label, choice, thread] = [one(".nol-teamrun-organization-thread-head", aside), one(".to-label", aside), one(".to-choice", aside),
-        one(".nol-teamrun-organization-thread", aside)];
+      const [head, label, choice, thread] = [one(".nol-teamrun-organization-chat-title", aside), one(".to-label", aside), one(".to-choice", aside),
+        one("nol-teamrun-composer", aside)];
       const design = one(":scope > .department", department("Design"));
       const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
       const [summary, message] = [one(".department-summary", design), one(".message", design)];
@@ -1023,7 +1027,7 @@ describe("OrganizationViewComponent", () => {
       one(".top .views [role=radio]:nth-of-type(3)").click();
       await settle();
       const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart section.focus"), box(".chart section.focus > nol-canvas"),
-        box(".chart section.focus > nol-teamrun-organization-messages")];
+        box(".chart section.focus > nol-teamrun-organization-chat")];
       for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
         [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
         AppearanceFixture.expectPixels(actual, expected);

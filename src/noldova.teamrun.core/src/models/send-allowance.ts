@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum OrganizationRecipientState {
-  Queued = "Queued",
-  Started = "Started",
-  Stopped = "Stopped",
-  Removed = "Removed",
-  Failed = "Failed"
+export class SendAllowance {
+  public readonly starts: string | null;
+
+  public constructor(starts: string | null) {
+    this.starts = starts;
+  }
 }

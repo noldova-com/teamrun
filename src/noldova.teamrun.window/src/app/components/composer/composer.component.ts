@@ -77,6 +77,7 @@ import {
 import { Resources } from "../../../resources";
 import { ImageOpenMode } from "../../enums/image-open-mode";
 import { SendKey } from "../../enums/send-key";
+import type { IComposerDrafts } from "../../interfaces/i-composer-drafts";
 import { AbilityRefusal } from "../../models/ability-refusal";
 import { ChatThread } from "../../models/chat-thread";
 import { ProviderChoice } from "../../models/provider-choice";
@@ -84,6 +85,7 @@ import type { ChatContext } from "../../models/chat-context";
 import { ComposerAttachment } from "../../models/composer-attachment";
 import { ComposerBar } from "../../models/composer-bar";
 import { ComposerDraft } from "../../models/composer-draft";
+import type { ComposerFanOut } from "../../models/composer-fan-out";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
 import { ImageViewerData } from "../../models/image-viewer-data";
@@ -96,6 +98,7 @@ import { CommandTargetsService } from "../../services/command-targets.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ComposerDraftService } from "../../services/composer-draft.service";
+import { KeptComposerDraftService } from "../../services/kept-composer-draft.service";
 import { ImageViewerService } from "../../services/image-viewer.service";
 import { PlanUsageStatus } from "../../services/plan-usage-status";
 import { ProviderSignOut } from "../../services/provider-sign-out";
@@ -130,9 +133,12 @@ import { WaitingMessagesComponent } from "../waiting-messages/waiting-messages.c
     TooltipDirective,
     WaitingMessagesComponent
   ],
-  providers: [ChatStoreService.provider, ComposerDefaultService.provider, ComposerDraftService, ImageViewerService.provider],
+  providers: [ChatStoreService.provider, ComposerDefaultService.provider, ComposerDraftService, KeptComposerDraftService, ImageViewerService.provider],
   templateUrl: "./composer.component.html",
-  styleUrl: "./composer.component.css"
+  styleUrl: "./composer.component.css",
+  host: {
+    "[class.nol-teamrun-composer-fan-out]": "isFanOut()"
+  }
 })
 export class ComposerComponent {
   private readonly box: Signal<ElementRef<HTMLTextAreaElement>> = viewChild.required<ElementRef<HTMLTextAreaElement>>("box");
@@ -169,7 +175,8 @@ export class ComposerComponent {
   private readonly shown: Signal<boolean> = inject(WindowPartTokens.shown, { optional: true }) ?? signal(true);
   private readonly usage: UsageFormatterService = inject(UsageFormatterService);
   private readonly focusOnShow: WritableSignal<boolean> = signal(false);
-  private readonly drafts: ComposerDraftService = inject(ComposerDraftService);
+  private readonly chatDrafts: ComposerDraftService = inject(ComposerDraftService);
+  private readonly keptDrafts: KeptComposerDraftService = inject(KeptComposerDraftService);
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly viewer: ImageViewerService = inject(ImageViewerService);
   private readonly tasks: PendingTasks = inject(PendingTasks);
@@ -285,10 +292,14 @@ export class ComposerComponent {
   private readonly defaultLabel: Signal<string>;
 
   public readonly conversationId: InputSignal<string> = input.required<string>();
+  public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
+  public readonly fanOut: InputSignal<ComposerFanOut | null> = input<ComposerFanOut | null>(null);
+
+  protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
 
   public constructor() {
     const store = this.store;
-    this.teammateMentions = computed(() => store.teammates().map(t => new TeammateMention(t.id, t.name)));
+    this.teammateMentions = computed(() => Object.isNull(this.teammateId()) ? store.teammates().map(t => new TeammateMention(t.id, t.name)) : []);
     this.ownChoice = computed(() => this.choices.choiceOf(this.conversationId()), { equal: (a, b) => a === b || (!Object.isNull(a) && a.equals(b)) });
     this.keptChoice = computed(() => store.conversation(this.conversationId())?.responder, { equal: ComposerComponent.sameResponder });
     this.runningReply = computed(() => store.runningReplyOf(this.conversationId()));
@@ -305,6 +316,8 @@ export class ComposerComponent {
     this.memberTeammates = computed(() => NameOrder.sort(store.membersOf(this.conversationId())
       .map(t => store.teammate(t.teammateId)).filter((t): t is Teammate => !Object.isNull(t)), t => t.name));
     this.candidates = computed(() => {
+      if (!Object.isNull(this.teammateId()))
+        return [];
       const members = this.memberTeammates();
       const candidates = new TeammateCandidates();
       const options = (section: string) => (teammate: Teammate): IMentionCandidateOptions =>
@@ -624,8 +637,13 @@ export class ComposerComponent {
     });
     effect(() => {
       const id = this.responderId();
-      if (!Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
+      if (Object.isNull(this.teammateId()) && !Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
         untracked(() => this.selectResponder(null, false));
+    });
+    effect(() => {
+      const fixed = this.teammateId();
+      if (!Object.isNull(fixed) && this.responderId() !== fixed)
+        untracked(() => this.responderId.set(fixed));
     });
     effect(onCleanup => {
       const conversationId = this.conversationId();
@@ -1182,6 +1200,10 @@ export class ComposerComponent {
       void attachment.loadPreview(path => this.store.shareAttachment(conversationId, path));
   }
 
+  private get drafts(): IComposerDrafts {
+    return this.isFanOut() ? this.keptDrafts : this.chatDrafts;
+  }
+
   private currentSettings(): ComposerSettings | null {
     const kind = this.kind();
     return Object.isNull(kind) ? null : new ComposerSettings(kind, this.model(), this.effort(), this.ownProvider(), this.responderId(), this.speed(), this.mode());
@@ -1242,9 +1264,11 @@ export class ComposerComponent {
         attachments.push(new AttachmentInput(saved.name, saved.mediaType, null, saved.path));
       }
       if (await this.deliver(text, settings, conversationId, attachments, mentions.map(t => t.teammateId), delivery)) {
-        this.context.keepDocument(Resources.conversationDocumentName, conversationId);
-        this.choices.remember(conversationId, settings);
-        this.defaults.remember(settings);
+        if (!this.isFanOut()) {
+          this.context.keepDocument(Resources.conversationDocumentName, conversationId);
+          this.choices.remember(conversationId, settings);
+          this.defaults.remember(settings);
+        }
         const last = mentions.at(-1);
         if (!Object.isUndefined(last)) {
           this.choices.remember(conversationId, settings.withResponder(last.teammateId));
@@ -1273,6 +1297,9 @@ export class ComposerComponent {
 
   private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[],
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
+    const fanOut = this.fanOut();
+    if (!Object.isNull(fanOut))
+      return fanOut.send(text, settings, attachments);
     const editing = this.editing();
     if (!Object.isNull(editing))
       return this.saveEdit(editing, text, conversationId, mentioned);

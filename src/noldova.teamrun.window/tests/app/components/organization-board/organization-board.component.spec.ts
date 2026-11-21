@@ -16,7 +16,7 @@ import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular"
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
-import { OrganizationConversation } from "../../../../src/app/models/organization-conversation";
+import { OrganizationTargetKey } from "../../../../src/app/models/organization-target-key";
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
@@ -57,7 +57,7 @@ describe("OrganizationBoardComponent", () => {
   const box = (view: Element): DOMRect => view.getBoundingClientRect();
   const nth = (boxes: readonly DOMRect[], index: number): DOMRect => {
     const found = boxes[index];
-    if (found === undefined)
+    if (Object.isUndefined(found))
       throw new Error(`No box at ${index}.`);
     return found;
   };
@@ -174,7 +174,7 @@ describe("OrganizationBoardComponent", () => {
   it("opens each conversation in the inbox from its row, and marks the open one", async () => {
     await create();
     const chosen: string[] = [];
-    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationConversation.keyOf(t)));
+    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationTargetKey.of(t)));
     const selected = (): string[] => all(".ask.selected .name, .leaders > .selected .name, .lane.selected .lane-name, .lane > .selected .name")
       .map(t => t.textContent?.trim() ?? "");
 
@@ -183,19 +183,19 @@ describe("OrganizationBoardComponent", () => {
     expect([chosen, selected()]).toEqual([["Teammate:bob", "Teammate:offline", "Leaders:", "Teammate:alice", "Teammate:reviewer", "Department:design",
       "Department:ui", "Department:build", "Teammate:bob", "Teammate:offline", "Teammate:carol"], []]);
 
-    const marks: [OrganizationTarget, string[]][] = [[OrganizationTarget.teammate("bob"), ["Bob", "Bob"]], [OrganizationTarget.department("build"), ["Build"]],
-      [OrganizationTarget.teammate("alice"), ["Alice"]]];
-    for (const [target, names] of marks) {
+    const marked = async (target: OrganizationTarget): Promise<string[]> => {
       fixture.componentRef.setInput("target", target);
       await settle();
-      expect(selected()).toEqual(names);
-    }
+      return selected();
+    };
+    expect([await marked(OrganizationTarget.teammate("bob")), await marked(OrganizationTarget.department("build")), await marked(OrganizationTarget.teammate("alice"))])
+      .toEqual([["Bob", "Bob"], ["Build"], ["Alice"]]);
   });
 
   it("edits the structure in edit mode: renames a department, adds a member from outside it and a department, and lets each member's card move or remove it", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
@@ -236,7 +236,7 @@ describe("OrganizationBoardComponent", () => {
   it("asks before deleting a department, and deletes nothing when the question is closed", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
-      if (found === undefined)
+      if (Object.isUndefined(found))
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
@@ -291,24 +291,25 @@ describe("OrganizationBoardComponent", () => {
       const columns = Math.floor((host.width + gap) / (16 * rem() + gap));
       const width = (host.width - (columns - 1) * gap) / columns;
       const [none, design] = [one(".lane:nth-child(1)"), one(".lane:nth-child(2)")];
-      const offsets = (lane: HTMLElement): { head: DOMRect; summary: DOMRect; sort: DOMRect; member: DOMRect; column: DOMRect } => ({ column: box(lane),
-        head: box(one(".lane-head", lane)), summary: box(one(".lane-summary", lane)), sort: box(one(".lane-sort", lane)), member: box(one("nol-teamrun-organization-card", lane)) });
-      const [ours, theirs] = [offsets(none), offsets(design)];
+      const part = (root: HTMLElement, selector: string): DOMRect => box(one(selector, root));
+      const lane = box(none);
+      const other = box(design);
 
       expect(texts(".lane-name", none)).toEqual(["No department"]);
       for (const [index, column] of all(".lane").map(box).entries()) {
         AppearanceFixture.expectPixels(column.width, width);
         AppearanceFixture.expectPixels(column.left - host.left, index * (width + gap));
-        AppearanceFixture.expectPixels(column.top, ours.column.top);
+        AppearanceFixture.expectPixels(column.top, box(none).top);
       }
-      AppearanceFixture.expectPixels(ours.head.left - ours.column.left, space(3) + 1);
-      AppearanceFixture.expectPixels(ours.head.top - ours.column.top, theirs.head.top - theirs.column.top);
-      AppearanceFixture.expectPixels(ours.summary.top - ours.head.bottom, theirs.summary.top - theirs.head.bottom);
-      AppearanceFixture.expectPixels(ours.sort.top - ours.summary.bottom, theirs.sort.top - theirs.summary.bottom);
-      AppearanceFixture.expectPixels(ours.sort.left - ours.column.left, space(3) + 1);
-      AppearanceFixture.expectPixels(ours.member.top - ours.sort.bottom, theirs.member.top - theirs.sort.bottom);
-      AppearanceFixture.expectPixels(ours.member.left - ours.column.left, theirs.member.left - theirs.column.left);
-      AppearanceFixture.expectPixels(ours.member.width, theirs.member.width);
+      const [head, summary, sort, member] = [".lane-head", ".lane-summary", ".lane-sort", "nol-teamrun-organization-card"];
+      AppearanceFixture.expectPixels(part(none, head).left - lane.left, space(3) + 1);
+      AppearanceFixture.expectPixels(part(none, head).top - lane.top, part(design, head).top - other.top);
+      AppearanceFixture.expectPixels(part(none, summary).top - part(none, head).bottom, part(design, summary).top - part(design, head).bottom);
+      AppearanceFixture.expectPixels(part(none, sort).top - part(none, summary).bottom, part(design, sort).top - part(design, summary).bottom);
+      AppearanceFixture.expectPixels(part(none, sort).left - lane.left, space(3) + 1);
+      AppearanceFixture.expectPixels(part(none, member).top - part(none, sort).bottom, part(design, member).top - part(design, sort).bottom);
+      AppearanceFixture.expectPixels(part(none, member).left - lane.left, part(design, member).left - other.left);
+      AppearanceFixture.expectPixels(part(none, member).width, part(design, member).width);
     });
 
     it("lays the board out at 76rem: the queue in columns of at least 17rem, the leaders at up to 20rem on one line, the departments in columns of at least 16rem", async () => {

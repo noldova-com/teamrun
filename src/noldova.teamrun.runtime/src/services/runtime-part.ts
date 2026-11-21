@@ -52,7 +52,6 @@ import {
   ComputerUseGrantTimings,
   NodeTimer,
   TeammatesService,
-  OrganizationMessagesService,
   OrganizationService,
   WindowsService
 } from "@noldova/teamrun.core";
@@ -275,8 +274,6 @@ export class RuntimePart implements IRuntimePart {
     const channels = new Map<string, EventChannel>(Object.values(EventName).map(t => [t, context.declareEvent(Resources.formatQualifiedName(context.moduleId, t))]));
     this.subscriptions.push(events.subscribe(new EventForwarder(channels)));
     await engine.reconcileAsync();
-    const organizationMessages = new OrganizationMessagesService(database, organization, teammates, messages, engine, events);
-    await organizationMessages.reconcileAsync();
     this.answerer = RuntimePart.registerAnswerer(context, engine, calls);
     await database.database.connection.runInTransactionAsync(async transaction => {
       const usual = new Map<string, string | null>();
@@ -299,7 +296,7 @@ export class RuntimePart implements IRuntimePart {
       : new ComputerUseGrantsService(new RuntimeRememberedAppGrants(context.permissions), conversations, teammates, apps,
         ComputerUseGrantTimings.createDefault(), new NodeTimer());
     const dispatcher = new RequestDispatcher(kinds, providers, projects, conversations, messages, approvals, engine, teammates, events, drafts, folder,
-      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization, organizationMessages);
+      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization);
     const methods = new Map<string, IMethodHandler>();
     const clients = new WindowClients(new DispatchedMethod(MethodName.WindowFocused, dispatcher), windows);
     context.onClientClosed(t => clients.close(t));

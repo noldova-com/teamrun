@@ -29,7 +29,7 @@ import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, Cha
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
 import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization }
   from "@noldova/teamrun.protocol";
-import { OrganizationLayoutSaveParams, OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
+import { OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
 import {
   AttachmentContent,
@@ -228,31 +228,6 @@ export class RequestDispatcherTests {
     Assert.areEqual(ErrorCode.UnknownMethod, unknown.info?.name);
     Assert.isFalse(deleted.hasErrors);
     Assert.areEqual(1, host.listener.count(EventName.OrganizationChanged));
-  }
-
-  @TestMethod
-  public async sendsStopsAndListsOrganizationMessagesAndKnowsNoneOfTheirMethodsWithoutThem(): Promise<void> {
-    await using host = await CoreHost.createAsync();
-    const provider = await host.createProviderAsync();
-    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
-
-    const sent = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageSend,
-      new OrganizationMessageSendParams(OrganizationTarget.teammate(ada.id), "Hi").toJson()));
-    await host.engine.waitForIdle();
-    const stopped = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageStop, new MessageIdParams(sent.id).toJson()));
-    const listed = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageList, null);
-    const replies = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageReplyList, new MessageIdParams(sent.id).toJson());
-    const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
-      host.approvals, host.engine, host.teammates, host.events);
-    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList,
-      MethodName.OrganizationMessageReplyList].map(t => without.dispatch(new Request("r", t, null))));
-
-    Assert.areEqual(`${ada.id}:Started`, sent.recipients.map(t => `${t.teammateId}:${t.state}`).join());
-    Assert.areEqual(JSON.stringify(sent.toJson()), JSON.stringify(stopped.toJson()));
-    Assert.areEqual(JSON.stringify([stopped.toJson()]), JSON.stringify(listed));
-    Assert.areEqual(JSON.stringify((await host.organizationMessages.listRepliesAsync(new MessageIdParams(sent.id))).map(t => t.toJson())), JSON.stringify(replies));
-    Assert.areEqual(1, Array.isArray(replies) ? replies.length : 0);
-    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
   }
 
   @TestMethod
