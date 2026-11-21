@@ -409,6 +409,10 @@ describe("OrganizationViewComponent", () => {
       await editAsync();
 
       one(".remove", card("Bob")).click();
+      await dialogAsync();
+      await answerAsync(".nol-teamrun-cancel");
+      const cancelled = asked.length;
+      one(".remove", card("Bob")).click();
       const asking = await dialogAsync();
       await answerAsync(".nol-teamrun-confirm");
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
@@ -418,7 +422,7 @@ describe("OrganizationViewComponent", () => {
       one(".top .edit").click();
       await settle();
 
-      expect([asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([
+      expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
         ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
       expect(asked).toEqual([[MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: null }],
         [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
