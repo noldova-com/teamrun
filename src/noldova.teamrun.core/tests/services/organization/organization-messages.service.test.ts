@@ -125,15 +125,20 @@ export class OrganizationMessagesServiceTests {
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null));
     host.adapter.signInCheck = new SignInCheck(AuthStatus.LoggedOut, null, null, null);
     await host.providers.checkAsync(new ProviderIdParams(out.id));
+    const gone = await host.createProviderAsync("fake", "Gone");
+    const cid = await host.teammates.createAsync(new TeammateCreateParams("Cid", null, gone.id, Harness.Provider, null, null));
+    await host.providers.deleteAsync(new ProviderIdParams(gone.id));
 
     const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "Status?"));
     await host.engine.waitForIdle();
 
-    Assert.areEqual(`Ada:Started:null,Bob:Failed:${Resources.formatAccountCannotReply("Bob", "Spare")}`,
+    Assert.areEqual(`Ada:Started:null,Bob:Failed:${Resources.formatAccountCannotReply("Bob", "Spare")},`
+      + `Cid:Failed:${Resources.formatAccountCannotReply("Cid", null)}`,
       sent.recipients.map(t => `${t.teammateName}:${t.state}:${t.reason}`).join());
     Assert.areEqual(1, host.adapter.requests.length);
     Assert.areEqual(ada.id, sent.recipients[0]?.teammateId);
     Assert.isNull(sent.recipients.find(t => t.teammateId === bob.id)?.chatId);
+    Assert.isNull(sent.recipients.find(t => t.teammateId === cid.id)?.chatId);
   }
 
   @TestMethod
