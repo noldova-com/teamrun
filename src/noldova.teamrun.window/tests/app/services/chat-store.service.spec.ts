@@ -3468,6 +3468,29 @@ describe("ChatStoreService", () => {
           XDG_STATE_HOME: "/home/person/profiles/opencode/Work/home/.local/state", OPENCODE_CONFIG: "", OPENCODE_DISABLE_PROJECT_CONFIG: "1" }, "opencode auth login"]]);
     });
 
+    it("signs Claude Code in its usual folder in with the person's own environment, and one with its own folder with its folder named", async () => {
+      const usual = new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"]));
+      context.answer(MethodName.ProviderKindList, () => [usual.toJson()]);
+      const folders = new Map([["c1", "/person/.claude"], ["c2", "/person/profiles/claude/Work"]]);
+      context.answer(MethodName.ProviderList, () => [...folders].map(([id, folder]) => provider(id, "claude", folder).toJson()));
+      context.answer(MethodName.ProviderCheck, t => {
+        const id = (t as { readonly providerId: string }).providerId;
+        return provider(id, "claude", folders.get(id) ?? String.empty, AuthStatus.LoggedIn).toJson();
+      });
+      await store.initialize();
+
+      for (const [index, id] of ["c1", "c2"].entries()) {
+        const signIn = store.signInProvider(id);
+        await Wait.until(() => expect(terminals.launches).toHaveLength(index + 1));
+        terminals.end(index);
+        await signIn;
+      }
+
+      expect(terminals.launches.map(({ request }) => [request.environment, request.command])).toEqual([[{}, "claude auth login"],
+        [{ CLAUDE_CONFIG_DIR: "/person/profiles/claude/Work" }, "claude auth login"]]);
+    });
+
     it("leaves the kind's variable to the person's own environment for a provider in one of the person's folders, so the sign-in lands where its turns look", async () => {
       const opencode = new ProviderKind("opencode", "OpenCode", true, false, null,
         new ProviderProfile("XDG_DATA_HOME", "opencode auth login", "/home/person/.local/share", null, {}, {}, ["/home/person/.local/share", "/data/profiles/opencode/default"]));

@@ -1739,7 +1739,7 @@ export class ClaudeAdapterTests {
     Assert.isNull((await adapter.forkSession(new ForkRequest(null, host.directory.path, "session-1", "turn-1", new RequestedSettings("claude", null, null)))).providerId);
     Assert.isFalse(adapter.descriptor.supportsSignIn);
     Assert.areEqual("true:null", [adapter.descriptor.supportsSignOut, adapter.descriptor.signOutCommand ?? "null"].join(":"));
-    Assert.areEqual(JSON.stringify({ variable: "CLAUDE_CONFIG_DIR", signInCommand: "claude auth login", usualFolder: "/work/claude-home", toolCommand: null, signInVariables: {}, signInValues: {}, personFolders: [] }),
+    Assert.areEqual(JSON.stringify({ variable: "CLAUDE_CONFIG_DIR", signInCommand: "claude auth login", usualFolder: "/work/claude-home", toolCommand: null, signInVariables: {}, signInValues: {}, personFolders: ["/work/claude-home"] }),
       JSON.stringify(host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: "/work/claude-home" }).descriptor.profile?.toJson()));
     Assert.areEqual(join(homedir(), ".claude"), host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: "" }).descriptor.profile?.usualFolder);
     Assert.areEqual([join(homedir(), ".claude"), "/work/claude-home"].join(),
@@ -2053,16 +2053,51 @@ export class ClaudeAdapterTests {
       await adapter.signOut(provider);
       return host.starter.environments.at(-1)?.["CLAUDE_CONFIG_DIR"];
     };
+    const listFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.listModels(provider);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
+    const usageFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.readPlanUsage(provider);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
 
     const checked = [(await adapter.checkSignIn(usual)).identity?.email, (await adapter.checkSignIn(own)).identity?.email];
     const turns = [await turnFolder(usual, "s-1"), await turnFolder(own, "s-2")];
+    const lists = [await listFolder(usual), await listFolder(own)];
+    const usages = [await usageFolder(usual), await usageFolder(own)];
     const signOuts = [await signOutFolder(usual), await signOutFolder(own)];
 
     Assert.areEqual(JSON.stringify(["unset", host.directory.resolve("claude-profile")]), JSON.stringify(checked));
     Assert.isUndefined(turns[0]);
     Assert.areEqual(host.directory.resolve("claude-profile"), turns[1]);
+    Assert.isUndefined(lists[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), lists[1]);
+    Assert.isUndefined(usages[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), usages[1]);
     Assert.isUndefined(signOuts[0]);
     Assert.areEqual(host.directory.resolve("claude-profile"), signOuts[1]);
+  }
+
+  @TestMethod
+  public async takesClaudeCodesUsualFolderFromTheEnvironmentItPassesOnNotTeamRunsOwn(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "env", CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings,
+      host.directory.resolve("home"));
+    host.starter.current = { CLAUDE_CONFIG_DIR: host.directory.resolve("claude-work") };
+    const home = host.createProvider("acc-1", join("home", ".claude"));
+    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-1", "none", null, []), SdkMessages.success("s-1", "ok")]);
+
+    const checked = (await adapter.checkSignIn(home)).identity?.email;
+    await adapter.runTurn(host.createRequest("Hi", home), new RecordingTurnListener(), new AbortController().signal);
+    const turn = host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    await adapter.listModels(home);
+    const list = host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    await adapter.signOut(home);
+    const signOut = host.starter.environments.at(-1)?.["CLAUDE_CONFIG_DIR"];
+
+    const folder = host.directory.resolve(join("home", ".claude"));
+    Assert.areEqual(JSON.stringify([folder, folder, folder, folder]), JSON.stringify([checked, turn, list, signOut]));
   }
 
   @TestMethod

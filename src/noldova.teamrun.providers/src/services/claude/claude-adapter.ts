@@ -116,9 +116,9 @@ export class ClaudeAdapter implements IProviderAdapter {
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;
+    const usual = UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory);
     this.descriptor = new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
-      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand,
-        UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory)),
+      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand, usual, null, {}, {}, [usual]),
       true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
       Resources.claudeOwnMcpServersShortNote, false, true);
     this.profileSearch = new ProfileSearch(UsualFolder.places(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory),
@@ -159,7 +159,8 @@ export class ClaudeAdapter implements IProviderAdapter {
       return new SignInCheck(AuthStatus.Error, null, null, Resources.claudeNotFound);
 
     mkdirSync(provider.profileDir, { recursive: true });
-    const environment = { ...ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), this.ownFolderOf(provider.profileDir), this.appVersion), ...quiet };
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = { ...ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion), ...quiet };
     const own = command.withOrigin(this.originOf(provider));
     const version = await this.versionReader.read(own, environment);
     try {
@@ -210,9 +211,10 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
     const abort = new AbortController();
+    const passed = await this.readBeforeStartAsync();
     const query = this.queryFactory.start(ClaudeAdapter.emptyPrompt(), {
       pathToClaudeCodeExecutable: command.executable,
-      env: ClaudeEnvironment.build(await this.readBeforeStartAsync(), this.ownFolderOf(provider?.profileDir ?? null), this.appVersion),
+      env: ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider?.profileDir ?? null), this.appVersion),
       settingSources: [], strictMcpConfig: true, mcpServers: {}, plugins: [], tools: [], persistSession: false, abortController: abort
     }, this.originOf(provider));
     const run = new ClaudeRun(query, abort);
@@ -247,7 +249,8 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
 
-    const environment = ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), this.ownFolderOf(provider.profileDir), this.appVersion);
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion);
     const logout = command.withOrigin(this.originOf(provider)).withArguments(Resources.authArgument, Resources.logoutArgument);
     const result = await this.runner.run(logout, environment, this.timings.signInCheckTimeout);
     if (result.timedOut)
@@ -438,8 +441,8 @@ export class ClaudeAdapter implements IProviderAdapter {
     return new ProcessOrigin(this.descriptor.id, provider?.id ?? null);
   }
 
-  private ownFolderOf(profileDir: string | null): string | null {
-    const usual = UsualFolder.of(this.baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory);
+  private ownFolderOf(passed: NodeJS.ProcessEnv, profileDir: string | null): string | null {
+    const usual = UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory);
     return Object.isNull(profileDir) || ProfileFolderPath.isSame(profileDir, usual) ? null : profileDir;
   }
 
@@ -556,7 +559,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     }, new ClaudeTasks(this.timer, this.timings.taskOutputInterval), (Object.isNull(continued) ? undefined : this.plans.get(continued)) ?? new ClaudePlan(),
       undefined, served?.token ?? null, this.log, this.timings.requestTimeout, withheld ? (t, named) => this.ownServersStartedAsync(t, passed, [...fromProject, ...named]) : null,
       this.idleTimer, this.timings.silenceLimit, this.timings.idleLimit);
-    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, this.ownFolderOf(profileDir), this.appVersion, !request.isolated),
+    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, this.ownFolderOf(base, profileDir), this.appVersion, !request.isolated),
       [Resources.claudeSessionStateEventsVariable]: Resources.enabledValue, ...Object.fromEntries(Object.entries(request.environment)
         .filter(([name]) => (Object.isNull(served) && !withheld) || name !== ProtocolResources.senderTokenVariable)) };
     const trusted = !request.isolated && await this.trustsAsync(request);
