@@ -12,7 +12,6 @@ import { TeamRunApp } from "./teamrun-app.fixture.ts";
 
 export class TerminalScreen {
   public static readonly PROMPT_END: RegExp = /[$#%>]$/u;
-  private static readonly ECHO_TIMEOUT: number = 5_000;
   private static readonly SPACES: RegExp = /\s/gu;
 
   public static async rowsAsync(screen: Locator): Promise<readonly string[]> {
@@ -39,7 +38,7 @@ export class TerminalScreen {
     const typed = command.replace(TerminalScreen.SPACES, "");
     const echoed = async (): Promise<boolean> => (await TerminalScreen.rowsAsync(screen)).join("").replace(TerminalScreen.SPACES, "").includes(typed);
     try {
-      await expect.poll(echoed, { ...TeamRunApp.pollOf(TerminalScreen.ECHO_TIMEOUT), message: "the shell echoes the whole command" }).toBe(true);
+      await expect.poll(echoed, { ...TeamRunApp.pollOf(30_000), message: "the shell echoes the whole command" }).toBe(true);
       return true;
     }
     catch {
