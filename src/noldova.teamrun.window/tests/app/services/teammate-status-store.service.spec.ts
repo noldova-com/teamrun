@@ -25,7 +25,7 @@ import { ListNotArrayException } from "../../../src/app/exceptions/list-not-arra
 import { TeammateActivity } from "../../../src/app/models/teammate-activity";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { TeammateStatusStoreService } from "../../../src/app/services/teammate-status-store.service";
-import type { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../fixtures/teammate.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
@@ -80,7 +80,7 @@ describe("TeammateStatusStoreService", () => {
     new Message(id, chatId, 1, MessageAuthor.Provider, null, MessageStatus.Completed, text === "" ? [] : [SampleData.detail(0, DetailKind.Text, text)],
       SampleData.provenance, earlier, earlier, endedAt, [], teammateId, teammateId);
   const lastSaid = (teammateId: string): string | null => store.lastReplyOf(teammateId)()?.text ?? null;
-  const reads = (): number => context.methods.filter(t => t.endsWith(MethodName.TeammateLastReplyList)).length;
+  const reads = (): number => context.methods.filter(t => t === FakeWindowPartContext.qualify(MethodName.TeammateLastReplyList)).length;
 
   const create = async (prepare: (fixture: TeammateFixture) => void = () => undefined): Promise<void> => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => open.map(t => t.toJson()))
@@ -349,6 +349,9 @@ describe("TeammateStatusStoreService", () => {
     listed = () => { throw new Error("The runtime is offline."); };
     context.emit(EventName.StateResyncRequested, null);
     await Wait.until(() => expect(store.lastRepliesError()).toBe("The runtime is offline."));
+    listed = () => Promise.reject("The runtime refused.");
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(store.lastRepliesError()).toBe("The runtime refused."));
     listed = () => ({});
     context.emit(EventName.StateResyncRequested, null);
     await Wait.until(() => expect(store.lastRepliesError()).toBe(new ListNotArrayException(Resources.formatValueKind({})).message));

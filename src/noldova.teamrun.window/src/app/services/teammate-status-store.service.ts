@@ -120,6 +120,7 @@ export class TeammateStatusStoreService {
         throw new ListNotArrayException(Resources.formatValueKind(json));
       this.lastRepliesSignal.set(new Map(json.map(t => TeammateLastReply.fromJson(t)).map(t => [t.teammateId, t])));
       this.lastRepliesErrorSignal.set(null);
+      this.updatedWhileReading = null;
       for (const message of updated)
         this.applyUpdated(message);
     }
