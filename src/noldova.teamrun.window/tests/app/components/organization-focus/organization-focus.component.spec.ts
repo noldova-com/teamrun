@@ -175,7 +175,7 @@ describe("OrganizationFocusComponent", () => {
   it("edits the structure in edit mode: renames the focused department, moves its members, adds one from outside it and adds a department", async () => {
     const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
     const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.componentInstance as SelectComponent);
+    const moves = (): SelectComponent[] => fixture.debugElement.queryAll(By.css("nol-select.member-move")).map((t): SelectComponent => t.componentInstance);
     await create("Department:design");
     expect([all(".unit-rename").length, all(".member-move").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
 

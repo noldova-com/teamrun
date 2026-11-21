@@ -176,7 +176,7 @@ describe("OrganizationBoardComponent", () => {
       field.value = value;
       field.dispatchEvent(new Event("change"));
     }
-    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map(t => t.componentInstance as SelectComponent);
+    const moves = fixture.debugElement.queryAll(By.css("nol-select.member-move")).map((t): SelectComponent => t.componentInstance);
     expect(moves.map(t => [t.label(), t.value()])).toEqual([["Bob's department", "design"], ["Offline's department", "build"], ["Carol's department", "build"]]);
     at(moves, 0).valueChange.emit("build");
     one(".lane:nth-child(1) .add-member").click();
