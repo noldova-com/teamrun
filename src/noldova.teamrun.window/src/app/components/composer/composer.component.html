@@ -243,7 +243,9 @@ LICENSE file in the root directory of this source tree.
     @if (responder(); as teammate) {
       <button type="button" nol-menu-item class="nol-teamrun-edit-teammate" [label]="resources.formatEditTeammate(resources.formatMention(teammate.name))"
         (triggered)="editResponder(teammate)"></button>
-      <button type="button" nol-menu-item class="nol-teamrun-without-teammate" [label]="resources.answerWithoutTeammateLabel" (triggered)="selectResponder(null)"></button>
+      @if (teammateId() === null) {
+        <button type="button" nol-menu-item class="nol-teamrun-without-teammate" [label]="resources.answerWithoutTeammateLabel" (triggered)="selectResponder(null)"></button>
+      }
     }
   </nol-menu>
 </ng-template>

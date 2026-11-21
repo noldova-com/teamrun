@@ -285,10 +285,11 @@ export class ComposerComponent {
   private readonly defaultLabel: Signal<string>;
 
   public readonly conversationId: InputSignal<string> = input.required<string>();
+  public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
 
   public constructor() {
     const store = this.store;
-    this.teammateMentions = computed(() => store.teammates().map(t => new TeammateMention(t.id, t.name)));
+    this.teammateMentions = computed(() => Object.isNull(this.teammateId()) ? store.teammates().map(t => new TeammateMention(t.id, t.name)) : []);
     this.ownChoice = computed(() => this.choices.choiceOf(this.conversationId()), { equal: (a, b) => a === b || (!Object.isNull(a) && a.equals(b)) });
     this.keptChoice = computed(() => store.conversation(this.conversationId())?.responder, { equal: ComposerComponent.sameResponder });
     this.runningReply = computed(() => store.runningReplyOf(this.conversationId()));
@@ -305,6 +306,8 @@ export class ComposerComponent {
     this.memberTeammates = computed(() => NameOrder.sort(store.membersOf(this.conversationId())
       .map(t => store.teammate(t.teammateId)).filter((t): t is Teammate => !Object.isNull(t)), t => t.name));
     this.candidates = computed(() => {
+      if (!Object.isNull(this.teammateId()))
+        return [];
       const members = this.memberTeammates();
       const candidates = new TeammateCandidates();
       const options = (section: string) => (teammate: Teammate): IMentionCandidateOptions =>
@@ -624,8 +627,13 @@ export class ComposerComponent {
     });
     effect(() => {
       const id = this.responderId();
-      if (!Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
+      if (Object.isNull(this.teammateId()) && !Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
         untracked(() => this.selectResponder(null, false));
+    });
+    effect(() => {
+      const fixed = this.teammateId();
+      if (!Object.isNull(fixed) && this.responderId() !== fixed)
+        untracked(() => this.responderId.set(fixed));
     });
     effect(onCleanup => {
       const conversationId = this.conversationId();

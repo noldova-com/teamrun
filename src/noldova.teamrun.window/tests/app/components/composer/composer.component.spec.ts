@@ -2133,6 +2133,29 @@ describe("ComposerComponent", () => {
     expect(summary()).toContain("Bob");
   });
 
+  it("answers with its fixed teammate, whatever the chat chose, with no mentions and no way to answer without it", async () => {
+    new TeammateFixture(context);
+    await prepare();
+    remember(new ComposerSettings("codex", null, null, null, null));
+    fixture = TestBed.createComponent(ComposerComponent);
+    fixture.componentRef.setInput("conversationId", "c1");
+    fixture.componentRef.setInput("teammateId", "alice");
+    await fixture.whenStable();
+
+    expect(summary()).toContain("Alice");
+    await type("@");
+    await fixture.whenStable();
+    expect([names(), document.querySelectorAll("nol-mention-list").length]).toEqual([[], 0]);
+
+    await type("@Bob, look");
+    await send();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+    expect([sent()[0]?.text, sent()[0]?.mentionedTeammateIds, sent()[0]?.responderTeammateId]).toEqual(["@Bob, look", [], "alice"]);
+
+    await choose();
+    expect([labels().includes(Resources.formatEditTeammate("@Alice")), labels().includes(Resources.answerWithoutTeammateLabel)]).toEqual([true, false]);
+  });
+
   it("resolves a written name with spaces to its teammate, shows its initials, and offers it in completion", async () => {
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer, new Teammate("code", "Code", null, "a1", Harness.Provider, null, null, "t", "t"));
