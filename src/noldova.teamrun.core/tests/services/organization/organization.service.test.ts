@@ -11,7 +11,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity } from "@noldova/teamrun.core";
 import {
   type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
-  type Organization, type Teammate, TeammateCreateParams
+  type Organization, OrganizationLayoutSaveParams, type Teammate, TeammateCreateParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -214,6 +214,19 @@ export class OrganizationServiceTests {
     Assert.isNull(organization.departments[0]?.leaderId);
   }
 
+  @TestMethod
+  public async keepsTheOrganizationLayoutAsItIsAndRecordsEachSave(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const first = { collapsed: ["d1"], cardsShow: { status: true } };
+    const second = { collapsed: [], cards: { t1: { usage: true } } };
+
+    Assert.isNull(await host.organization.readLayoutAsync());
+    Assert.areEqual(JSON.stringify(first), JSON.stringify(await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(first))));
+    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(second));
+
+    Assert.areEqual(JSON.stringify(second), JSON.stringify(await host.organization.readLayoutAsync()));
+    Assert.areEqual("Insert,Update", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
+  }
   private static async createAsync(host: CoreHost, name: string, parentId: string | null = null): Promise<Department> {
     return await host.organization.createAsync(new DepartmentCreateParams(name, parentId));
   }

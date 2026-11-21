@@ -37,6 +37,7 @@ import { McpServersViewComponent } from "../../src/app/components/mcp-servers-vi
 import { PlanViewComponent } from "../../src/app/components/plan-view/plan-view.component";
 import { ProjectsViewComponent } from "../../src/app/components/projects-view/projects-view.component";
 import { SubAgentsViewComponent } from "../../src/app/components/sub-agents-view/sub-agents-view.component";
+import { OrganizationViewComponent } from "../../src/app/components/organization-view/organization-view.component";
 import { TeammatesViewComponent } from "../../src/app/components/teammates-view/teammates-view.component";
 import { BackgroundTaskStoreService } from "../../src/app/services/background-task-store.service";
 import { ChatStoreService } from "../../src/app/services/chat-store.service";
@@ -44,6 +45,7 @@ import { ComposerDefaultService } from "../../src/app/services/composer-default.
 import { GitHubReferenceSource } from "../../src/app/services/github-reference-source";
 import { PlanUsageStatus } from "../../src/app/services/plan-usage-status";
 import { ChatPages } from "../../src/app/services/pages/chat-pages";
+import { OrganizationLayoutService } from "../../src/app/services/organization-layout.service";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
 import { TimeFormatService } from "../../src/app/services/time-format.service";
@@ -112,18 +114,20 @@ describe("TeamRun's window part", () => {
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {
     const context = new RecordingWindowPartContext();
     await createPart().activateAsync(context);
-    const shows = context.commands.slice(0, 5);
+    const shows = context.commands.slice(0, 6);
 
     expect(shows.map(t => [t.name, t.title, t.icon, t.defaultKey])).toEqual([
+      ["teamrun.showOrganization", "Show organization", "lan", null],
       ["teamrun.showTeammates", "Manage teammates", "group", null],
       ["teamrun.showProviders", "Manage providers", "key", null],
       ["teamrun.showMcpServers", "Manage MCP servers", "hub", null],
       ["teamrun.showComputerUseGrants", "Manage computer use", "desktop_windows", null],
       ["teamrun.showOutsideSessions", "Connect outside agents", "hub", null]
     ]);
-    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null]);
-    await shows[0]?.runAsync(null);
+    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null, null]);
+    await shows[1]?.runAsync(null);
     expect(context.openedDocuments).toEqual([
+      { name: "teamrun.organization", instance: "organization", title: "Organization", options: undefined },
       { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
       { name: "teamrun.providers", instance: "providers", title: "Providers", options: undefined },
       { name: "teamrun.mcpServers", instance: "mcpServers", title: "MCP servers", options: undefined },
@@ -134,10 +138,10 @@ describe("TeamRun's window part", () => {
     expect([context.dialogs, context.keptDocuments]).toEqual([[], []]);
   });
 
-  it("leaves Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
+  it("leaves Organization, Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
     const context = new RecordingWindowPartContext();
     await createPart().activateAsync(context);
-    const names = ["teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
+    const names = ["teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
 
     expect([declaration.contributes.views.filter(t => names.includes(t)), context.views.filter(t => names.includes(t.name))]).toEqual([[], []]);
     expect([declaration.contributes.documents.filter(t => names.includes(t)), context.documents.filter(t => names.includes(t.name)).map(t => t.name)]).toEqual([names, names]);
@@ -149,7 +153,7 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.commands.map(t => t.name)).toEqual(declaration.contributes.commands);
-    expect(context.commands.slice(5).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
+    expect(context.commands.slice(6).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
       ["teamrun.newConversation", "New chat", "edit_square", "Mod+N"],
       ["teamrun.openProject", "Open folder", "folder_open", "Mod+O"],
       ["teamrun.openBrowser", "Open browser", "language", undefined],
@@ -168,7 +172,7 @@ describe("TeamRun's window part", () => {
       ["teamrun.reload", "Load TeamRun's data again", "refresh", undefined],
       ["teamrun.newChatTerminal", "New chat terminal", "terminal", "Mod+Alt+Backquote"]
     ]);
-    expect([...context.commands.slice(12, 16), ...context.commands.slice(21)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
+    expect([...context.commands.slice(13, 17), ...context.commands.slice(22)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
       t.defaultKey?.label("linux")])).toEqual([["⌥↑", "Alt+Up", "Alt+Up"], ["⌥↓", "Alt+Down", "Alt+Down"], ["⇧⌘↑", "Ctrl+Shift+Up", "Ctrl+Shift+Up"],
       ["⇧⌘↓", "Ctrl+Shift+Down", "Ctrl+Shift+Down"], ["⌥⌘`", "Ctrl+Alt+`", "Ctrl+Alt+`"]]);
   });
@@ -349,9 +353,9 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.documents.map(t => [t.name, t.padding])).toEqual([["teamrun.conversation", ContentPadding.None], ["teamrun.image", ContentPadding.None],
-      ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
+      ["teamrun.organization", ContentPadding.None], ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
       ["teamrun.computerUseGrants", ContentPadding.None], ["teamrun.outsideConnection", ContentPadding.None], ["teamrun.page", ContentPadding.None]]);
-    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, TeammatesViewComponent,
+    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, OrganizationViewComponent, TeammatesViewComponent,
       ProvidersViewComponent, McpServersViewComponent, ComputerUseGrantsViewComponent, OutsideConnectionViewComponent, PageDocumentComponent]);
   });
 
@@ -537,6 +541,7 @@ describe("TeamRun's window part", () => {
     const store = ChatStoreService.of(context);
     const tasks = BackgroundTaskStoreService.of(context);
     const layout = ProjectsLayoutService.of(context);
+    const organizationLayout = OrganizationLayoutService.of(context);
     const choice = ComposerDefaultService.of(context);
     const pages = ChatPages.of(context);
 
@@ -548,11 +553,13 @@ describe("TeamRun's window part", () => {
     expect(ChatStoreService.of(context)).not.toBe(store);
     expect(BackgroundTaskStoreService.of(context)).not.toBe(tasks);
     expect(ProjectsLayoutService.of(context)).not.toBe(layout);
+    expect(OrganizationLayoutService.of(context)).not.toBe(organizationLayout);
     expect(ComposerDefaultService.of(context)).not.toBe(choice);
     expect(ChatPages.of(context)).not.toBe(pages);
     ChatStoreService.release(context);
     BackgroundTaskStoreService.release(context);
     ProjectsLayoutService.release(context);
+    OrganizationLayoutService.release(context);
     ComposerDefaultService.release(context);
     ChatPages.release(context);
   });

@@ -6,6 +6,13 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+### New
+
+- **Organization:** Show organization in the View menu opens the team's organization as its own view: you at the root, then each department with its count, its leader's card and its members' cards, nested to any depth, on a canvas you pan, zoom and fit, with an overview map (#317).
+  A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.
+  Edit structure adds, renames and deletes departments, chooses a department's leader, renames teammates, and adds, moves and removes members, asking before a delete or a removal.
+  The view, the collapsed departments and the cards' fields are kept across a restart.
+
 ### Fixed
 
 - **Claude Code on macOS:** a Claude Code signed in the usual way is listed as signed in, and its turns run, rather than showing `Sign-in required` (#338).

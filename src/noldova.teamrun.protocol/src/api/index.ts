@@ -195,6 +195,7 @@ export { DepartmentUpdateParams } from "../models/methods/department-update-para
 export { DepartmentMoveParams } from "../models/methods/department-move-params.js";
 export { DepartmentIdParams } from "../models/methods/department-id-params.js";
 export { DepartmentMemberSetParams } from "../models/methods/department-member-set-params.js";
+export { OrganizationLayoutSaveParams } from "../models/methods/organization-layout-save-params.js";
 export { OrganizationTargetKind } from "../enums/organization-target-kind.js";
 export { OrganizationRecipientState } from "../enums/organization-recipient-state.js";
 export { OrganizationTarget } from "../models/organization-target.js";
