@@ -92,7 +92,7 @@ export class ComposerDefaultService {
     else if (Object.isNull(kept) && !Object.isNull(this.stored)) {
       const moved = await this.save(this.stored.toJson(), true);
       if (!Object.isUndefined(moved)) {
-        base = ComposerSettings.fromJson(moved);
+        base = this.latest ?? ComposerSettings.fromJson(moved);
         ComposerDefaultService.removeStored();
       }
     }

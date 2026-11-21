@@ -118,7 +118,7 @@ export class ProjectsLayoutService {
     else if (Object.isNull(kept) && !Object.isNull(this.stored)) {
       const moved = await this.save(this.stored.toJson(), true);
       if (!Object.isUndefined(moved)) {
-        base = ProjectsLayout.fromJson(moved);
+        base = this.latest ?? ProjectsLayout.fromJson(moved);
         ProjectsLayoutService.removeStored();
       }
     }
