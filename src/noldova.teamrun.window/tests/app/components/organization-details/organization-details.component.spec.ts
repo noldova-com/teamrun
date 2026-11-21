@@ -216,6 +216,26 @@ describe("OrganizationDetailsComponent", () => {
     expect(popovers()).toEqual([]);
   });
 
+  it("PROBE", async () => {
+    await create();
+    const tag = (e: Element | null): string => e === null ? "null" : `${e.tagName.toLowerCase()}.${[...e.classList].slice(0, 3).join(".")}`;
+    const state = (step: string): void => {
+      const hovered = [...document.querySelectorAll(":hover")].at(-1) ?? null;
+      console.log(`PROBE ${step} pops=${popovers().map(t => t.getAttribute("aria-label")).join("|")} active=${tag(document.activeElement)} hover=${tag(hovered)} card=${hovered?.closest("nol-teamrun-organization-card")?.getAttribute("aria-label") ?? "-"}`);
+    };
+    const wait = (ms: number): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, ms));
+    state("created");
+    one(".top .edit").click();
+    await settle();
+    state("edit");
+    await wait(800);
+    state("edit+800");
+    TestBed.inject(FocusMonitor).focusVia(card("Bob"), "keyboard");
+    await settle();
+    await wait(300);
+    state("bob");
+  });
+
   it("closes a card's details while its structure is edited once a field in it takes the focus, so Escape closes that field's list", async () => {
     await create();
     one(".top .edit").click();
