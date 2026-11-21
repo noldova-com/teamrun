@@ -54,7 +54,7 @@ function groupOf(places: readonly IGroupPlace[], key: string): IGroupPlace {
   return found;
 }
 
-test("a fresh install opens Explorer on the left, Background tasks and Pages above Plans and Sub-agents on the right, and Activity and Changes at the bottom, each group showing its first tab, and Reset the layout returns to it", async ({ app }, testInfo) => {
+test("a fresh install opens Explorer on the left, Background tasks and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it", async ({ app }, testInfo) => {
   const page = await app.startAsync();
   await expect(page.locator("nol-tab[data-tab-key='view/teamrun.projects']")).toBeVisible({ timeout: 60_000 });
 
@@ -66,7 +66,8 @@ test("a fresh install opens Explorer on the left, Background tasks and Pages abo
   const lower = groupOf(fresh, "view/teamrun.plan");
   const bottom = groupOf(fresh, "view/teamrun.activity");
   expect([explorer.left < width / 4, upper.right > width * 3 / 4, upper.left > explorer.right, upper.bottom <= lower.top, upper.left === lower.left, upper.right === lower.right,
-    bottom.top > height / 2, bottom.left >= explorer.right, bottom.right <= upper.left]).toEqual([true, true, true, true, true, true, true, true, true]);
+    bottom.top > height / 2, bottom.top >= explorer.bottom, bottom.top >= lower.bottom, bottom.left < explorer.right, bottom.right > upper.left])
+    .toEqual([true, true, true, true, true, true, true, true, true, true, true]);
   for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await testInfo.attach(`fresh-install-${scheme}.png`, { body: await page.screenshot(), contentType: "image/png" });
