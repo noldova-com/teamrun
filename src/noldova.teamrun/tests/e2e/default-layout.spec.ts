@@ -22,7 +22,7 @@ interface IGroupPlace {
 
 const EXPECTED: readonly (readonly [string, readonly string[], string])[] = [
   ["Left", ["view/teamrun.projects"], "view/teamrun.projects"],
-  ["Right", ["view/teamrun.backgroundTasks", "view/teamrun.pages"], "view/teamrun.backgroundTasks"],
+  ["Right", ["view/teamrun.backgroundTasks", "view/git.view", "view/teamrun.pages"], "view/teamrun.backgroundTasks"],
   ["Right", ["view/teamrun.plan", "view/teamrun.subAgents"], "view/teamrun.plan"],
   ["Bottom", ["view/teamrun.activity", "view/teamrun.changes"], "view/teamrun.activity"]
 ];
@@ -33,7 +33,7 @@ async function placesAsync(page: Page): Promise<readonly IGroupPlace[]> {
     const box = group.getBoundingClientRect();
     return {
       side: group.getAttribute("data-side"),
-      tabs: tabs.map(t => t.getAttribute("data-tab-key")).filter(t => t !== "view/git.view"),
+      tabs: tabs.map(t => t.getAttribute("data-tab-key")),
       shown: tabs.find(t => t.getAttribute("aria-selected") === "true")?.getAttribute("data-tab-key") ?? null,
       left: box.left,
       top: box.top,
@@ -54,7 +54,7 @@ function groupOf(places: readonly IGroupPlace[], key: string): IGroupPlace {
   return found;
 }
 
-test("a fresh install opens Explorer on the left, Background tasks and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it", async ({ app }, testInfo) => {
+test("a fresh install opens Explorer on the left, Background tasks, Git and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it", async ({ app }, testInfo) => {
   const page = await app.startAsync();
   await expect(page.locator("nol-tab[data-tab-key='view/teamrun.projects']")).toBeVisible({ timeout: 60_000 });
 
