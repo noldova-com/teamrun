@@ -912,7 +912,7 @@ export class CodexAdapter implements IProviderAdapter {
       await target.onObservedAsync(parent.observed);
       const turn = new CodexTurn(parent.threadId, target, parent.observed, this.itemReader, new DeltaStream(target, this.timings.streamInterval));
       target.end(await this.runTurnOnThread(client, turn, target, [CodexAdapter.textInputOf(Resources.codexWakePrompt)],
-        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, held.mode, held.model, held.effort, held.cwd, held.params, null, null));
+        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, target.mode ?? held.mode, held.model, held.effort, held.cwd, held.params, null, null));
     }
     finally {
       release();

@@ -23,6 +23,7 @@ import { Deadline } from "../deadline.js";
 import { DeltaStream } from "../delta-stream.js";
 import { FailureDescriber } from "../failure-describer.js";
 import { ClaudeInput } from "./claude-input.js";
+import { ClaudeModes } from "./claude-modes.js";
 import { ClaudePlan } from "./claude-plan.js";
 import { ClaudePrompt } from "./claude-prompt.js";
 import { ClaudeSubAgents } from "./claude-sub-agents.js";
@@ -487,7 +488,7 @@ export class ClaudeChat {
     if (wake.planFirst && !planning)
       await this.planWake(turn, wake);
     else if (!wake.planFirst)
-      await this.ensureMode(this.leaveTo, wake);
+      await this.ensureMode(Object.isNull(wake.mode) ? this.leaveTo : ClaudeModes.of(wake.mode), wake);
     await this.applySender(query, wake.environment, wake);
     if (!Object.isNull(this.init))
       await turn.handle(this.init, query);

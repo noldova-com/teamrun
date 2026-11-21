@@ -1044,6 +1044,35 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async switchesAWakeToTheModeTheChatHoldsWhenItStarts(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-woken", "none", null, []),
+      SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-woken", "Started")),
+      SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("33333333-3333-3333-3333-333333333333", [SdkMessages.text("The server stopped")], "claude-opus-5"),
+      SdkMessages.success("s-woken", "Stopped"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, false, undefined, Resources.defaultPermissionMode);
+    const woken = listener.wakeTurn.follow(new RecordingTurnListener(), new AbortController().signal);
+
+    await adapter.runTurn(new TurnRequest(null, host.directory.path, "Start", new RequestedSettings("claude", null, null, null, Resources.acceptEditsPermissionMode),
+      null, [], null, null), listener, new AbortController().signal);
+    const turnModes = query.permissionModes.join(",");
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, reply.outcome);
+    Assert.areEqual(`|${Resources.defaultPermissionMode}`, `${turnModes}|${query.permissionModes.join(",")}`);
+  }
+
+  @TestMethod
   @TestData(true)
   @TestData(false)
   public async saysTeamRunsToolsAreUnavailableInAWakeWhoseTokenIsRefusedAndResumesTheNextTurnOnANewChat(expired: boolean): Promise<void> {
