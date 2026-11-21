@@ -1202,8 +1202,8 @@ export class Resources {
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
   public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
-    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Model, OrganizationCardField.Git,
-      OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
+    [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
+      OrganizationCardField.Model, OrganizationCardField.Git, OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
   public static readonly organizationWorkFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Git, OrganizationCardField.PullRequests, OrganizationCardField.Documents, OrganizationCardField.Artifacts];
   public static readonly organizationFieldLabels: Readonly<Record<OrganizationCardField, string>> = {

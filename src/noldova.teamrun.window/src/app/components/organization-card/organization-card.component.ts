@@ -8,7 +8,7 @@
 
 import { Component, computed, effect, inject, type InputSignal, input, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
-import type { Department, Teammate } from "@noldova/teamrun.protocol";
+import type { Department, Teammate, TeammateLastReply } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
   MeterComponent, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
@@ -78,6 +78,8 @@ export class OrganizationCardComponent {
     return { icon: Resources.organizationNowRunningIcon, text: this.store.conversation(first.chatId)?.title ?? Resources.organizationNowReplying,
       lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length) };
   });
+
+  protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
 
   protected readonly editsIn: Signal<Department | null> = computed(() => this.editing() ? this.department() : null);
   protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() =>

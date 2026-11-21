@@ -46,6 +46,11 @@ LICENSE file in the root directory of this source tree.
     <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="isWarning(shown.meter)">{{ shown.meter.text }}</nol-meter>
   }
 }
+@if (fields().has(fieldNames.Last)) {
+  @if (last(); as reply) {
+    <p class="last">{{ reply.text }}</p>
+  }
+}
 @if (fields().has(fieldNames.Model)) {
   @if (model(); as text) {
     <span class="model">{{ text }}</span>
