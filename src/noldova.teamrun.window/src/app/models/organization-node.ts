@@ -34,4 +34,8 @@ export class OrganizationNode {
     });
     return nodesOf(null);
   }
+
+  public static departmentsOf(organization: Organization, parentId: string | null = null): readonly Department[] {
+    return organization.childrenOf(parentId).flatMap(t => [t, ...OrganizationNode.departmentsOf(organization, t.id)]);
+  }
 }

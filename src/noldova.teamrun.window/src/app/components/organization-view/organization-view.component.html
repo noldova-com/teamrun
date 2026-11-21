@@ -13,7 +13,7 @@ LICENSE file in the root directory of this source tree.
   <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
   <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
     aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
-  <button type="button" nol-button class="edit" [variant]="editing() ? primary : outlined" (click)="toggleEditing()"><span nolButtonIcon
+  <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" (click)="toggleEditing()"><span nolButtonIcon
     class="material-symbols-rounded" aria-hidden="true">{{ editing() ? resources.organizationDoneIcon : resources.organizationEditIcon }}</span>{{ editing()
     ? resources.organizationDoneEditing : resources.organizationEditStructure }}</button>
 </header>
@@ -36,6 +36,12 @@ LICENSE file in the root directory of this source tree.
     <button type="button" nol-button [variant]="text" (click)="organization.reload()">{{ resources.replyHistoryRetry }}</button>
   </div>
 }
+@if (organization.actionError(); as error) {
+  <div class="failure">
+    <p class="error action-error" role="alert">{{ error }}</p>
+    <button type="button" nol-button class="dismiss" [variant]="text" (click)="organization.clearActionError()">{{ resources.dismissLabel }}</button>
+  </div>
+}
 <main class="chart">
   <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
     @switch (mode()) {
@@ -54,10 +60,16 @@ LICENSE file in the root directory of this source tree.
               <span class="role">{{ ownerRole() }}</span>
             </div>
           </div>
-          @if (tree().length > 0) {
+          @if (tree().length > 0 || editing()) {
             <div class="kids">
               @for (node of tree(); track node.department.id) {
-                <nol-teamrun-organization-department class="kid" [node]="node" />
+                <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" />
+              }
+              @if (editing()) {
+                <div class="kid">
+                  <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+                    class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+                </div>
               }
             </div>
           } @else {

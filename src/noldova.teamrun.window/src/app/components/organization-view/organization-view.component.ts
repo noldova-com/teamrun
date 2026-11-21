@@ -38,6 +38,7 @@ export class OrganizationViewComponent {
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
+  protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
@@ -51,6 +52,10 @@ export class OrganizationViewComponent {
 
   protected toggleEditing(): void {
     this.editing.update(t => !t);
+  }
+
+  protected addDepartment(): void {
+    void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
   protected showView(value: string): void {
