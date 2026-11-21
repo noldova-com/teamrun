@@ -707,7 +707,9 @@ export class FakeCodexAppServer {
         this.notify("item/completed", { threadId, turnId, item: { id: "wake-held", type: "agentMessage", text: "Waking" } });
         return;
       }
-      this.notify("item/completed", { threadId, turnId, item: { id: "wake-msg", type: "agentMessage", text: `Woken with: ${String(this.subAgentResult)}` } });
+      const woken = process.env["TEAMRUN_FAKE_CODEX_WAKE"] === "policy" ? JSON.stringify({ sandboxPolicy: params["sandboxPolicy"] ?? null })
+        : `Woken with: ${String(this.subAgentResult)}`;
+      this.notify("item/completed", { threadId, turnId, item: { id: "wake-msg", type: "agentMessage", text: woken } });
       this.notify("turn/completed", { threadId, turn: { id: turnId, status: "completed" } });
       return;
     }
