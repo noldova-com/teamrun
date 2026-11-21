@@ -60,6 +60,7 @@ export class TeammatesViewComponent {
   private readonly choices: ComposerChoicesService = inject(ComposerChoicesService);
   private readonly defaults: ComposerDefaultService = inject(ComposerDefaultService);
   private readonly injector: Injector = inject(Injector);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly changeDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("changeDefaultButton", { read: ElementRef });
   private readonly clearDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("clearDefaultButton", { read: ElementRef });
   private readonly formatter: FormatterService = inject(FormatterService);
@@ -187,8 +188,18 @@ export class TeammatesViewComponent {
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)
-        void this.store.deleteTeammate(teammate, this.report);
+        void this.delete(teammate);
     });
+  }
+
+  private async delete(teammate: Teammate): Promise<void> {
+    const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-item[data-teammate]")].map(t => t.dataset["teammate"]);
+    const at = ids.indexOf(teammate.id);
+    const neighbour = ids[at + 1] ?? ids[at - 1];
+    if (await this.store.deleteTeammate(teammate, this.report))
+      afterNextRender(() => (Object.isUndefined(neighbour)
+        ? this.host.querySelector<HTMLElement>(".nol-teamrun-add")
+        : this.host.querySelector<HTMLElement>(`.nol-teamrun-item[data-teammate="${CSS.escape(neighbour)}"] .nol-teamrun-delete`))?.focus(), { injector: this.injector });
   }
 
   private connectionName(kind: string, provider: Provider): string {

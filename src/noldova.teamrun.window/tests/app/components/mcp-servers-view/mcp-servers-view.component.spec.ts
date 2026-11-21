@@ -905,6 +905,26 @@ describe("McpServersViewComponent", () => {
       expect(details().getAttribute("aria-label")).toBe("tracker");
     });
 
+    it("moves the focus to the next server's row once one is deleted, and to Add shared server once none is left", async () => {
+      await create();
+      await listedShared();
+      const confirmDelete = async (): Promise<void> => {
+        const remove = part(details(), ".nol-teamrun-delete");
+        remove.focus();
+        remove.click();
+        await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
+        inDialog<HTMLButtonElement>(".nol-teamrun-confirm").click();
+      };
+
+      await confirmDelete();
+      await Wait.until(() => expect(texts(".nol-teamrun-shared-mcp-row .nol-teamrun-item-name")).toEqual(["tracker"]));
+      await Wait.until(() => expect(document.activeElement).toBe(part(element(), ".nol-teamrun-shared-mcp-row")));
+      await confirmDelete();
+
+      await Wait.until(() => expect(document.activeElement).toBe(part(element(), ".nol-teamrun-add-shared-mcp")));
+      expect(element().querySelector(".nol-teamrun-shared-mcp-row")).toBeNull();
+    });
+
     it("keeps a server whose delete the runtime part refuses, and shows why in the view's error line", async () => {
       await create(t => t.answer(MethodName.SharedMcpServerDelete, () => {
         throw new Error("The database is busy.");

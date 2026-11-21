@@ -453,6 +453,27 @@ describe("TeammatesViewComponent", () => {
     expect(texts(".nol-teamrun-item-name")).toEqual(["Alice", "Offline"]);
   });
 
+  it("moves the focus to the next teammate's Delete once one is deleted, to the one before for the last, and to Add once none is left", async () => {
+    await create();
+    const confirmDelete = async (name: string): Promise<void> => {
+      const remove = button(".nol-teamrun-delete", row(name));
+      remove.focus();
+      remove.click();
+      await settle();
+      button(".nol-teamrun-confirm", document).click();
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).toBeNull());
+    };
+
+    await confirmDelete("Bob");
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-delete", row("Offline"))));
+    await confirmDelete("Offline");
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-delete", row("Alice"))));
+    await confirmDelete("Alice");
+
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-add")));
+    expect(texts(".nol-teamrun-item-name")).toEqual([]);
+  });
+
   describe("New chat", () => {
     const created = new Conversation("c7", "p1", "New chat", SampleData.timestamp, SampleData.timestamp);
     const choice = (): ComposerSettings | null => TestBed.inject(ComposerChoicesService).choiceOf("c7");

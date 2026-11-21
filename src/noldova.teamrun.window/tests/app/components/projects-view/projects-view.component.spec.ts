@@ -606,6 +606,37 @@ describe("ProjectsViewComponent", () => {
     expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
   });
 
+  it("moves the focus to the next row of its tree once a chat is deleted, to New chat once the chat's group is gone, and leaves a focus the person moved meanwhile", async () => {
+    conversations = [SampleData.conversation, second, other, scratch];
+    let deleting = new DeferredResponse();
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => 0).answer(MethodName.ConversationDelete, () => deleting.promise));
+    const remove = async (title: string): Promise<void> => {
+      deleting = new DeferredResponse();
+      conversationRow(title).focus();
+      await choose(conversationRow(title), Resources.deleteConversationLabel);
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+    };
+    const rows = [...element().querySelectorAll(`#${Resources.projectsGroupId} [role="treeitem"]`)];
+    const next = rows[rows.indexOf(conversationRow(second.title)) + 1];
+
+    await remove(second.title);
+    deleting.resolve(null);
+    await Wait.until(() => expect(document.activeElement).toBe(next));
+    await remove(scratch.title);
+    deleting.resolve(null);
+    await Wait.until(() => expect(document.activeElement).toBe(part(element(), ".nol-teamrun-action")));
+    await remove(other.title);
+    const outside = document.body.appendChild(document.createElement("button"));
+    outside.focus();
+    deleting.resolve(null);
+    await Wait.until(() => expect(element().textContent).not.toContain(other.title));
+    await settle();
+    const kept = document.activeElement === outside;
+    outside.remove();
+
+    expect([Object.isUndefined(next), kept]).toEqual([false, true]);
+  });
+
   it("attaches the folder the person chooses to a chat without a project, then offers to replace it after a confirm or detach it, and offers neither in a project", async () => {
     const attachedTo = (folder: string): Conversation => scratch.withAttachedFolder(folder, SampleData.timestamp).withFolder(folder);
     conversations = [SampleData.conversation, scratch];

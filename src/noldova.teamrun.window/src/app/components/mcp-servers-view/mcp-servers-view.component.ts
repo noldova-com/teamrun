@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, DestroyRef, effect, inject, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
+import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
 import {
@@ -88,6 +88,8 @@ export class McpServersViewComponent {
   private readonly announcer: Announcer = inject(Announcer);
   private readonly listings: WritableSignal<ReadonlyMap<string, OwnMcpServerListing>> = signal(new Map());
   private readonly formatter: FormatterService = inject(FormatterService);
+  private readonly injector: Injector = inject(Injector);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
   public constructor() {
     effect(() => {
@@ -365,9 +367,15 @@ export class McpServersViewComponent {
   }
 
   private async deleteShared(server: SharedMcpServer): Promise<void> {
+    const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-shared-mcp-row[data-server]")].map(t => t.dataset["server"]);
+    const at = ids.indexOf(server.id);
+    const neighbour = ids[at + 1] ?? ids[at - 1];
     if (await this.store.deleteSharedMcpServer(server.id, this.report)) {
       this.secretsSaved.set(null);
       await this.listShared();
+      afterNextRender(() => (Object.isUndefined(neighbour)
+        ? this.host.querySelector<HTMLElement>(".nol-teamrun-add-shared-mcp")
+        : this.host.querySelector<HTMLElement>(`.nol-teamrun-shared-mcp-row[data-server="${CSS.escape(neighbour)}"]`))?.focus(), { injector: this.injector });
     }
   }
 
