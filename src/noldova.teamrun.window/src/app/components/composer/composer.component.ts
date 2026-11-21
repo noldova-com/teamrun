@@ -78,6 +78,7 @@ import { Resources } from "../../../resources";
 import { ImageOpenMode } from "../../enums/image-open-mode";
 import { SendKey } from "../../enums/send-key";
 import { AbilityRefusal } from "../../models/ability-refusal";
+import { CatalogSource } from "../../models/catalog-source";
 import { ChatThread } from "../../models/chat-thread";
 import { ProviderChoice } from "../../models/provider-choice";
 import type { ChatContext } from "../../models/chat-context";
@@ -385,16 +386,16 @@ export class ComposerComponent {
     });
     effect(() => {
       const teammates = [...this.memberTeammates(), ...hasImages() ? parties() : []].filter(t => !store.isTeammateUnavailable(t.id))
-        .map((t): [string, string | null] => [store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
-      const wanted: readonly [string, string | null][] = Object.isNull(this.responder()) ? teammates : [...teammates, [this.kind()!, this.ownProvider()]];
+        .map(t => new CatalogSource(store.providers().find(u => u.id === t.providerId)!.kind, t.providerId));
+      const wanted: readonly CatalogSource[] = Object.isNull(this.responder()) ? teammates : [...teammates, new CatalogSource(this.kind()!, this.ownProvider())];
       const loaded = untracked(() => this.catalogs());
       const resynced = this.resynced();
       const fresh = resynced !== this.catalogsResynced;
       this.catalogsResynced = resynced;
-      for (const [kind, provider] of wanted) {
-        const key = ComposerComponent.catalogKey(kind, provider);
+      for (const source of wanted) {
+        const key = ComposerComponent.catalogKey(source.kind, source.providerId);
         if (fresh || !loaded.has(key))
-          void store.modelCatalogs.load(kind, provider).then(t => this.catalogs.update(u => new Map(u).set(key, t)));
+          void store.modelCatalogs.load(source.kind, source.providerId).then(t => this.catalogs.update(u => new Map(u).set(key, t)));
       }
     });
     this.canCompose = computed(() => !this.preparing() && !this.restoring());
@@ -821,7 +822,7 @@ export class ComposerComponent {
     if (!this.canCompose() || !Array.from(event.dataTransfer?.types ?? []).includes(Resources.filesTransferType))
       return;
     event.preventDefault();
-    this.dropping.set(this.editingSignal() === null);
+    this.dropping.set(Object.isNull(this.editingSignal()));
   }
 
   protected dragLeave(): void {

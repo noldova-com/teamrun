@@ -15,6 +15,7 @@ import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, TooltipDirective } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { CatalogSource } from "../../models/catalog-source";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -74,12 +75,12 @@ export class ConversationMembersComponent {
       resynced();
       const kind = this.defaultKind();
       const teammates = this.store.teammates().filter(t => !this.store.isTeammateUnavailable(t.id))
-        .map((t): [string, string | null] => [this.store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
-      const wanted: readonly [string, string | null][] = Object.isNull(kind) ? teammates : [...teammates, [kind, this.defaultSettings()?.providerId ?? null]];
+        .map(t => new CatalogSource(this.store.providers().find(u => u.id === t.providerId)!.kind, t.providerId));
+      const wanted: readonly CatalogSource[] = Object.isNull(kind) ? teammates : [...teammates, new CatalogSource(kind, this.defaultSettings()?.providerId ?? null)];
       untracked(() => {
-        for (const [wantedKind, provider] of wanted)
-          void this.store.modelCatalogs.load(wantedKind, provider)
-            .then(t => this.catalogs.update(u => new Map(u).set(ConversationMembersComponent.catalogKey(wantedKind, provider), t)));
+        for (const source of wanted)
+          void this.store.modelCatalogs.load(source.kind, source.providerId)
+            .then(t => this.catalogs.update(u => new Map(u).set(ConversationMembersComponent.catalogKey(source.kind, source.providerId), t)));
       });
     });
   }
