@@ -1445,15 +1445,16 @@ export class RequestDispatcherTests {
   public async listsEachTeammatesLastReply(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, (await host.createProviderAsync()).id, Harness.Provider, null, null));
     const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
 
     const empty = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
     await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed,
-      [new MessageDetail(0, DetailKind.Text, "Done.", null, "t")], provenance, "t", "t", "t2", [], "ada", "Ada"));
+      [new MessageDetail(0, DetailKind.Text, "Done.", null, "t")], provenance, "t", "t", "t2", [], ada.id, "Ada"));
     const listed = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
 
     Assert.areEqual("[]", JSON.stringify(empty));
-    Assert.areEqual(JSON.stringify([new TeammateLastReply("ada", conversation.id, "reply", "Done.", "t2").toJson()]), JSON.stringify(listed));
+    Assert.areEqual(JSON.stringify([new TeammateLastReply(ada.id, conversation.id, "reply", "Done.", "t2").toJson()]), JSON.stringify(listed));
   }
 
   @TestMethod

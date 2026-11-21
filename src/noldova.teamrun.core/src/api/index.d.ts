@@ -3741,7 +3741,8 @@ export declare class Resources {
   public static readonly textBlanks: string;
   /**
    * Each teammate's latest completed reply with text, its text from `messageText`: for each teammate it walks the last-reply index down from the last
-   * ended, so it reads no other message; its one parameter is `textBlanks`.
+   * ended, so it reads no other message; it compares `+tm.id`, without the column's text affinity, which would keep SQLite off the expression index.
+   * Its one parameter is `textBlanks`.
    */
   public static readonly selectTeammateLastReplies: string;
   /**
@@ -5358,7 +5359,8 @@ export declare class Resources {
   public static formatLikePattern(query: string): string;
 
   /**
-   * Renders the SQL condition for a Completed provider reply, the condition the last-reply index covers.
+   * Renders the SQL condition for a Completed provider reply with valid JSON, the condition the last-reply index covers, so `json_extract` never reads
+   * a row whose JSON isn't valid.
    * @param row The message row's name in the statement, or null for the table's own columns.
    * @returns The condition.
    */

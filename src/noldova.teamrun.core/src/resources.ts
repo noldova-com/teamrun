@@ -653,7 +653,7 @@ export class Resources {
   public static readonly selectTeammateLastReplies: string =
     "SELECT l.teammateId, m.chatId, m.id, t.text, json_extract(m.json, '$.endedAt') AS endedAt FROM (SELECT tm.id AS teammateId, "
     + `(SELECT r.rowid FROM messages r CROSS JOIN messageText x ON x.rowid = r.rowid WHERE ${Resources.formatFinishedReply("r")} `
-    + "AND json_extract(r.json, '$.teammateId') = tm.id AND json_extract(r.json, '$.endedAt') IS NOT NULL AND trim(x.text, ?) <> '' "
+    + "AND json_extract(r.json, '$.teammateId') = +tm.id AND json_extract(r.json, '$.endedAt') IS NOT NULL AND trim(x.text, ?) <> '' "
     + "ORDER BY json_extract(r.json, '$.endedAt') DESC, r.rowid DESC LIMIT 1) AS lastRowid FROM teammates tm) l "
     + "CROSS JOIN messages m ON m.rowid = l.lastRowid CROSS JOIN messageText t ON t.rowid = m.rowid ORDER BY l.teammateId";
   public static readonly selectTeammateUsage: string =
@@ -1299,7 +1299,7 @@ export class Resources {
 
   public static formatFinishedReply(row: string | null): string {
     const prefix = Object.isNull(row) ? "" : `${row}.`;
-    return `${prefix}status = '${MessageStatus.Completed}' AND json_extract(${prefix}json, '$.author') = '${MessageAuthor.Provider}'`;
+    return `${prefix}status = '${MessageStatus.Completed}' AND json_valid(${prefix}json) AND json_extract(${prefix}json, '$.author') = '${MessageAuthor.Provider}'`;
   }
 
   public static formatMessageText(row: string): string {

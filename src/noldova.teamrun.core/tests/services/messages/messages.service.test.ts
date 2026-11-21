@@ -447,9 +447,9 @@ export class MessagesServiceTests {
     const plan = (await host.context.database.connection.queryAsync(new SqlQuery(`EXPLAIN QUERY PLAN ${Resources.selectTeammateLastReplies}`,
       [Resources.textBlanks]))).map(t => t.readString("detail"));
 
-    Assert.isTrue(plan.some(t => t.startsWith("SEARCH r USING INDEX IX_messages_teammateId_endedAt")), plan.join("; "));
+    Assert.isTrue(plan.includes("SEARCH r USING INDEX IX_messages_teammateId_endedAt (<expr>=?)"), plan.join("; "));
     Assert.isTrue(plan.some(t => t.startsWith("SEARCH m USING INTEGER PRIMARY KEY")), plan.join("; "));
-    Assert.isFalse(plan.some(t => /^SCAN (messages|m|r)\b/u.test(t)), plan.join("; "));
+    Assert.isFalse(plan.some(t => /^SCAN (messages|m|r)\b/u.test(t) || t.includes("TEMP B-TREE")), plan.join("; "));
   }
 
   private static said(conversationId: string, sequence: number, teammateId: string | null, status: MessageStatus, endedAt: string | null,
