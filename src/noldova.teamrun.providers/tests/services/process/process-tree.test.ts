@@ -202,8 +202,10 @@ export class ProcessTreeTests {
     const left = [root, child].filter(t => ProcessTreeTests.runs(t))
       .map(t => `${String(t)} ${last.split("\n").some(line => line.trim().split(" ")[0] === String(t)) ? "listed" : "not listed"}`);
 
+    const rounds = runner.commands.map(t => t.arguments.at(-1) ?? "").filter(t => t.startsWith("$ids = "));
     Assert.isTrue(ended);
     Assert.areEqual("[]", JSON.stringify(left));
+    Assert.isTrue(rounds.length < Resources.processTreeFreezeRounds, JSON.stringify(rounds));
     Assert.isTrue(delays.reduce((total, delay) => total + delay, 0) < grace, JSON.stringify(delays.length));
     Assert.isTrue(runner.timeouts.length > 0 && runner.timeouts.every(t => t === Resources.processListTimeout), JSON.stringify(runner.timeouts));
   }
@@ -438,6 +440,32 @@ export class ProcessTreeTests {
     Assert.isTrue(ended);
     Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, Resources.formatProcessEndScript([task, child], [start + 10_000, start + 20_000]),
       Resources.formatProcessEndScript([task], [start + 10_000])]), JSON.stringify(session.calls.map(t => t[0])));
+  }
+
+  @TestMethod
+  public async endsAWindowsTreeInItsLastRoundAndReportsItEndedWhenEveryListingStillShowsAProcess(): Promise<void> {
+    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
+    const task = ProcessTreeTests.GONE - 1;
+    const session = new ListingPowershellSession([
+      ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start], [task, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
+
+    const ended = await new ProcessTree("win32", new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, session)
+      .endTree(task, start + 30_000, ProcessTreeTests.ANCESTOR);
+
+    Assert.isTrue(ended);
+    Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, ...Array.from({ length: Resources.processTreeFreezeRounds },
+      () => Resources.formatProcessEndScript([task], [start + 10_000]))]), JSON.stringify(session.calls.map(t => t[0])));
+  }
+
+  @TestMethod
+  public waitsForEachProcessTheEndScriptEndsToExitWithinTheScriptsDeadline(): void {
+    const script = Resources.formatProcessEndScript([1001], [5_000]);
+
+    Assert.areEqual(`$ids = @(1001); $starts = @(5000); $deadline = [DateTime]::UtcNow.AddMilliseconds(${String(Resources.processExitWait)}); ` +
+      "for ($i = 0; $i -lt $ids.Count; $i++) { try { $p = [System.Diagnostics.Process]::GetProcessById($ids[$i]); $null = $p.Handle; " +
+      "if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - $starts[$i]) -le 1) { $p.Kill(); " +
+      "$null = $p.WaitForExit([int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)) } } catch { } }; ",
+      script.slice(0, script.indexOf("}; ") + 3));
   }
 
   @TestMethod
