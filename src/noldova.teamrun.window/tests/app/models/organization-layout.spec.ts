@@ -20,7 +20,7 @@ describe("OrganizationLayout", () => {
 
   it("round-trips through JSON, and reads what is missing or malformed as the defaults or nothing", () => {
     const layout = new OrganizationLayout(["d1", "d1", " ", "d2"], new Set([OrganizationCardField.Usage]),
-      new Map([["t1", new Set([OrganizationCardField.Model])], [" ", new Set([OrganizationCardField.Last])]]));
+      new Map<string, ReadonlySet<OrganizationCardField>>([["t1", new Set([OrganizationCardField.Model])], [" ", new Set([OrganizationCardField.Last])]]));
     const read = OrganizationLayout.fromJson(layout.toJson());
     const odd = OrganizationLayout.fromJson({ collapsedDepartments: ["d1", 3], cardsShow: { Usage: true, Status: false, Ghost: true, Last: "yes" }, cards: { t2: [1], t3: { Now: true } } });
 
