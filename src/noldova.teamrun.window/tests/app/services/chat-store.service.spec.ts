@@ -2560,7 +2560,7 @@ describe("ChatStoreService", () => {
     expect([shown, forgotten, store.messageIndex()]).toEqual([["m1", "m2"], ["m1", "m2"], []]);
   });
 
-  it("offers the person's rewound message back, its text and files, and nothing for a failure, a reply or a rewind from elsewhere", async () => {
+  it("offers the person's rewound message back, its text and files, once asked to after a rewind, and nothing for a failure, a reply or a rewind from elsewhere", async () => {
     const file = new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/c1/notes.txt");
     const asked = new Message("m1", "c1", 0, MessageAuthor.User, null, MessageStatus.Completed,
       [SampleData.detail(0, DetailKind.Text, "first"), SampleData.detail(1, DetailKind.Note, "aside"), SampleData.detail(2, DetailKind.Text, "second")], null,
@@ -2580,19 +2580,24 @@ describe("ChatStoreService", () => {
       return new ConversationRewindResult(SampleData.conversation, [params.messageId], null).toJson();
     });
     await store.rewind(SampleData.reply, false);
+    store.offerRewoundDraft(SampleData.reply);
     expect(store.rewoundDraft()).toBeNull();
 
     await store.rewind(asked, false);
+    const offered = store.rewoundDraft();
+    store.offerRewoundDraft(asked);
     const offer = store.rewoundDraft();
-    expect([offer?.conversationId, offer?.text, offer?.attachments]).toEqual(["c1", "first\n\nsecond", [file]]);
+    expect([offered, offer?.conversationId, offer?.text, offer?.attachments]).toEqual([null, "c1", "first\n\nsecond", [file]]);
 
     store.clearRewoundDraft();
     context.emit(EventName.MessageCreated, asked.toJson());
     context.emit(EventName.ConversationRewound, new ConversationRewoundPayload("c1", 0).toJson());
     expect(store.rewoundDraft()).toBeNull();
 
-    await store.rewind(new Message("m9", "c2", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "there")], null,
-      SampleData.timestamp, null, SampleData.timestamp), false);
+    const other = new Message("m9", "c2", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "there")], null,
+      SampleData.timestamp, null, SampleData.timestamp);
+    await store.rewind(other, false);
+    store.offerRewoundDraft(other);
     expect([store.rewoundDraft()?.conversationId, store.rewoundDraft()?.text]).toEqual(["c2", "there"]);
     expect(rewound.at(-1)).toBe("c2");
   });
