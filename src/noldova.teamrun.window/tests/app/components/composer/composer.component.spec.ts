@@ -4852,21 +4852,40 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("hello");
     });
 
-    it("says when the unsent message could not be read, and keeps nothing written there over it", async () => {
+    it("says when the unsent message could not be read, saves nothing written there over it while it still can't be read, and saves it once it can", async () => {
+      let readable = false;
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1"
-        ? Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
+        ? readable ? null : Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
       await prepare();
       await render();
 
       expect(alert()).toBe(Resources.formatDraftUnreadable("unreadable"));
       expect(box().readOnly).toBe(false);
       await type("hello");
-      await saveStep()();
+      await expect(saveStep()()).rejects.toThrow(Resources.draftNotSaved);
       expect(context.count(MethodName.DraftSave)).toBe(0);
+      readable = true;
+      await saveStep()();
+      expect(saves().map(t => t.text)).toEqual(["hello"]);
 
       fixture.componentRef.setInput("conversationId", "c2");
       await fixture.whenStable();
       expect(alert()).toBe(Resources.formatDraftUnreadable("offline"));
+    });
+
+    it("shows the unsent message a save's read finds after a failed read, in place of what was written, and saves nothing over it", async () => {
+      let readable = false;
+      context.answer(MethodName.DraftRead, () => readable
+        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new Error("unreadable")));
+      await prepare();
+      await render();
+      await type("ok");
+      readable = true;
+
+      await saveStep()();
+
+      await Wait.until(() => expect(box().value).toBe("a long unsent message"));
+      expect(context.count(MethodName.DraftSave)).toBe(0);
     });
 
     it("keeps the field closed and takes no files until the unsent message is read", async () => {
