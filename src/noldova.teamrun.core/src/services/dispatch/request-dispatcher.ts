@@ -36,6 +36,7 @@ import {
   DepartmentIdParams,
   DepartmentMemberSetParams,
   OrganizationLayoutSaveParams,
+  OrganizationChat,
   OrganizationMessageSendParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
@@ -265,6 +266,9 @@ export class RequestDispatcher {
         return (await RequestDispatcher.require(this.organizationMessages, method).stopAsync(MessageIdParams.fromJson(payload))).toJson();
       case MethodName.OrganizationMessageList:
         return (await RequestDispatcher.require(this.organizationMessages, method).listAsync()).map(t => t.toJson());
+      case MethodName.OrganizationChatOpen:
+        return (await this.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId,
+          TeammateIdParams.fromJson(payload).teammateId))).toJson();
       case MethodName.OrganizationMessageReplyList:
         return (await RequestDispatcher.require(this.organizationMessages, method).listRepliesAsync(MessageIdParams.fromJson(payload))).map(t => t.toJson());
       case MethodName.SharedMcpServerList:

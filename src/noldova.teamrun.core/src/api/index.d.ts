@@ -157,6 +157,7 @@ import type {
   DepartmentMoveParams,
   DepartmentUpdateParams,
   Organization,
+  OrganizationChat,
   OrganizationLayoutSaveParams,
   OrganizationMessage,
   OrganizationMessageSendParams
@@ -1290,9 +1291,18 @@ export interface IConversationsService {
    * @param params The project id, the optional title and the optional teammate.
    * @param transaction The transaction to work in, or none for its own.
    * @returns The conversation.
+   * @param organizationChat The organization and teammate whose Organization chat this is, or `null` (the default) for any other chat.
    * @throws ServiceException named `ErrorCode.NotFound` when the project or the teammate does not exist.
    */
-  createAsync(params: ConversationCreateParams, transaction?: SqlTransaction): Promise<Conversation>;
+  createAsync(params: ConversationCreateParams, transaction?: SqlTransaction, organizationChat?: OrganizationChat | null): Promise<Conversation>;
+
+  /**
+   * Finds a teammate's Organization chat in an organization.
+   * @param chat The organization and the teammate.
+   * @param transaction The transaction to read in.
+   * @returns The first such chat, or `null` when there is none.
+   */
+  findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null>;
 
   /**
    * Renames a conversation and marks it edited.
@@ -2199,6 +2209,9 @@ export interface IConversationEngine {
    * Otherwise the message is posted and no one starts. A default teammate's send has a `MessageSender` with no teammate id, under its
    * provider's display name. A teammate's reply runs in the permission mode its membership of the chat chose, when its provider lists it,
    * and in the teammate's own mode otherwise, a hand-off's reply included.
+   * The person's message to a teammate's Organization chat keeps, on its text detail, the line `Resources.formatOrganizationRole` builds
+   * from the organization in the send's transaction, naming the teammate's place and who it reports to, with the teammate's id; that
+   * teammate's reply gets the line before the message's text, attachments and mention names, and another teammate's reply gets the message alone.
    * @param params The message, attachment inputs, resolved mentions and responder selection.
    * @returns The stored message and zero or more pending replies, updated through events.
    * @throws ServiceException named `ErrorCode.NotFound` when the conversation, its project, the
@@ -2372,6 +2385,15 @@ export interface IConversationEngine {
    * @param conversationId The conversation id.
    */
   releaseFolderAsync(conversationId: string): Promise<void>;
+
+  /**
+   * Finds a teammate's Organization chat in an organization, or makes it, titled with
+   * `Resources.formatOrganizationChatTitle` and with the teammate as its member, without sending anything.
+   * @param chat The organization and the teammate.
+   * @returns The chat.
+   * @throws ServiceException `NotFound` for a teammate that doesn't exist.
+   */
+  openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation>;
 
   /**
    * Refuses a change to a conversation's folder while work the conversation started still runs in it: a background task, a TeamRun helper, or
@@ -3070,8 +3092,12 @@ export declare class Resources {
   public static readonly insertOrganizationMessage: string;
   /** Replaces an organization message's JSON. */
   public static readonly updateOrganizationMessage: string;
-  /** The label an organization message's text carries in each recipient's outside chat. */
-  public static readonly organizationMessageLabel: string;
+  /** The organization every Organization chat belongs to until there are several. */
+  public static readonly defaultOrganizationId: string;
+  /** Who a teammate reports to when no leader is above it, in an Organization message's prompt. */
+  public static readonly organizationReportsToPerson: string;
+  /** A teammate's place when it is in no department, in an Organization message's prompt. */
+  public static readonly organizationNoDepartment: string;
   /** Why a recipient still queued when TeamRun stopped failed. */
   public static readonly organizationSendInterrupted: string;
   public static readonly selectHandoverSummary: string;
@@ -3679,6 +3705,10 @@ export declare class Resources {
    * Selects a conversation's JSON: `id`.
    */
   public static readonly selectConversationById: string;
+  /**
+   * Selects the JSON of a teammate's first Organization chat in an organization: `organizationId`, `teammateId`.
+   */
+  public static readonly selectOrganizationChat: string;
   /**
    * Selects a project's conversations' JSON, oldest first: `projectId`.
    */
@@ -4385,6 +4415,10 @@ export declare class Resources {
   public static readonly replyToField: string;
   /** The payload field of a user message's `Text` detail holding the prompt the provider gets instead of the shown text. */
   public static readonly promptField: string;
+  /** The payload field of a user message's `Text` detail holding the Organization role line its chat's teammate gets before the message. */
+  public static readonly organizationRoleField: string;
+  /** The payload field of a user message's `Text` detail naming the teammate whose reply gets the Organization role line. */
+  public static readonly organizationRoleTeammateIdField: string;
   /**
    * The payload field of a user message's `Text` detail naming the reply it was steered into; the next turn of that reply's session
    * leaves the message out, since the provider already has it.
@@ -4433,6 +4467,46 @@ export declare class Resources {
    */
   public static formatOutsideNoTeammate(conversationId: string): string;
   public static formatOutsideCapEndsTasks(conversationId: string): string;
+
+  /**
+   * The title of a teammate's Organization chat.
+   * @param name The teammate's name.
+   */
+  public static formatOrganizationChatTitle(name: string): string;
+
+  /**
+   * A department leader's place, in an Organization message's prompt.
+   * @param department The department's name.
+   */
+  public static formatOrganizationLeader(department: string): string;
+
+  /**
+   * A department member's place, in an Organization message's prompt.
+   * @param department The department's name.
+   */
+  public static formatOrganizationMember(department: string): string;
+
+  /**
+   * The line an Organization message gives its teammate: who sent it, the teammate's place and who it reports to.
+   * @param place The teammate's place.
+   * @param manager Who the teammate reports to.
+   */
+  public static formatOrganizationRole(place: string, manager: string): string;
+
+  /**
+   * Puts an Organization role line before the message's text as its teammate gets it.
+   * @param role The line `formatOrganizationRole` built.
+   * @param text The message's text, with its attachments and mention names.
+   */
+  public static formatOrganizationRolePrompt(role: string, text: string): string;
+
+  /**
+   * The prompt an Organization message gives its teammate: who sent it, the teammate's place and who it reports to, then the text.
+   * @param place The teammate's place.
+   * @param manager Who the teammate reports to.
+   * @param text The message's text.
+   */
+  public static formatOrganizationMessagePrompt(place: string, manager: string, text: string): string;
 
   /**
    * The title of a teammate's chat for outside messages.
@@ -6550,6 +6624,27 @@ export declare class ForkRequest {
 }
 
 /**
+ * A teammate's Organization chat as the engine found or made it.
+ */
+export declare class OrganizationChatOpening {
+  /**
+   * The chat.
+   */
+  public readonly conversation: Conversation;
+  /**
+   * Whether the engine made the chat rather than finding it.
+   */
+  public readonly made: boolean;
+
+  /**
+   * Initializes the opening.
+   * @param conversation The chat.
+   * @param made Whether the engine made it.
+   */
+  public constructor(conversation: Conversation, made: boolean);
+}
+
+/**
  * The reply to an outside message, as the outside session reads it.
  */
 export declare class OutsideReply {
@@ -7400,7 +7495,12 @@ export declare class ConversationsService implements IConversationsService {
   /**
    * @inheritdoc
    */
-  public createAsync(params: ConversationCreateParams, transaction?: SqlTransaction): Promise<Conversation>;
+  public findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null>;
+
+  /**
+   * @inheritdoc
+   */
+  public createAsync(params: ConversationCreateParams, transaction?: SqlTransaction, organizationChat?: OrganizationChat | null): Promise<Conversation>;
 
   /**
    * @inheritdoc
@@ -9511,7 +9611,7 @@ export declare class ConversationEngine implements IConversationEngine, IOrganiz
   /**
    * @inheritdoc
    */
-  public startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+  public startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
 
   /**
    * @inheritdoc
@@ -9619,6 +9719,11 @@ export declare class ConversationEngine implements IConversationEngine, IOrganiz
    * See {@link IConversationEngine.releaseFolderAsync}.
    */
   public releaseFolderAsync(conversationId: string): Promise<void>;
+
+  /**
+   * See {@link IConversationEngine.openOrganizationChatAsync}.
+   */
+  public openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation>;
 
   /**
    * See {@link IConversationEngine.requireNothingRunningAsync}.
@@ -10101,15 +10206,19 @@ export interface IOrganizationService {
   removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
 }
 
-/** Starts a teammate's reply to a message from outside its chats, and stops a reply. */
+/** Starts a teammate's reply to the person's Organization message, and stops a reply. */
 export interface IOrganizationSender {
   /**
-   * Sends the text to the teammate's outside chat and starts its replies without waiting for them; while the chat answers an earlier
-   * message, the new replies wait as Pending behind it and start when it ends.
+   * Sends the text as the person's own message to the teammate's Organization chat, made with
+   * `Resources.formatOrganizationChatTitle` when the organization has none for it yet, and starts its replies without waiting for
+   * them; the teammate reads it after its place in the organization, as every send of the person there does. While the chat answers an earlier message, the new replies wait as
+   * Pending behind it and start when it ends.
+   * @param chat The organization and the teammate.
+   * @param text The text.
    * @throws ServiceException `NotFound` for a teammate that no longer exists, `Conflict` with `Resources.formatAccountCannotReply` when its account
    * can't reply.
    */
-  startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult>;
+  startAsPersonAsync(chat: OrganizationChat, text: string): Promise<MessageSendResult>;
 
   /** Stops a reply that hasn't finished. */
   cancelAsync(params: MessageIdParams): Promise<Message>;

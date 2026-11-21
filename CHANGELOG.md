@@ -18,6 +18,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization messages:** a message from Organization is now your own message in the teammate's Organization chat, `Organization · <name>`, not one from outside TeamRun, and tells the teammate its department, whether it leads it, and who it reports to; before you send, the thread names who it reaches, and says when a department has no leader (#397).
 - **Model lists after the engine restarts:** the composer's model picker, the Teammates view and a chat's members list ask each provider for its models again, rather than showing the lists they had before the engine went away (#387).
 - **Rewinding to your own message:** its text comes back to the message box once the rewind dialog has closed, with the caret in the box, and a draft already there is asked about only then, rather than in a second dialog over the first (#156).
 - **A reply that fails in a group:** a reply whose failure escapes, such as a failed write as it starts or as it fails, fails only itself, and the other teammates addressed in the same message still answer, rather than all failing with its error; a reply stopped as it fails stays stopped, and its tools and sub-agents still close (#141).

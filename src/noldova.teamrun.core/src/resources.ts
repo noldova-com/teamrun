@@ -495,7 +495,9 @@ export class Resources {
   public static readonly selectOrganizationMessage: string = "SELECT json FROM organizationMessages WHERE id = ?";
   public static readonly insertOrganizationMessage: string = "INSERT INTO organizationMessages (id, json, createdAt) VALUES (?, ?, ?)";
   public static readonly updateOrganizationMessage: string = "UPDATE organizationMessages SET json = ? WHERE id = ?";
-  public static readonly organizationMessageLabel: string = "Organization";
+  public static readonly defaultOrganizationId: string = "my-organization";
+  public static readonly organizationReportsToPerson: string = "the person";
+  public static readonly organizationNoDepartment: string = "you are in no department";
   public static readonly organizationSendInterrupted: string = "TeamRun stopped before it was sent.";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
@@ -599,6 +601,8 @@ export class Resources {
   public static readonly deleteConversation: string = "DELETE FROM chats WHERE id = ?";
   public static readonly insertConversation: string = "INSERT INTO chats (id, projectId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
   public static readonly selectConversationById: string = "SELECT json FROM chats WHERE id = ?";
+  public static readonly selectOrganizationChat: string = "SELECT json FROM chats WHERE json_extract(json, '$.organizationChat.organizationId') = ? "
+    + "AND json_extract(json, '$.organizationChat.teammateId') = ? ORDER BY createdAt, rowid LIMIT 1";
   public static readonly selectConversationsByProject: string = "SELECT json FROM chats WHERE projectId IS ? ORDER BY createdAt, rowid";
   public static readonly selectRecentConversations: string = "SELECT chats.json FROM chats "
     + "JOIN (SELECT chatId, MAX(rowid) AS latest FROM messages GROUP BY chatId) AS last ON last.chatId = chats.id ORDER BY last.latest DESC LIMIT ?";
@@ -903,6 +907,8 @@ export class Resources {
   public static readonly replyToField: string = "replyTo";
   public static readonly answerUnsentField: string = "answerUnsent";
   public static readonly promptField: string = "prompt";
+  public static readonly organizationRoleField: string = "organizationRole";
+  public static readonly organizationRoleTeammateIdField: string = "organizationRoleTeammateId";
   public static readonly steeredIntoField: string = "steeredInto";
   public static readonly mediaTypeField: string = "mediaType";
   public static readonly storedPathField: string = "storedPath";
@@ -1463,6 +1469,30 @@ export class Resources {
 
   public static formatOutsideCapEndsTasks(conversationId: string): string {
     return `The chat "${conversationId}" runs background tasks in a mode an outside message can't use; try again once they end.`;
+  }
+
+  public static formatOrganizationChatTitle(name: string): string {
+    return `Organization · ${name}`;
+  }
+
+  public static formatOrganizationLeader(department: string): string {
+    return `you lead the ${department} department`;
+  }
+
+  public static formatOrganizationMember(department: string): string {
+    return `you are a member of the ${department} department`;
+  }
+
+  public static formatOrganizationRole(place: string, manager: string): string {
+    return `The person sent you this message from TeamRun's Organization view. In the organization, ${place}, and you report to ${manager}.`;
+  }
+
+  public static formatOrganizationRolePrompt(role: string, text: string): string {
+    return `${role}\n\n${text}`;
+  }
+
+  public static formatOrganizationMessagePrompt(place: string, manager: string, text: string): string {
+    return Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(place, manager), text);
   }
 
   public static formatOutsideChatTitle(name: string): string {

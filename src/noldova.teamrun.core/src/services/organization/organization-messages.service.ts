@@ -12,7 +12,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
-  ErrorCode, Event, EventName, type Message, MessageIdParams, MessageStatus, type Organization, OrganizationMessage, type OrganizationMessageSendParams,
+  ErrorCode, Event, EventName, type Message, MessageIdParams, MessageStatus, type Organization, OrganizationChat, OrganizationMessage, type OrganizationMessageSendParams,
   OrganizationRecipient, OrganizationRecipientState, type OrganizationTarget, OrganizationTargetKind, type Teammate
 } from "@noldova/teamrun.protocol";
 
@@ -99,7 +99,7 @@ export class OrganizationMessagesService implements IOrganizationMessagesService
     const change = (state: OrganizationRecipientState, chatId: string | null, sentId: string | null, reason: string | null) =>
       this.changeAsync(messageId, t => t.teammateId === teammateId && t.state === OrganizationRecipientState.Queued ? t.with(state, chatId, sentId, reason) : t);
     try {
-      const result = await this.sender.startOutsideAsync(teammateId, text, Resources.organizationMessageLabel);
+      const result = await this.sender.startAsPersonAsync(new OrganizationChat(Resources.defaultOrganizationId, teammateId), text);
       const message = await change(OrganizationRecipientState.Started, result.sent.chatId, result.sent.id, null);
       if (message.recipients.some(t => t.teammateId === teammateId && t.state === OrganizationRecipientState.Started))
         return;
