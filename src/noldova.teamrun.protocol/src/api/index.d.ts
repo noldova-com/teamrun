@@ -611,6 +611,11 @@ export declare enum MethodName {
    */
   OrganizationMessageReplyList = "OrganizationMessageReplyList",
   /**
+   * Finds a teammate's Organization chat, or makes it when there is none yet, without sending anything.
+   * Parameters: `TeammateIdParams`. Result: `Chat`.
+   */
+  OrganizationChatOpen = "OrganizationChatOpen",
+  /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
   ConversationAddMember = "ConversationAddMember",

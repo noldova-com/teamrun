@@ -2384,6 +2384,15 @@ export interface IConversationEngine {
   releaseFolderAsync(conversationId: string): Promise<void>;
 
   /**
+   * Finds a teammate's Organization chat in an organization, or makes it, titled with
+   * `Resources.formatOrganizationChatTitle` and with the teammate as its member, without sending anything.
+   * @param chat The organization and the teammate.
+   * @returns The chat.
+   * @throws ServiceException `NotFound` for a teammate that doesn't exist.
+   */
+  openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation>;
+
+  /**
    * Releases, as `releaseFolderAsync` does, every own folder in the data folder whose conversation is gone or now has a project; the
    * runtime runs it at its start. It releases no further folder once the signal aborts. Never rejects.
    * @param signal Aborts when the sweep should stop, such as when the runtime part deactivates.
@@ -9621,6 +9630,11 @@ export declare class ConversationEngine implements IConversationEngine, IOrganiz
    * See {@link IConversationEngine.releaseFolderAsync}.
    */
   public releaseFolderAsync(conversationId: string): Promise<void>;
+
+  /**
+   * See {@link IConversationEngine.openOrganizationChatAsync}.
+   */
+  public openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation>;
 
   /**
    * See {@link IConversationEngine.sweepFoldersAsync}.

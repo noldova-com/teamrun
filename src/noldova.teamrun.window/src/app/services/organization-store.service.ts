@@ -11,8 +11,8 @@ import { type FactoryProvider, inject, type Signal, signal, type WritableSignal 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import { DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, EventName, MethodName, Organization }
-  from "@noldova/teamrun.protocol";
+import { Conversation, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, EventName, MethodName,
+  Organization, TeammateIdParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 
@@ -91,6 +91,17 @@ export class OrganizationStoreService {
 
   public async setMember(teammateId: string, departmentId: string | null): Promise<boolean> {
     return this.act(MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(teammateId, departmentId).toJson());
+  }
+
+  public async openOrganizationChat(teammateId: string): Promise<Conversation | null> {
+    this.actionErrorSignal.set(null);
+    try {
+      return Conversation.fromJson(await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationChatOpen), new TeammateIdParams(teammateId).toJson()));
+    }
+    catch (error) {
+      this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
+      return null;
+    }
   }
 
   public fail(error: unknown): void {

@@ -420,14 +420,20 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const provider = await this.providers.findAsync(teammate.providerId);
     if (!this.canReply(provider))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammate.id]);
-    const [chatId, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [string, boolean]> => {
+    const opened = await this.openOrganizationChatAsync(chat);
+    return this.sendMessageAsync(new MessageSendParams(opened.id, text, null, null, [], [], teammate.id), prompt, null, undefined, null, true);
+  }
+
+  public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
+    const teammate = await this.requireTeammateAsync(chat.teammateId);
+    const [opened, made] = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<readonly [Conversation, boolean]> => {
       const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
-      return Object.isNull(known) ? [(await this.conversations.createAsync(new ConversationCreateParams(null, Resources.formatOrganizationChatTitle(teammate.name),
-        teammate.id), transaction, chat)).id, true] : [known.id, false];
+      return Object.isNull(known) ? [await this.conversations.createAsync(new ConversationCreateParams(null, Resources.formatOrganizationChatTitle(teammate.name),
+        teammate.id), transaction, chat), true] : [known, false];
     });
     if (made)
       this.events.publish(new Event(EventName.StateInvalidated, null));
-    return this.sendMessageAsync(new MessageSendParams(chatId, text, null, null, [], [], teammate.id), prompt, null, undefined, null, true);
+    return opened;
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {

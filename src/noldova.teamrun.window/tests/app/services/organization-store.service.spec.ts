@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
-import { Department, DepartmentMember, EventName, MethodName, Organization } from "@noldova/teamrun.protocol";
+import { Chat, Department, DepartmentMember, EventName, MethodName, Organization, OrganizationChat, TeammateIdParams } from "@noldova/teamrun.protocol";
 
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
@@ -171,5 +171,24 @@ describe("OrganizationStoreService", () => {
     store.clearActionError();
 
     expect([moved, said, plain, deleted, afterSuccess, store.actionError()]).toEqual([false, "A department can't move under one of its own.", "Busy", true, null, null]);
+  });
+
+  it("opens a teammate's Organization chat, or says why it couldn't", async () => {
+    const chat = new Chat("c1", null, "Organization · Grok", "t", "t", false, null, null, false, null, false, [], false, false, null,
+      new OrganizationChat("my-organization", "grok"));
+    const asked: string[] = [];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Organization.empty.toJson())
+      .answer(MethodName.OrganizationChatOpen, t => {
+        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        asked.push(teammateId);
+        return teammateId === "grok" ? chat.toJson() : Promise.reject(new Error("There is no teammate gone."));
+      });
+    const store = OrganizationStoreService.of(context);
+
+    const missing = await store.openOrganizationChat("gone");
+    const said = store.actionError();
+    const opened = await store.openOrganizationChat("grok");
+
+    expect([missing, said, opened?.toJson(), store.actionError(), asked]).toEqual([null, "There is no teammate gone.", chat.toJson(), null, ["gone", "grok"]]);
   });
 });
