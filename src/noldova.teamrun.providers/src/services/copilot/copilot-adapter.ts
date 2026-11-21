@@ -47,7 +47,7 @@ export class CopilotAdapter extends AcpAdapter {
     locate: () => ProcessCommand | null = CommandSource.none, installation: IProviderKindInstallation | null = null, idleTimer: ITimer = new NodeTimer(),
     processTree?: IProcessTree) {
     const agent = new CopilotAgent(command, environment, workDirectory, locate);
-    super(agent, clientInfo, starter, timings, timer, undefined, undefined, processTree, idleTimer);
+    super(agent, clientInfo, starter, timings, timer, undefined, log, processTree, idleTimer);
     this.lister = new CopilotModelLister(agent, starter, timings, timer, log);
     this.log = log;
     if (!Object.isNull(installation))

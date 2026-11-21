@@ -28,6 +28,7 @@ export class ProviderTimings {
   public readonly modelListTimeout: number;
   public readonly silenceLimit: number;
   public readonly idleLimit: number;
+  public readonly stopReportWait: number;
 
   public constructor(
     versionTimeout: number,
@@ -46,7 +47,8 @@ export class ProviderTimings {
     accountTimeout: number = Resources.accountTimeout,
     modelListTimeout: number = Resources.modelListTimeout,
     silenceLimit: number = Resources.silenceLimit,
-    idleLimit: number = Resources.idleLimit) {
+    idleLimit: number = Resources.idleLimit,
+    stopReportWait: number = Resources.stopReportWait) {
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(versionTimeout, Resources.versionTimeoutParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(signInCheckTimeout, Resources.signInCheckTimeoutParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(initializeTimeout, Resources.initializeTimeoutParameterName);
@@ -64,6 +66,7 @@ export class ProviderTimings {
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(modelListTimeout, Resources.modelListTimeoutParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(silenceLimit, Resources.silenceLimitParameterName);
     ArgumentOutOfRangeException.throwIfNotPositiveInteger(idleLimit, Resources.idleLimitParameterName);
+    ArgumentOutOfRangeException.throwIfNotPositiveInteger(stopReportWait, Resources.stopReportWaitParameterName);
 
     this.versionTimeout = versionTimeout;
     this.signInCheckTimeout = signInCheckTimeout;
@@ -82,6 +85,7 @@ export class ProviderTimings {
     this.modelListTimeout = modelListTimeout;
     this.silenceLimit = silenceLimit;
     this.idleLimit = idleLimit;
+    this.stopReportWait = stopReportWait;
   }
 
   public static createDefault(): ProviderTimings {
