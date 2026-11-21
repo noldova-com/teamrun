@@ -33,6 +33,7 @@ export class ProviderTimingsTests {
     Assert.areEqual(15_000, timings.modelListTimeout);
     Assert.areEqual(14_400_000, timings.silenceLimit);
     Assert.areEqual(1_800_000, timings.idleLimit);
+    Assert.areEqual(60_000, timings.stopReportWait);
     Assert.areEqual("killWait", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("abortGrace", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1), ArgumentOutOfRangeException).parameterName);
     Assert.areEqual("streamInterval", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1), ArgumentOutOfRangeException).parameterName);
@@ -45,6 +46,8 @@ export class ProviderTimingsTests {
     Assert.areEqual("silenceLimit", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0), ArgumentOutOfRangeException)
       .parameterName);
     Assert.areEqual("idleLimit", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0), ArgumentOutOfRangeException)
+      .parameterName);
+    Assert.areEqual("stopReportWait", Assert.throws(() => new ProviderTimings(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0), ArgumentOutOfRangeException)
       .parameterName);
   }
 }

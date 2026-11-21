@@ -312,6 +312,8 @@ export class AcpAdapter implements IProviderAdapter {
     let confirming: Promise<boolean> | null = null;
     const interruptWait = new AbortController();
     const toolsWait = new AbortController();
+    const stopReport = new AbortController();
+    let step = Resources.turnStepStart;
     const steers: Promise<boolean>[] = [];
     let revoke: () => void = () => undefined;
     let adopt: (tools: TurnTools) => void = () => undefined;
@@ -348,6 +350,9 @@ export class AcpAdapter implements IProviderAdapter {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
       void this.timer.delayAsync(this.timings.interruptGrace, interruptWait.signal).then(() => client?.stop()).catch(() => undefined);
+      const subAgents = turn.subAgentStates;
+      void this.timer.delayAsync(this.timings.stopReportWait, stopReport.signal)
+        .then(() => this.sessionLog?.write(Resources.formatTurnStopStuck(this.descriptor.id, step, subAgents)), () => undefined);
     };
     signal.addEventListener(Resources.abortEvent, cancel, { once: true });
     try {
@@ -486,7 +491,9 @@ export class AcpAdapter implements IProviderAdapter {
           steers.push(taken);
           return taken;
         });
+      step = Resources.turnStepPrompt;
       const result = JsonReader.fromValue(await client.request(Resources.acpSessionPrompt, { sessionId, prompt }, null));
+      step = Resources.turnStepAnswer;
       const reason = result.readNonBlankString(Resources.acpStopReasonField);
       if (signal.aborted || reason === Resources.acpCancelled)
         return new TurnResult(TurnOutcome.Interrupted, sessionId, this.unconfirmed(observed, request.requested), null, turn.nativeTurnId);
@@ -507,6 +514,7 @@ export class AcpAdapter implements IProviderAdapter {
       return new TurnResult(TurnOutcome.Completed, sessionId, confirmed ? observed : this.unconfirmed(observed, request.requested), null, turn.nativeTurnId);
     }
     catch (error) {
+      step = Resources.turnStepHandled;
       if (!Object.isNull(client))
         await client.whenHandledAsync();
       if (!Object.isNull(client) && !signal.aborted)
@@ -522,18 +530,29 @@ export class AcpAdapter implements IProviderAdapter {
       signal.removeEventListener(Resources.abortEvent, cancel);
       interruptWait.abort();
       toolsWait.abort();
-      if (!Object.isNull(client))
-        await client.whenHandledAsync();
-      if (!Object.isNull(blocked))
-        await this.reportBlockedServersAsync(request, listener, startedAt, blocked);
-      await turn.finishAsync();
-      if (unreported)
-        await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatCompactionUnreported(this.descriptor.displayName), null, null));
-      if (turn.compacted && !Object.isNull(sessionId))
-        this.sessionsWithoutHome.add(sessionId);
-      await this.settle(steers);
-      if (!Object.isNull(client))
-        await this.release(client, channel, shutdowns, revoke, keeping, sessionId);
+      try {
+        step = Resources.turnStepHandled;
+        if (!Object.isNull(client))
+          await client.whenHandledAsync();
+        step = Resources.turnStepBlockedServers;
+        if (!Object.isNull(blocked))
+          await this.reportBlockedServersAsync(request, listener, startedAt, blocked);
+        step = Resources.turnStepFinish;
+        await turn.finishAsync();
+        step = Resources.turnStepCompaction;
+        if (unreported)
+          await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatCompactionUnreported(this.descriptor.displayName), null, null));
+        if (turn.compacted && !Object.isNull(sessionId))
+          this.sessionsWithoutHome.add(sessionId);
+        step = Resources.turnStepSteers;
+        await this.settle(steers);
+        step = Resources.turnStepRelease;
+        if (!Object.isNull(client))
+          await this.release(client, channel, shutdowns, revoke, keeping, sessionId);
+      }
+      finally {
+        stopReport.abort();
+      }
     }
   }
 
