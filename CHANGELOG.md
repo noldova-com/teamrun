@@ -9,6 +9,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### New
 
 - **Organization:** Show organization in the View menu opens the team's organization as its own view: you at the root, then each department with its count, its leader's card and its members' cards, nested to any depth, on a canvas you pan, zoom and fit, with an overview map (#317).
+  The teammates in no department show first, under No department, in every view, so the count over the view matches the cards in it (#396).
   A card shows its teammate's status, what it runs now and for how long, and, when chosen, its usage, its last message and its model; Cards show chooses the fields for every card, a card's own menu for itself.
   Pointing at a card or reaching it with the keyboard opens its details: status, whom it reports to, model, usage, last words and what it runs now; the messages beside the tree talk to whom you choose under To, a teammate whose name you click or a department's Message; long last words show three lines.
   View switches between the Tree, a Board and Focus: the Board queues who needs you, with how long ago and what they asked, then the leaders and a column for each department, and opens each conversation in the inbox beside it; Focus outlines the departments and their people beside one department or teammate in full, with every activity and its time, over its conversation.

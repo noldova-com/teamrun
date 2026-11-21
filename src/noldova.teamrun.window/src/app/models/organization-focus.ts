@@ -29,7 +29,7 @@ export class OrganizationFocus {
   }
 
   public get departmentName(): string {
-    return this.department?.department.name ?? String.empty;
+    return this.department?.name ?? String.empty;
   }
 
   public static resolve(tree: readonly OrganizationNode[], key: string | null): OrganizationFocus {
@@ -37,7 +37,7 @@ export class OrganizationFocus {
     const kind = Object.isNull(key) || at < 0 ? null : key.slice(0, at);
     const id = Object.isNull(key) || at < 0 ? String.empty : key.slice(at + 1);
     if (kind === OrganizationTargetKind.Department) {
-      const path = OrganizationFocus.pathTo(tree, t => t.department.id === id);
+      const path = OrganizationFocus.pathTo(tree, t => !t.isUnplaced && t.id === id);
       if (path.length > 0)
         return new OrganizationFocus(OrganizationTarget.department(id), path, null);
     }

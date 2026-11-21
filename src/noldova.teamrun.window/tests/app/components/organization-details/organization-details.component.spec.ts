@@ -153,6 +153,15 @@ describe("OrganizationDetailsComponent", () => {
       .toEqual([["Review · Design", "You"], ["UI", "Alice"], ["Tools", "Code Reviewer"], ["Build", "You"]]);
   });
 
+  it("places a teammate in no department under No department, reporting to you", async () => {
+    await create(context => context.answer(MethodName.OrganizationList, () => new Organization(organization.departments,
+      organization.members.filter(t => t.teammateId !== "offline")).toJson()));
+
+    await focus("Offline");
+
+    expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([["No department"], "You"]);
+  });
+
   it("says when a teammate has no model of its own, no usage with a percent, and nothing said yet, and that a stopped one runs nothing", async () => {
     await create(context => context.answer(MethodName.PlanUsageList, () =>
       [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, null, null, null, null, true)], SampleData.timestamp).toJson()]));
