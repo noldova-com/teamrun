@@ -302,12 +302,14 @@ describe("OrganizationDetailsComponent", () => {
       probe.style.border = "1px solid var(--nol-hover-widget-border)";
       probe.style.color = "var(--nol-text)";
       details.append(probe);
-      const expected = [getComputedStyle(probe).backgroundColor, getComputedStyle(probe).borderTopColor, getComputedStyle(probe).color];
+      const surface = getComputedStyle(probe).backgroundColor;
+      const border = getComputedStyle(probe).borderTopColor;
+      const text = getComputedStyle(probe).color;
       probe.remove();
       const style = getComputedStyle(details);
 
       AppearanceFixture.expectPixels(details.getBoundingClientRect().width, 18 * rem);
-      expect([style.backgroundColor, style.borderTopColor, style.borderBottomColor, style.color]).toEqual([...expected, expected[1]]);
+      expect([style.backgroundColor, style.borderTopColor, style.borderBottomColor, style.color]).toEqual([surface, border, border, text]);
     });
 
     it("cuts long last words to three lines, with the time since them on a line of its own under them", async () => {
