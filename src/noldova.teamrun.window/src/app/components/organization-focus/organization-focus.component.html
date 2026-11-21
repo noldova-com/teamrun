@@ -71,9 +71,20 @@ LICENSE file in the root directory of this source tree.
       </div>
       <div class="unit-head">
         @if (editing() && unit(); as unit) {
-          <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="unit.department.name" (change)="rename(unit, $event)" />
-          <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
-            [label]="resources.formatOrganizationDeleteNamed(unit.department.name)" (click)="deleteDepartment(unit)"></button>
+          <div class="edit-row">
+            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="unit.department.name" (change)="rename(unit, $event)" />
+            <button type="button" nol-button class="delete-department" [variant]="outlined" (click)="deleteDepartment(unit)"><span nolButtonIcon
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveDepartment }}</button>
+          </div>
+        } @else if (editing() && focus().teammate; as teammate) {
+          <div class="edit-row">
+            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.formatOrganizationRenameLabel(teammate.name)" [value]="teammate.name"
+              (change)="renameTeammate(teammate, $event)" />
+            @if (removable() && focus().department; as node) {
+              <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, node)"><span nolButtonIcon
+                class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
+            }
+          </div>
         } @else {
           <h2 class="unit-name">{{ unitName() }}</h2>
         }
@@ -81,7 +92,8 @@ LICENSE file in the root directory of this source tree.
       </div>
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {
-          <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)" />
+          <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)"
+            [departmentName]="departmentNameOf(card)" (message)="go(teammate(card))" />
         } @empty {
           <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
         }

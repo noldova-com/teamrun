@@ -8,6 +8,7 @@
 
 import type { Teammate } from "@noldova/teamrun.protocol";
 
+import { Resources } from "../../resources";
 import { TeammateStatus } from "../enums/teammate-status";
 
 export class OrganizationBoardAsk {
@@ -29,8 +30,9 @@ export class OrganizationBoardAsk {
     this.status = status;
   }
 
-  public get isAnswer(): boolean {
-    return this.status === TeammateStatus.WaitingForYou;
+  public get action(): string {
+    return this.status === TeammateStatus.WaitingForYou ? Resources.organizationBoardAnswer
+      : this.status === TeammateStatus.Stopped ? Resources.organizationBoardOpen : Resources.organizationBoardMessage;
   }
 
   public static needsYou(status: TeammateStatus): boolean {

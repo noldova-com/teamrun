@@ -911,6 +911,31 @@ describe("OrganizationViewComponent", () => {
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
     });
 
+    it("stacks each view below 48rem: the Board's 32rem canvas over its 34rem inbox, and Focus's outline, at most 20rem, over its 32rem canvas and conversation", async () => {
+      await create();
+      element().style.width = "40rem";
+      element().style.height = "50rem";
+      await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
+      one(".top .views [role=radio]:nth-of-type(2)").click();
+      await settle();
+      const [board, inbox] = [box(".chart"), box("aside.messages")];
+      for (const [actual, expected] of [[board.height, 32 * rem], [inbox.height, 34 * rem], [inbox.top - board.bottom, space(4)], [inbox.left, board.left],
+        [inbox.width, board.width]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+
+      one(".top .views [role=radio]:nth-of-type(3)").click();
+      await settle();
+      const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart .focus"), box(".chart .focus > nol-canvas"),
+        box(".chart .focus > nol-teamrun-organization-messages")];
+      for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
+        [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
+        AppearanceFixture.expectPixels(actual, expected);
+      expect([all("aside.messages").length, getComputedStyle(one(".chart .outline")).maxHeight, outline.height <= 20 * rem + 1]).toEqual([0, `${20 * rem}px`, true]);
+    });
+
     it("keeps the cards at their widths while editing, with their fields, choices and buttons inside the cards' padding", async () => {
       await create();
       element().style.width = "72rem";

@@ -127,6 +127,10 @@
     height: 32rem;
   }
 
+  .chart.focused {
+    height: auto;
+  }
+
   .messages {
     flex: 1 1 100%;
     height: 30rem;

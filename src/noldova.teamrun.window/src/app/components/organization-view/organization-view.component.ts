@@ -88,14 +88,6 @@ export class OrganizationViewComponent {
     void this.organization.createDepartment(Resources.organizationNewDepartment, null);
   }
 
-  protected messageLeaders(): void {
-    this.chosen.set(OrganizationTarget.leaders);
-  }
-
-  protected messageDepartment(departmentId: string): void {
-    this.chosen.set(OrganizationTarget.department(departmentId));
-  }
-
   protected pick(key: string): void {
     const found = this.choices().find(t => t.key === key);
     if (!Object.isUndefined(found))

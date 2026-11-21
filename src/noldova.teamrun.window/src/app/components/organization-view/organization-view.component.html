@@ -52,13 +52,13 @@ LICENSE file in the root directory of this source tree.
   </div>
 }
 <div class="body">
-  <main class="chart">
+  <main class="chart" [class.focused]="mode() === modes.Focus">
     @if (mode() === modes.Focus) {
       <nol-teamrun-organization-focus class="focus" [tree]="tree()" [editing]="editing()" />
     } @else {
       <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
         @if (mode() === modes.Board) {
-          <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" (messageLeaders)="messageLeaders()" (messageDepartment)="messageDepartment($event)" />
+          <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
         } @else {
           <div class="tree">
             <div class="owner" nolCanvasItem>

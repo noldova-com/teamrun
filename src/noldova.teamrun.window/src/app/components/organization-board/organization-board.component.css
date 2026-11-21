@@ -64,6 +64,23 @@
   background: var(--nol-raised);
 }
 
+.ask.selected {
+  background: var(--nol-selected);
+}
+
+.ask-state {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.ask-text {
+  margin: 0;
+  color: var(--nol-text);
+  overflow-wrap: anywhere;
+}
+
 .ask-body {
   display: flex;
   flex: 1 1 auto;
@@ -119,6 +136,11 @@
   background: var(--nol-hover);
 }
 
+.leaders > .leader.selected,
+.lane > .selected {
+  background: var(--nol-selected);
+}
+
 .lanes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
@@ -134,6 +156,10 @@
   border: 1px solid var(--nol-card-border);
   border-radius: var(--nol-radius-large);
   background: var(--nol-panel);
+}
+
+.lane.selected {
+  border-color: var(--nol-accent);
 }
 
 .lane-head {

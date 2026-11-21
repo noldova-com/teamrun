@@ -9,7 +9,7 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
+import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
   Teammate } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -18,11 +18,14 @@ import { OrganizationFocusComponent } from "../../../../src/app/components/organ
 import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
+import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
+import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
+import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -158,7 +161,7 @@ describe("OrganizationFocusComponent", () => {
     expect(texts(".unit-name")).toEqual(["Organization"]);
 
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Department:ui", "Department:build", "Teammate:bob", "Department:design",
-      "Leaders"]));
+      "Leaders:"]));
     expect(all(".crumb[aria-current=true]").map(text)).toEqual(["Organization"]);
     expect(all("[nolCanvasItem]").map(t => [t.tagName.toLowerCase(), texts(".name", t).join()])).toEqual([["nol-teamrun-organization-card", "Alice"],
       ["nol-teamrun-organization-card", "Code Reviewer"]]);
@@ -198,10 +201,13 @@ describe("OrganizationFocusComponent", () => {
     const field = one(".unit-rename");
     if (!(field instanceof HTMLInputElement))
       throw new Error("The rename field is no input.");
+    const typed: string[] = [];
     for (const value of ["   ", "Design", "  Craft  "]) {
       field.value = value;
       field.dispatchEvent(new Event("change"));
+      typed.push(field.value);
     }
+    expect(typed).toEqual(["Design", "Design", "  Craft  "]);
     await click(one(".add-member", row("Design")));
     await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
     at(menuItems(), 0).click();
@@ -229,7 +235,7 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect(one(".delete-department").getAttribute("aria-label")).toBe("Delete UI");
+    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["delete Remove department"], true]);
     await click(one(".delete-department"));
     expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
@@ -259,6 +265,69 @@ describe("OrganizationFocusComponent", () => {
     expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Bob"], 1]);
     await click(one(".crumb"));
     expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Organization"], 0]);
+  });
+
+  it("shows each card in full, every activity with its time and the role with its department, and focuses its teammate from the name or the chat button", async () => {
+    const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
+    TestBed.overrideProvider(ClockService, { useValue: clock });
+    const running = (id: string, chatId: string, at: string): Message =>
+      new Message(id, chatId, 1, MessageAuthor.Provider, null, MessageStatus.Running, [], SampleData.provenance, at, at, null, [], "alice", "alice");
+    const alice = (): HTMLElement => one(".grid nol-teamrun-organization-card");
+    await create("Department:design");
+    context.emit(EventName.MessageCreated, running("r1", "c9", "2026-09-10T08:04:30.000Z").toJson());
+    context.emit(EventName.MessageCreated, running("r2", "c1", "2026-09-10T08:04:20.000Z").toJson());
+    await Wait.until(() => expect(texts(".act", alice())).toHaveLength(2));
+
+    expect([texts(".act", alice()), one(".acts", alice()).getAttribute("aria-label"), all(".now", alice()).length, texts(".role", alice()),
+      texts(".grid nol-teamrun-organization-card .chat").length, one(".chat", alice()).getAttribute("aria-label")]).toEqual([
+      ["progress_activity First 40 s", "progress_activity Replying 30 s"], "What Alice is doing now", 0, ["Review · Design"], 2, "Message Alice"]);
+    await click(one(".chat", alice()));
+    expect(texts(".unit-name")).toEqual(["Alice"]);
+    await click(one(".crumbs button:nth-of-type(2)"));
+    await click(one(".grid nol-teamrun-organization-card:nth-child(2) .name"));
+    expect(texts(".unit-name")).toEqual(["Bob"]);
+    await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Teammate:alice", "Department:design", "Teammate:bob"]));
+  });
+
+  it("renames a focused teammate, puts the name back on an empty or refused one, and removes a member from its department after asking, but no leader", async () => {
+    const field = (): HTMLInputElement => {
+      const found = one(".edit-row .unit-rename");
+      if (!(found instanceof HTMLInputElement))
+        throw new Error("The name field is no input.");
+      return found;
+    };
+    const renameAsync = async (value: string): Promise<string> => {
+      field().value = value;
+      field().dispatchEvent(new Event("change"));
+      await settle();
+      return field().value;
+    };
+    const answer = async (button: string): Promise<void> => {
+      const found = document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`);
+      if (Object.isNull(found))
+        throw new Error(`No ${button} in the dialog.`);
+      found.click();
+      await settle();
+    };
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
+    await create("Teammate:alice");
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+    const leader = [field().value, field().getAttribute("aria-label"), all(".remove-teammate").length];
+    await click(one(".obtn", row("Bob")));
+
+    const typed = [await renameAsync("   "), await renameAsync("Bob!!"), OrganizationStoreService.of(context).actionError(), context.count(MethodName.TeammateUpdate)];
+    await renameAsync(" Robert ");
+    await Wait.until(() => expect(context.count(MethodName.TeammateUpdate)).toBe(1));
+    expect([leader, typed, OrganizationStoreService.of(context).actionError(), texts(".remove-teammate")]).toEqual([["Alice", "Rename Alice", 0],
+      ["Bob", "Bob", Resources.organizationTeammateNameRule, 0], null, ["delete Remove teammate"]]);
+
+    await click(one(".remove-teammate"));
+    await answer(".nol-teamrun-cancel");
+    await click(one(".remove-teammate"));
+    await answer(".nol-teamrun-confirm");
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }]]));
+    expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
 
   describe.each([
@@ -295,6 +364,8 @@ describe("OrganizationFocusComponent", () => {
       const width = (plane.width - (columns - 1) * space(3)) / columns;
 
       expect(texts(".focus .nol-canvas-zoom")).toEqual(["100%"]);
+      if (forcedColors === "none")
+        expect(getComputedStyle(one(".asks")).color).toBe(AppearanceFixture.readColor(FixtureTheme.theme, mode, "warning"));
       AppearanceFixture.expectPixels(outline.left, host.left);
       AppearanceFixture.expectPixels(outline.height, host.height);
       AppearanceFixture.expectPixels(outline.width, 16 * rem() + (host.width - 51 * rem() - space(4)) / 1000);

@@ -6,10 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, type WritableSignal } from "@angular/core";
+import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import type { Teammate } from "@noldova/teamrun.protocol";
+import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -19,15 +19,16 @@ import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import type { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
+import { OrganizationConversation } from "../../models/organization-conversation";
 import { OrganizationEdits } from "../../models/organization-edits";
 import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { ClockService } from "../../services/clock.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
-import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
@@ -43,11 +44,13 @@ export class OrganizationBoardComponent {
   private readonly statuses: TeammateStatusStoreService = TeammateStatusStoreService.of(inject(WindowPartTokens.context));
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly sorts: WritableSignal<ReadonlyMap<string, OrganizationBoardSort>> = signal(new Map());
+  private readonly clock: ClockService = inject(ClockService);
+  private readonly time: WritableSignal<number> = signal(this.clock.now());
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
-  public readonly messageLeaders: OutputEmitterRef<void> = output<void>();
-  public readonly messageDepartment: OutputEmitterRef<string> = output<string>();
+  public readonly target: InputSignal<OrganizationTarget | null> = input<OrganizationTarget | null>(null);
+  public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly row: OrganizationCardShape = OrganizationCardShape.Row;
@@ -61,6 +64,39 @@ export class OrganizationBoardComponent {
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
     .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.department.name, this.status(t))))
     .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
+  protected readonly targetKey: Signal<string | null> = computed(() => {
+    const target = this.target();
+    return Object.isNull(target) ? null : OrganizationConversation.keyOf(target);
+  });
+  protected readonly leadersTarget: OrganizationTarget = OrganizationTarget.leaders;
+
+  public constructor() {
+    effect(onCleanup => {
+      untracked(() => this.time.set(this.clock.now()));
+      onCleanup(this.clock.every(Resources.clockIntervalMilliseconds, () => this.time.set(this.clock.now())));
+    });
+  }
+
+  protected isOpen(target: OrganizationTarget): boolean {
+    return this.targetKey() === OrganizationConversation.keyOf(target);
+  }
+
+  protected teammateTarget(teammate: Teammate): OrganizationTarget {
+    return OrganizationTarget.teammate(teammate.id);
+  }
+
+  protected departmentTarget(node: OrganizationNode): OrganizationTarget {
+    return OrganizationTarget.department(node.department.id);
+  }
+
+  protected askAgo(ask: OrganizationBoardAsk): string | null {
+    const reply = this.statuses.lastReplyOf(ask.teammate.id)();
+    return Object.isNull(reply) ? null : Resources.formatOrganizationBoardAskAgo(Date.parse(reply.endedAt), this.time());
+  }
+
+  protected askText(ask: OrganizationBoardAsk): string | null {
+    return this.statuses.lastReplyOf(ask.teammate.id)()?.text ?? null;
+  }
 
   protected status(teammate: Teammate): TeammateStatus {
     return this.statuses.statusOf(teammate.id)();
@@ -91,9 +127,7 @@ export class OrganizationBoardComponent {
   }
 
   protected rename(node: OrganizationNode, event: Event): void {
-    const name = OrganizationEdits.nameOf(event);
-    if (name.length > 0 && name !== node.department.name)
-      void this.organization.renameDepartment(node.department.id, name);
+    void OrganizationEdits.renameAsync(event, node.department.name, name => this.organization.renameDepartment(node.department.id, name));
   }
 
   protected addMember(node: OrganizationNode, teammate: Teammate): void {
@@ -102,18 +136,6 @@ export class OrganizationBoardComponent {
 
   protected addDepartment(): void {
     void this.organization.createDepartment(Resources.organizationNewDepartment, null);
-  }
-
-  protected answer(ask: OrganizationBoardAsk): void {
-    const chatId = ask.isAnswer ? this.statuses.activitiesOf(ask.teammate.id)().at(0)?.chatId : undefined;
-    if (Object.isString(chatId)) {
-      this.chats.showChatPage(chatId);
-      return;
-    }
-    const dialog = this.dialogs.open(TeammateDialogComponent, ".nol-teamrun-teammate-name");
-    dialog.componentRef?.setInput("store", this.chats);
-    dialog.componentRef?.setInput("teammate", ask.teammate);
-    dialog.componentInstance?.closed.subscribe(() => dialog.close());
   }
 
   protected deleteDepartment(node: OrganizationNode): void {

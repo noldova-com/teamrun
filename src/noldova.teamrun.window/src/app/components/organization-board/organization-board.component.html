@@ -14,17 +14,25 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="queue">
     @for (ask of asks(); track ask.teammate.id) {
-      <div class="ask">
+      <div class="ask" [class.selected]="isOpen(teammateTarget(ask.teammate))">
         <nol-teamrun-teammate-avatar [teammate]="ask.teammate" [decorative]="true" />
         <div class="ask-body">
           <div class="name-line">
             <span class="name">{{ ask.teammate.name }}</span>
             <span class="note department">{{ ask.department }}</span>
           </div>
-          <nol-teamrun-teammate-status class="status" [teammateId]="ask.teammate.id" />
+          <div class="ask-state">
+            <nol-teamrun-teammate-status class="status" [teammateId]="ask.teammate.id" />
+            @if (askAgo(ask); as ago) {
+              <span class="note ask-ago">{{ ago }}</span>
+            }
+          </div>
+          @if (askText(ask); as text) {
+            <p class="ask-text">{{ text }}</p>
+          }
         </div>
-        <button type="button" nol-button class="answer" [variant]="primary" [attr.aria-label]="resources.formatOrganizationBoardAnswer(ask.isAnswer, ask.teammate.name)"
-          (click)="answer(ask)">{{ ask.isAnswer ? resources.organizationBoardAnswer : resources.organizationBoardOpen }}</button>
+        <button type="button" nol-button class="answer" [variant]="primary" [attr.aria-label]="resources.formatOrganizationBoardAnswer(ask.action, ask.teammate.name)"
+          (click)="chosen.emit(teammateTarget(ask.teammate))">{{ ask.action }}</button>
       </div>
     } @empty {
       <span class="note needs-empty">{{ resources.organizationBoardNobodyWaiting }}</span>
@@ -36,12 +44,13 @@ LICENSE file in the root directory of this source tree.
     <span id="organization-board-leaders" class="title">{{ resources.organizationBoardLeadersTitle }}</span>
     <span class="note">{{ resources.organizationBoardLeadersNote }}</span>
     <span class="spacer"></span>
-    <button type="button" nol-button class="message-leaders" [variant]="secondary" (click)="messageLeaders.emit()"><span nolButtonIcon
+    <button type="button" nol-button class="message-leaders" [variant]="secondary" (click)="chosen.emit(leadersTarget)"><span nolButtonIcon
       class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationBoardMessageLeadersIcon }}</span>{{ resources.organizationBoardMessageLeaders }}</button>
   </div>
   <div class="leaders">
     @for (leader of leaders(); track leader.id) {
-      <nol-teamrun-organization-card class="leader" nolCanvasItem [teammate]="leader" [shape]="row" />
+      <nol-teamrun-organization-card class="leader" nolCanvasItem [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row"
+        [editing]="editing()" (message)="chosen.emit(teammateTarget(leader))" />
     }
   </div>
 </section>
@@ -52,7 +61,7 @@ LICENSE file in the root directory of this source tree.
   </div>
   <div class="lanes">
     @for (node of departments(); track node.department.id) {
-      <div class="lane">
+      <div class="lane" [class.selected]="isOpen(departmentTarget(node))">
         <div class="lane-head">
           @if (editing()) {
             <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node.department.name"
@@ -64,7 +73,7 @@ LICENSE file in the root directory of this source tree.
             <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
             <span class="spacer"></span>
             <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
-              [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="messageDepartment.emit(node.department.id)"></button>
+              [label]="resources.formatOrganizationBoardMessage(node.department.name)" (click)="chosen.emit(departmentTarget(node))"></button>
           }
         </div>
         @if (summaryOf(node); as summary) {
@@ -75,7 +84,8 @@ LICENSE file in the root directory of this source tree.
             (valueChange)="sort(node, $event)" />
         }
         @for (member of membersOf(node); track member.id) {
-          <nol-teamrun-organization-card nolCanvasItem [teammate]="member" [shape]="row" [editing]="editing()" [department]="node.department" />
+          <nol-teamrun-organization-card nolCanvasItem [class.selected]="isOpen(teammateTarget(member))" [teammate]="member" [shape]="row" [editing]="editing()"
+            [department]="node.department" (message)="chosen.emit(teammateTarget(member))" />
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
         }

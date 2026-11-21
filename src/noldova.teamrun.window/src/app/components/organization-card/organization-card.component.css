@@ -127,6 +127,25 @@
   white-space: nowrap;
 }
 
+.acts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nol-text-small);
+}
+
+.act {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nol-space-2);
+  padding: calc(var(--nol-space-1) + var(--nol-space-half)) var(--nol-space-2);
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-raised);
+}
+
 .usage {
   --nol-meter-height: var(--nol-space-1);
   --nol-meter-gap: var(--nol-space-2);

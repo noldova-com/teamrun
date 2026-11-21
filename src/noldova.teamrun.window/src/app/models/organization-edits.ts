@@ -24,7 +24,14 @@ export class OrganizationEdits {
       Resources.organizationDeleteLabel, null, true);
   }
 
-  public static nameOf(event: Event): string {
-    return event.target instanceof HTMLInputElement ? event.target.value.trim() : String.empty;
+  public static async renameAsync(event: Event, stored: string, rename: (name: string) => Promise<boolean>): Promise<void> {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement))
+      return;
+    const name = field.value.trim();
+    if (name === stored)
+      return;
+    if (name.length === 0 || !await rename(name))
+      field.value = stored;
   }
 }

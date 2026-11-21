@@ -32,10 +32,6 @@ export class OrganizationFocus {
     return this.department?.department.name ?? String.empty;
   }
 
-  public static keyOf(target: OrganizationTarget): string {
-    return Object.isNull(target.id) ? target.kind : `${target.kind}${OrganizationFocus.separator}${target.id}`;
-  }
-
   public static resolve(tree: readonly OrganizationNode[], key: string | null): OrganizationFocus {
     const at = key?.indexOf(OrganizationFocus.separator) ?? -1;
     const kind = Object.isNull(key) || at < 0 ? null : key.slice(0, at);

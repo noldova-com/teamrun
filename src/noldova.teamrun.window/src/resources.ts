@@ -1205,6 +1205,8 @@ export class Resources {
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
   public static readonly organizationRemoveLabel: string = "Remove";
+  public static readonly organizationRemoveDepartment: string = "Remove department";
+  public static readonly organizationRemoveTeammate: string = "Remove teammate";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
       OrganizationCardField.Model];
@@ -1708,6 +1710,7 @@ export class Resources {
   public static readonly organizationBoardNobodyWaiting: string = "Nobody is waiting for you.";
   public static readonly organizationBoardAnswer: string = "Answer";
   public static readonly organizationBoardOpen: string = "Open";
+  public static readonly organizationBoardMessage: string = "Message";
   public static readonly organizationBoardSortLabels: Readonly<Record<OrganizationBoardSort, string>> = {
     [OrganizationBoardSort.Status]: "Status",
     [OrganizationBoardSort.Name]: "Name"
@@ -1794,6 +1797,15 @@ export class Resources {
 
   public static formatOrganizationChooseFields(name: string): string {
     return `Choose what ${name}'s card shows`;
+  }
+
+  public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
+    const parts = [role, department].filter(t => !Object.isNull(t) && t.length > 0);
+    return parts.length === 0 ? null : parts.join(" · ");
+  }
+
+  public static formatOrganizationNowOf(name: string): string {
+    return `What ${name} is doing now`;
   }
 
   public static formatOrganizationNowFor(milliseconds: number, more: number): string {
@@ -3092,8 +3104,12 @@ export class Resources {
     return `Message ${name}`;
   }
 
-  public static formatOrganizationBoardAnswer(isAnswer: boolean, name: string): string {
-    return `${isAnswer ? Resources.organizationBoardAnswer : Resources.organizationBoardOpen} ${name}`;
+  public static formatOrganizationBoardAnswer(action: string, name: string): string {
+    return `${action} ${name}`;
+  }
+
+  public static formatOrganizationBoardAskAgo(endedAt: number, now: number): string {
+    return `· ${Resources.formatAgo(Math.floor((now - endedAt) / Resources.minuteMilliseconds))}`;
   }
 
   public static formatOrganizationBoardSort(name: string): string {

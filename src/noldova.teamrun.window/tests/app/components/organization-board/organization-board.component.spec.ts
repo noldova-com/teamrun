@@ -10,18 +10,21 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization,
-  Teammate } from "@noldova/teamrun.protocol";
-import { ChoicePillsComponent, DialogService, ThemeMode } from "@noldova/ui.components.angular";
+import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationTarget,
+  Teammate, TeammateLastReply } from "@noldova/teamrun.protocol";
+import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
+import { OrganizationConversation } from "../../../../src/app/models/organization-conversation";
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
+import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
+import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -31,6 +34,7 @@ describe("OrganizationBoardComponent", () => {
   const started = "2026-09-10T08:00:00.000Z";
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<OrganizationBoardComponent>;
+  let clock: FakeClock;
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
   const sample = new Organization([
@@ -65,17 +69,19 @@ describe("OrganizationBoardComponent", () => {
     await fixture.whenStable();
   };
   const create = async (): Promise<void> => {
-    context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()]);
+    context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()])
+      .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("bob", "c9", "r1", "Ship the header now?", started).toJson()]);
+    clock = new FakeClock(Date.parse(started) + 5 * 60_000);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
-      OrganizationStoreService.provider] });
+      OrganizationStoreService.provider, { provide: ClockService, useValue: clock }] });
     fixture = TestBed.createComponent(OrganizationBoardComponent);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
     fixture.autoDetectChanges();
-    await Wait.until(() => expect(texts(".ask .name")).toEqual(["Bob", "Offline"]));
+    await Wait.until(() => expect([texts(".ask .name"), texts(".ask-text")]).toEqual([["Bob", "Offline"], ["Ship the header now?"]]));
     await settle();
   };
 
@@ -90,9 +96,13 @@ describe("OrganizationBoardComponent", () => {
     await create();
 
     expect([texts(".needs-section .title"), texts(".needs-count"), all(".ask").map(t => [texts(".name", t), texts(".department", t), texts(".status", t),
-      texts(".answer", t), one(".answer", t).getAttribute("aria-label")]), texts(".needs-empty")]).toEqual([
-      ["Needs you"], ["2"], [[["Bob"], ["Design"], ["Waiting for you"], ["Answer"], "Answer Bob"], [["Offline"], ["Build"], ["Stopped"], ["Open"], "Open Offline"]], []
+      texts(".ask-ago", t), texts(".ask-text", t), texts(".answer", t), one(".answer", t).getAttribute("aria-label")]), texts(".needs-empty")]).toEqual([
+      ["Needs you"], ["2"], [[["Bob"], ["Design"], ["Waiting for you"], ["· 5 min ago"], ["Ship the header now?"], ["Answer"], "Answer Bob"],
+        [["Offline"], ["Build"], ["Stopped"], [], [], ["Open"], "Open Offline"]], []
     ]);
+    clock.advance(60 * 60_000);
+    await settle();
+    expect(texts(".ask-ago")).toEqual(["· 1 h ago"]);
     expect([texts(".leaders-section .title"), texts(".leaders-section .note"), texts(".message-leaders"), texts(".leaders > .leader .name")]).toEqual([
       ["Leaders"], ["They talk across departments; you lead them."], ["forumMessage all leaders"], ["Alice", "Code Reviewer"]
     ]);
@@ -144,23 +154,25 @@ describe("OrganizationBoardComponent", () => {
       .toEqual([0, ["0"], ["Nobody is waiting for you."], 0, 0]);
   });
 
-  it("answers in the chat where the teammate waits, and opens a stopped teammate's settings", async () => {
+  it("opens each conversation in the inbox from its row, and marks the open one", async () => {
     await create();
-    const chats = ChatStoreService.of(context);
-    const shown: string[] = [];
-    vi.spyOn(chats, "showChatPage").mockImplementation(t => {
-      shown.push(t);
-    });
-    const dialogs = TestBed.inject(DialogService);
+    const chosen: string[] = [];
+    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationConversation.keyOf(t)));
+    const selected = (): string[] => all(".ask.selected .name, .leaders > .selected .name, .lane.selected .lane-name, .lane > .selected .name")
+      .map(t => t.textContent?.trim() ?? "");
 
-    one(".ask .answer").click();
-    expect([shown, dialogs.isOpen]).toEqual([["c9"], false]);
+    for (const button of [...all(".answer"), one(".message-leaders"), ...all(".leaders > .leader .name"), ...all(".message-department"), ...all(".lane .name")])
+      button.click();
+    expect([chosen, selected()]).toEqual([["Teammate:bob", "Teammate:offline", "Leaders:", "Teammate:alice", "Teammate:reviewer", "Department:design",
+      "Department:ui", "Department:build", "Teammate:bob", "Teammate:offline", "Teammate:carol"], []]);
 
-    one(".ask:nth-child(2) .answer").click();
-    await Wait.until(() => expect(document.querySelector("nol-teamrun-teammate-dialog")).not.toBeNull());
-    expect([shown, dialogs.isOpen]).toEqual([["c9"], true]);
-    one("nol-teamrun-teammate-dialog .nol-teamrun-cancel", document).click();
-    await Wait.until(() => expect(dialogs.isOpen).toBe(false));
+    const marks: [OrganizationTarget, string[]][] = [[OrganizationTarget.teammate("bob"), ["Bob", "Bob"]], [OrganizationTarget.department("build"), ["Build"]],
+      [OrganizationTarget.teammate("alice"), ["Alice"]]];
+    for (const [target, names] of marks) {
+      fixture.componentRef.setInput("target", target);
+      await settle();
+      expect(selected()).toEqual(names);
+    }
   });
 
   it("edits the structure in edit mode: renames a department, adds a member from outside it and a department, and lets each member's card move or remove it", async () => {
@@ -182,8 +194,9 @@ describe("OrganizationBoardComponent", () => {
     expect([fields().map(t => t.value), all(".lane-rename").map(t => t.getAttribute("aria-label")), all(".lane-name").length,
       all(".message-department").length]).toEqual([["Design", "UI", "Build"], ["Department name", "Department name", "Department name"], 0, 0]);
     expect([all(".lanes nol-teamrun-organization-card").map(t => [t.querySelector<HTMLInputElement>(".name-field")?.value, all(".move-choice, .remove", t).length]),
+      all(".leaders nol-teamrun-organization-card").map(t => t.querySelector<HTMLInputElement>(".name-field")?.value),
       all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
-      .toEqual([[["Bob", 2], ["Offline", 2], ["Carol", 2]], 0]);
+      .toEqual([[["Bob", 2], ["Offline", 2], ["Carol", 2]], ["Alice", "Code Reviewer"], 0]);
     for (const value of ["  Craft  ", "   ", "UI"]) {
       const field = at(fields(), value === "UI" ? 1 : 0);
       field.value = value;
@@ -200,6 +213,7 @@ describe("OrganizationBoardComponent", () => {
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
       ["teamrun.departmentCreate", { name: "New department", parentId: null }]
     ]));
+    expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });
 
   it("asks before deleting a department, and deletes nothing when the question is closed", async () => {

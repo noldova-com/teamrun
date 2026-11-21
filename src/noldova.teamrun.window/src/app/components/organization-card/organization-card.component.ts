@@ -54,6 +54,7 @@ export class OrganizationCardComponent {
   public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
+  public readonly departmentName: InputSignal<string | null> = input<string | null>(null);
   public readonly message: OutputEmitterRef<void> = output<void>();
 
   protected readonly resources: typeof Resources = Resources;
@@ -82,6 +83,11 @@ export class OrganizationCardComponent {
     return { icon: Resources.organizationNowRunningIcon, text: this.store.conversation(first.chatId)?.title ?? Resources.organizationNowReplying,
       lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length) };
   });
+
+  protected readonly activities: Signal<readonly { readonly id: string; readonly text: string; readonly lasted: string }[]> = computed(() =>
+    this.statuses.activitiesOf(this.teammate().id)().map(t => ({ id: t.chatId, text: this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
+      lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0) })));
+  protected readonly roleLine: Signal<string | null> = computed(() => Resources.formatOrganizationRoleIn(this.teammate().role, this.departmentName() ?? this.department()?.name ?? null));
 
   protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
 
