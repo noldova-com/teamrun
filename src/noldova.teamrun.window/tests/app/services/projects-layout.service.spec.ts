@@ -263,7 +263,7 @@ describe("ProjectsLayoutService", () => {
     expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutSave)]).toEqual([before, 0]);
   });
 
-  it("opens on another window's layout when its own read fails after that layout came, without logging", async () => {
+  it("opens on another window's layout when its own read fails after that layout came, logging the failed read", async () => {
     const read = new DeferredResponse();
     context.answer(MethodName.ProjectsLayoutRead, () => read.promise);
     const layout = ProjectsLayoutService.of(context);
@@ -275,7 +275,21 @@ describe("ProjectsLayoutService", () => {
     layout.togglePin("c1");
 
     await Wait.until(() => expect(saves).toEqual([kept(["c2", "c1"])]));
-    expect(context.lines).toEqual([]);
+    expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error")]);
+  });
+
+  it("opens on another window's layout that came while moving the stored layout failed", async () => {
+    localStorage.setItem(key, JSON.stringify(kept(["c9"])));
+    const saving = new DeferredResponse();
+    context.answer(MethodName.ProjectsLayoutSave, () => saving.promise);
+    const layout = ProjectsLayoutService.of(context);
+    await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
+
+    context.emit(EventName.ProjectsLayoutUpdated, kept(["c2"]));
+    saving.reject(new Error("The disk is full."));
+    await settle();
+
+    expect([layout.pinnedConversations(), context.lines]).toEqual([["c2"], [Resources.formatProjectsLayoutNotSaved("Error")]]);
   });
 
   it("keeps a change for this window when the runtime refuses it", async () => {

@@ -135,10 +135,9 @@ export class ProjectsLayoutService {
       kept = await this.request(MethodName.ProjectsLayoutRead, null);
     }
     catch (error) {
-      if (Object.isNull(this.latest)) {
-        this.context.log(Resources.formatProjectsLayoutNotRead(ProjectsLayoutService.failureOf(error)));
+      this.context.log(Resources.formatProjectsLayoutNotRead(ProjectsLayoutService.failureOf(error)));
+      if (Object.isNull(this.latest))
         return;
-      }
     }
     if (!Object.isNull(this.latest)) {
       base = this.latest;
@@ -154,6 +153,8 @@ export class ProjectsLayoutService {
         base = this.latest ?? ProjectsLayout.fromJson(moved);
         ProjectsLayoutService.removeStored();
       }
+      else if (!Object.isNull(this.latest))
+        base = this.latest;
     }
     this.isOpen = true;
     const held = this.held.splice(0);
