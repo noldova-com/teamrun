@@ -260,8 +260,8 @@ Product names and trademarks, such as the providers' names above, belong to thei
 - From activation until a view loads it, the store only watches: it reads the open replies once and follows only their events and the runtime's resync events, so the chat tabs show the working state of a reply that `teamrun send` or another window started.
   The first view loads it in full, and the watch's subscriptions end then.
 - On activation it registers the Projects view, `teamrun.projects`, in the left dock.
-  Each view declares its side, group and order through Noldova Desktop's view contribution, so a fresh install and Reset the layout open the same layout: Explorer on the left; on the right an upper group of Background tasks, Git and Pages above a lower group of Plans and Sub-agents; Activity and Changes at the bottom; each group showing its first tab.
-  Git declares its own place, between Background tasks and Pages, in the git module.
+  Each view declares its side, group and order through Noldova Desktop's view contribution, so a fresh install and Reset the layout open the same layout: Explorer on the left; on the right an upper group of Background tasks and Pages above a lower group of Plans and Sub-agents; Activity and Changes at the bottom; each group showing its first tab.
+  The git module places Git in the right dock's upper group too.
   The view lists the open projects and their conversations, pinned ones first, from the window part's store, so it follows changes made in any window.
   It registers with `ContentPadding.None`, so its list scrolls over the whole pane with the scrollbar along the pane's end edge from top to bottom, and carries the view padding inside it: `--nol-content-padding-inline` on both sides, `--nol-view-padding-block` above, and that and `--nol-space-2` below.
   After the projects, a Chats group lists the chats without a project that aren't pinned, newest first until the person orders them, ten until Show more; New chat with no project open or from a chat without a project starts one, asking for no folder, and its tab's breadcrumb is Chats.
