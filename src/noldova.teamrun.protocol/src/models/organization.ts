@@ -69,8 +69,13 @@ export class Organization {
         const members = this.members.filter(t => t.departmentId === target.id && known.has(t.teammateId)).map(t => t.teammateId);
         return [...members.filter(t => t === leaderId), ...members.filter(t => t !== leaderId)];
       }
-      case OrganizationTargetKind.Leaders:
-        return this.departments.map(t => t.leaderId).filter((t): t is string => !Object.isNull(t) && known.has(t));
+      case OrganizationTargetKind.Leaders: {
+        const leaders: string[] = [];
+        for (const department of this.departments)
+          if (!Object.isNull(department.leaderId) && known.has(department.leaderId))
+            leaders.push(department.leaderId);
+        return [...leaders, ...teammateIds.filter(t => Object.isNull(this.departmentOf(t)) && !leaders.includes(t))];
+      }
       default:
         return [...teammateIds];
     }

@@ -43,7 +43,12 @@ describe("OrganizationDetailsComponent", () => {
     new Department("tools", "Tools", "ui", null, 0, "c", "u")
   ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "tools"), new DepartmentMember("offline", "build"),
     new DepartmentMember("reviewer", "ui")]);
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new Error("The component has no element.");
+    return native;
+  };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
     const found = root.querySelector<HTMLElement>(selector);
@@ -152,13 +157,13 @@ describe("OrganizationDetailsComponent", () => {
       .toEqual([["Review · Design", "You"], ["UI", "Alice"], ["Tools", "Code Reviewer"], ["Build", "You"]]);
   });
 
-  it("places a teammate in no department under No department, reporting to you", async () => {
+  it("says a teammate in no department, a card under you in the tree, reports to you", async () => {
     await create(context => context.answer(MethodName.OrganizationList, () => new Organization(organization.departments,
       organization.members.filter(t => t.teammateId !== "offline")).toJson()));
 
     await focus("Offline");
 
-    expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([["No department"], "You"]);
+    expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([["Reports to you"], "You"]);
   });
 
   it("says when a teammate has no model of its own, no usage with a percent, and nothing said yet, and that a stopped one runs nothing", async () => {

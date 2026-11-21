@@ -95,6 +95,7 @@ describe("OrganizationViewComponent", () => {
   const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
   const tree = (): unknown[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(shape);
+  const reports = (): string[] => texts(".chart .tree > .kids > .report > nol-teamrun-organization-card .name");
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -143,7 +144,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
       all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
-      .toEqual([["Organization"], ["4 teammates in 3 departments"], ["You"], ["Owner · 1 leader reports to you"], "Organization structure", 8]);
+      .toEqual([["Organization"], ["4 teammates in 3 departments"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "2 idle", ["Alice"], ["Bob"], [["UI", "1", "1 idle", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 stopped", [], ["Offline"], [], []]
@@ -151,35 +152,32 @@ describe("OrganizationViewComponent", () => {
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
   });
 
-  it("follows each change to the organization as it comes, and says when it has no departments", async () => {
+  it("follows each change to the organization as it comes, the teammates in no department as your direct reports", async () => {
     await create();
     context.emit(EventName.OrganizationChanged, new Organization([new Department("build", "Build", null, "offline", 0, "c", "u")],
       [new DepartmentMember("offline", "build")]).toJson());
     await settle();
 
-    expect([tree(), texts(".owner .role")]).toEqual([[["No department", "3", "3 idle", [], ["Alice", "Bob", "Code Reviewer"], [], []],
-      ["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Owner · 1 leader reports to you"]]);
+    expect([tree(), reports(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Alice", "Bob", "Code Reviewer"],
+      ["Owner · 4 direct reports"]]);
 
     context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
     await settle();
 
-    expect([tree(), texts(".empty"), texts(".owner .role")]).toEqual([[["No department", "4", "3 idle · 1 stopped", [], ["Alice", "Bob", "Code Reviewer", "Offline"],
-      [], []]], [], ["Owner · 0 leaders report to you"]]);
+    expect([tree(), reports(), texts(".empty"), texts(".owner .role")]).toEqual([[], ["Alice", "Bob", "Code Reviewer", "Offline"], [], ["Owner · 4 direct reports"]]);
   });
 
-  it("shows the teammates in no department first, under No department, so the headcount counts what the tree shows, with no department's own controls", async () => {
+  it("shows the teammates in no department under you as your direct reports, first, with no group of their own, so the headcount counts what the tree shows", async () => {
     await create(() => {
       organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
         [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
     });
-    const none = (): HTMLElement => department("No department");
-    const controls = (view: HTMLElement): number[] => [".department-field", ".delete", ".leader-choice", ".message"].map(t => own(view, `.department ${t}`).length);
 
-    expect([texts(".top .headcount"), tree(), all(".chart nol-teamrun-organization-card").length, controls(none())]).toEqual([
-      ["4 teammates in 2 departments"],
-      [["No department", "2", "1 idle · 1 stopped", [], ["Code Reviewer", "Offline"], [], []], ["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []],
-        ["Build", "0", undefined, [], [], [], []]],
-      4, [0, 0, 0, 0]
+    expect([texts(".top .headcount"), reports(), tree(), all(".chart nol-teamrun-organization-card").length, texts(".owner .role"),
+      all(".chart *").filter(t => t.children.length === 0 && t.textContent?.includes("No department")).length]).toEqual([
+      ["4 teammates in 2 departments"], ["Code Reviewer", "Offline"],
+      [["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []], ["Build", "0", undefined, [], [], [], []]],
+      4, ["Owner · 3 direct reports"], 0
     ]);
     await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
     await Wait.until(() => expect(document.querySelectorAll(".nol-select-option").length).toBeGreaterThan(0));
@@ -192,9 +190,29 @@ describe("OrganizationViewComponent", () => {
     one(".top .edit").click();
     await settle();
 
-    expect([controls(department("Design")), controls(none()), all(":scope > .reports > .add-member", none()).length,
-      ["Code Reviewer", "Offline"].map(t => all(".move-choice, .remove", card(t)).length), texts(":scope > .department .department-name", none())])
-      .toEqual([[1, 1, 1, 1], [0, 0, 0, 0], 0, [0, 0], ["No department"]]);
+    expect([all(".chart .tree > .kids > .report > nol-teamrun-organization-card").length, ["Code Reviewer", "Offline"].map(t => all(".move-choice, .remove", card(t)).length)]).toEqual([2, [0, 0]]);
+  });
+
+  it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you counts them", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(context => {
+      organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
+        [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
+      context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" }));
+    });
+
+    expect([texts(".chart nol-teamrun-organization-board .leaders > nol-teamrun-organization-card .name"),
+      texts(".chart nol-teamrun-organization-board .leaders > .report .name")]).toEqual([["Alice", "Code Reviewer", "Offline"], ["Code Reviewer", "Offline"]]);
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Design"]));
+    await userEvent.click(one(".message-leaders"));
+    await settle();
+    const note = texts("aside.messages .nol-teamrun-organization-thread-note").join();
+    expect([note.startsWith("3 people report to you: Alice, "), ["Code Reviewer", "Offline"].every(t => note.includes(t))]).toEqual([true, true]);
+
+    one(".top .views [role=radio]:last-of-type").click();
+    await settle();
+    expect([texts(".chart nol-teamrun-organization-focus .orow .label").slice(0, 4), texts(".chart nol-teamrun-organization-focus .orow.report .label")])
+      .toEqual([["Organization", "Code Reviewer", "Offline", "Design"], ["Code Reviewer", "Offline"]]);
   });
 
   it("collapses a department to a count of the members and nested departments' people it hides, keeps that on the server, and opens it again", async () => {
@@ -429,7 +447,7 @@ describe("OrganizationViewComponent", () => {
     expect(panel()).toEqual([true, ["Design"], 0]);
     await userEvent.click(one(".message-leaders"));
     await settle();
-    expect(panel()).toEqual([true, ["All leaders"], 0]);
+    expect(panel()).toEqual([true, ["All leaders and your direct reports"], 0]);
     await userEvent.click(one(".lane:nth-child(1) .message-department"));
     await settle();
     expect(panel()).toEqual([true, ["Design"], 0]);
@@ -563,14 +581,14 @@ describe("OrganizationViewComponent", () => {
 
       const offered = await pickAsync("UI (department)");
       const ui = [heading(), chosenLabel()];
-      await pickAsync("All leaders");
+      await pickAsync("All leaders and your direct reports");
       const leaders = [heading(), chosenLabel()];
       await userEvent.click(one(".name", card("Offline")));
       await settle();
 
       expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
-        ["All leaders", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
-        [["Chat with UI"], "UI (department)"], [["Chat with all leaders"], "All leaders"], [["Chat with Offline"], "Offline"]]);
+        ["All leaders and your direct reports", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
+        [["Chat with UI"], "UI (department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Offline"], "Offline"]]);
     });
 
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
@@ -941,7 +959,7 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("lays No department out first in the row under you, as a department card with its members hung off one line, as a department without a leader is", async () => {
+    it("lays a direct report out first in the row under you, its card at a department card's width and top, hung off the same line", async () => {
       await create(() => {
         organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
           [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build")]);
@@ -958,24 +976,21 @@ describe("OrganizationViewComponent", () => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
-      const [none, build] = [department("No department"), department("Build")];
       const kids = one(".chart .tree > .kids");
-      const card = (view: HTMLElement): HTMLElement => one(":scope > .department", view);
-      const reports = (view: HTMLElement): HTMLElement => one(":scope > .reports", view);
-      const member = (view: HTMLElement): HTMLElement => one(":scope > nol-teamrun-organization-card", reports(view));
+      const report = one(":scope > .report", kids);
+      const design = department("Design");
+      const designCard = one(":scope > .department", design);
 
-      expect(all(":scope > nol-teamrun-organization-department", kids)[0]).toBe(none);
-      AppearanceFixture.expectPixels(box(card(none)).width, 15 * rem);
-      AppearanceFixture.expectPixels(box(member(none)).width, 13.25 * rem);
-      AppearanceFixture.expectPixels(box(none).left, box(kids).left);
-      AppearanceFixture.expectPixels(box(department("Design")).left - box(none).right, 0);
-      AppearanceFixture.expectPixels(box(card(none)).top - box(kids).top, space(3) * 2);
-      AppearanceFixture.expectPixels(box(card(none)).top, box(card(build)).top);
-      AppearanceFixture.expectPixels(box(reports(none)).left - box(card(none)).left, box(reports(build)).left - box(card(build)).left);
-      AppearanceFixture.expectPixels(box(member(none)).top - box(card(none)).bottom, box(member(build)).top - box(card(build)).bottom);
-      AppearanceFixture.expectPixels(box(member(none)).left - box(reports(none)).left, space(3) + 1);
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(none, "::before").left), box(none).width / 2);
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(none, "::after").height), space(3));
+      expect(kids.firstElementChild).toBe(report);
+      expect(texts(".name", report)).toEqual(["Code Reviewer"]);
+      AppearanceFixture.expectPixels(box(card("Code Reviewer")).width, 15 * rem);
+      AppearanceFixture.expectPixels(box(report).left, box(kids).left);
+      AppearanceFixture.expectPixels(box(design).left - box(report).right, 0);
+      AppearanceFixture.expectPixels(box(card("Code Reviewer")).top - box(kids).top, space(3) * 2);
+      AppearanceFixture.expectPixels(box(card("Code Reviewer")).top, box(designCard).top);
+      AppearanceFixture.expectPixels(box(card("Code Reviewer")).left - box(report).left, box(designCard).left - box(design).left);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(report, "::before").left), box(report).width / 2);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(report, "::after").height), space(3));
     });
 
     it("fills the space under the header, inside the view's padding, with the canvas and the messages beside it, 22rem wide for the Tree's thread and 24rem for the Board's inbox as the chart takes the rest, and fits the chart at 100% to its top, under the canvas's tools", async () => {

@@ -65,7 +65,7 @@ describe("Resources", () => {
     expect(Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Ada"])).toBe("Ada was removed before it arrived");
     expect([Resources.formatOrganizationChat("Ada"), Resources.formatOrganizationOnlyNote("Ada")]).toEqual(["Chat with Ada", "Only Ada"]);
     expect([Resources.formatOrganizationLeadersNote(["Agy"]), Resources.formatOrganizationLeadersNote(["Agy", "Bob"]), Resources.formatOrganizationLeadersNote([])])
-      .toEqual(["1 leader: Agy", "2 leaders: Agy and Bob", "No department has a leader yet"]);
+      .toEqual(["1 person reports to you: Agy", "2 people report to you: Agy and Bob", "No one reports to you yet"]);
     expect([Resources.formatOrganizationDepartmentNote("Agy", ["Bob"]), Resources.formatOrganizationDepartmentNote(null, ["Bob", "Cid"]),
       Resources.formatOrganizationDepartmentNote(null, [])]).toEqual(["Leader: Agy · 1 member: Bob", "No leader · 2 members: Bob and Cid", "No leader, no members"]);
     expect([Resources.formatOrganizationEveryoneNote(["Agy"]), Resources.formatOrganizationEveryoneNote(["Agy", "Bob", "Cid"]),
@@ -93,7 +93,7 @@ describe("Resources", () => {
   });
 
   it("never calls a provider an account in a text it holds or writes, leaving the organization chart's icon name alone", () => {
-    const all = Object.getOwnPropertyNames(Resources).flatMap(t => texts((Resources as unknown as Record<string, unknown>)[t]));
+    const all = Object.getOwnPropertyNames(Resources).flatMap(t => texts(Reflect.get(Resources, t)));
 
     expect(all.length).toBeGreaterThan(400);
     expect(all.filter(t => /account/i.test(t) && t !== Resources.organizationEditIcon)).toEqual([]);
@@ -163,7 +163,7 @@ describe("Resources", () => {
 
   it("says chat, never conversation, in every text it holds", () => {
     const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : Object.isObject(t) ? Object.values(t) : [t]);
-    const texts = values.filter((t): t is string => Object.isString(t) && t.includes(" "));
+    const texts = values.flatMap((t: unknown) => Object.isString(t) && t.includes(" ") ? [t] : []);
 
     expect(texts).toContain(Resources.newConversationLabel);
     expect(texts.filter(t => /conversation/i.test(t))).toEqual([]);
@@ -238,10 +238,10 @@ describe("Resources", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
   });
 
-  it("counts Focus's leaders and a department's teammates in the singular for one and the plural for more", () => {
+  it("counts Focus's direct reports and a department's teammates in the singular for one and the plural for more", () => {
     expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
       Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
-      .toEqual(["Your 1 leader", "Your 2 leaders", "1 teammate", "2 teammates"]);
+      .toEqual(["Your 1 direct report", "Your 2 direct reports", "1 teammate", "2 teammates"]);
   });
 
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {

@@ -58,7 +58,7 @@ export class OrganizationTests {
   }
 
   @TestMethod
-  public listsTheTeammatesEachTargetGoesToOnceAndSkipsTeammatesNoLongerKnown(): void {
+  public listsTheTeammatesEachTargetGoesToOnceAndSkipsTeammatesNoLongerKnownWithTheLeadersTargetReachingEveryLeaderAndEachTeammateInNoDepartment(): void {
     const design = new Department("design", "Design", null, "lead", 1, "c", "u");
     const web = new Department("web", "Web", "design", null, 0, "c", "u");
     const ops = new Department("ops", "Ops", null, "boss", 0, "c", "u");
@@ -70,8 +70,10 @@ export class OrganizationTests {
     Assert.areEqual("lead,ann", organization.recipientsOf(OrganizationTarget.department("design"), teammates).join(","));
     Assert.areEqual("kid", organization.recipientsOf(OrganizationTarget.department("web"), teammates).join(","));
     Assert.areEqual("", organization.recipientsOf(OrganizationTarget.department("missing"), teammates).join(","));
-    Assert.areEqual("boss,lead", organization.recipientsOf(OrganizationTarget.leaders, teammates).join(","));
+    Assert.areEqual("boss,lead,solo", organization.recipientsOf(OrganizationTarget.leaders, teammates).join(","));
     Assert.areEqual("boss", organization.recipientsOf(OrganizationTarget.leaders, ["boss"]).join(","));
+    Assert.areEqual("outside,solo", new Organization([new Department("ops", "Ops", null, "outside", 0, "c", "u")], [])
+      .recipientsOf(OrganizationTarget.leaders, ["solo", "outside"]).join(","));
     Assert.areEqual("ann,boss,kid,lead,solo", organization.recipientsOf(OrganizationTarget.everyone, teammates).join(","));
     Assert.areEqual("solo", organization.recipientsOf(OrganizationTarget.teammate("solo"), teammates).join(","));
     Assert.areEqual("", organization.recipientsOf(OrganizationTarget.teammate("gone"), teammates).join(","));

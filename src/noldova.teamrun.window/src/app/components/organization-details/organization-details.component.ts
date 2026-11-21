@@ -13,6 +13,8 @@ import { PopoverDirective } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { TeammateStatus } from "../../enums/teammate-status";
+import { OrganizationRunningReply } from "../../models/organization-running-reply";
+import { OrganizationSaid } from "../../models/organization-said";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
@@ -43,7 +45,7 @@ export class OrganizationDetailsComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly label: Signal<string> = computed(() => Resources.formatOrganizationDetailsLabel(this.teammate().name));
   protected readonly place: Signal<string> = computed(() =>
-    [this.teammate().role, this.department()?.name ?? Resources.organizationNoDepartment].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
+    [this.teammate().role, this.department()?.name ?? Resources.organizationReportsToYou].filter(t => !Object.isNull(t)).join(Resources.titleSeparator));
   protected readonly reportsTo: Signal<string> = computed(() => {
     const leader = OrganizationDetailsComponent.leaderAbove(this.organization.organization(), this.store.teammates(), this.department(), this.teammate().id);
     return Object.isNull(leader) ? Resources.organizationOwnerName : leader.name;
@@ -59,17 +61,14 @@ export class OrganizationDetailsComponent {
         return Resources.formatOrganizationDetailsUsage((Resources.wholePercent - meter.percent) / Resources.wholePercent, meter.label);
     return Resources.organizationDetailsNoUsage;
   });
-  protected readonly last: Signal<{ readonly text: string; readonly ago: string } | null> = computed(() => {
+  protected readonly last: Signal<OrganizationSaid | null> = computed(() => {
     const reply = this.statuses.lastReplyOf(this.teammate().id)();
     return Object.isNull(reply) ? null
-      : { text: reply.text, ago: Resources.formatAgo(Math.floor(Math.max(0, this.time() - Date.parse(reply.endedAt)) / Resources.minuteMilliseconds)) };
+      : new OrganizationSaid(reply.text, Resources.formatAgo(Math.floor(Math.max(0, this.time() - Date.parse(reply.endedAt)) / Resources.minuteMilliseconds)));
   });
-  protected readonly running: Signal<readonly { readonly chatId: string; readonly text: string; readonly lasted: string }[]> = computed(() =>
-    this.statuses.activitiesOf(this.teammate().id)().map(t => ({
-      chatId: t.chatId,
-      text: this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
-      lasted: Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0)
-    })));
+  protected readonly running: Signal<readonly OrganizationRunningReply[]> = computed(() =>
+    this.statuses.activitiesOf(this.teammate().id)().map(t => new OrganizationRunningReply(t.chatId, this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
+      Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0))));
   protected readonly idle: Signal<string> = computed(() => this.statuses.statusOf(this.teammate().id)() === TeammateStatus.Stopped
     ? Resources.teammateStatusLabels[TeammateStatus.Stopped] : Resources.organizationNothingRunning);
 

@@ -8,10 +8,11 @@
 
 import { Component, computed, inject, linkedSignal, signal, type Signal, type WritableSignal } from "@angular/core";
 
-import { OrganizationTarget } from "@noldova/teamrun.protocol";
+import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 
 import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChoicePillsComponent, MenuComponent,
-  MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
+  MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective,
+  SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
@@ -25,7 +26,9 @@ import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
+import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationFocusComponent } from "../organization-focus/organization-focus.component";
 import { OrganizationMessagesComponent } from "../organization-messages/organization-messages.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
@@ -33,8 +36,8 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-view",
   imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent,
-    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationDepartmentComponent, OrganizationFocusComponent, OrganizationMessagesComponent,
-    SelectComponent, TeammateStatusComponent],
+    MenuSeparatorComponent, MenuTriggerDirective, OrganizationBoardComponent, OrganizationCardComponent, OrganizationDepartmentComponent, OrganizationDetailsComponent,
+    OrganizationFocusComponent, OrganizationMessagesComponent, PopoverTriggerDirective, SelectComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
@@ -49,6 +52,10 @@ export class OrganizationViewComponent {
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
+  protected readonly targets: typeof OrganizationTarget = OrganizationTarget;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly shapes: typeof OrganizationMessagesShape = OrganizationMessagesShape;
@@ -60,21 +67,24 @@ export class OrganizationViewComponent {
   protected readonly focusKey: Signal<string | null> = computed(() => this.layout.layout().focus);
   protected readonly chosen: WritableSignal<OrganizationTarget | null> = linkedSignal<string | null, OrganizationTarget | null>({ source: this.focusKey, computation: () => null });
   protected readonly tree: Signal<readonly OrganizationNode[]> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
+  protected readonly directReports: Signal<readonly Teammate[]> = computed(() =>
+    OrganizationNode.directReportsOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() =>
     Resources.formatOrganizationHeadcount(this.store.teammates().length, OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
-    const first = this.tree().flatMap(t => t.department ?? [])[0];
+    const first = this.tree()[0];
     const key = this.focusKey();
-    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.tree(), key).target)
+    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.tree(), this.directReports(), key).target)
       ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
-  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.tree()));
+  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.tree(), this.directReports()));
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.choices().map(t => new SelectOption(t.key, t.label)));
   protected readonly targetKey: Signal<string> = computed(() => {
     const target = this.target();
     return Object.isNull(target) ? String.empty : OrganizationConversation.keyOf(target);
   });
-  protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length));
+  protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length
+    + this.directReports().length));
 
   protected showView(value: string): void {
     this.layout.showView(OrganizationLayout.viewOf(value));

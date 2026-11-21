@@ -55,6 +55,13 @@
   line-height: 1;
 }
 
+.slot {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: 1em;
+}
+
 .orow {
   display: flex;
   align-items: center;
@@ -62,6 +69,10 @@
   min-height: 1.625rem;
   padding: 0 var(--nol-space-2) 0 var(--nol-space-1);
   border-radius: var(--nol-radius-small);
+}
+
+.orow.report {
+  padding-inline-start: 0.25rem;
 }
 
 .orow:hover {

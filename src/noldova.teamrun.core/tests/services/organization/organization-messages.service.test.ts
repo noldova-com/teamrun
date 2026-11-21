@@ -82,7 +82,7 @@ export class OrganizationMessagesServiceTests {
   }
 
   @TestMethod
-  public async sendsToOneTeammateTheLeadersOrEveryoneAndRefusesAnUnknownTargetOrMessage(): Promise<void> {
+  public async sendsToOneTeammateTheLeadersAndTheTeammatesInNoDepartmentOrEveryoneAndRefusesAnUnknownTargetOrMessage(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
     const bob = await OrganizationMessagesServiceTests.teammateAsync(host, "Bob");
@@ -97,11 +97,11 @@ export class OrganizationMessagesServiceTests {
     const everyone = await service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "All"));
     const nobody = await service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.department(empty.id), "None"));
 
-    Assert.areEqual("Bob:Started|Ada:Started|Ada:Started,Bob:Started,Carol:Started|",
+    Assert.areEqual("Bob:Started|Ada:Started,Carol:Started|Ada:Started,Bob:Started,Carol:Started|",
       [one, leaders, everyone, nobody].map(t => OrganizationMessagesServiceTests.states(t)).join("|"));
-    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One ${Resources.defaultOrganizationId}:${carol.id}:All`,
+    Assert.areEqual(`${Resources.defaultOrganizationId}:${bob.id}:One ${Resources.defaultOrganizationId}:${carol.id}:Leaders`,
       `${sender.sends[0]} ${sender.sends.find(t => t.includes(`:${carol.id}:`))}`);
-    Assert.areEqual(5, sender.sends.length);
+    Assert.areEqual(6, sender.sends.length);
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.teammate("gone"), "Hi")));
     await OrganizationMessagesServiceTests.failsAsync(() => service.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.department("gone"), "Hi")));
     await OrganizationMessagesServiceTests.failsAsync(() => service.stopAsync(new MessageIdParams("gone")));

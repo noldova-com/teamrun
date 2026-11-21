@@ -648,8 +648,8 @@ export class Resources {
   public static readonly organizationInboxEmpty: string = "No messages yet. Write the first.";
   public static readonly organizationThreadEmpty: string = "No messages yet.";
   public static readonly organizationChooseTarget: string = "Choose whom to message.";
-  public static readonly organizationLeadersTitle: string = "All leaders";
-  public static readonly organizationLeadersChat: string = "Chat with all leaders";
+  public static readonly organizationLeadersTitle: string = "All leaders and your direct reports";
+  public static readonly organizationLeadersChat: string = "Chat with all leaders and your direct reports";
   public static readonly organizationEveryoneTitle: string = "Everyone";
   public static readonly organizationDeletedDepartment: string = "Deleted department";
   public static readonly organizationRemovedTeammate: string = "Removed teammate";
@@ -1201,7 +1201,7 @@ export class Resources {
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationEmpty: string = "No departments yet.";
-  public static readonly organizationNoDepartment: string = "No department";
+  public static readonly organizationReportsToYou: string = "Reports to you";
   public static readonly organizationCardsShowLabel: string = "Cards show";
   public static readonly organizationCardsShowIcon: string = "tune";
   public static readonly organizationEveryCardShows: string = "Every card shows";
@@ -1740,9 +1740,9 @@ export class Resources {
   public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
-  public static readonly organizationBoardLeadersTitle: string = "Leaders";
-  public static readonly organizationBoardLeadersNote: string = "They talk across departments; you lead them.";
-  public static readonly organizationBoardMessageLeaders: string = "Message all leaders";
+  public static readonly organizationBoardLeadersTitle: string = "Reports to you";
+  public static readonly organizationBoardLeadersNote: string = "They report to you; the leaders talk across departments.";
+  public static readonly organizationBoardMessageLeaders: string = "Message all leaders and your direct reports";
   public static readonly organizationBoardMessageLeadersIcon: string = "forum";
   public static readonly organizationBoardDepartmentsTitle: string = "Departments";
   public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
@@ -1831,8 +1831,8 @@ export class Resources {
     return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 department" : `${departments} departments`}`;
   }
 
-  public static formatOrganizationOwnerRole(leaders: number): string {
-    return leaders === 1 ? "Owner · 1 leader reports to you" : `Owner · ${leaders} leaders report to you`;
+  public static formatOrganizationOwnerRole(reports: number): string {
+    return reports === 1 ? "Owner · 1 direct report" : `Owner · ${reports} direct reports`;
   }
 
   public static formatOrganizationDepartmentSummary(statuses: readonly TeammateStatus[]): string {
@@ -2062,8 +2062,8 @@ export class Resources {
   }
 
   public static formatOrganizationLeadersNote(names: readonly string[]): string {
-    return names.length === 0 ? "No department has a leader yet"
-      : `${names.length} ${names.length === 1 ? "leader" : "leaders"}: ${Resources.formatNameList(names)}`;
+    return names.length === 0 ? "No one reports to you yet"
+      : `${names.length} ${names.length === 1 ? "person reports" : "people report"} to you: ${Resources.formatNameList(names)}`;
   }
 
   public static formatOrganizationChat(name: string): string {
@@ -3212,7 +3212,7 @@ export class Resources {
   }
 
   public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`Your ${count} ${count === 1 ? "leader" : "leaders"}`, ...Resources.statusCountParts(counts)].join(" · ");
+    return [`Your ${count} ${count === 1 ? "direct report" : "direct reports"}`, ...Resources.statusCountParts(counts)].join(" · ");
   }
 
   public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {

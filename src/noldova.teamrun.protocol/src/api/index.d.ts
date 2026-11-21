@@ -11971,7 +11971,7 @@ export declare class Organization {
    * @param target The target.
    * @param teammateIds Every teammate's id, in the order to list everyone.
    * @returns The ids: the teammate when it's one of them; a department's leader, then its other direct members; each
-   * department's leader, in the departments' order; or every teammate.
+   * department's leader, in the departments' order, then each teammate in no department; or every teammate.
    */
   public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[];
   /** Reads a wire value and reports malformed fields at their JSON path. */
@@ -11986,7 +11986,7 @@ export declare enum OrganizationTargetKind {
   Teammate = "Teammate",
   /** A department's leader and its direct members. */
   Department = "Department",
-  /** Every department's leader. */
+  /** Everyone who reports to the person: every department's leader and each teammate in no department. */
   Leaders = "Leaders",
   /** Every teammate, in a department or not. */
   Everyone = "Everyone"
@@ -12008,7 +12008,7 @@ export declare enum OrganizationRecipientState {
 
 /** Whom an organization message goes to. */
 export declare class OrganizationTarget {
-  /** Every department's leader. */
+  /** Everyone who reports to the person: every department's leader and each teammate in no department. */
   public static readonly leaders: OrganizationTarget;
   /** Every teammate. */
   public static readonly everyone: OrganizationTarget;

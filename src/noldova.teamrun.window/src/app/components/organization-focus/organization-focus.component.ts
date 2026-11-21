@@ -48,6 +48,7 @@ export class OrganizationFocusComponent {
   private readonly dialogs: DialogService = inject(DialogService);
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
+  public readonly directReports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly resources: typeof Resources = Resources;
@@ -58,8 +59,8 @@ export class OrganizationFocusComponent {
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
-  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, 0));
-  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.layout.layout().focus));
+  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, this.directReports().length));
+  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.directReports(), this.layout.layout().focus));
   protected readonly unit: Signal<OrganizationNode | null> = computed(() => Object.isNull(this.focus().teammate) ? this.focus().department : null);
   protected readonly removable: Signal<boolean> = computed(() => {
     const focus = this.focus();
@@ -68,6 +69,8 @@ export class OrganizationFocusComponent {
   protected readonly key: Signal<string> = computed(() => OrganizationConversation.keyOf(this.focus().target));
   protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
     const names = new Map<string, string>();
+    for (const person of this.directReports())
+      names.set(person.id, Resources.organizationReportsToYou);
     for (const row of this.rows())
       for (const person of row.people)
         names.set(person.id, row.node.name);
@@ -79,12 +82,12 @@ export class OrganizationFocusComponent {
     if (!Object.isNull(focus.teammate))
       return [focus.teammate];
     const department = focus.department;
-    return Object.isNull(department) ? this.leaders() : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
+    return Object.isNull(department) ? [...this.leaders(), ...this.directReports()] : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
   });
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
     const here = this.key();
-    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.flatMap(t => Object.isNull(t.department) ? [] : [new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)]),
+    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)),
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
     return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationConversation.keyOf(t.target) === here));
   });
@@ -162,10 +165,7 @@ export class OrganizationFocusComponent {
   }
 
   protected open(row: OrganizationOutlineRow): void {
-    if (row.node.isUnplaced)
-      this.layout.toggleDepartment(row.node.id);
-    else
-      this.go(this.department(row));
+    this.go(this.department(row));
   }
 
   protected teammate(teammate: Teammate): OrganizationTarget {

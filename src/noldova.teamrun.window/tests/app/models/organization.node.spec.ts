@@ -8,7 +8,6 @@
 import { Department, DepartmentMember, Harness, Organization, Teammate } from "@noldova/teamrun.protocol";
 
 import { OrganizationNode } from "../../../src/app/models/organization.node";
-import { Resources } from "../../../src/resources";
 
 describe("OrganizationNode", () => {
   const teammate = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
@@ -53,16 +52,22 @@ describe("OrganizationNode", () => {
     expect(shape(OrganizationNode.treeOf(organization, [ada]))).toEqual([["design", null, ["ada"], 1, 1, 1, []]]);
   });
 
-  it("puts the teammates in no department first, under No department in name order, and leaves it out once every teammate is placed", () => {
+  it("leaves a teammate in no department out of the tree, which holds only the departments", () => {
+    const organization = new Organization([new Department("design", "Design", null, "ada", 0, "c", "u")], [new DepartmentMember("ada", "design")]);
+
+    expect(shape(OrganizationNode.treeOf(organization, [ada, bea]))).toEqual([["design", "ada", [], 1, 1, 0, []]]);
+  });
+
+  it("lists the teammates in no department apart from the tree, as the person's direct reports in name order, and none once every teammate is placed", () => {
     const organization = new Organization([new Department("design", "Design", null, "ada", 0, "c", "u"), new Department("ui", "UI", "design", null, 0, "c", "u")],
       [new DepartmentMember("ada", "design"), new DepartmentMember("bea", "ui")]);
-    const tree = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
+    const teammates = [fay, ada, dee, bea, cy];
 
-    expect([shape(tree), tree.map(t => [t.name, t.isUnplaced, t.department?.id ?? null])]).toEqual([
-      [["no-department", null, ["cy", "dee", "fay"], 3, 3, 3, []], ["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]],
-      [[Resources.organizationNoDepartment, true, null], ["Design", false, "design"]]
+    expect([shape(OrganizationNode.treeOf(organization, teammates)), OrganizationNode.directReportsOf(organization, teammates).map(t => t.id)]).toEqual([
+      [["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]], ["cy", "dee", "fay"]
     ]);
-    expect(shape(OrganizationNode.treeOf(organization, [ada, bea]))).toEqual([["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]]);
-    expect(shape(OrganizationNode.treeOf(Organization.empty, [bea, ada]))).toEqual([["no-department", null, ["ada", "bea"], 2, 2, 2, []]]);
+    expect(OrganizationNode.directReportsOf(organization, [ada, bea])).toEqual([]);
+    expect([shape(OrganizationNode.treeOf(Organization.empty, [bea, ada])), OrganizationNode.directReportsOf(Organization.empty, [bea, ada]).map(t => t.id)])
+      .toEqual([[], ["ada", "bea"]]);
   });
 });

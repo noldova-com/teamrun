@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { OrganizationTarget } from "@noldova/teamrun.protocol";
+import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { OrganizationConversation } from "./organization-conversation";
@@ -23,10 +23,11 @@ export class OrganizationTargetChoice {
     this.label = label;
   }
 
-  public static of(tree: readonly OrganizationNode[]): readonly OrganizationTargetChoice[] {
+  public static of(tree: readonly OrganizationNode[], directReports: readonly Teammate[]): readonly OrganizationTargetChoice[] {
     return [
       new OrganizationTargetChoice(OrganizationTarget.leaders, Resources.organizationLeadersTitle),
       new OrganizationTargetChoice(OrganizationTarget.everyone, Resources.organizationEveryoneTitle),
+      ...directReports.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
       ...tree.flatMap(t => OrganizationTargetChoice.under(t))
     ];
   }
@@ -34,8 +35,7 @@ export class OrganizationTargetChoice {
   private static under(node: OrganizationNode): readonly OrganizationTargetChoice[] {
     const department = node.department;
     return [
-      ...(Object.isNull(department) ? []
-        : [new OrganizationTargetChoice(OrganizationTarget.department(department.id), Resources.formatOrganizationDepartmentOption(department.name))]),
+      new OrganizationTargetChoice(OrganizationTarget.department(department.id), Resources.formatOrganizationDepartmentOption(department.name)),
       ...(Object.isNull(node.leader) ? []
         : [new OrganizationTargetChoice(OrganizationTarget.teammate(node.leader.id), Resources.formatOrganizationLeaderOption(node.leader.name, node.name))]),
       ...node.members.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),

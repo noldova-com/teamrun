@@ -20,20 +20,21 @@ describe("OrganizationFocus", () => {
     [OrganizationConversation.keyOf(focus.target), focus.path.map(t => t.id), focus.teammate?.id ?? null, focus.departmentName];
 
   it("focuses a member of a department with no leader, with that department's name", () => {
-    expect(shape(OrganizationFocus.resolve(tree, "Teammate:cy"))).toEqual(["Teammate:cy", ["build"], "cy", "Build"]);
+    expect(shape(OrganizationFocus.resolve(tree, [], "Teammate:cy"))).toEqual(["Teammate:cy", ["build"], "cy", "Build"]);
   });
 
   it("opens on the leaders, with no department name, for a teammate it doesn't know", () => {
-    expect(shape(OrganizationFocus.resolve(tree, "Teammate:nobody"))).toEqual([OrganizationConversation.keyOf(OrganizationTarget.leaders), [], null, ""]);
+    expect(shape(OrganizationFocus.resolve(tree, [], "Teammate:nobody"))).toEqual([OrganizationConversation.keyOf(OrganizationTarget.leaders), [], null, ""]);
   });
 
-  it("focuses a teammate in no department under No department, and opens on the leaders for No department itself, which no message goes to", () => {
+  it("focuses a direct report in no department under Organization alone, saying it reports to you, and opens on the leaders for the old No department", () => {
     const eve = teammate("eve", "Eve");
-    const placed = OrganizationNode.treeOf(new Organization([new Department("design", "Design", null, "ada", 0, "c", "u")], [new DepartmentMember("ada", "design")]),
-      [ada, eve]);
+    const organization = new Organization([new Department("design", "Design", null, "ada", 0, "c", "u")], [new DepartmentMember("ada", "design")]);
+    const placed = OrganizationNode.treeOf(organization, [ada, eve]);
+    const reports = OrganizationNode.directReportsOf(organization, [ada, eve]);
 
-    expect([shape(OrganizationFocus.resolve(placed, "Teammate:eve")), shape(OrganizationFocus.resolve(placed, `Department:${OrganizationNode.unplacedId}`))]).toEqual([
-      ["Teammate:eve", [OrganizationNode.unplacedId], "eve", "No department"], [OrganizationConversation.keyOf(OrganizationTarget.leaders), [], null, ""]
+    expect([shape(OrganizationFocus.resolve(placed, reports, "Teammate:eve")), shape(OrganizationFocus.resolve(placed, reports, "Department:no-department"))]).toEqual([
+      ["Teammate:eve", [], "eve", "Reports to you"], [OrganizationConversation.keyOf(OrganizationTarget.leaders), [], null, ""]
     ]);
   });
 });

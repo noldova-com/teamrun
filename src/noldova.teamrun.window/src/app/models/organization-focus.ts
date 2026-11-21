@@ -9,6 +9,7 @@
 import "@noldova/context.core";
 import { OrganizationTarget, OrganizationTargetKind, type Teammate } from "@noldova/teamrun.protocol";
 
+import { Resources } from "../../resources";
 import type { OrganizationNode } from "./organization.node";
 
 export class OrganizationFocus {
@@ -29,19 +30,22 @@ export class OrganizationFocus {
   }
 
   public get departmentName(): string {
-    return this.department?.name ?? String.empty;
+    return this.department?.name ?? (Object.isNull(this.teammate) ? String.empty : Resources.organizationReportsToYou);
   }
 
-  public static resolve(tree: readonly OrganizationNode[], key: string | null): OrganizationFocus {
+  public static resolve(tree: readonly OrganizationNode[], directReports: readonly Teammate[], key: string | null): OrganizationFocus {
     const at = key?.indexOf(OrganizationFocus.separator) ?? -1;
     const kind = Object.isNull(key) || at < 0 ? null : key.slice(0, at);
     const id = Object.isNull(key) || at < 0 ? String.empty : key.slice(at + 1);
     if (kind === OrganizationTargetKind.Department) {
-      const path = OrganizationFocus.pathTo(tree, t => !t.isUnplaced && t.id === id);
+      const path = OrganizationFocus.pathTo(tree, t => t.id === id);
       if (path.length > 0)
         return new OrganizationFocus(OrganizationTarget.department(id), path, null);
     }
     if (kind === OrganizationTargetKind.Teammate) {
+      const report = directReports.find(t => t.id === id);
+      if (!Object.isUndefined(report))
+        return new OrganizationFocus(OrganizationTarget.teammate(id), [], report);
       const path = OrganizationFocus.pathTo(tree, t => t.leader?.id === id || t.members.some(member => member.id === id));
       const node = path.at(-1);
       const teammate = Object.isUndefined(node) ? undefined : [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].find(t => t.id === id);

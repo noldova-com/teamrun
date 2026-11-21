@@ -54,11 +54,11 @@ LICENSE file in the root directory of this source tree.
 <div class="body">
   <main class="chart" [class.focused]="mode() === modes.Focus">
     @if (mode() === modes.Focus) {
-      <nol-teamrun-organization-focus class="focus" [tree]="tree()" [editing]="editing()" />
+      <nol-teamrun-organization-focus class="focus" [tree]="tree()" [directReports]="directReports()" [editing]="editing()" />
     } @else {
       <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
         @if (mode() === modes.Board) {
-          <nol-teamrun-organization-board [tree]="tree()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
+          <nol-teamrun-organization-board [tree]="tree()" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
         } @else {
           <div class="tree">
             <div class="owner" nolCanvasItem>
@@ -68,8 +68,16 @@ LICENSE file in the root directory of this source tree.
                 <span class="role">{{ ownerRole() }}</span>
               </div>
             </div>
-            @if (tree().length > 0 || editing()) {
+            @if (tree().length > 0 || directReports().length > 0 || editing()) {
               <div class="kids">
+                @for (report of directReports(); track report.id) {
+                  <div class="kid report">
+                    <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name" [teammate]="report" [editing]="editing()"
+                      [nolPopoverTrigger]="reportDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment"
+                      (message)="chosen.set(targets.teammate(report.id))" />
+                    <ng-template #reportDetails><nol-teamrun-organization-details [teammate]="report" [department]="null" /></ng-template>
+                  </div>
+                }
                 @for (node of tree(); track node.id) {
                   <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
                 }

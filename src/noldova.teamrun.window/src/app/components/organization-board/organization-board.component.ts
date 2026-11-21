@@ -48,6 +48,7 @@ export class OrganizationBoardComponent {
   private readonly time: WritableSignal<number> = signal(this.clock.now());
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
+  public readonly directReports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
   public readonly target: InputSignal<OrganizationTarget | null> = input<OrganizationTarget | null>(null);
   public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
@@ -61,9 +62,10 @@ export class OrganizationBoardComponent {
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
-  protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus(this.departments()
-    .flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))
-    .filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
+  protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus([
+    ...this.directReports().map(t => new OrganizationBoardAsk(t, Resources.organizationReportsToYou, this.status(t))),
+    ...this.departments().flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))
+  ].filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
   protected readonly targetKey: Signal<string | null> = computed(() => {
     const target = this.target();
     return Object.isNull(target) ? null : OrganizationConversation.keyOf(target);

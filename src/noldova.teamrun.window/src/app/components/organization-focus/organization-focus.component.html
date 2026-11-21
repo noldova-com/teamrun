@@ -21,6 +21,14 @@ LICENSE file in the root directory of this source tree.
       aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
       class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
   </div>
+  @for (person of directReports(); track person.id) {
+    <div class="orow person report" [class.selected]="isHere(teammate(person))">
+      <span class="twist"></span>
+      <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="icon slot" aria-hidden="true"><span class="dot"
+        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span><span class="spacer"></span><span
+        class="note short">{{ resources.teammateStatusLabels[status(person)] }}</span></button>
+    </div>
+  }
   @for (row of rows(); track row.node.id) {
     <div class="orow department" [class.selected]="isHere(department(row))" [style.padding-inline-start.rem]="0.25 + row.depth * 1.5">
       <button type="button" nol-icon-button class="twist" [icon]="layout.layout().isCollapsed(row.node.id) ? resources.organizationFocusShowIcon : resources.organizationFocusHideIcon"
@@ -32,7 +40,7 @@ LICENSE file in the root directory of this source tree.
           <span class="asks note"><span class="dot waiting" aria-hidden="true"></span>{{ resources.formatOrganizationFocusAsks(asksIn(row)) }}</span>
         }
         <nol-chip>{{ row.node.headcount }}</nol-chip></button>
-      @if (editing() && !row.node.isUnplaced) {
+      @if (editing()) {
         <button type="button" nol-icon-button class="add-member" [icon]="resources.organizationAddMemberIcon"
           [label]="resources.formatOrganizationFocusAddMember(row.node.name)" [disabled]="addable(row).length === 0" [nolMenuTriggerFor]="addMenu"></button>
         <ng-template #addMenu>
