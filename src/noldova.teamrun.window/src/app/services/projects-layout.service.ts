@@ -30,6 +30,7 @@ export class ProjectsLayoutService {
   private readonly held: ((layout: ProjectsLayout) => ProjectsLayout)[] = [];
   private isOpen: boolean = false;
   private opening: Promise<void> | null = null;
+  private isAskedAgain: boolean = false;
   private latest: ProjectsLayout | null = null;
   private edits: number = 0;
   private received: number = 0;
@@ -115,8 +116,15 @@ export class ProjectsLayoutService {
   }
 
   private openOnce(): void {
-    this.opening ??= this.open().finally(() => {
+    if (!Object.isNull(this.opening)) {
+      this.isAskedAgain = true;
+      return;
+    }
+    this.isAskedAgain = false;
+    this.opening = this.open().finally(() => {
       this.opening = null;
+      if (this.isAskedAgain && !this.isOpen)
+        this.openOnce();
     });
   }
 
@@ -161,8 +169,8 @@ export class ProjectsLayoutService {
       if (!Object.isNull(kept) && edits === this.edits && received === this.received && this.saving === 0)
         this.current.set(ProjectsLayout.fromJson(kept));
     }
-    catch {
-      return;
+    catch (error) {
+      this.context.log(Resources.formatProjectsLayoutNotRead(ProjectsLayoutService.failureOf(error)));
     }
   }
 
