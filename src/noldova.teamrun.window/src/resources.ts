@@ -1149,6 +1149,8 @@ export class Resources {
     [ChatAction.CancelInstall]: "Couldn't cancel the install",
     [ChatAction.RemoveProvider]: "Couldn't remove the provider",
     [ChatAction.InstallTool]: "Couldn't install the provider's tool",
+    [ChatAction.AddAcpAgent]: "Couldn't add the ACP agent",
+    [ChatAction.RemoveAcpAgent]: "Couldn't remove the ACP agent",
     [ChatAction.OpenPage]: "Couldn't open the page",
     [ChatAction.OpenBrowser]: "Couldn't open the Browser",
     [ChatAction.SaveTeammate]: "Couldn't save the teammate",
@@ -1220,6 +1222,18 @@ export class Resources {
   public static readonly organizationNowIdleIcon: string = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
   public static readonly organizationNowReplying: string = "Replying";
+  public static readonly organizationDetailsStatus: string = "Status";
+  public static readonly organizationDetailsReportsTo: string = "Reports to";
+  public static readonly organizationDetailsModel: string = "Model";
+  public static readonly organizationDetailsUsage: string = "Usage";
+  public static readonly organizationDetailsLastSaid: string = "Last said";
+  public static readonly organizationDetailsNow: string = "Now";
+  public static readonly organizationDetailsNoUsage: string = "Not reported";
+  public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
+  public static readonly organizationMessagesLabel: string = "Messages";
+  public static readonly organizationMessageButton: string = "Message";
+  public static readonly organizationMessageIcon: string = "chat";
+  public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
@@ -1851,6 +1865,14 @@ export class Resources {
     return [model, effort].filter(t => !Object.isNull(t)).join(Resources.titleSeparator);
   }
 
+  public static formatOrganizationDetailsLabel(name: string): string {
+    return `${name}'s details`;
+  }
+
+  public static formatOrganizationDetailsUsage(used: number, limit: string): string {
+    return `${Resources.formatOrganizationUsage(used)} used${Resources.titleSeparator}${limit}`;
+  }
+
   public static formatRemove(entry: string): string {
     return `Remove ${entry}`;
   }
@@ -2012,6 +2034,18 @@ export class Resources {
     return `Every teammate (${count})`;
   }
 
+  public static formatOrganizationMessageNamed(name: string): string {
+    return `Message ${name}`;
+  }
+
+  public static formatOrganizationDepartmentOption(name: string): string {
+    return `${name} (department)`;
+  }
+
+  public static formatOrganizationLeaderOption(name: string, department: string): string {
+    return `${name} (leads ${department})`;
+  }
+
   public static formatOrganizationPlaceholder(title: string): string {
     return `Message ${title}`;
   }
@@ -2110,6 +2144,10 @@ export class Resources {
 
   public static formatTeammateError(name: string, error: string): string {
     return `@${name}: ${error}`;
+  }
+
+  public static formatAcpAgentActionTitle(action: ChatAction.AddAcpAgent | ChatAction.RemoveAcpAgent, name: string): string {
+    return action === ChatAction.AddAcpAgent ? `Couldn't add ${name}` : `Couldn't remove ${name}`;
   }
 
   public static formatProviderActionTitle(action: ProviderAction, name: string | null): string {

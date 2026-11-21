@@ -254,7 +254,7 @@ describe("AcpAgentsDialogComponent", () => {
     await click(".nol-teamrun-acp-add", row("droid"));
 
     await Wait.until(() => expect(texts(".nol-teamrun-acp-error")).toEqual(["Droid can't be added."]));
-    expect(context.count(MethodName.ProviderKindInstall)).toBe(0);
+    expect([context.count(MethodName.ProviderKindInstall), context.noticeText()]).toEqual([0, null]);
     await Wait.until(() => expect(part(".nol-teamrun-acp-add", row("droid")).getAttribute("aria-busy")).toBeNull());
     expect(part<HTMLButtonElement>(".nol-teamrun-acp-add", row("droid")).disabled).toBe(false);
     await click(".nol-teamrun-acp-add", row("droid"));
@@ -361,6 +361,44 @@ describe("AcpAgentsDialogComponent", () => {
     outside.remove();
 
     expect([failures, focused]).toEqual([[], true]);
+  });
+
+  it("shows an add or a remove that fails after the dialog has closed in a notice", async () => {
+    const adding = new DeferredResponse();
+    const removing = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpAgentAdd, () => adding.promise).answer(MethodName.AcpAgentRemove, () => removing.promise));
+
+    await click(".nol-teamrun-acp-add", row("droid"));
+    await click(".nol-teamrun-acp-remove", row("devin"));
+    await Wait.until(() => expect([context.count(MethodName.AcpAgentAdd), context.count(MethodName.AcpAgentRemove)]).toEqual([1, 1]));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    adding.reject(new Error("Droid can't be added."));
+    removing.reject(new Error("A provider still uses Devin."));
+    await dialog.settled();
+
+    await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.title, t.text])).toEqual([
+      ["Couldn't add Droid", "Droid can't be added."],
+      ["Couldn't remove Devin", "A provider still uses Devin."]
+    ]));
+  });
+
+  it("shows a local command whose add fails after the dialog has closed in a notice named after it", async () => {
+    const adding = new DeferredResponse();
+    await create(t => t.answer(MethodName.AcpLocalCommandAdd, () => adding.promise));
+    await fillForm();
+
+    await submit();
+    await Wait.until(() => expect(context.count(MethodName.AcpLocalCommandAdd)).toBe(1));
+    const dialog = fixture.componentInstance;
+    element().remove();
+    fixture.destroy();
+    adding.reject(new Error("The command can't be added."));
+    await dialog.settled();
+
+    await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.title, t.text]))
+      .toEqual([["Couldn't add Tool", "The command can't be added."]]));
   });
 
   it("removes an agent and a local command, and clears an old error when it tries again", async () => {

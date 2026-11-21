@@ -139,6 +139,7 @@ import { ProjectActivity } from "../projects/project-activity.js";
 import { EngineServices } from "./engine-services.js";
 import { KeptSessions } from "./kept-sessions.js";
 import { McpToolCalls } from "./mcp-tool-calls.js";
+import { MentionCheck } from "./mention-check.js";
 import { OutsideMessages } from "./outside-messages.js";
 import { PermissionAsks } from "./permission-asks.js";
 import { ChatTitles } from "./chat-titles.js";
@@ -965,9 +966,9 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     for (const id of new Set(params.mentionedTeammateIds))
       mentions.push(await this.requireTeammateAsync(id));
     const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
-    const resolved = !Object.isNull(outside) ? [] : Object.isNull(sender) ? MentionResolver.resolve(params.text, available)
-      : MentionResolver.resolveTeammateText(params.text, available);
-    if (resolved.length !== mentions.length || resolved.some((t, index) => t.teammateId !== mentions[index]?.id))
+    const matches = !Object.isNull(outside) ? mentions.length === 0
+      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender));
+    if (!matches)
       throw new ServiceException(ErrorCode.Conflict, Resources.mentionsChanged, []);
     const called = Object.isNull(sender) ? mentions : mentions.filter(t => t.id !== sender.teammateId);
     const responder = called.length > 0 || Object.isNull(params.responderTeammateId) ? null : await this.requireTeammateAsync(params.responderTeammateId);

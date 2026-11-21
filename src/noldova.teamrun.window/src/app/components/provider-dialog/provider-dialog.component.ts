@@ -178,7 +178,7 @@ export class ProviderDialogComponent {
       void this.store().installKind(row.kind.id, report);
       return;
     }
-    void this.store().installTool(row.kind.id, report);
+    void this.store().installTool(row.kind.id);
     this.closed.emit();
   }
 
