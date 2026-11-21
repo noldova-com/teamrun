@@ -566,7 +566,6 @@ The Test waits check refuses a fixed pause in any test file this table doesn't l
 | `src/noldova.teamrun.providers/tests/services/process/process-terminator.test.ts` | Gives a terminated process at most 5 seconds to exit. |
 | `src/noldova.teamrun.runtime/tests/services/mcp-http-endpoint.test.ts` | Gives a tool call at most 5 seconds to be aborted after its connection drops, so the test fails with that reason rather than at the runner's timeout. |
 | `src/noldova.teamrun.runtime/tests/services/runtime-part.test.ts` | Between bounded checks, 50 ms apart for at most 15 seconds, of a background command's process tree: until it has written its pid file, and until its pids are gone after a Stop, a chat's delete or a shutdown, which no event reports. |
-| `src/noldova.teamrun/tests/e2e/inline-terminal.spec.ts` | For one second after the inline screen shows a command and ends at the prompt, before the next Run. The Terminal module counts itself busy until the last key typed into it is a second old or its shell marks a new prompt, its echo settle, which no event reports; the screen can show the prompt before the terminal has read its mark, so only the second is sure, and a Run into a busy terminal asks the person instead of running. |
 
 The check treats these as fixed pauses, outside strings:
 

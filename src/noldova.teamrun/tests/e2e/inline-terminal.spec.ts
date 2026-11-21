@@ -9,11 +9,53 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import "@noldova/context.core";
 import { type Locator, type Page, expect } from "playwright/test";
 
 import { CodexDouble } from "./fixtures/codex-double.ts";
 import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
 import { TerminalScreen } from "./fixtures/terminal-screen.ts";
+import type { IFocusState } from "./interfaces/i-focus-state.ts";
+
+class WindowSize {
+  public readonly width: number;
+  public readonly height: number;
+
+  public constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+  }
+}
+
+class ElementBox {
+  public readonly top: number;
+  public readonly bottom: number;
+  public readonly left: number;
+  public readonly right: number;
+  public readonly height: number;
+
+  public constructor(top: number, bottom: number, left: number, right: number, height: number) {
+    this.top = top;
+    this.bottom = bottom;
+    this.left = left;
+    this.right = right;
+    this.height = height;
+  }
+
+  public static fromRect(x: number, y: number, width: number, height: number): ElementBox {
+    return new ElementBox(y, y + height, x, x + width, height);
+  }
+}
+
+class BoxPair {
+  public readonly first: ElementBox;
+  public readonly second: ElementBox;
+
+  public constructor(first: ElementBox, second: ElementBox) {
+    this.first = first;
+    this.second = second;
+  }
+}
 
 interface IBlockLanguage {
   readonly language: string;
@@ -42,24 +84,15 @@ const LANGUAGES: readonly IBlockLanguage[] = process.platform === "win32" ? [BAS
 const EDGE_TOLERANCE: number = 1;
 const MINIMUM_ROWS: number = 8;
 const TERMINAL_INSET: number = 12;
-const PROMPT_WINDOW: { readonly width: number; readonly height: number } = { width: 1440, height: 900 };
-const SHORT_WINDOW: { readonly width: number; readonly height: number } = { width: 640, height: 720 };
+const PROMPT_WINDOW: WindowSize = new WindowSize(1440, 900);
+const SHORT_WINDOW: WindowSize = new WindowSize(640, 720);
 const SHOWN_COMMAND: string = "echo shown-$((6*7))";
 const SHOWN_OUTPUT: string = "shown-42";
-const TERMINAL_ECHO_SETTLE_MS: number = 1_000;
 
-interface IBox {
-  readonly top: number;
-  readonly bottom: number;
-  readonly left: number;
-  readonly right: number;
-  readonly height: number;
-}
-
-const focusOf = (): { readonly window: boolean; readonly input: boolean; readonly active: string } => {
+const focusOf = (): IFocusState => {
   const active = document.activeElement;
   const path: string[] = [];
-  for (let element = active; element !== null && path.length < 6; element = element.parentElement)
+  for (let element = active; !Object.isNull(element) && path.length < 6; element = element.parentElement)
     path.push(`${element.tagName.toLowerCase()}.${element.classList[0] ?? ""}`);
   return {
     window: document.hasFocus(),
@@ -87,17 +120,13 @@ const shownUnlessAtPromptAsync = async (page: Page, text: string): Promise<reado
 
 const settledAtPromptAsync = async (page: Page, text: string): Promise<void> => {
   await expect.poll(() => shownUnlessAtPromptAsync(page, text), { ...TeamRunApp.pollOf(30_000), message: `the screen shows ${text} above the next prompt` }).toEqual([]);
-  await page.waitForTimeout(TERMINAL_ECHO_SETTLE_MS);
 };
 
-const boxFrom = (box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): IBox =>
-  ({ top: box.y, bottom: box.y + box.height, left: box.x, right: box.x + box.width, height: box.height });
-
-const boxOrNullAsync = async (locator: Locator): Promise<IBox | null> => {
+const boxOrNullAsync = async (locator: Locator): Promise<ElementBox | null> => {
   if (await locator.count() !== 1)
     return null;
   const box = await locator.boundingBox();
-  return box === null ? null : boxFrom(box);
+  return Object.isNull(box) ? null : ElementBox.fromRect(box.x, box.y, box.width, box.height);
 };
 
 const hostsOf = (): string => JSON.stringify({
@@ -105,7 +134,7 @@ const hostsOf = (): string => JSON.stringify({
   hosts: [...document.querySelectorAll("nol-teamrun-inline-terminal")].map(t => ({ isConnected: t.isConnected, live: t.querySelector(".live")?.childElementCount ?? 0 }))
 });
 
-const boxesAsync = async (page: Page, locators: readonly Locator[]): Promise<readonly IBox[]> => {
+const boxesAsync = async (page: Page, locators: readonly Locator[]): Promise<readonly ElementBox[]> => {
   const elements = await Promise.all(locators.map(t => t.elementHandle()));
   const boxes = await page.evaluate(found => found.map(element => {
     if (!element.isConnected || element.getClientRects().length === 0)
@@ -113,26 +142,26 @@ const boxesAsync = async (page: Page, locators: readonly Locator[]): Promise<rea
     const box = element.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, height: box.height };
   }), elements).finally(() => Promise.all(elements.map(t => t.dispose())));
-  return boxes;
+  return boxes.map(t => new ElementBox(t.top, t.bottom, t.left, t.right, t.height));
 };
 
-const boxAt = (boxes: readonly IBox[], index: number): IBox => {
+const boxAt = (boxes: readonly ElementBox[], index: number): ElementBox => {
   const box = boxes[index];
-  if (box === undefined)
+  if (Object.isUndefined(box))
     throw new Error("The element has no box.");
   return box;
 };
 
-const boxPairAsync = async (page: Page, first: Locator, second: Locator): Promise<{ readonly first: IBox; readonly second: IBox }> => {
+const boxPairAsync = async (page: Page, first: Locator, second: Locator): Promise<BoxPair> => {
   const boxes = await boxesAsync(page, [first, second]);
-  return { first: boxAt(boxes, 0), second: boxAt(boxes, 1) };
+  return new BoxPair(boxAt(boxes, 0), boxAt(boxes, 1));
 };
 
-const boxOf = async (locator: Locator): Promise<IBox> => {
+const boxOf = async (locator: Locator): Promise<ElementBox> => {
   const box = await locator.boundingBox();
-  if (box === null)
+  if (Object.isNull(box))
     throw new Error("The element has no box.");
-  return boxFrom(box);
+  return ElementBox.fromRect(box.x, box.y, box.width, box.height);
 };
 
 for (const { language, write, compute } of LANGUAGES)
@@ -177,7 +206,7 @@ for (const { language, write, compute } of LANGUAGES)
       const isAboveSecondAsync = async (): Promise<boolean> => {
         const moved = await boxOrNullAsync(inline);
         const block = await boxOrNullAsync(blocks.nth(1));
-        return moved !== null && block !== null && moved.bottom <= block.top + EDGE_TOLERANCE;
+        return !Object.isNull(moved) && !Object.isNull(block) && moved.bottom <= block.top + EDGE_TOLERANCE;
       };
       await expect.poll(isAboveSecondAsync, TeamRunApp.pollOf(30_000)).toBe(true).catch(async (error: unknown) => {
         await testInfo.attach(`${language}-inline-hosts`, { body: await page.evaluate(hostsOf), contentType: "text/plain" });
@@ -337,6 +366,7 @@ test("an earlier Run's output comes back under its block after the window reload
   await runs.nth(1).click();
   await expect.poll(() => TeamRunApp.readPid(second), TeamRunApp.pollOf(60_000)).not.toBeNull();
   await expectKeptUnderFirstAsync(page, path.basename(first));
+  await expect.poll(() => TeamRunApp.savedLayoutAsync(page), { ...TeamRunApp.pollOf(30_000), message: "the window saved its layout with the chat open, which a reload doesn't wait for in Desktop releases before desktop#471 (desktop#469)" }).toContain("\"teamrun.conversation\"");
 
   await page.reload();
   await expectKeptUnderFirstAsync(page, path.basename(first));

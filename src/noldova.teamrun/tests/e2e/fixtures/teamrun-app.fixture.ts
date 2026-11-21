@@ -14,7 +14,14 @@ import path from "node:path";
 
 import { type ElectronApplication, type Locator, type Page, type TestInfo, _electron, test as base, expect } from "playwright/test";
 
+import type { IDesktopBridge } from "../interfaces/i-desktop-bridge.ts";
 import { CodexDouble } from "./codex-double.ts";
+
+declare global {
+  interface Window {
+    readonly desktop: IDesktopBridge;
+  }
+}
 
 export interface IStartedProcess {
   readonly pid: number;
@@ -153,6 +160,10 @@ export class TeamRunApp {
 
   public static pollOf(timeout: number = TeamRunApp.POLL_TIMEOUT): { readonly timeout: number; readonly intervals: number[] } {
     return { timeout, intervals: [...TeamRunApp.POLL_INTERVALS] };
+  }
+
+  public static async savedLayoutAsync(page: Page): Promise<string> {
+    return JSON.stringify(await page.evaluate(() => window.desktop.readLayout()));
   }
 
   public static homeVariablesOf(platform: NodeJS.Platform, home: string): Readonly<Record<string, string>> {
