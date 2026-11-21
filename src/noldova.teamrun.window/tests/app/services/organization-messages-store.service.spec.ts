@@ -72,6 +72,13 @@ describe("OrganizationMessagesStoreService", () => {
     await reading;
 
     expect(store.messages().map(t => `${t.id}:${t.recipients[0]?.state}`)).toEqual(["o1:Stopped", "o2:Started"]);
+    const failed = new DeferredResponse();
+    context.answer(MethodName.OrganizationMessageList, () => failed.promise);
+    const failing = store.reload();
+    context.emit(EventName.OrganizationMessageUpdated, toAda.toJson());
+    failed.reject(new Error("too late"));
+    await failing;
+    expect(store.loadError()).toBeNull();
   });
 
   it.each([
@@ -143,6 +150,7 @@ describe("OrganizationMessagesStoreService", () => {
 
   it.each([
     ["an error", (): never => { throw new Error("chat gone"); }, "chat gone"],
+    ["a string", (): Promise<JsonValue> => Promise.reject("chat gone"), "chat gone"],
     ["a value that isn't a list", (): JsonValue => "nope", new ListNotArrayException("string").message]
   ])("reports replies answered with %s and clears it once replies read", async (_, answer, shown) => {
     let fail = true;

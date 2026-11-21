@@ -39,10 +39,10 @@ LICENSE file in the root directory of this source tree.
   </ul>
 }
 <section class="nol-teamrun-organization-thread-wrap" [attr.aria-label]="title() || resources.organizationChooseTarget">
-  @if (target()) {
+  @if (target(); as current) {
     <div class="nol-teamrun-organization-thread-head">
       <h3 class="nol-teamrun-organization-thread-title">{{ title() }}</h3>
-      <span class="nol-teamrun-organization-thread-note">{{ note() }}</span>
+      <span class="nol-teamrun-organization-thread-note">{{ noteOf(current) }}</span>
     </div>
   }
   <div class="nol-teamrun-organization-thread">

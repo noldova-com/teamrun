@@ -118,7 +118,7 @@ describe("OrganizationMessagesComponent", () => {
   });
 
   it("has an inbox shape and a thread shape", () => {
-    expect(Object.values(OrganizationMessagesShape)).toEqual(["inbox", "thread"]);
+    expect(Object.values(OrganizationMessagesShape)).toEqual(["Inbox", "Thread"]);
   });
 
   it("lists each conversation, the latest first, with its title, time and last line, and opens one on a click", async () => {
@@ -220,8 +220,11 @@ describe("OrganizationMessagesComponent", () => {
     expect(context.count(MethodName.OrganizationMessageSend)).toBe(1);
   });
 
-  it("keeps the text and says why when a send fails", async () => {
-    sendAnswer = () => Promise.reject(new Error("runtime down"));
+  it.each([
+    ["an error", (): Promise<JsonValue> => Promise.reject(new Error("runtime down"))],
+    ["a string", (): Promise<JsonValue> => Promise.reject("runtime down")]
+  ])("keeps the text and says why when a send fails with %s", async (_, answer) => {
+    sendAnswer = answer;
     await create(toAlice);
 
     await userEvent.type(input(), "Hello{Enter}");
@@ -248,8 +251,11 @@ describe("OrganizationMessagesComponent", () => {
     expect(texts(".nol-teamrun-organization-delivery-line")).toContain(Resources.formatOrganizationRecipients(OrganizationRecipientState.Stopped, ["Bob"]));
   });
 
-  it("says why a stop failed", async () => {
-    stopAnswer = () => Promise.reject("refused");
+  it.each([
+    ["an error", (): Promise<JsonValue> => Promise.reject(new Error("refused"))],
+    ["a string", (): Promise<JsonValue> => Promise.reject("refused")]
+  ])("says why a stop failed with %s", async (_, answer) => {
+    stopAnswer = answer;
     await create(OrganizationTarget.everyone);
 
     await userEvent.click(one(".nol-teamrun-organization-stop"));

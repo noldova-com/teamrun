@@ -10,13 +10,15 @@ import { Component, type InputSignal, type ModelSignal, type Signal, type Writab
   from "@angular/core";
 
 import "@noldova/context.core";
-import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, OrganizationTarget, OrganizationTargetKind,
-  type Teammate } from "@noldova/teamrun.protocol";
-import { AvatarSize, ChipComponent, IconButtonComponent, MessageAuthor as Author, MessageAuthorKind, type MessageBlock, MessageComponent,
+import { DetailKind, type Message, MessageStatus, type OrganizationMessage, OrganizationRecipientState, OrganizationTarget, OrganizationTargetKind }
+  from "@noldova/teamrun.protocol";
+import { AvatarSize, ChipComponent, IconButtonComponent, MessageAuthor as Author, MessageAuthorKind, MessageComponent,
   MessageLayout, MessageStatus as Status, MessageText, SelectComponent, SelectGroup, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
+import type { IOrganizationConversationRow } from "../../interfaces/i-organization-conversation-row";
+import type { IOrganizationThreadEntry } from "../../interfaces/i-organization-thread-entry";
 import { OrganizationConversation } from "../../models/organization-conversation";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { FormatterService } from "../../services/formatter.service";
@@ -24,32 +26,6 @@ import { OrganizationMessagesStoreService } from "../../services/organization-me
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TimeFormatService } from "../../services/time-format.service";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
-
-interface ConversationRow {
-  readonly conversation: OrganizationConversation;
-  readonly title: string;
-  readonly teammate: Teammate | null;
-  readonly icon: string;
-  readonly time: string;
-  readonly lastLine: string;
-  readonly unread: number;
-}
-
-interface ThreadEntry {
-  readonly message: OrganizationMessage;
-  readonly blocks: readonly MessageBlock[];
-  readonly lines: readonly string[];
-  readonly failures: readonly string[];
-  readonly stoppable: boolean;
-  readonly replies: readonly ReplyEntry[];
-}
-
-interface ReplyEntry {
-  readonly reply: Message;
-  readonly author: Author;
-  readonly blocks: readonly MessageBlock[];
-  readonly status: Status;
-}
 
 @Component({
   selector: "nol-teamrun-organization-messages",
@@ -81,7 +57,7 @@ export class OrganizationMessagesComponent {
   protected readonly actionError: WritableSignal<string | null> = signal(null);
   protected readonly error: Signal<string | null> = computed(() => this.actionError() ?? this.store.loadError() ?? this.store.repliesError());
 
-  protected readonly rows: Signal<readonly ConversationRow[]> = computed(() => this.store.conversations().map(t => {
+  protected readonly rows: Signal<readonly IOrganizationConversationRow[]> = computed(() => this.store.conversations().map(t => {
     const shown = this.store.repliesOf(t.last.id)().flatMap(u => {
       const text = OrganizationMessagesComponent.textOf(u);
       return Object.isUndefined(text) ? [] : [{ reply: u, text }];
@@ -106,28 +82,13 @@ export class OrganizationMessagesComponent {
     const target = this.target();
     return Object.isNull(target) ? String.empty : this.titleOf(target, this.messages().at(-1) ?? null);
   });
-  protected readonly note: Signal<string> = computed(() => {
-    const target = this.target();
-    if (Object.isNull(target))
-      return String.empty;
-    switch (target.kind) {
-      case OrganizationTargetKind.Teammate:
-        return this.chats.teammate(target.id)?.role ?? Resources.organizationTeammateNote;
-      case OrganizationTargetKind.Department:
-        return Resources.formatOrganizationDepartmentNote(this.recipientCount());
-      case OrganizationTargetKind.Leaders:
-        return Resources.organizationLeadersNote;
-      case OrganizationTargetKind.Everyone:
-        return Resources.formatOrganizationEveryoneNote(this.recipientCount());
-    }
-  });
   protected readonly recipientCount: Signal<number> = computed(() => {
     const target = this.target();
     return Object.isNull(target) ? 0 : this.organizations.organization().recipientsOf(target, this.chats.teammates().map(t => t.id)).length;
   });
   protected readonly messages: Signal<readonly OrganizationMessage[]> = computed(() =>
     this.store.conversations().find(t => t.key === this.selectedKey())?.messages ?? []);
-  protected readonly entries: Signal<readonly ThreadEntry[]> = computed(() => this.messages().map(t => this.entryOf(t)));
+  protected readonly entries: Signal<readonly IOrganizationThreadEntry[]> = computed(() => this.messages().map(t => this.entryOf(t)));
   protected readonly replying: Signal<string> = computed(() => {
     const names = this.entries().flatMap(t => t.replies.filter(u => u.status === Status.Streaming).map(u => u.author.name));
     return names.length === 0 ? String.empty : Resources.formatOrganizationReplying([...new Set(names)]);
@@ -196,11 +157,24 @@ export class OrganizationMessagesComponent {
     }
   }
 
+  protected noteOf(target: OrganizationTarget): string {
+    switch (target.kind) {
+      case OrganizationTargetKind.Teammate:
+        return this.chats.teammate(target.id)?.role ?? Resources.organizationTeammateNote;
+      case OrganizationTargetKind.Department:
+        return Resources.formatOrganizationDepartmentNote(this.recipientCount());
+      case OrganizationTargetKind.Leaders:
+        return Resources.organizationLeadersNote;
+      case OrganizationTargetKind.Everyone:
+        return Resources.formatOrganizationEveryoneNote(this.recipientCount());
+    }
+  }
+
   protected time(at: string): Date {
     return new Date(at);
   }
 
-  private entryOf(message: OrganizationMessage): ThreadEntry {
+  private entryOf(message: OrganizationMessage): IOrganizationThreadEntry {
     const states = [OrganizationRecipientState.Started, OrganizationRecipientState.Queued, OrganizationRecipientState.Stopped,
       OrganizationRecipientState.Removed, OrganizationRecipientState.Failed];
     const lines = states.flatMap(t => {

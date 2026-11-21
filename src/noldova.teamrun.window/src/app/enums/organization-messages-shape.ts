@@ -7,6 +7,6 @@
  */
 
 export enum OrganizationMessagesShape {
-  Inbox = "inbox",
-  Thread = "thread"
+  Inbox = "Inbox",
+  Thread = "Thread"
 }

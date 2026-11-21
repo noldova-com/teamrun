@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, OrganizationRecipientState, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
 import { Resources } from "../src/resources";
@@ -53,6 +53,15 @@ describe("Resources", () => {
   it("says a sign-in didn't finish before its command ended, and before it signed in for a terminal with no command", () => {
     expect([Resources.formatSignInUnfinished("cursor-agent login"), Resources.formatSignInUnfinished(null)])
       .toEqual(["Sign-in didn't finish: the terminal closed before cursor-agent login ended.", Resources.signInUnfinished]);
+  });
+
+  it("says whom an organization message reached in each state, one name alone and the last after and", () => {
+    expect([OrganizationRecipientState.Started, OrganizationRecipientState.Queued, OrganizationRecipientState.Stopped, OrganizationRecipientState.Removed,
+      OrganizationRecipientState.Failed].map(t => Resources.formatOrganizationRecipients(t, ["Ada", "Bob", "Cid"]))).toEqual(["Sent to Ada, Bob and Cid",
+      "Waiting to start for Ada, Bob and Cid", "Stopped before it reached Ada, Bob and Cid", "Ada, Bob and Cid were removed before it arrived",
+      "Couldn't reach Ada, Bob and Cid"]);
+    expect(Resources.formatOrganizationRecipients(OrganizationRecipientState.Removed, ["Ada"])).toBe("Ada was removed before it arrived");
+    expect([0, 1, 2].map(t => Resources.formatOrganizationGoesTo(t))).toEqual(["Goes to no teammate", "Goes to 1 teammate", "Goes to 2 teammates"]);
   });
 
   it("qualifies a TeamRun method or event name with the module's id", () => {
