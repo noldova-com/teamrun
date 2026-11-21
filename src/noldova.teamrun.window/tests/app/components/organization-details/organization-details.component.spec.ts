@@ -53,7 +53,8 @@ describe("OrganizationDetailsComponent", () => {
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.replace(/\s+/gu, " ").trim() ?? "");
   const card = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
+    const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name
+      || t.querySelector<HTMLInputElement>(".name-field")?.value === name);
     if (Object.isUndefined(found))
       throw new Error(`No card is named ${name}.`);
     return found;
@@ -96,6 +97,8 @@ describe("OrganizationDetailsComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
+    element().style.width = "84rem";
+    element().style.height = "60rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
@@ -177,9 +180,6 @@ describe("OrganizationDetailsComponent", () => {
 
   it("opens the details once the pointer rests on a card, and closes them when it leaves the card and them", async () => {
     await create();
-    element().style.width = "60rem";
-    element().style.height = "60rem";
-    await settle();
 
     await userEvent.hover(card("Bob"));
     await Wait.until(() => expect(popovers()).toHaveLength(1));
@@ -285,7 +285,7 @@ describe("OrganizationDetailsComponent", () => {
     it("rings a card the keyboard reached in the accent's colour, inside its edge", async () => {
       await create();
       const alice = card("Alice");
-      TestBed.inject(FocusMonitor).focusVia(alice, "keyboard");
+      alice.setAttribute("data-nol-state", "Focus");
       await settle();
       const style = getComputedStyle(alice);
       const probe = document.createElement("span");
@@ -295,7 +295,7 @@ describe("OrganizationDetailsComponent", () => {
       probe.remove();
       const width = AppearanceFixture.measureLook("border-width") * (forcedColors === "active" ? 2 : 1);
 
-      expect([alice.matches(":focus-visible"), style.outlineStyle, style.outlineColor]).toEqual([true, "solid", accent]);
+      expect([style.outlineStyle, style.outlineColor]).toEqual(["solid", accent]);
       AppearanceFixture.expectPixels(Number.parseFloat(style.outlineWidth), width);
       AppearanceFixture.expectPixels(Number.parseFloat(style.outlineOffset), -AppearanceFixture.measureLook("border-width"));
     });

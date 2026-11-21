@@ -115,6 +115,8 @@ describe("OrganizationViewComponent", () => {
     configure(context);
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
+    element().style.width = "84rem";
+    element().style.height = "60rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
@@ -684,7 +686,7 @@ describe("OrganizationViewComponent", () => {
 
     it("sizes the cards, hangs each leader under its department, the members off one line, and joins the departments to you through one bar", async () => {
       await create();
-      element().style.width = "60rem";
+      element().style.width = "84rem";
       element().style.height = "60rem";
       await settle();
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
@@ -726,15 +728,15 @@ describe("OrganizationViewComponent", () => {
 
     it("fills the space under the header with one canvas inside the view's padding, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
-      element().style.width = "60rem";
+      element().style.width = "84rem";
       element().style.height = "60rem";
       await settle();
       const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
-      const [host, top, canvas] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas")];
+      const [host, top, canvas, messages] = [element().getBoundingClientRect(), box(".top"), box(".chart > nol-canvas"), box("aside.messages")];
       const [tools, tree] = [box(".chart .nol-canvas-tools"), box(".chart .tree")];
 
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
-      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, host.right - space(6)],
+      for (const [actual, expected] of [[canvas.top, top.bottom + space(4)], [canvas.left, host.left + space(6)], [canvas.right, messages.left - space(4)], [messages.right, host.right - space(6)],
         [canvas.bottom, host.bottom - space(6)]] as const)
         AppearanceFixture.expectPixels(actual, expected);
       expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
