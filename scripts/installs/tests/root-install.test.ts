@@ -31,7 +31,7 @@ const createRoot = (): { root: string; npm: string; record: string } => {
     "const calls = fs.existsSync(record) ? JSON.parse(fs.readFileSync(record, \"utf8\")) : [];",
     "calls.push({ values: process.argv.slice(2), directory: process.cwd(), logs: process.env.npm_config_logs_dir });",
     "fs.writeFileSync(record, JSON.stringify(calls));",
-    "const results = JSON.parse(process.env.FAKE_NPM_RESULTS ?? \"[{\"exitCode\":0}]\");",
+    "const results = JSON.parse(process.env.FAKE_NPM_RESULTS ?? '[{\"exitCode\":0}]');",
     "const result = results[Math.min(calls.length, results.length) - 1];",
     "fs.writeFileSync(path.join(process.env.npm_config_logs_dir, \"2026-11-20T00_00_00_000Z-debug-0.log\"), (result.log ?? []).join(\"\\n\"));",
     "process.exitCode = result.exitCode;"
