@@ -75,8 +75,10 @@ describe("OrganizationDetailsComponent", () => {
       throw new PartReadError(`${open.length} details are open.`);
     return found;
   };
-  const facts = (): DetailFact[] => all("dt", popover()).map(t => new DetailFact(t.textContent?.trim() ?? "",
-    t.nextElementSibling instanceof HTMLElement ? t.nextElementSibling.innerText.replace(/\s+/gu, " ").trim() : ""));
+  const facts = (): DetailFact[] => {
+    const values = all("dt + dd", popover());
+    return all("dt", popover()).map((t, index) => new DetailFact(t.textContent?.trim() ?? "", values[index]?.innerText.replace(/\s+/gu, " ").trim() ?? ""));
+  };
   const fact = (term: string): string | undefined => facts().find(t => t.term === term)?.value;
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
@@ -462,8 +464,9 @@ describe("OrganizationDetailsComponent", () => {
       expect(box(ago).bottom).toBeLessThanOrEqual(box(details).bottom);
     });
 
-    it("rings a card the keyboard reached in the accent's colour, inside its edge", async () => {
-      await create();
+    it.each(["Tree", "Board", "Focus"])("rings a card the keyboard reached on the %s in the accent's colour, inside its edge", async view => {
+      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
+      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
       const alice = card("Alice");
       alice.setAttribute("data-nol-state", "Focus");
       await settle();
