@@ -54,6 +54,7 @@ export class TeamRunApp {
   private static readonly LINUX_PASSWORD_STORE: string = "--password-store=gnome-libsecret";
   private static readonly MAC_MOCK_KEYCHAIN: string = "--use-mock-keychain";
   private static readonly SHOW_ALL_TABS: string = "Show all tabs";
+  private static readonly OVERFLOW_MENU: string = ".nol-tab-group-overflow-menu";
   private static readonly TAB_TIMEOUT: number = 60_000;
   private static readonly TAB_STEP_TIMEOUT: number = 1_000;
   private static readonly DESKTOP_DEFAULT_WIDTH: number = 1280;
@@ -173,19 +174,23 @@ export class TeamRunApp {
     return page.locator("nol-tab-group").filter({ has: TeamRunApp.tabOf(page, name) });
   }
 
-  public static async showTabAsync(page: Page, name: string): Promise<void> {
+  public static async selectTabAsync(page: Page, name: string, item: string = name, timeout: number = TeamRunApp.TAB_TIMEOUT): Promise<void> {
     const tab = TeamRunApp.tabOf(page, name);
-    const menu = page.locator(".nol-tab-group-overflow-menu");
+    if (await tab.isVisible()) {
+      await tab.click({ timeout });
+      return;
+    }
+    await TeamRunApp.groupOf(page, name).getByRole("button", { name: TeamRunApp.SHOW_ALL_TABS, exact: true }).click({ timeout });
+    await page.locator(TeamRunApp.OVERFLOW_MENU).getByRole("menuitem", { name: item, exact: true }).click({ timeout });
+  }
+
+  public static async showTabAsync(page: Page, name: string, item: string = name): Promise<void> {
+    const tab = TeamRunApp.tabOf(page, name);
+    const menu = page.locator(TeamRunApp.OVERFLOW_MENU);
     await expect(async () => {
       if (await menu.isVisible())
         await page.keyboard.press("Escape");
-      if (await tab.isVisible()) {
-        await tab.click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
-      }
-      else {
-        await TeamRunApp.groupOf(page, name).getByRole("button", { name: TeamRunApp.SHOW_ALL_TABS, exact: true }).click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
-        await menu.getByRole("menuitem", { name, exact: true }).click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
-      }
+      await TeamRunApp.selectTabAsync(page, name, item, TeamRunApp.TAB_STEP_TIMEOUT);
       await expect(tab).toHaveAttribute("aria-selected", "true", { timeout: TeamRunApp.TAB_STEP_TIMEOUT });
       await expect(tab).toBeVisible({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
     }, `${name}'s tab shows`).toPass({ timeout: TeamRunApp.TAB_TIMEOUT });

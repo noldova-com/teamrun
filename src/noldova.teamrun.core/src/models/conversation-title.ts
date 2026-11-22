@@ -15,7 +15,9 @@ export class ConversationTitle {
 
   public constructor(message: string) {
     const line = (message.split(Resources.lineSeparator).find(t => !String.isNullOrWhitespace(t)) ?? message).trim();
-    this.text = line.length <= Resources.maximumTitleLength ? line : `${line.slice(0, Resources.maximumTitleLength - 1).trimEnd()}${Resources.ellipsis}`;
+    const points = [...line];
+    this.text = points.length <= Resources.maximumTitleLength ? line
+      : `${points.slice(0, Resources.maximumTitleLength - 1).join(String.empty).trimEnd()}${Resources.ellipsis}`;
   }
 
   public static ofAnswer(answer: string): string | null {
