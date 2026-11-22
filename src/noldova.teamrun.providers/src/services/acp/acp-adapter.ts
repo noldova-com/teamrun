@@ -42,6 +42,7 @@ import { AcpModelChoices } from "../../models/acp-model-choices.js";
 import { AcpServedEndpoint } from "../../models/acp-served-endpoint.js";
 import { AcpSession } from "../../models/acp-session.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
+import { LaunchedAcpClient } from "../../models/launched-acp-client.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
@@ -1051,7 +1052,7 @@ export class AcpAdapter implements IProviderAdapter {
   private async createClient(provider: Provider | null, requested: RequestedSettings | null, signingIn: boolean = false,
     environment: Readonly<Record<string, string>> = {}, workingDirectory: string | null = null, approvedTools: readonly string[] | null = null,
     shutdowns: number = this.shutdowns, extraArguments: readonly string[] = [], chatTurn: boolean = false,
-    titleSession: boolean = false): Promise<{ client: AcpClient; environment: NodeJS.ProcessEnv }> {
+    titleSession: boolean = false): Promise<LaunchedAcpClient> {
     const base = await this.starter.readEnvironmentAsync(this.agent.baseEnvironment);
     if (shutdowns !== this.shutdowns)
       throw new ProviderStoppedException(Resources.formatStoppedForShutdown(this.descriptor.displayName));
@@ -1062,17 +1063,17 @@ export class AcpAdapter implements IProviderAdapter {
 
   private launchClient(provider: Provider | null, requested: RequestedSettings | null, base: NodeJS.ProcessEnv, signingIn: boolean = false,
     environment: Readonly<Record<string, string>> = {}, workingDirectory: string | null = null, approvedTools: readonly string[] | null = null,
-    extraArguments: readonly string[] = [], chatTurn: boolean = false, titleSession: boolean = false): { client: AcpClient; environment: NodeJS.ProcessEnv } {
+    extraArguments: readonly string[] = [], chatTurn: boolean = false, titleSession: boolean = false): LaunchedAcpClient {
     const launch = this.agent.launch(provider, requested, workingDirectory, approvedTools, base, chatTurn, titleSession);
     if (!signingIn && this.agent.isSignedIn(provider) === false)
       throw new SignInException(this.agent.formatSignIn(provider));
     const command = launch.command.withArguments(...extraArguments).withOrigin(this.originOf(provider)).inOwnGroup();
     const launched = signingIn ? AcpEnvironment.forSignIn(launch.environment, base) : launch.environment;
     const client = new AcpClient(command, { ...launched, ...environment }, launch.directory, this.starter, this.timings, this.timer, MessageFraming.Lines,
-      this.processTree);
+      this.processTree, this.agent.toolGate ?? null);
     this.clients.set(client, provider?.id ?? null);
     client.start();
-    return { client, environment: base };
+    return new LaunchedAcpClient(client, base);
   }
 
   private async initializeSignedIn(client: AcpClient): Promise<JsonReader | null> {

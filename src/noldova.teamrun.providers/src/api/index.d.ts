@@ -3492,6 +3492,7 @@ export declare class Resources {
   public static readonly acpAlreadyStarted: string;
   public static readonly acpDisconnected: string;
   public static readonly acpTooManyRequests: string;
+  public static readonly acpGatedRequestRefused: string;
   public static readonly acpDidNotStop: string;
   public static readonly acpFrameTooLarge: string;
   public static readonly acpInvalidFrame: string;
@@ -11484,9 +11485,11 @@ export declare class AcpClient {
   /**
    * Creates a single-use client with explicit launch environment and process ownership; its stop waits on the timer, by default `NodeTimer`.
    * Messages are framed as `framing` says, one per line by default. With `tree`, its stop ends what the agent started too.
+   * With `gate`, a request for one of its methods that the client can't hand on or answer, past the open-request cap, under an id already open, with no listener, or whose answer
+   * fails, is answered with the gate's refusal, `Resources.acpGatedRequestRefused`, never an error, since the agent lets the call go on after an error.
    */
   public constructor(command: ProcessCommand, environment: NodeJS.ProcessEnv, directory: string, starter: IProcessStarter, timings: ProviderTimings, timer?: ITimer,
-    framing?: MessageFraming, tree?: IProcessTree | null);
+    framing?: MessageFraming, tree?: IProcessTree | null, gate?: IAcpToolGate | null);
 
   /**
    * Starts the process; a second start throws.

@@ -680,6 +680,7 @@ export class Resources {
   public static readonly acpAlreadyStarted: string = "The ACP client is already started.";
   public static readonly acpDisconnected: string = "The ACP agent connection is closed.";
   public static readonly acpTooManyRequests: string = "The ACP request limit was reached.";
+  public static readonly acpGatedRequestRefused: string = "TeamRun refused this tool call, as it couldn't answer the agent's check before it.";
   public static readonly acpDidNotStop: string = "The ACP agent did not stop within the shutdown timeout.";
   public static readonly acpFrameTooLarge: string = "The ACP agent exceeded the message size limit.";
   public static readonly acpInvalidFrame: string = "The ACP agent returned an invalid message.";

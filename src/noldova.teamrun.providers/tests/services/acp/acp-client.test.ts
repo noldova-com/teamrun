@@ -12,10 +12,11 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testin
 import { JsonException, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { TimeoutException } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
-import { AcpClient, AcpConnectionException, AcpRequestException, type IAcpClientListener, type IProcessTree, MessageFraming, NodeProcessStarter, ProviderTimings, Resources, StartedProcess }
-  from "@noldova/teamrun.providers";
+import { AcpClient, AcpConnectionException, AcpRequestException, GrokToolGate, type IAcpClientListener, type IProcessTree, MessageFraming, NodeProcessStarter, ProviderTimings,
+  Resources, StartedProcess } from "@noldova/teamrun.providers";
 import { CopilotTestHost } from "../../fixtures/copilot-test-host.fixture.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
+import { HeldAcpClientListener } from "../../fixtures/held-acp-client-listener.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
 import { ElapsedDelayTimer } from "../../fixtures/elapsed-delay-timer.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -460,6 +461,73 @@ export class AcpClientTests {
     Assert.areEqual(2, received.length);
     Assert.areEqual(`first:${"x".repeat(256 * 1024)}`, received[0]);
     Assert.areEqual("second:after", received[1]);
+  }
+
+  @TestMethod
+  public async refusesAGatedRequestItCantHandOnOrAnswerAndAnswersOthersWithAnError(): Promise<void> {
+    await using host = new GrokTestHost();
+    const started = new StartedProcess();
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const errors = new PassThrough();
+    input.on("finish", () => {
+      output.end();
+      errors.end();
+      started.end(0, null);
+    });
+    const gate = new GrokToolGate();
+    const client = new AcpClient(host.command, host.environment, host.directory.path, host.programs.wrap({ start: () => started }), AcpClientTests.TIMINGS, host.timer,
+      MessageFraming.Lines, null, gate);
+    const held = Promise.withResolvers<JsonValue>();
+    client.setListener(new HeldAcpClientListener(held.promise, []));
+    client.start();
+    started.attach(7, input, output, errors, () => Promise.resolve());
+    const lines: string[] = [];
+    let buffered = String.empty;
+    input.on("data", (chunk: Buffer) => {
+      const parts = `${buffered}${chunk.toString("utf8")}`.split("\n");
+      buffered = parts.pop() ?? String.empty;
+      lines.push(...parts);
+    });
+    const answersAsync = async (count: number): Promise<readonly string[]> => {
+      while (lines.length < count)
+        await once(input, "data");
+      return lines.splice(0, count);
+    };
+    const hook = "x.ai/hooks/run";
+    const send = (id: string, method: string): void => {
+      output.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params: {} })}\n`);
+    };
+    const refused = (id: string): string => JSON.stringify({ jsonrpc: "2.0", id, result: gate.answer(Resources.acpGatedRequestRefused) });
+    const opened = Array.from({ length: Resources.acpMaximumPending }, (_, index) => `open-${index}`);
+    try {
+      for (const id of opened)
+        send(id, hook);
+      send("past", hook);
+      send("plain", "session/request_permission");
+      const pastCap = await answersAsync(2);
+      held.resolve(null);
+      const released = await answersAsync(Resources.acpMaximumPending);
+      const repeated = Promise.withResolvers<JsonValue>();
+      client.setListener(new HeldAcpClientListener(repeated.promise, ["broken", "unknown"]));
+      send("twice", hook);
+      send("twice", hook);
+      send("broken", hook);
+      send("unknown", "fixture/unknown");
+      const failed = await answersAsync(3);
+      repeated.resolve(null);
+      const answered = await answersAsync(1);
+
+      Assert.areEqual(refused("past"), pastCap[0]);
+      Assert.areEqual(JSON.stringify({ jsonrpc: "2.0", id: "plain", error: { code: Resources.acpUnsupportedCode, message: Resources.acpTooManyRequests } }), pastCap[1]);
+      Assert.areEqual(opened.map(id => JSON.stringify({ jsonrpc: "2.0", id, result: null })).join("|"), released.join("|"));
+      Assert.areEqual([refused("twice"), refused("broken"),
+        JSON.stringify({ jsonrpc: "2.0", id: "unknown", error: { code: Resources.acpUnsupportedCode, message: Resources.acpUnsupportedRequest } })].join("|"), failed.join("|"));
+      Assert.areEqual(JSON.stringify({ jsonrpc: "2.0", id: "twice", result: null }), answered[0]);
+    }
+    finally {
+      await client.stop();
+    }
   }
 
   private static async initializeFailureAsync(mode: string, timeout: number | null): Promise<Error> {
