@@ -169,6 +169,19 @@ describe("TeamRun's window part", () => {
     expect([none, show?.isEnabled(null)]).toEqual([[false, null, []], true]);
   });
 
+  it("keeps Show organization available while the first listing hasn't answered, and leaves it unavailable once the listing answers none", async () => {
+    const held = new DeferredResponse();
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => held.promise);
+    await createPart().activateAsync(context);
+    const show = context.commands.find(t => t.name === "teamrun.showOrganization");
+
+    const waiting = show?.isEnabled(null);
+    held.resolve([]);
+    await OrganizationCatalog.of(context).firstAsync();
+
+    expect([waiting, show?.isEnabled(null)]).toEqual([true, false]);
+  });
+
   it("opens the organization the newest listing names when a resync reloads the list while Show organization waits for it", async () => {
     const first = new DeferredResponse();
     const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()])];

@@ -105,7 +105,10 @@ export class TeamRunWindowPart implements IWindowPart {
       else if (!Object.isNull(catalog.loadError()))
         context.openDocument(Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle);
       return null;
-    }, () => OrganizationCatalog.of(context).organizations().length > 0 || !Object.isNull(OrganizationCatalog.of(context).loadError())));
+    }, () => {
+      const catalog = OrganizationCatalog.of(context);
+      return !catalog.listed() || catalog.organizations().length > 0 || !Object.isNull(catalog.loadError());
+    }));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,

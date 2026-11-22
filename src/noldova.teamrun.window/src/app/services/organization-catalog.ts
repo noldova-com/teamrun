@@ -24,6 +24,7 @@ export class OrganizationCatalog {
   private readonly context: IWindowPartContext;
   private readonly organizationsSignal: WritableSignal<readonly Organization[]> = signal([]);
   private readonly loadErrorSignal: WritableSignal<string | null> = signal(null);
+  private readonly listedSignal: WritableSignal<boolean> = signal(false);
   private readonly subscriptions: readonly (() => void)[];
   private generation: number = 0;
   private changes: Map<string, Organization | null> = new Map();
@@ -31,6 +32,7 @@ export class OrganizationCatalog {
 
   public readonly organizations: Signal<readonly Organization[]> = this.organizationsSignal.asReadonly();
   public readonly loadError: Signal<string | null> = this.loadErrorSignal.asReadonly();
+  public readonly listed: Signal<boolean> = this.listedSignal.asReadonly();
 
   public constructor(context: IWindowPartContext) {
     this.context = context;
@@ -79,8 +81,10 @@ export class OrganizationCatalog {
       if (!Array.isArray(value))
         throw new ListNotArrayException(Resources.formatValueKind(value));
       const organizations = value.map(t => Organization.fromJson(t));
-      if (generation === this.generation)
+      if (generation === this.generation) {
         this.set([...organizations.filter(t => !changes.has(t.id)), ...[...changes.values()].flatMap(t => Object.isNull(t) ? [] : [t])]);
+        this.listedSignal.set(true);
+      }
     }
     catch (error) {
       if (!(error instanceof RuntimeRequestException || error instanceof ListNotArrayException || error instanceof JsonException || error instanceof ArgumentException))
