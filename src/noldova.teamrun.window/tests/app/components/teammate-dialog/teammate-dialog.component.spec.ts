@@ -261,7 +261,7 @@ describe("TeammateDialogComponent", () => {
       expect(sentKeys(MethodName.TeammateUpdate)).toEqual(["fallbacks", "resetsSoonestFirst", "sustain", "teammateId"]);
     });
 
-    it("adds a provider and model no entry uses yet, the teammate's own included, and turns Add off once every one is used", async () => {
+    it("adds a provider and model no entry uses yet, the teammate's own included and the default model counted as its catalog's default, and turns Add off once every one is used", async () => {
       await create(sustained, withSustain);
       const add = field<HTMLButtonElement>(".nol-teamrun-add-fallback");
 
@@ -278,7 +278,7 @@ describe("TeammateDialogComponent", () => {
       expect(add.disabled).toBe(true);
       const entries = [`${sustained.providerId} ${String(sustained.model)}`, ...stored().fallbacks.map(t => `${t.providerId} ${String(t.model)}`)];
       expect(new Set(entries).size).toBe(entries.length);
-      expect(entries).toEqual(["a1 gpt-5", "a3 gpt-5-mini", "a2 null", "a2 other", "a5 null", "a5 gpt-5", "a5 gpt-5-mini", "a3 null", "a3 gpt-5", "a1 null", "a1 gpt-5-mini"]);
+      expect(entries).toEqual(["a1 gpt-5", "a3 gpt-5-mini", "a2 null", "a5 null", "a5 gpt-5-mini", "a3 null", "a1 gpt-5-mini"]);
     });
 
     it("keeps the first entry's Move up and the last entry's Move down off, and names each action by its entry", async () => {

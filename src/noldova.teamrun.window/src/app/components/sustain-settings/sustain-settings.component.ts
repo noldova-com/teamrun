@@ -83,7 +83,7 @@ export class SustainSettingsComponent {
     const listed = this.listedProviders();
     return [...listed.filter(t => t.id !== this.providerId()), ...listed.filter(t => t.id === this.providerId())]
       .flatMap(t => [null, ...(this.catalogs().get(t.id)?.choices ?? []).map(u => u.id)].map(u => new TeammateFallback(t.id, u)))
-      .filter(t => !entries.some(u => u.providerId === t.providerId && u.model === t.model)).slice(0, 1);
+      .filter(t => !entries.some(u => u.providerId === t.providerId && this.modelOf(u) === this.modelOf(t))).slice(0, 1);
   });
   protected readonly canAdd: Signal<boolean> = computed(() => this.nextEntry().length > 0);
   protected readonly unreadKinds: Signal<readonly SelectGroup[]> = computed(() => {
@@ -198,6 +198,10 @@ export class SustainSettingsComponent {
   private providerLabel(providerId: string): string {
     const provider = this.providers().get(providerId);
     return Object.isUndefined(provider) ? Resources.unavailableTeammateLabel : ProviderChoice.ofProvider(provider, this.store().kinds()).fullLabel;
+  }
+
+  private modelOf(entry: TeammateFallback): string | null {
+    return entry.model ?? this.catalogs().get(entry.providerId)?.modelOf(null)?.id ?? null;
   }
 
   private defaultModelOf(providerId: string): string {
