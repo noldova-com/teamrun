@@ -14,8 +14,8 @@ Product names and trademarks belong to their owners.
 ## Organization
 
 The Organization view shows the person's teammates as an organization: departments, each with an optional leader and its members, nested to any depth, with the person at the root.
-It has three layouts on one canvas: the tree, the department board and Focus, on one department or teammate.
-Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped), what it is doing now and the last thing it said.
+It has three layouts: the tree and the department board on one canvas, and Focus, on one department or teammate.
+Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped) and what it is doing now, and it can also show the last thing it said and its Git branch, pull requests, documents and artifacts.
 The Messages panel sends one message to a teammate, a department (its leader first, then its members), every leader or everyone; it shows how many teammates the message goes to before sending, and Stop halts the ones not yet started.
 ARCHITECTURE.md describes the organization's storage, the statuses and the messages.
 
