@@ -189,10 +189,11 @@ describe("OrganizationChatComponent", () => {
     expect(opened).toEqual(["alice", "bob"]);
   });
 
-  it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or a deleted one", async id => {
-    const own = (organizationId: string, teammateId: string): Conversation => new Conversation(`${organizationId}-${teammateId}`, null, `Organization · ${teammateId}`,
-      SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false, null, new OrganizationChat(organizationId, teammateId));
-    const others = ["my-organization", "studio", "gone"].filter(t => t !== id).map(t => own(t, "alice"));
+  it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
+    const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>
+      new Conversation(`${organizationId}-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null,
+        false, [], false, false, null, chat);
+    const others = [...["my-organization", "studio"].filter(t => t !== id).map(t => own(t, "alice")), own("gone", "alice", null)];
     const openings = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationChatOpen))
       .map(t => OrganizationChat.fromJson(t.parameters).organizationId);
     scope = id;
