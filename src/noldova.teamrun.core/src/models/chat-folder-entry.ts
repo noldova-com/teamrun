@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-/** A file, folder or link in a chat folder, by its path relative to the folder. */
 export class ChatFolderEntry {
   public readonly path: string;
   public readonly isDirectory: boolean;
