@@ -313,6 +313,7 @@ export class Resources {
   public static readonly gitObjectsDirectoryName: string = "objects";
   public static readonly gitBranchesPath: string = "refs/heads";
   public static readonly chatGitHead: string = "ref: refs/heads/main\n";
+  public static readonly chatGitHeadDraftFileName: string = "HEAD.teamrun";
   public static readonly chatGitConfig: string = "[core]\n\trepositoryformatversion = 0\n\tbare = false\n";
   public static readonly removeRetries: number = 3;
   public static readonly checkpointsDeleted: string = "Deleted";
@@ -1791,6 +1792,10 @@ export class Resources {
 
   public static formatToolCallNotKept(chatId: string, failureKind: string): string {
     return `A tool call's record in the chat ${chatId} wasn't kept: ${failureKind}.`;
+  }
+
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string {
+    return `A waiting message in the chat ${chatId} was kept but not delivered: ${failureKind}.`;
   }
 
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string {

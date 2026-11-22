@@ -46,6 +46,36 @@ export class ChatFoldersTests {
   }
 
   @TestMethod
+  public makesTheGitRootAgainAfterAHeadWriteCutShort(): void {
+    using directory = new TemporaryDataDirectory();
+    const folders = new ChatFolders(directory.path);
+    const git = join(folders.pathOf("c1"), ".git");
+    const full = new CodedError("ENOSPC: no space left on device", "ENOSPC");
+    const original = fs.writeFileSync;
+    const write = mock.method(fs, "writeFileSync", (...args: Parameters<typeof original>): void => {
+      if (!String(args[0]).startsWith(join(git, "HEAD")))
+        return original(...args);
+      original(args[0], "ref: refs/he");
+      throw full;
+    });
+    syncBuiltinESMExports();
+    let thrown: Error;
+    try {
+      thrown = Assert.throws(() => folders.prepare("c1"), Error);
+    }
+    finally {
+      write.mock.restore();
+      syncBuiltinESMExports();
+    }
+
+    folders.prepare("c1");
+
+    Assert.isTrue(thrown === full);
+    Assert.areEqual(Resources.chatGitHead, readFileSync(join(git, "HEAD"), "utf8"));
+    Assert.isFalse(existsSync(join(git, Resources.chatGitHeadDraftFileName)));
+  }
+
+  @TestMethod
   public stopsGitsWalkUpAtTheChatsFolderEvenInsideACheckout(): void {
     using directory = new TemporaryDataDirectory();
     const checkout = new GitRepository(join(directory.path, "checkout"));
