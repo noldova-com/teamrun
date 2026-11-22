@@ -57,7 +57,7 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
 
   public fail(method: MethodName, message: string): this {
     return this.answer(method, () => {
-      throw new Error(message);
+      throw new RuntimeRequestException(FailureCode.Internal, message);
     });
   }
 

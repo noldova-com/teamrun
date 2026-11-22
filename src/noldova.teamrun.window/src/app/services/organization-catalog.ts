@@ -9,7 +9,9 @@
 import { type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
-import type { IWindowPartContext } from "@noldova/desktop.window";
+import { ArgumentException } from "@noldova/context.exceptions";
+import { JsonException } from "@noldova/context.json";
+import { type IWindowPartContext, RuntimeRequestException } from "@noldova/desktop.window";
 import { EventName, MethodName, Organization, OrganizationIdParams, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
@@ -25,6 +27,7 @@ export class OrganizationCatalog {
   private readonly subscriptions: readonly (() => void)[];
   private generation: number = 0;
   private changes: Map<string, Organization | null> = new Map();
+  private loading: Promise<void> = Promise.resolve();
 
   public readonly organizations: Signal<readonly Organization[]> = this.organizationsSignal.asReadonly();
   public readonly loadError: Signal<string | null> = this.loadErrorSignal.asReadonly();
@@ -53,7 +56,21 @@ export class OrganizationCatalog {
     OrganizationCatalog.catalogs.delete(context);
   }
 
-  public async reload(): Promise<void> {
+  public async firstAsync(): Promise<Organization | null> {
+    for (let loading = this.loading; this.organizationsSignal().length === 0; loading = this.loading) {
+      await loading;
+      if (loading === this.loading)
+        break;
+    }
+    return this.organizationsSignal().at(0) ?? null;
+  }
+
+  public reload(): Promise<void> {
+    this.loading = this.load();
+    return this.loading;
+  }
+
+  private async load(): Promise<void> {
     const generation = ++this.generation;
     const changes = new Map<string, Organization | null>();
     this.changes = changes;
@@ -66,8 +83,10 @@ export class OrganizationCatalog {
         this.set([...organizations.filter(t => !changes.has(t.id)), ...[...changes.values()].flatMap(t => Object.isNull(t) ? [] : [t])]);
     }
     catch (error) {
+      if (!(error instanceof RuntimeRequestException || error instanceof ListNotArrayException || error instanceof JsonException || error instanceof ArgumentException))
+        throw error;
       if (generation === this.generation)
-        this.loadErrorSignal.set(error instanceof Error ? error.message : String(error));
+        this.loadErrorSignal.set(error.message);
     }
   }
 

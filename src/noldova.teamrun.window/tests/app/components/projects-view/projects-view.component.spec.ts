@@ -2640,7 +2640,7 @@ describe("ProjectsViewComponent", () => {
   });
 
   describe("the Organizations group", () => {
-    it("lists each organization with its own teammates in no department first, then each department by its path with its teammates by name, and keeps Organization chats out of Chats", async () => {
+    it("lists each organization with its own teammates in no department first, with no group for them, then each department by its path with its teammates by name, and keeps Organization chats out of Chats", async () => {
       conversations = [SampleData.conversation, scratch, grokChat];
       await createOrganization();
       const levels = [...element().querySelectorAll(".nol-teamrun-organization-list [role='treeitem']")].map(t => t.getAttribute("aria-level"));
@@ -2649,6 +2649,7 @@ describe("ProjectsViewComponent", () => {
       expect(names()).toEqual([organization.name, "Grok", "Opus 1", "Marketing", "DevOps", "Agy", "Builder", "Sol", "DevOps \u203a Infra", "Mia", "Labs", "Research", "Nova"]);
       expect(levels).toEqual(["1", "2", "2", "2", "2", "3", "3", "3", "2", "3", "1", "2", "3"]);
       expect(chats()).toEqual([scratch.title]);
+      expect(/no department/iu.test(element().querySelector(".nol-teamrun-organization-list")?.textContent ?? "")).toBe(false);
     });
 
     it("folds a department and the organization from their twisties, saving each", async () => {
@@ -2702,7 +2703,22 @@ describe("ProjectsViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
       await settle();
 
-      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("Error: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("Error: No chat.")]]);
+      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat.")]]);
+    });
+
+    it("lists a teammate placed in two organizations under each, and opens from each row that organization's own Organization chat for it", async () => {
+      const both = labs.withTree(labs.departments, [...labs.placements, placementOf("grok", null, 0)]);
+      conversations = [SampleData.conversation, grokChat, organizationChatOf("o3", grok, labs.id)];
+      await createOrganization(t => t.answer(MethodName.OrganizationList, () => [organization.toJson(), both.toJson()]));
+      const rows = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(".nol-teamrun-teammate-row")].filter(u => u.textContent?.includes("Grok") === true);
+      const listed = rows().length;
+      for (const row of rows()) {
+        part(row, ".nol-teamrun-teammate-name").click();
+        await settle();
+      }
+
+      expect([listed, opened(), context.count(MethodName.OrganizationChatOpen)]).toEqual([2, [`${Resources.conversationDocumentName} o1`,
+        `${Resources.conversationDocumentName} o3`], 0]);
     });
 
     it("opens each organization's own Organization view, under its name, from the organization's name, by Enter and from its row menu", async () => {
@@ -2943,7 +2959,7 @@ describe("ProjectsViewComponent", () => {
 
       await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
 
-      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("Error: Taken.")));
+      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("RuntimeRequestException: Taken.")));
     });
 
     const teammateMenu = async (name: string): Promise<string[]> => {

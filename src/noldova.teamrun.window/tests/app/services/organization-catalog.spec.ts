@@ -7,7 +7,9 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
-import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
+import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 import { OrganizationCatalog } from "../../../src/app/services/organization-catalog";
 import { Resources } from "../../../src/resources";
@@ -115,20 +117,40 @@ describe("OrganizationCatalog", () => {
     expect(catalog.organizations().find(t => t.id === "second")?.order).toBe(1);
   });
 
-  it("says why the listing failed, in its own words or not, and clears the failure once a listing succeeds", async () => {
-    let failure: unknown = new Error("The runtime is gone.");
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Object.isNull(failure) ? [organizationOf("Design").toJson()] : Promise.reject(failure));
+  it("says why the listing failed, the runtime's request, an organization it can't read or one that fails its own checks, and clears the failure once a listing succeeds", async () => {
+    context = new FakeWindowPartContext().fail(MethodName.OrganizationList, "The runtime is gone.");
     const catalog = OrganizationCatalog.of(context);
-
     await Wait.until(() => expect(catalog.loadError()).toBe("The runtime is gone."));
-    failure = "The runtime stopped.";
+    context.answer(MethodName.OrganizationList, () => [{ id: "broken" }]);
     await catalog.reload();
-    const plain = catalog.loadError();
-    failure = null;
+    const unreadable = catalog.loadError();
+    const invalid = { ...organizationOf("Design").toJson(), placements: [new TeammatePlacement("alice", OrganizationParent.department("gone"), 0).toJson()] };
+    context.answer(MethodName.OrganizationList, () => [invalid]);
+    await catalog.reload();
+    const unchecked = catalog.loadError();
+    context.answer(MethodName.OrganizationList, () => [organizationOf("Design").toJson()]);
+
     context.emit(EventName.StateResyncRequested, null);
 
     await Wait.until(() => expect(catalog.loadError()).toBeNull());
-    expect([plain, namesOf(catalog)]).toEqual(["The runtime stopped.", "my-organization:Design"]);
+    expect(unreadable).toEqual(expect.any(String));
+    expect(() => Organization.fromJson({ id: "broken" })).toThrow(unreadable ?? "no message");
+    expect(unchecked).toEqual(expect.any(String));
+    expect(() => Organization.fromJson(invalid)).toThrow(unchecked ?? "no message");
+    expect(namesOf(catalog)).toBe("my-organization:Design");
+  });
+
+  it("rethrows a failure that isn't the listing's own, such as a fault in the code, and leaves the load error alone", async () => {
+    let answer: () => JsonValue = () => [organizationOf("Design").toJson()];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
+    const catalog = OrganizationCatalog.of(context);
+    await Wait.until(() => expect(namesOf(catalog)).toBe("my-organization:Design"));
+    answer = () => {
+      throw new TypeError("A fault in the code.");
+    };
+
+    await expect(catalog.reload()).rejects.toThrow(TypeError);
+    expect([catalog.loadError(), namesOf(catalog)]).toEqual([null, "my-organization:Design"]);
   });
 
   it("says a listing that isn't a list is one, and keeps the organizations it had", async () => {
@@ -154,7 +176,7 @@ describe("OrganizationCatalog", () => {
 
     const failed = catalog.reload();
     context.emit(EventName.OrganizationChanged, organizationOf("Newer").toJson());
-    failing.reject(new Error("Too late."));
+    failing.reject(new RuntimeRequestException(FailureCode.Internal, "Too late."));
     await failed;
     answer = () => late.promise;
     const released = catalog.reload();

@@ -26,8 +26,10 @@ import { OrganizationStoreService } from "../../../../src/app/services/organizat
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
+import { DetailFact } from "../../../fixtures/detail-fact.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { PartReadError } from "../../../fixtures/part-read-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { ThemeCase } from "../../../fixtures/theme-case.fixture";
@@ -48,32 +50,34 @@ describe("OrganizationDetailsComponent", () => {
   const element = (): HTMLElement => {
     const native: unknown = fixture.nativeElement;
     if (!(native instanceof HTMLElement))
-      throw new Error("The fixture has no element.");
+      throw new PartReadError("The fixture has no element.");
     return native;
   };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
     const found = root.querySelector<HTMLElement>(selector);
     if (Object.isNull(found))
-      throw new Error(`Nothing matches ${selector}.`);
+      throw new PartReadError(`Nothing matches ${selector}.`);
     return found;
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.replace(/\s+/gu, " ").trim() ?? "");
   const card = (name: string): HTMLElement => {
     const found = all("nol-teamrun-organization-card").find(t => t.querySelector(".name")?.textContent?.trim() === name);
     if (Object.isUndefined(found))
-      throw new Error(`No card is named ${name}.`);
+      throw new PartReadError(`No card is named ${name}.`);
     return found;
   };
   const popovers = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-details .nol-popover")];
   const popover = (): HTMLElement => {
-    const [found, ...others] = popovers();
-    if (Object.isUndefined(found) || others.length > 0)
-      throw new Error(`${popovers().length} details are open.`);
+    const open = popovers();
+    const found = open.at(0);
+    if (Object.isUndefined(found) || open.length > 1)
+      throw new PartReadError(`${open.length} details are open.`);
     return found;
   };
-  const facts = (): string[][] => all("dt", popover()).map(t => [t.textContent?.trim() ?? "",
-    t.nextElementSibling instanceof HTMLElement ? t.nextElementSibling.innerText.replace(/\s+/gu, " ").trim() : ""]);
+  const facts = (): DetailFact[] => all("dt", popover()).map(t => new DetailFact(t.textContent?.trim() ?? "",
+    t.nextElementSibling instanceof HTMLElement ? t.nextElementSibling.innerText.replace(/\s+/gu, " ").trim() : ""));
+  const fact = (term: string): string | undefined => facts().find(t => t.term === term)?.value;
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -141,8 +145,8 @@ describe("OrganizationDetailsComponent", () => {
       .toEqual(["dialog", "Alice's details", "dialog", "true", "group", "Alice", true]);
     expect([texts(".head .name", details), texts(".head .place", details), facts(), texts(".now-label", details), texts(".act", details)]).toEqual([
       ["Alice"], ["Review · Design"],
-      [["Status", "Idle"], ["Reports to", "You"], ["Model", "gpt-5 · high"], ["Usage", "40% used · 5h"], ["Works in", "Its own folder"],
-        ["Last said", "The header is done. 5 min ago"]],
+      [new DetailFact("Status", "Idle"), new DetailFact("Reports to", "You"), new DetailFact("Model", "gpt-5 · high"), new DetailFact("Usage", "40% used · 5h"),
+        new DetailFact("Works in", "Its own folder"), new DetailFact("Last said", "The header is done. 5 min ago")],
       ["Now"], ["Nothing running"]]);
   });
 
@@ -150,7 +154,7 @@ describe("OrganizationDetailsComponent", () => {
     await create();
     const reportsTo = async (name: string): Promise<string[]> => {
       await focus(name);
-      const shown = [texts(".head .place", popover())[0] ?? "", facts().find(t => t[0] === "Reports to")?.[1] ?? ""];
+      const shown = [texts(".head .place", popover()).at(0) ?? "", fact("Reports to") ?? ""];
       await blur();
       return shown;
     };
@@ -165,7 +169,25 @@ describe("OrganizationDetailsComponent", () => {
 
     await focus("Offline");
 
-    expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([["Reports to you"], "You"]);
+    expect([texts(".head .place", popover()), fact("Reports to")]).toEqual([["Reports to you"], "You"]);
+  });
+
+  it("names the teammate a card under another teammate outside any department reports to, without saying it reports to you", async () => {
+    const placed = (t: TeammatePlacement): TeammatePlacement => {
+      switch (t.teammateId) {
+        case "offline":
+          return new TeammatePlacement("offline", OrganizationParent.person, 0);
+        case "bob":
+          return new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0);
+        default:
+          return t;
+      }
+    };
+    await create(context => context.answer(MethodName.OrganizationList, () => [SampleData.organizationOf(organization.departments, organization.placements.map(placed)).toJson()]));
+
+    await focus("Bob");
+
+    expect([texts(".head .place", popover()), fact("Reports to")]).toEqual([[], "Offline"]);
   });
 
   it("says when a teammate has no model of its own, no usage with a percent, and nothing said yet, and that a stopped one runs nothing", async () => {
@@ -178,8 +200,10 @@ describe("OrganizationDetailsComponent", () => {
     await focus("Offline");
 
     expect([bob, facts(), texts(".act", popover())]).toEqual([
-      [["Status", "Idle"], ["Reports to", "Code Reviewer"], ["Model", "Default model"], ["Usage", "Not reported"], ["Works in", "Its own folder"], ["Last said", "Nothing yet"]],
-      [["Status", "Stopped"], ["Reports to", "You"], ["Model", "Default model"], ["Usage", "Not reported"], ["Works in", "Its own folder"], ["Last said", "Nothing yet"]],
+      [new DetailFact("Status", "Idle"), new DetailFact("Reports to", "Code Reviewer"), new DetailFact("Model", "Default model"), new DetailFact("Usage", "Not reported"),
+        new DetailFact("Works in", "Its own folder"), new DetailFact("Last said", "Nothing yet")],
+      [new DetailFact("Status", "Stopped"), new DetailFact("Reports to", "You"), new DetailFact("Model", "Default model"), new DetailFact("Usage", "Not reported"),
+        new DetailFact("Works in", "Its own folder"), new DetailFact("Last said", "Nothing yet")],
       ["Stopped"]]);
   });
 
@@ -191,7 +215,7 @@ describe("OrganizationDetailsComponent", () => {
       : [chatOf("alice").withAttachedFolder("D:/work/site", SampleData.timestamp).toJson()]));
     const worksIn = async (name: string): Promise<string | undefined> => {
       await focus(name);
-      const shown = facts().find(t => t[0] === "Works in")?.[1];
+      const shown = fact("Works in");
       await blur();
       return shown;
     };
@@ -292,12 +316,15 @@ describe("OrganizationDetailsComponent", () => {
       const left = inner.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth);
       const right = inner.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth);
       const top = inner.top + Number.parseFloat(style.paddingTop) + Number.parseFloat(style.borderTopWidth);
-      const [head, dl, label, list] = [one(".head", details), one(".facts", details), one(".now-label", details), one(".running", details)];
-      const [firstTerm, secondTerm] = all("dt", details);
-      const [firstValue] = all("dd", details);
-      const [text, lasted] = [one(".act-text", details), one(".act-for", details)];
-      if (Object.isUndefined(firstTerm) || Object.isUndefined(secondTerm) || Object.isUndefined(firstValue))
-        throw new Error("The facts have no rows.");
+      const head = one(".head", details);
+      const dl = one(".facts", details);
+      const label = one(".now-label", details);
+      const list = one(".running", details);
+      const firstTerm = one("dt:nth-of-type(1)", details);
+      const secondTerm = one("dt:nth-of-type(2)", details);
+      const firstValue = one("dd:nth-of-type(1)", details);
+      const text = one(".act-text", details);
+      const lasted = one(".act-for", details);
 
       AppearanceFixture.expectPixels(inner.left, box(card("Alice")).left);
       expect(inner.top).toBeGreaterThan(box(card("Alice")).bottom);
@@ -374,7 +401,8 @@ describe("OrganizationDetailsComponent", () => {
         .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("alice", "c1", "r0", words, SampleData.timestamp).toJson()]));
       const details = await focus("Alice");
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
-      const [said, ago] = [one(".said", details), one(".ago", details)];
+      const said = one(".said", details);
+      const ago = one(".ago", details);
       const line = Number.parseFloat(getComputedStyle(said).lineHeight);
 
       expect(said.textContent).toBe(words);
