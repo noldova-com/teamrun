@@ -34,6 +34,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization:** while you edit the structure, each person's Add teammate and Add unit sit right under that person's card, or a unit's leader, on the line to the people below, rather than after everyone below; Reports to stays on one line, and a single report's line runs straight down with no stub (#146).
 - **Organization:** a failed change shows its reason once, in the view's header, and a failed message to a teammate or a group once, in the chat beside the tree, rather than in both places (#138).
 - **Organization:** removing a member from a unit now says the teammate will report to you, where it goes, rather than that it stays in no unit (#137).
 - **Default teammate:** its row in Teammates now names its model and effort, such as GPT-5 and Extra high, rather than their ids, also when no teammate in the list chooses a model or effort on its provider (#214).
