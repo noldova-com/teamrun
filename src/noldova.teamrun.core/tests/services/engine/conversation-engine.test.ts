@@ -66,6 +66,7 @@ import {
 } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 import { GitRepository } from "../../fixtures/git-repository.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
@@ -171,7 +172,7 @@ export class ConversationEngineTests {
   public async finalizesRepliesWhenEventDeliveryFailsAndReleasesTheProject(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
-    const broken = host.events.subscribe({
+    const broken = FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageCreated)
           throw new Error("delivery failed");
@@ -182,7 +183,7 @@ export class ConversationEngineTests {
     Assert.isNull(await host.messages.findOpenReplyAsync(conversation.id));
     Assert.areEqual(MessageStatus.Failed, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1)?.status);
     broken[Symbol.dispose]();
-    const terminalDelivery = host.events.subscribe({
+    const terminalDelivery = FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageUpdated)
           throw new Error("status delivery failed");
@@ -499,7 +500,7 @@ export class ConversationEngineTests {
     const conversation = await host.createConversationAsync();
     const provider = await host.createProviderAsync();
     host.adapter.failWith = new TypeError("Summarize the plan in secret.md");
-    host.events.subscribe({
+    FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
           throw new RangeError("The window is gone.");
@@ -592,7 +593,7 @@ export class ConversationEngineTests {
       if (host.adapter.requests.length === 1)
         throw new TypeError("Ana's turn broke.");
     }];
-    host.events.subscribe({
+    FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
           throw new RangeError("The window is gone.");
@@ -680,7 +681,7 @@ export class ConversationEngineTests {
     const provider = await host.createProviderAsync();
     const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
     const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
-    host.events.subscribe({
+    FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
           throw new RangeError("The window is gone.");
@@ -702,7 +703,7 @@ export class ConversationEngineTests {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
     const prompt = "Summarize the plan in secret.md";
-    host.events.subscribe({
+    FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageCreated)
           throw new RangeError(prompt);
