@@ -72,8 +72,6 @@ export class OrganizationService implements IOrganizationService {
   public async deleteOrganizationAsync(params: OrganizationIdParams): Promise<void> {
     await this.context.database.connection.runInTransactionAsync(async transaction => {
       const organization = await this.requireAsync(params.organizationId, transaction);
-      if ((await transaction.queryAsync(new SqlQuery(Resources.selectOrganizations))).length < 2)
-        throw new ServiceException(ErrorCode.Conflict, Resources.formatLastOrganization(organization.name), [organization.id]);
       const feed = this.context.database.changeFeed;
       await transaction.executeAsync(new SqlQuery(Resources.deleteOrganizationPlacements, [organization.id]));
       for (const placement of organization.placements)
