@@ -1194,7 +1194,6 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     return message;
   }
 
-
   private async startedRequestedAsync(reply: Message, transaction?: SqlTransaction): Promise<RequestedSettings> {
     const requested = ReplyProvenance.of(reply).requested;
     const teammate = Object.isNull(reply.teammateId) ? null : await this.teammates.findAsync(reply.teammateId, transaction);
