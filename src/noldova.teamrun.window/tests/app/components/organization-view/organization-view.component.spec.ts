@@ -414,7 +414,7 @@ describe("OrganizationViewComponent", () => {
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ cardsShow: { Model: true } })));
     const tune = (name: string): HTMLElement => one(".tune", card(name));
 
-    expect([shows("Alice"), tune("Alice").getAttribute("aria-label")]).toEqual([["gpt-5 · high"], "Choose what Alice's card shows"]);
+    expect([shows("Alice"), tune("Alice").getAttribute("aria-label")]).toEqual([["gpt-5 · high"], "Choose what Alice's card shows and where Alice works"]);
 
     await openMenu(tune("Alice"));
     expect(menuItem("Use what every card shows").getAttribute("aria-disabled")).toBe("true");

@@ -11,7 +11,7 @@ import { type FactoryProvider, type Signal, type WritableSignal, computed, injec
 import "@noldova/context.core";
 import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import { EventName, MethodName, ProjectsLayoutSaveParams } from "@noldova/teamrun.protocol";
+import { EventName, MethodName, type Project, ProjectsLayoutSaveParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import type { ProjectsGroup } from "../enums/projects-group";
@@ -71,6 +71,12 @@ export class ProjectsLayoutService {
   public static release(context: IWindowPartContext): void {
     ProjectsLayoutService.stores.get(context)?.dispose();
     ProjectsLayoutService.stores.delete(context);
+  }
+
+  public ordered(projects: readonly Project[]): readonly Project[] {
+    const order = this.projectOrder();
+    const named = order.flatMap(id => projects.filter(t => t.id === id));
+    return [...named, ...projects.filter(t => !order.includes(t.id))];
   }
 
   public toggleProject(projectId: string): void {
@@ -207,7 +213,7 @@ export class ProjectsLayoutService {
   }
 
   private static failureOf(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
+    return error instanceof Error ? error.name : Resources.projectsLayoutFailureNotAnError;
   }
 
   private static readStored(): ProjectsLayout | null {

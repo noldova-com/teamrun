@@ -11,8 +11,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Department, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName,
-  TeammateLastReply, TeammatePlacement
+  Conversation, ConversationListParams, Department, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat, OrganizationParent,
+  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -140,7 +140,8 @@ describe("OrganizationDetailsComponent", () => {
       .toEqual(["dialog", "Alice's details", "dialog", "true", "group", "Alice", true]);
     expect([texts(".head .name", details), texts(".head .place", details), facts(), texts(".now-label", details), texts(".act", details)]).toEqual([
       ["Alice"], ["Review · Design"],
-      [["Status", "Idle"], ["Reports to", "You"], ["Model", "gpt-5 · high"], ["Usage", "40% used · 5h"], ["Last said", "The header is done. 5 min ago"]],
+      [["Status", "Idle"], ["Reports to", "You"], ["Model", "gpt-5 · high"], ["Usage", "40% used · 5h"], ["Works in", "Its own folder"],
+        ["Last said", "The header is done. 5 min ago"]],
       ["Now"], ["Nothing running"]]);
   });
 
@@ -176,9 +177,25 @@ describe("OrganizationDetailsComponent", () => {
     await focus("Offline");
 
     expect([bob, facts(), texts(".act", popover())]).toEqual([
-      [["Status", "Idle"], ["Reports to", "Code Reviewer"], ["Model", "Default model"], ["Usage", "Not reported"], ["Last said", "Nothing yet"]],
-      [["Status", "Stopped"], ["Reports to", "You"], ["Model", "Default model"], ["Usage", "Not reported"], ["Last said", "Nothing yet"]],
+      [["Status", "Idle"], ["Reports to", "Code Reviewer"], ["Model", "Default model"], ["Usage", "Not reported"], ["Works in", "Its own folder"], ["Last said", "Nothing yet"]],
+      [["Status", "Stopped"], ["Reports to", "You"], ["Model", "Default model"], ["Usage", "Not reported"], ["Works in", "Its own folder"], ["Last said", "Nothing yet"]],
       ["Stopped"]]);
+  });
+
+  it("says where each teammate's Organization chat works: an attached folder, its project, or its own folder", async () => {
+    const chatOf = (teammateId: string): Conversation => new Conversation(`org-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp,
+      SampleData.timestamp, false, null, null, false, null, false, [], false, false, null, new OrganizationChat("my-organization", teammateId));
+    await create(context => context.answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.project.id
+      ? [SampleData.conversation.toJson(), chatOf("bob").withProjectId(SampleData.project.id, SampleData.timestamp).toJson()]
+      : [chatOf("alice").withAttachedFolder("D:/work/site", SampleData.timestamp).toJson()]));
+    const worksIn = async (name: string): Promise<string | undefined> => {
+      await focus(name);
+      const shown = facts().find(t => t[0] === "Works in")?.[1];
+      await blur();
+      return shown;
+    };
+
+    expect([await worksIn("Alice"), await worksIn("Bob"), await worksIn("Offline")]).toEqual(["site", SampleData.project.name, "Its own folder"]);
   });
 
   it("lists every reply its teammate runs now with how long each has run, ticking each second while one runs, and follows its last words", async () => {
@@ -374,7 +391,7 @@ describe("OrganizationDetailsComponent", () => {
       probe.remove();
 
       expect([...all("dt", details), one(".ago", details), one(".act-for", details)].map(t => getComputedStyle(t).color))
-        .toEqual(Array.from({ length: 7 }, () => muted));
+        .toEqual(Array.from({ length: 8 }, () => muted));
     });
   });
 });

@@ -8,7 +8,8 @@
 
 import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
-import { type Department, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
+import { WindowPartTokens } from "@noldova/desktop.window";
+import { type Conversation, type Department, type Project, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
   MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
@@ -21,10 +22,13 @@ import { OrganizationCardNow } from "../../models/organization-card-now";
 import { OrganizationCardUsage } from "../../models/organization-card-usage";
 import { OrganizationRunningReply } from "../../models/organization-running-reply";
 import { OrganizationNode } from "../../models/organization.node";
+import { ChatPlacement } from "../../services/chat-placement";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
+import { ConversationActions } from "../../services/conversation-actions";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
+import { ProjectsLayoutService } from "../../services/projects-layout.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -36,7 +40,8 @@ import { TeammateWorkComponent } from "../teammate-work/teammate-work.component"
   selector: "nol-teamrun-organization-card",
   imports: [IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, MeterComponent,
     SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TeammateWorkComponent],
-  providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
+  providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, ProjectsLayoutService.provider,
+    TeammateStatusStoreService.provider],
   host: { "class": "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row", "(focusin)": "closeDetails($event)" },
   templateUrl: "./organization-card.component.html",
   styleUrl: "./organization-card.component.css"
@@ -46,8 +51,10 @@ export class OrganizationCardComponent {
   private readonly formatter: UsageFormatterService = inject(UsageFormatterService);
   private readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   private readonly dialogs: DialogService = inject(DialogService);
+  private readonly placement: ChatPlacement = new ChatPlacement(inject(WindowPartTokens.context), this.store, this.dialogs);
   private readonly statuses: TeammateStatusStoreService = inject(TeammateStatusStoreService);
   private readonly clock: ClockService = inject(ClockService);
+  private readonly projectsLayout: ProjectsLayoutService = inject(ProjectsLayoutService);
   private readonly time: WritableSignal<number> = signal(this.clock.now());
   private readonly details: PopoverTriggerDirective | null = inject(PopoverTriggerDirective, { self: true, optional: true });
 
@@ -93,6 +100,14 @@ export class OrganizationCardComponent {
 
   protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
 
+  protected readonly chat: Signal<Conversation | null> = computed(() => this.store.organizationChatOf(this.teammate().id));
+  protected readonly worksIn: Signal<string> = computed(() =>
+    Resources.formatOrganizationWorksIn(this.teammate().name, ConversationActions.placeOf(this.store, this.chat()) ?? Resources.organizationOwnFolderInText));
+  protected readonly inProject: Signal<boolean> = computed(() => !Object.isNull(this.chat()?.projectId ?? null));
+  protected readonly attachedChat: Signal<Conversation | null> = computed(() => Object.isNull(this.chat()?.attachedFolder ?? null) ? null : this.chat());
+  protected readonly otherProjects: Signal<readonly Project[]> = computed(() =>
+    this.projectsLayout.ordered(this.store.projects()).filter(t => t.id !== this.chat()?.projectId));
+
   protected readonly editsIn: Signal<Department | null> = computed(() => this.editing() ? this.department() : null);
   protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() =>
     OrganizationNode.departmentsOf(this.organization.organization()).map(t => new SelectOption(t.id, t.name)));
@@ -111,6 +126,28 @@ export class OrganizationCardComponent {
       this.details?.close();
   }
 
+  protected async moveToProject(project: Project): Promise<void> {
+    const chat = await this.openChat();
+    if (!Object.isNull(chat))
+      await this.placement.moveToProject(chat, project);
+  }
+
+  protected async moveToFolder(): Promise<void> {
+    const chat = await this.openChat();
+    if (!Object.isNull(chat))
+      await this.placement.moveToFolder(chat);
+  }
+
+  protected async attachFolder(): Promise<void> {
+    const chat = await this.openChat();
+    if (!Object.isNull(chat))
+      await this.placement.attachFolder(chat);
+  }
+
+  protected async detachFolder(chat: Conversation): Promise<void> {
+    await this.placement.detachFolder(chat);
+  }
+
   protected move(departmentId: string): void {
     void this.organization.setMember(this.teammate().id, departmentId);
   }
@@ -125,5 +162,9 @@ export class OrganizationCardComponent {
       if (confirmed)
         void this.organization.setMember(teammate.id, null);
     });
+  }
+
+  private async openChat(): Promise<Conversation | null> {
+    return this.chat() ?? await this.organization.openOrganizationChat(this.teammate().id);
   }
 }

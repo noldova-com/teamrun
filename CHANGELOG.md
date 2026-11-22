@@ -14,6 +14,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
   Pointing at a card or reaching it with the keyboard opens its details: status, whom it reports to, model, usage, last words and what it runs now; the chat beside the tree talks to whom you choose under To, a teammate whose name you click or a department's Message; long last words show three lines.
   That chat is a teammate's own Organization chat, with its history and composer, answered by that teammate alone; to a group, one message goes to each member's chat, answered with each one's own settings, and each member's row shows its reply's status and opens its chat (#412).
   View switches between the Tree, a Board and Focus: the Board queues who needs you, with how long ago and what they asked, then the leaders and a column for each department, and lists the Organization chats beside it, with each one's last message and the replies that came while another was open; Focus outlines the departments and their people beside one department or teammate in full, with every activity and its time, over its conversation.
+  A card's menu chooses where its teammate's Organization chat works: moves it into a project, attaches a folder, or detaches it, by the chat's usual rules, and the details say where it works (#400).
   Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
   The view, the collapsed departments and the cards' fields are kept across a restart.
 

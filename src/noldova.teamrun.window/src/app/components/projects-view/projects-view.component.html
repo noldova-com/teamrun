@@ -142,9 +142,9 @@ LICENSE file in the root directory of this source tree.
           [label]="conversation.projectId === null ? resources.moveToProjectLabel : resources.moveToAnotherProjectLabel" [nolMenuTriggerFor]="moveMenu"></button>
         @if (conversation.projectId === null) {
           <button nol-menu-item [icon]="resources.attachFolderIcon"
-            [label]="conversation.attachedFolder === null ? resources.attachFolderLabel : resources.replaceFolderLabel" (triggered)="attachFolder(conversation)"></button>
+            [label]="conversation.attachedFolder === null ? resources.attachFolderLabel : resources.replaceFolderLabel" (triggered)="placement.attachFolder(conversation)"></button>
           @if (conversation.attachedFolder !== null) {
-            <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachFolder(conversation)"></button>
+            <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="placement.detachFolder(conversation)"></button>
           }
         }
         <button nol-menu-item [icon]="resources.forgetIcon" [label]="resources.deleteConversationLabel" (triggered)="remove(conversation, tree)"></button>
@@ -153,12 +153,12 @@ LICENSE file in the root directory of this source tree.
     <ng-template #moveMenu>
       <nol-menu>
         @for (project of otherProjectsOf(conversation); track project.id) {
-          <button nol-menu-item [label]="project.name" (triggered)="moveToProject(conversation, project)"></button>
+          <button nol-menu-item [label]="project.name" (triggered)="placement.moveToProject(conversation, project)"></button>
         }
         @if (otherProjectsOf(conversation).length > 0) {
           <nol-menu-separator />
         }
-        <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="moveToFolder(conversation)"></button>
+        <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="placement.moveToFolder(conversation)"></button>
       </nol-menu>
     </ng-template>
   </div>

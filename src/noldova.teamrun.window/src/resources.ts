@@ -348,6 +348,7 @@ export class Resources {
   public static readonly webpLosslessChunk: readonly number[] = [0x56, 0x50, 0x38, 0x4c];
   public static readonly webpExtendedChunk: readonly number[] = [0x56, 0x50, 0x38, 0x58];
   public static readonly projectsLayoutStorageKey: string = "teamrun.projectsLayout";
+  public static readonly projectsLayoutFailureNotAnError: string = "a value that isn't an error";
   public static readonly collapsedProjectsField: string = "collapsedProjects";
   public static readonly pinnedChatsField: string = "pinnedChats";
   public static readonly projectOrderField: string = "projectOrder";
@@ -1243,6 +1244,9 @@ export class Resources {
   public static readonly organizationDetailsNow: string = "Now";
   public static readonly organizationDetailsNoUsage: string = "Not reported";
   public static readonly organizationDetailsNothingSaid: string = "Nothing yet";
+  public static readonly organizationDetailsWorksIn: string = "Works in";
+  public static readonly organizationOwnFolder: string = "Its own folder";
+  public static readonly organizationOwnFolderInText: string = "its own folder";
   public static readonly organizationMessagesLabel: string = "Messages";
   public static readonly organizationMessageButton: string = "Message";
   public static readonly organizationMessageIcon: string = "chat";
@@ -1882,8 +1886,12 @@ export class Resources {
     return `${name}'s card shows`;
   }
 
-  public static formatOrganizationChooseFields(name: string): string {
-    return `Choose what ${name}'s card shows`;
+  public static formatOrganizationWorksIn(name: string, place: string): string {
+    return `${name} works in ${place}`;
+  }
+
+  public static formatOrganizationCardMenu(name: string): string {
+    return `Choose what ${name}'s card shows and where ${name} works`;
   }
 
   public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {

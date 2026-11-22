@@ -602,6 +602,10 @@ export class ChatStoreService {
     return this.findConversation(conversationId);
   }
 
+  public organizationChatOf(teammateId: string): Conversation | null {
+    return this.organizationChatsByTeammate().get(teammateId) ?? null;
+  }
+
   public folderOf(conversationId: string): string | null {
     const conversation = this.findConversation(conversationId);
     return conversation?.folder ?? this.projects().find(t => t.id === conversation?.projectId)?.rootPath ?? null;
@@ -615,17 +619,13 @@ export class ChatStoreService {
     return this.conversationsByProjectSignal().get(projectId) ?? [];
   }
 
-  public organizationChatOf(teammateId: string): Conversation | null {
-    return this.conversationsOf(null).find(t => t.organizationChat?.teammateId === teammateId) ?? null;
-  }
-
   public organizationChats(): readonly Conversation[] {
-    return this.conversationsOf(null).filter(t => !Object.isNull(t.organizationChat));
+    return [...this.conversationsByProjectSignal().values()].flatMap(t => t.filter(u => !Object.isNull(u.organizationChat)));
   }
 
   public organizationChatsByTeammate(): ReadonlyMap<string, Conversation> {
     const chats = new Map<string, Conversation>();
-    for (const chat of this.conversationsOf(null))
+    for (const chat of [...this.conversationsByProjectSignal().values()].flat())
       if (!Object.isNull(chat.organizationChat))
         chats.set(chat.organizationChat.teammateId, chat);
     return chats;

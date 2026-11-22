@@ -225,7 +225,7 @@ describe("ProjectsLayoutService", () => {
     expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutRead), localStorage.getItem(key)]).toEqual([["c1", "c5"], 3, null]);
   });
 
-  it("reads the kept layout again at a resync after a first read refused with a value that isn't an error, logging its type and saving nothing", async () => {
+  it("reads the kept layout again at a resync after a first read refused with a value that isn't an error, logging that it wasn't an error and saving nothing", async () => {
     context.answer(MethodName.ProjectsLayoutRead, () => Promise.reject("The runtime is gone."));
     const layout = await open();
     context.answer(MethodName.ProjectsLayoutRead, () => kept(["c3"]));
@@ -234,7 +234,7 @@ describe("ProjectsLayoutService", () => {
 
     await Wait.until(() => expect(layout.pinnedConversations()).toEqual(["c3"]));
     expect([context.count(MethodName.ProjectsLayoutRead), context.count(MethodName.ProjectsLayoutSave), context.lines])
-      .toEqual([2, 0, [Resources.formatProjectsLayoutNotRead("string")]]);
+      .toEqual([2, 0, [Resources.formatProjectsLayoutNotRead(Resources.projectsLayoutFailureNotAnError)]]);
   });
 
   it("reads again once a first read fails while a pin was made, and saves the pin on the layout that read returns", async () => {

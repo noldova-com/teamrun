@@ -31,7 +31,7 @@ LICENSE file in the root directory of this source tree.
       (click)="confirmRemove(department)"></button>
   }
   <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
-    [label]="resources.formatOrganizationChooseFields(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
+    [label]="resources.formatOrganizationCardMenu(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
 </div>
 @if (editsIn(); as department) {
   <div class="move">
@@ -92,5 +92,28 @@ LICENSE file in the root directory of this source tree.
     <nol-menu-separator />
     <button nol-menu-item class="use-every-card" [label]="resources.organizationUseEveryCard" [icon]="resources.organizationResetIcon"
       [disabled]="!layout.layout().hasOwnFields(teammate().id)" (triggered)="layout.clearCard(teammate().id)"></button>
+    <nol-menu-separator />
+    <nol-menu-group class="works-in" [label]="worksIn()">
+      <button nol-menu-item [icon]="resources.moveToProjectIcon" [label]="inProject() ? resources.moveToAnotherProjectLabel : resources.moveToProjectLabel"
+        [nolMenuTriggerFor]="moveMenu"></button>
+      @if (!inProject()) {
+        <button nol-menu-item [icon]="resources.attachFolderIcon" [label]="attachedChat() ? resources.replaceFolderLabel : resources.attachFolderLabel"
+          (triggered)="attachFolder()"></button>
+        @if (attachedChat(); as attachedChat) {
+          <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachFolder(attachedChat)"></button>
+        }
+      }
+    </nol-menu-group>
+  </nol-menu>
+</ng-template>
+<ng-template #moveMenu>
+  <nol-menu>
+    @for (project of otherProjects(); track project.id) {
+      <button nol-menu-item [label]="project.name" (triggered)="moveToProject(project)"></button>
+    }
+    @if (otherProjects().length > 0) {
+      <nol-menu-separator />
+    }
+    <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="moveToFolder()"></button>
   </nol-menu>
 </ng-template>

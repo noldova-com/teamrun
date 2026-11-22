@@ -17,6 +17,7 @@ import { OrganizationRunningReply } from "../../models/organization-running-repl
 import { OrganizationSaid } from "../../models/organization-said";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
+import { ConversationActions } from "../../services/conversation-actions";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
@@ -61,6 +62,8 @@ export class OrganizationDetailsComponent {
         return Resources.formatOrganizationDetailsUsage((Resources.wholePercent - meter.percent) / Resources.wholePercent, meter.label);
     return Resources.organizationDetailsNoUsage;
   });
+  protected readonly worksIn: Signal<string> = computed(() => ConversationActions.placeOf(this.store, this.store.organizationChatOf(this.teammate().id))
+    ?? Resources.organizationOwnFolder);
   protected readonly last: Signal<OrganizationSaid | null> = computed(() => {
     const reply = this.statuses.lastReplyOf(this.teammate().id)();
     return Object.isNull(reply) ? null

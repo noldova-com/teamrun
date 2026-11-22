@@ -22,7 +22,8 @@ import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationChatsComponent", () => {
-  const chatOf = (teammateId: string, updatedAt: string): Conversation => new Conversation(`org-${teammateId}`, null, `Organization · ${teammateId}`,
+  const chatOf = (teammateId: string, updatedAt: string, projectId: string | null = null): Conversation => new Conversation(`org-${teammateId}`, projectId,
+    `Organization · ${teammateId}`,
     SampleData.timestamp, updatedAt, false, null, null, false, null, false, [], false, false, null, new OrganizationChat("my-organization", teammateId));
   const said = (chatId: string, sequence: number, author: MessageAuthor, text: string, status: MessageStatus = MessageStatus.Completed): Message =>
     SampleData.withStatus(new Message(`${chatId}-${sequence}`, chatId, sequence, author, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, text)],
@@ -32,6 +33,7 @@ describe("OrganizationChatsComponent", () => {
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<OrganizationChatsComponent>;
   let chosen: string[];
+  let aliceWorksIn: string | null;
   let unreadable: readonly string[];
   let more: readonly Conversation[];
 
@@ -47,10 +49,12 @@ describe("OrganizationChatsComponent", () => {
   const create = async (selectedTeammateId: string | null, lines: readonly string[] = ["Bob: Done.", "You: Status?"]): Promise<void> => {
     context = SampleData.createContext();
     new TeammateFixture(context);
-    context.answer(MethodName.ConversationList, t => Object.isNull(ConversationListParams.fromJson(t).projectId)
-      ? [chatOf("alice", "2026-09-11T08:00:00.000Z").toJson(), chatOf("bob", "2026-09-12T08:00:00.000Z").toJson(),
-        new Conversation("free", null, "Free", SampleData.timestamp, "2026-09-13T08:00:00.000Z").toJson(), ...more.map(t => t.toJson())]
-      : [SampleData.conversation.toJson()])
+    context.answer(MethodName.ConversationList, t => {
+      const projectId = ConversationListParams.fromJson(t).projectId;
+      const chats = [chatOf("alice", "2026-09-11T08:00:00.000Z", aliceWorksIn), chatOf("bob", "2026-09-12T08:00:00.000Z"),
+        new Conversation("free", null, "Free", SampleData.timestamp, "2026-09-13T08:00:00.000Z"), ...more];
+      return [...Object.isNull(projectId) ? [] : [SampleData.conversation], ...chats.filter(u => u.projectId === projectId)].map(u => u.toJson());
+    })
       .answer(MethodName.MessagePage, t => {
         const conversationId = MessagePageParams.fromJson(t).conversationId;
         if (unreadable.includes(conversationId))
@@ -68,6 +72,7 @@ describe("OrganizationChatsComponent", () => {
 
   beforeEach(() => {
     chosen = [];
+    aliceWorksIn = null;
     unreadable = [];
     more = [];
   });
@@ -108,6 +113,13 @@ describe("OrganizationChatsComponent", () => {
     expect([context.count(MethodName.MessagePage), element().querySelector("[aria-current]")]).toEqual([2, null]);
     element().querySelectorAll<HTMLButtonElement>(".nol-teamrun-organization-conversation")[1]?.click();
     expect(chosen).toEqual(["alice"]);
+  });
+
+  it("lists a teammate's Organization chat that was moved into a project", async () => {
+    aliceWorksIn = SampleData.project.id;
+    await create("alice");
+
+    expect([texts(".nol-teamrun-organization-conversation-title"), texts("[aria-current] .nol-teamrun-organization-conversation-title")]).toEqual([["Bob", "Alice"], ["Alice"]]);
   });
 
   it("shows a running reply's status, counts a reply that ends in a chat not chosen as unread with its text, and clears it once that chat is chosen", async () => {

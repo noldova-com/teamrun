@@ -36,6 +36,7 @@ import { ProjectsGroup } from "../../enums/projects-group";
 import { ConfirmRequest } from "../../models/confirm-request";
 import { TreeFocus } from "../../models/tree-focus";
 import { BrowserAvailability } from "../../services/browser-availability";
+import { ChatPlacement } from "../../services/chat-placement";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ConversationActions } from "../../services/conversation-actions";
@@ -60,6 +61,7 @@ export class ProjectsViewComponent {
   protected readonly layout: ProjectsLayoutService = inject(ProjectsLayoutService);
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
   private readonly dialogs: DialogService = inject(DialogService);
+  protected readonly placement: ChatPlacement = new ChatPlacement(this.context, this.store, this.dialogs);
   private readonly times: TimeFormatService = inject(TimeFormatService);
   private readonly unfoldedProjects: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly announcer: Announcer = inject(Announcer);
@@ -77,12 +79,7 @@ export class ProjectsViewComponent {
   protected readonly pinnedConversations: Signal<readonly Conversation[]> = computed(() =>
     this.layout.pinnedConversations().map(t => this.store.conversation(t)).filter((t): t is Conversation => !Object.isNull(t)));
 
-  protected readonly orderedProjects: Signal<readonly Project[]> = computed(() => {
-    const projects = this.store.projects();
-    const order = this.layout.projectOrder();
-    const named = order.map(id => projects.find(t => t.id === id)).filter((t): t is Project => !Object.isUndefined(t));
-    return [...named, ...projects.filter(t => !order.includes(t.id))];
-  });
+  protected readonly orderedProjects: Signal<readonly Project[]> = computed(() => this.layout.ordered(this.store.projects()));
 
   protected readonly listIds: Signal<string[]> = computed(() => this.orderedProjects().map(t => this.listIdOf(t.id)));
 
@@ -264,7 +261,7 @@ export class ProjectsViewComponent {
     });
     dialog.componentInstance?.other.subscribe(() => {
       dialog.close();
-      void this.moveToFolder(conversation);
+      void this.placement.moveToFolder(conversation);
     });
   }
 
@@ -272,52 +269,9 @@ export class ProjectsViewComponent {
     return this.orderedProjects().filter(t => t.id !== conversation.projectId);
   }
 
-  protected moveToProject(conversation: Conversation, project: Project): Promise<void> {
-    return this.moveInto(conversation, project.name, () => Promise.resolve(project));
-  }
-
-  protected async moveToFolder(conversation: Conversation): Promise<void> {
-    const folder = await this.context.chooseFolderAsync();
-    if (!Object.isNull(folder))
-      await this.moveInto(conversation, ConversationActions.folderNameOf(folder), () => this.store.openProject(folder));
-  }
-
-  protected async attachFolder(conversation: Conversation): Promise<void> {
-    const folder = await this.context.chooseFolderAsync();
-    if (Object.isNull(folder))
-      return;
-    const attach = async (): Promise<void> => {
-      await this.store.attachFolder(conversation.id, folder);
-    };
-    if (Object.isNull(conversation.attachedFolder))
-      await attach();
-    else
-      this.confirm(new ConfirmRequest(Resources.replaceFolderTitle, Resources.formatReplaceFolderText(conversation.attachedFolder, folder),
-        Resources.replaceFolderConfirmLabel), attach);
-  }
-
-  protected async detachFolder(conversation: Conversation): Promise<void> {
-    await this.store.detachFolder(conversation.id);
-  }
-
   protected forget(project: Project): void {
     const request = new ConfirmRequest(Resources.forgetTitle, Resources.formatForgetText(project.name), Resources.forgetConfirmLabel, null, true);
     this.confirm(request, () => this.store.forgetProject(project.id));
-  }
-
-  private async moveInto(conversation: Conversation, name: string, open: () => Promise<Project | null>): Promise<void> {
-    const count = Object.isNull(conversation.projectId) ? await this.store.countFolderFilesAsync(conversation.id, ChatAction.MoveChat) : 0;
-    if (Object.isNull(count))
-      return;
-    const move = async (): Promise<void> => {
-      const project = await open();
-      if (!Object.isNull(project))
-        await this.store.moveConversation(conversation.id, project.id);
-    };
-    if (count === 0)
-      await move();
-    else
-      this.confirm(new ConfirmRequest(Resources.moveTitle, Resources.formatMoveText(count, name), Resources.moveConfirmLabel), move);
   }
 
   private confirm(request: ConfirmRequest, action: () => Promise<void>): DialogRef<unknown, ConfirmDialogComponent> {
