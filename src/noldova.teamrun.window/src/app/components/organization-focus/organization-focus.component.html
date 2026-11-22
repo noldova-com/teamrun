@@ -80,10 +80,11 @@ LICENSE file in the root directory of this source tree.
       <div class="unit-head">
         @if (editing() && unit()?.department; as department) {
           <div class="edit-row">
-            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="department.name" (change)="rename(department, $event)" />
+            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.formatOrganizationUnitNameLabel(unit()?.type ?? null)" [value]="department.name" (change)="rename(department, $event)" />
             <button type="button" nol-button class="delete-department" [variant]="outlined" (click)="deleteDepartment(department)"><span nolButtonIcon
-              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveDepartment }}</button>
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.formatOrganizationRemoveUnit(unit()?.type ?? null) }}</button>
           </div>
+          <nol-teamrun-organization-type-choice class="unit-type" [department]="department" />
         } @else {
           <h2 class="unit-name"><nol-teamrun-organization-type-icon [type]="unit()?.type ?? null" />{{ unitName() }}</h2>
         }

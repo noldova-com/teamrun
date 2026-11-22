@@ -23,7 +23,7 @@ LICENSE file in the root directory of this source tree.
       aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
     @if (editing()) {
       <button type="button" nol-button class="types" [variant]="outlined" (click)="openTypes()"><span nolButtonIcon class="material-symbols-rounded"
-        aria-hidden="true">{{ resources.organizationTypesIcon }}</span>{{ resources.organizationTypesTitle }}</button>
+        aria-hidden="true">{{ resources.organizationTypesIcon }}</span>{{ resources.organizationTypesButton }}</button>
     }
     <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" [attr.aria-pressed]="editing()" (click)="toggleEditing()"><span
       nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationEditIcon }}</span>{{ editing() ? resources.organizationDoneEditing

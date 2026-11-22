@@ -59,6 +59,8 @@ export class OrganizationDepartmentDialogComponent {
     dialog.componentRef?.setInput("organization", organization);
     dialog.componentRef?.setInput("parent", parent);
     dialog.componentInstance?.closed.subscribe(() => dialog.close());
+    if (organization.organization().nodeTypes.length === 0)
+      dialog.componentInstance?.chooseType(Resources.organizationNewTypeValue);
   }
 
   protected edit(): void {

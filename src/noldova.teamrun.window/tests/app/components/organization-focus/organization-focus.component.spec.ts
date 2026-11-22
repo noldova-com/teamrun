@@ -11,11 +11,12 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent,
-  Teammate, TeammatePlacement
+  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, NodeType, Organization, OrganizationChat, OrganizationLayoutSaveParams,
+  OrganizationParent, Teammate, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
 import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
@@ -278,13 +279,13 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["deleteRemove department"], true]);
+    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["deleteRemove Department"], true]);
     await click(one(".delete-department"));
-    expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
+    expect(dialog()).toEqual(["Delete Department", "Delete UI? Its units and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
     await click(one(".obtn", row("Design")));
     await click(one(".delete-department"));
-    expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
+    expect(dialog()).toContain("Delete Design? Its units move up to report to you, and its members leave every unit.");
     await answer(".nol-teamrun-confirm");
 
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { organizationId: "my-organization", departmentId: "design" }]]));
@@ -357,6 +358,28 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "bob", departmentId: null }]]));
     expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["deleteRemove teammate"]], 0]);
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
+  });
+
+  it("chooses the focused unit's type under its name only while editing, among the organization's types, and sends the type chosen", async () => {
+    const team = new NodeType("team", "Team", null, null, SampleData.timestamp, SampleData.timestamp);
+    await create("Department:ui");
+    const hidden = all(".unit-type").length;
+    fixture.componentRef.setInput("editing", true);
+    context.emit(EventName.OrganizationChanged, new Organization(sample.id, sample.name, null, 0, SampleData.timestamp, SampleData.timestamp,
+      [SampleData.departmentType, team], sample.departments, sample.placements).toJson());
+    await settle();
+    const choice = one(".unit-type");
+    const shown = one(".nol-select-value", choice).textContent?.trim();
+    const geometry = [box(choice).left - box(one(".unit-rename")).left, box(choice).top >= box(one(".edit-row")).bottom];
+    await userEvent.click(one(".nol-select-button", choice));
+    await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+    const offered = [...document.querySelectorAll(".nol-select-option")].map(t => t.textContent?.trim());
+    await userEvent.click(one(".nol-select-option[data-value='team']", document));
+    await Wait.until(() => expect(context.count(MethodName.DepartmentUpdate)).toBe(1));
+
+    expect([hidden, shown, offered, geometry]).toEqual([0, "Department", ["Department", "Team", "New type…"], [0, true]]);
+    expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DepartmentUpdate)).map(t => t.parameters))
+      .toEqual([{ organizationId: "my-organization", departmentId: "ui", typeId: "team" }]);
   });
 
   describe.each([
