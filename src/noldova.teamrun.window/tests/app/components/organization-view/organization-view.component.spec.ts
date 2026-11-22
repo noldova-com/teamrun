@@ -937,9 +937,13 @@ describe("OrganizationViewComponent", () => {
       return [inDialog(".nol-dialog-title").textContent?.trim() ?? "", inDialog("[nolDialogDescription]").textContent?.trim() ?? "",
         inDialog(".nol-teamrun-confirm").textContent?.trim() ?? ""];
     };
+    const fadedAsync = async (): Promise<void> => {
+      await Wait.until(() => expect(document.querySelector(".cdk-overlay-backdrop:not(.cdk-overlay-backdrop-showing)")).toBeNull());
+    };
     const answerAsync = async (selector: string): Promise<void> => {
       inDialog(selector).click();
       await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+      await fadedAsync();
       await settle();
     };
     const optionsAsync = async (select: HTMLElement): Promise<string[]> => {
@@ -1185,6 +1189,7 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
       one(".nol-teamrun-cancel", lastDialog()).click();
       await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await fadedAsync();
       await settle();
       const kept = inDialog(".nol-teamrun-department-leader .nol-select-value").textContent?.trim();
       await chooseAsync(inDialog(".nol-teamrun-department-leader"), "New teammate…");
@@ -1192,6 +1197,7 @@ describe("OrganizationViewComponent", () => {
       await userEvent.type(one("input.nol-teamrun-teammate-name", document), "Dana");
       one("button[form='nol-teamrun-teammate-form']", document).click();
       await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await fadedAsync();
       await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
       inDialog(".nol-teamrun-save").click();
       await Wait.until(() => expect(asked).toHaveLength(1));
