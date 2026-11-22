@@ -612,6 +612,42 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
+  public async failsAReplyAsNotFoundWhenItsChatIsGoneBeforeItsTurnAndClosesTheGroup(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    const findAsync = host.conversations.findAsync.bind(host.conversations);
+    let gone = false;
+    host.conversations.findAsync = async (id, transaction) => gone && id === conversation.id ? null : await findAsync(id, transaction);
+    host.adapter.steps = [(): void => {
+      gone = true;
+    }];
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    const thrown = await Assert.throwsAsync(() => host.engine.waitForIdle(), ServiceException);
+    gone = false;
+    const first = result.replies[0];
+    const second = result.replies[1];
+    Assert.isDefined(first);
+    Assert.isDefined(second);
+    const answered = await host.messages.findAsync(first.id);
+    const failed = await host.messages.findAsync(second.id);
+    Assert.isNotNull(answered);
+    Assert.isNotNull(failed);
+    const note = failed.details.at(-1);
+    Assert.isDefined(note);
+
+    Assert.areEqual(ErrorCode.NotFound, thrown.info.name);
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [answered.teammateId, failed.teammateId].join());
+    Assert.areEqual([MessageStatus.Completed, MessageStatus.Failed].join(), [answered.status, failed.status].join());
+    Assert.areEqual(Resources.formatConversationNotFound(conversation.id), note.text);
+    Assert.areEqual(0, host.engine.activeRunCount);
+  }
+
+  @TestMethod
   public async keepsAReplyStoppedWhileItsTurnIsPreparedCancelledWhenThePreparationFails(): Promise<void> {
     const stops: Promise<unknown>[] = [];
     let conversationId = String.empty;

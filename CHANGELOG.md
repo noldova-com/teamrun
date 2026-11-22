@@ -9,6 +9,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### New
 
 - **Organization:** while editing, every teammate's card takes it out of the organization once you confirm, saying whom the teammates and units under it will report to; the teammate keeps its chats and can be added back, and a unit member's card still moves it out of its unit, now named Move out of unit (#154).
+- **Organization:** the Board's and Focus's cards open their teammate's details when pointed at or reached with the keyboard, as the Tree's do (#134).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
@@ -34,6 +35,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization:** a failed change shows its reason once, in the view's header, and a failed message to a teammate or a group once, in the chat beside the tree, rather than in both places (#138).
 - **Organization:** removing a member from a unit now says the teammate will report to you, where it goes, rather than that it stays in no unit (#137).
 - **Default teammate:** its row in Teammates now names its model and effort, such as GPT-5 and Extra high, rather than their ids, also when no teammate in the list chooses a model or effort on its provider (#214).
 - **Pages:** an error from opening a page in the browser, saving it or copying its path now goes away when you switch chats, rather than staying over the other chat's pages, and one that comes after you switched isn't shown (#216).
@@ -74,9 +76,12 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
 - **Deleting a chat:** once a chat is deleted, a failure in one of the cleanups after it, such as forgetting its runs, no longer skips the others or shows the delete as failed; and one part of TeamRun failing on an update no longer keeps the update from the parts after it, such as an approval's answer from its waiting run; each failure is logged (#85).
 - **Background tasks:** a task that writes a flood of output within a tenth of a second sends the window only its latest 65,536 characters, the most a task keeps, rather than all of it at once (#85).
+- **Chat folders:** a chat folder whose Git setup was cut short, such as by a full disk, is set up again on its next turn rather than left with a broken `HEAD` (#85).
+- **Waiting messages:** a waiting message whose sending or Send now fails after it was kept no longer shows the request as failed, so the window doesn't add it a second time; it waits and the failure is logged (#85).
 
 ### Changed
 
+- **Explorer:** Organizations come right after Pinned, before Projects and Chats, and the section headers stand as tall and as close to each other as New chat, Open folder and Open browser (#150, #43).
 - **The first launch's Skip for now and Continue:** they sit in a footer along the Providers tab's bottom edge, so they stay in view on a short window while the providers scroll above them (#350).
 - **A served call's approval card:** under its title, a card for a Git, GitHub or other module call that TeamRun serves names the module, the tool, the teammate and its chat, such as `Git · git_commit · Codex in "Gemini folder trust"`, as the approved design draws it (#19).
 - **Git 0.0.6:** TeamRun takes the Git and GitHub modules at 0.0.6, on Noldova Desktop 0.0.11 like TeamRun itself (#342).
