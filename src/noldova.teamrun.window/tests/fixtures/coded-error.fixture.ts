@@ -6,13 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import type { ErrorCode } from "@noldova/teamrun.protocol";
 
-export class CodedError extends Error {
-  public readonly code: ErrorCode;
-
+export class CodedError extends RuntimeRequestException {
   public constructor(message: string, code: ErrorCode) {
-    super(message);
-    this.code = code;
+    super(code, message);
   }
 }
