@@ -1140,7 +1140,7 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(icon.getBoundingClientRect().top - text.getBoundingClientRect().top, 0.0625 * rem);
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(text).fontSize), AppearanceFixture.measureLook("text-panel"));
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(lasted).fontSize), AppearanceFixture.measureLook("text-code"));
-      expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
+      expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "break-word"]);
     });
 
     it("sets To under the chat's head over a select as wide as the panel's padding allows, above the composer, a department's Message under its summary at its start, and a name as plain text", async () => {

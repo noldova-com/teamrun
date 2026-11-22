@@ -48,8 +48,10 @@ LICENSE file in the root directory of this source tree.
     @for (activity of activities(); track activity.chatId) {
       <li class="act">
         <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationNowRunningIcon }}</span>
-        <span class="now-text">{{ activity.text }}</span>
-        <span class="now-for">{{ activity.lasted }}</span>
+        <span class="now-body">
+          <span class="now-text">{{ activity.text }}</span>
+          <span class="now-for">{{ activity.lasted }}</span>
+        </span>
       </li>
     }
   </ul>
@@ -57,10 +59,12 @@ LICENSE file in the root directory of this source tree.
   @let shown = now();
   <div class="now">
     <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ shown.icon }}</span>
-    <span class="now-text">{{ shown.text }}</span>
-    @if (shown.lasted; as lasted) {
-      <span class="now-for">{{ lasted }}</span>
-    }
+    <span class="now-body">
+      <span class="now-text">{{ shown.text }}</span>
+      @if (shown.lasted; as lasted) {
+        <span class="now-for">{{ lasted }}</span>
+      }
+    </span>
   </div>
 }
 @if (fields().has(fieldNames.Usage)) {

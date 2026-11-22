@@ -116,10 +116,23 @@
   font-size: var(--nol-icon);
 }
 
-.now-text {
+.now-body {
+  display: flex;
   flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: calc(var(--nol-space-1) + var(--nol-space-half));
   min-width: 0;
-  overflow-wrap: anywhere;
+}
+
+.act .now-body {
+  column-gap: var(--nol-space-2);
+}
+
+.now-text {
+  flex: 1 1 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .now-for {
