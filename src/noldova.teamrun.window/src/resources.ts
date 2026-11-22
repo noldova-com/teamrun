@@ -1231,7 +1231,6 @@ export class Resources {
   public static readonly teamRunTagPrefix: string = "nol-teamrun-";
   public static readonly escapeOwnersSelector: string = "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='menu'], [role='listbox'], [role='dialog'], dialog";
   public static readonly teammatesTitle: string = "Teammates";
-  public static readonly organizationDefaultTypeName: string = "Department";
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
@@ -1275,6 +1274,15 @@ export class Resources {
   public static readonly organizationNewDepartment: string = "New department";
   public static readonly organizationNewTeammateOption: string = "New teammate…";
   public static readonly organizationNewTeammateValue: string = "new-teammate";
+  public static readonly organizationTypeLabel: string = "Type";
+  public static readonly organizationChooseType: string = "Choose a type";
+  public static readonly organizationNewTypeOption: string = "New type…";
+  public static readonly organizationNewTypeValue: string = "new-type";
+  public static readonly organizationNewTypeTitle: string = "New type";
+  public static readonly organizationEditTypeTitle: string = "Edit type";
+  public static readonly organizationTypeNameLabel: string = "Type name";
+  public static readonly organizationTypeIconLabel: string = "Icon";
+  public static readonly organizationTypeColorLabel: string = "Icon color";
   public static readonly organizationDragType: string = "application/x-noldova-organization-node";
   public static readonly organizationDragEffect: "move" = "move";
   public static readonly organizationDraggable: string = "true";
