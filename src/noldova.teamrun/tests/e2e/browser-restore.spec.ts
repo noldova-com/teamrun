@@ -9,16 +9,11 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
+import "@noldova/context.core";
 import { type ElectronApplication, type Page, expect } from "playwright/test";
 
 import { LinkedSite } from "./fixtures/linked-site.ts";
 import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
-
-declare global {
-  interface Window {
-    readonly desktop: { readTrayAvailable(): Promise<unknown> };
-  }
-}
 
 const TITLES: readonly string[] = ["One", "Two", "Three"];
 const PARTITION_PREFIX: string = "persist:browser.";
@@ -27,7 +22,7 @@ const OUTSIDE_PROJECTS_WORKSPACE: string = "teamrun-chats";
 const viewWorkspaceAsync = (application: ElectronApplication, address: string, workspaces: readonly string[]): Promise<string | null> =>
   application.evaluate(({ webContents, session }, { url, keys, prefix }) => {
     const contents = webContents.getAllWebContents().find(t => t.getURL() === url);
-    return contents === undefined ? null : keys.find(t => session.fromPartition(`${prefix}${t}`, { cache: false }).storagePath === contents.session.storagePath) ?? "another";
+    return Object.isUndefined(contents) ? null : keys.find(t => session.fromPartition(`${prefix}${t}`, { cache: false }).storagePath === contents.session.storagePath) ?? "another";
   }, { url: address, keys: workspaces, prefix: PARTITION_PREFIX });
 
 const viewCountAsync = (application: ElectronApplication, workspace: string): Promise<number> =>
@@ -53,7 +48,7 @@ test("three pages open as tabs in two workspaces come back after a restart at th
       await app.nameLocalSitesAsync(site.origin);
       await site.openFirstAsync(page);
       const [step] = LinkedSite.STEPS;
-      if (step === undefined)
+      if (Object.isUndefined(step))
         throw new Error("The linked site has no steps.");
       await site.pressAsync(app.electronApp, step);
       await site.expectShownAsync(app.electronApp, page, step.to, LinkedSite.openedNameOf(step));
@@ -75,7 +70,12 @@ test("three pages open as tabs in two workspaces come back after a restart at th
       const restarted = await app.startAsync();
 
       for (const title of TITLES)
-        await expect(restarted.getByRole("tab", { name: title, exact: true }), `${title}'s tab came back`).toBeVisible({ timeout: 60_000 });
+        await expect(TeamRunApp.tabOf(restarted, title), `${title}'s tab came back`).toBeAttached({ timeout: 60_000 });
+      for (const title of TITLES) {
+        const listed = (await TeamRunApp.listTabsAsync(restarted, title)).filter(t => TITLES.includes(t));
+        expect(listed, `${title}'s group lists it with the other restored tabs in order`).toEqual(TITLES.filter(t => listed.includes(t) || t === title));
+      }
+      await TeamRunApp.expectWholeTabsAsync(restarted, "Three");
       await expect.poll(() => site.isLoadedAsync(app.electronApp, "Three"), { message: "the shown page, Three, loaded", ...TeamRunApp.pollOf(60_000) }).toBe(true);
       const counts: (readonly number[])[] = [];
       const countAsync = async (): Promise<void> => {

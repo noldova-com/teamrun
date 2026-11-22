@@ -12,6 +12,20 @@ import { Resources } from "@noldova/teamrun.core";
 @TestClass
 export class ResourcesTests {
   @TestMethod
+  public namesEverythingStillRunningInAChatsFolder(): void {
+    const command = Resources.formatRunningCommand("npm test");
+    const helper = Resources.formatRunningHelper("Check the tests");
+
+    Assert.areEqual("This chat can't move to a project while the background command \"npm test\" is still running in its folder. "
+      + "Stop it or wait for it to end, then try again.", Resources.formatChatWorkRunning(Resources.chatMoveChange, [command]));
+    Assert.areEqual("This chat can't detach its folder while the background command \"npm test\" and the helper \"Check the tests\" are still running in "
+      + "its folder. Stop them or wait for them to end, then try again.", Resources.formatChatWorkRunning(Resources.chatDetachChange, [command, helper]));
+    Assert.areEqual("This chat can't attach a folder while the background command \"npm test\", the helper \"Check the tests\" and a teammate's background "
+      + "work are still running in its folder. Stop them or wait for them to end, then try again.",
+      Resources.formatChatWorkRunning(Resources.chatAttachChange, [command, helper, Resources.runningReplyWork]));
+  }
+
+  @TestMethod
   public namesTheDatabaseFileTablesAndColumns(): void {
     Assert.areEqual("teamrun.db", Resources.databaseFileName);
     Assert.areEqual("providers", Resources.providersTable);

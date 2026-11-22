@@ -18,6 +18,7 @@ export type { IProviderKindRegistryFactory } from "../interfaces/i-provider-kind
 export { Resources } from "../resources.js";
 export { ChangeView } from "../models/change-view.js";
 export { TeamRunChange } from "../models/teamrun-change.js";
+export { SubAgentMethod } from "../models/sub-agent-method.js";
 export { TeamRunTool } from "../models/teamrun-tool.js";
 export { ChangeSubjects } from "../services/change-subjects.js";
 export { CommandTool } from "../services/command-tool.js";

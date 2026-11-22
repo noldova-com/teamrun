@@ -24,6 +24,7 @@ import type { IAcpOwnMcpServersReader } from "../../interfaces/i-acp-own-mcp-ser
 import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
 import type { IAcpQuestionReader } from "../../interfaces/i-acp-question.reader.js";
 import type { IAcpSteering } from "../../interfaces/i-acp-steering.js";
+import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import type { IAcpUsageReader } from "../../interfaces/i-acp-usage.reader.js";
 import { AcpLaunch } from "../../models/acp-launch.js";
 import type { AcpModelMember } from "../../models/acp-model-member.js";
@@ -45,6 +46,7 @@ import { GrokAccountReader } from "./grok-account.reader.js";
 import { GrokMcpServersReader } from "./grok-mcp-servers.reader.js";
 import { GrokSignOutReader } from "./grok-sign-out.reader.js";
 import { GrokSteering } from "./grok-steering.js";
+import { GrokToolGate } from "./grok-tool-gate.js";
 import { GrokUsageReader } from "./grok-usage.reader.js";
 
 export class GrokAgent implements IAcpAgent {
@@ -85,6 +87,7 @@ export class GrokAgent implements IAcpAgent {
   public readonly plans: IAcpPlanReader = new GrokPlanReader();
   public readonly ownMcpServers: IAcpOwnMcpServersReader = new GrokMcpServersReader();
   public readonly steering: IAcpSteering = new GrokSteering();
+  public readonly toolGate: IAcpToolGate = new GrokToolGate();
   public readonly interactiveSignIn: boolean = false;
   public readonly turnModels: IAcpModelStore | null = null;
   public readonly modes: readonly ProviderMode[] = [
@@ -120,22 +123,27 @@ export class GrokAgent implements IAcpAgent {
       throw new ExecutableNotFoundException(Resources.grokNotFound);
     const args = [...Resources.grokAgentArguments, Resources.grokPermissionModeArgument,
       requested?.mode === Resources.grokAlwaysApproveMode ? Resources.grokAlwaysApproveMode : Resources.grokDefaultPermissionMode];
-    if (this.modes.some(t => t.id === requested?.mode && t.readOnly))
-      args.push(Resources.grokNoSubAgentsArgument);
+    args.push(...Resources.grokAgentCommandArguments);
     if (!Object.isNullOrUndefined(requested?.model))
       args.push(Resources.grokModelArgument, requested.model);
     if (!Object.isNullOrUndefined(requested?.effort))
       args.push(Resources.grokEffortArgument, requested.effort);
-    args.push(...Resources.grokStdioArguments);
+    args.push(Resources.grokStdioCommand);
     const home = this.home.of(provider, environment);
     const added = this.home.isAdded(provider);
+    const launched = this.environmentOf(environment, home, added, requested, workingDirectory, titleSession);
+    if (this.modes.some(t => t.id === requested?.mode && t.readOnly))
+      launched[Resources.grokSubAgentsVariable] = Resources.grokDisabledValue;
+    return new AcpLaunch(command.withArguments(...args), launched, UsualFolder.home(environment));
+  }
+
+  private environmentOf(environment: NodeJS.ProcessEnv, home: string, added: boolean, requested: RequestedSettings | null, workingDirectory: string | null,
+    titleSession: boolean): NodeJS.ProcessEnv {
     if (!titleSession)
-      return new AcpLaunch(command.withArguments(...args),
-        GrokEnvironment.build(environment, this.shortHome.of(home, workingDirectory, environment), added, Object.isNull(requested)), UsualFolder.home(environment));
+      return GrokEnvironment.build(environment, this.shortHome.of(home, workingDirectory, environment), added, Object.isNull(requested));
     mkdirSync(this.home.titleDirectory, { recursive: true });
     const signIn = added ? undefined : environment[Resources.grokAuthPathVariable];
-    return new AcpLaunch(command.withArguments(...args), GrokEnvironment.build(environment, this.home.titleDirectory, added, false,
-      signIn ?? join(home, Resources.grokAuthFile)), UsualFolder.home(environment));
+    return GrokEnvironment.build(environment, this.home.titleDirectory, added, false, signIn ?? join(home, Resources.grokAuthFile));
   }
 
   public readMcpBlocks(provider: Provider | null, since: string): ReadonlyMap<string, string> {

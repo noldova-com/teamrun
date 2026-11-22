@@ -10,6 +10,7 @@ import { ErrorCode, MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
 import { FileShare } from "../../../src/app/models/file-share";
+import { CodedError } from "../../fixtures/coded-error.fixture";
 
 describe("ComposerAttachment", () => {
   const address = "desktop-file://0123456789abcdef0123456789abcdef/";
@@ -99,7 +100,7 @@ describe("ComposerAttachment", () => {
 
   it("shows no preview of an image that can't be read back", async () => {
     const saved = new ComposerAttachment(new MessageAttachment("gone.png", "image/png", 5, "D:/data/attachments/drafts/c1/gone.png"));
-    await saved.loadPreview(() => Promise.reject(Object.assign(new Error("The attachment is gone."), { code: ErrorCode.NotFound })));
+    await saved.loadPreview(() => Promise.reject(new CodedError("The attachment is gone.", ErrorCode.NotFound)));
     expect(saved.previewUrl()).toBeNull();
 
     vi.stubGlobal("FileReader", class {
@@ -120,7 +121,7 @@ describe("ComposerAttachment", () => {
     const failure = new Error("The answer is malformed.");
 
     await expect(saved.loadPreview(() => Promise.reject(failure))).rejects.toBe(failure);
-    await expect(saved.loadPreview(() => Promise.reject(Object.assign(new Error("No code."), { code: 404 })))).rejects.toThrow("No code.");
+    await expect(saved.loadPreview(() => Promise.reject(new Error("No code.")))).rejects.toThrow("No code.");
     await expect(saved.loadPreview(() => Promise.reject("offline"))).rejects.toBe("offline");
     expect(saved.previewUrl()).toBeNull();
   });

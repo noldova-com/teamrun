@@ -77,6 +77,7 @@ export class MethodNameTests {
     Assert.areEqual("PlanUsageList", MethodName.PlanUsageList);
     Assert.areEqual("PlanUsageRead", MethodName.PlanUsageRead);
     Assert.areEqual("TeammateUsageList", MethodName.TeammateUsageList);
+    Assert.areEqual("TeammateLastReplyList", MethodName.TeammateLastReplyList);
     Assert.areEqual("WindowFocused", MethodName.WindowFocused);
     Assert.areEqual("WindowClosed", MethodName.WindowClosed);
     Assert.areEqual("WindowReload", MethodName.WindowReload);
@@ -124,9 +125,12 @@ export class MethodNameTests {
     Assert.areEqual("DepartmentMove", MethodName.DepartmentMove);
     Assert.areEqual("DepartmentDelete", MethodName.DepartmentDelete);
     Assert.areEqual("DepartmentMemberSet", MethodName.DepartmentMemberSet);
-    Assert.areEqual("OrganizationMessageSend", MethodName.OrganizationMessageSend);
-    Assert.areEqual("OrganizationMessageStop", MethodName.OrganizationMessageStop);
-    Assert.areEqual("OrganizationMessageList", MethodName.OrganizationMessageList);
+    Assert.areEqual("NodeTypeCreate", MethodName.NodeTypeCreate);
+    Assert.areEqual("NodeTypeUpdate", MethodName.NodeTypeUpdate);
+    Assert.areEqual("NodeTypeDelete", MethodName.NodeTypeDelete);
+    Assert.areEqual("OrganizationLayoutRead", MethodName.OrganizationLayoutRead);
+    Assert.areEqual("OrganizationLayoutSave", MethodName.OrganizationLayoutSave);
+    Assert.areEqual("TeammateWorkRead", MethodName.TeammateWorkRead);
   }
 
   @TestMethod

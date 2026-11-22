@@ -1085,7 +1085,8 @@ export interface IProcessTree {
    * @param processId The process.
    * @param startedBy The time, in milliseconds since the epoch, by which the process had started: when TeamRun learned its id.
    * @param ancestorId The process the tree must run under.
-   * @returns `true` once it has ended the tree; `false`, ending nothing, when the process isn't that one any more or the processes can't be listed.
+   * @returns `true` once it has ended the tree, which on Windows includes when a process of it still shows after the last round or a round's script
+   * fails; `false`, ending nothing, when the process isn't that one any more or the processes can't be listed.
    */
   endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;
 
@@ -1094,7 +1095,8 @@ export interface IProcessTree {
    * process started no later than `startedBy`, since a process TeamRun still holds keeps its id.
    * @param processId The process.
    * @param startedBy The time, in milliseconds since the epoch, by which the process had started.
-   * @returns `true` once it has ended the tree; `false`, ending nothing, when the process isn't listed or the processes can't be listed.
+   * @returns `true` once it has ended the tree, as {@link endTree} returns it; `false`, ending nothing, when the process isn't listed or the processes
+   * can't be listed.
    */
   endOwnTree(processId: number, startedBy: number): Promise<boolean>;
 
@@ -1817,6 +1819,10 @@ export declare class ProviderTimings {
    * How long a kept process with no session left stays open, in milliseconds: a Codex app-server with no thread.
    */
   public readonly idleLimit: number;
+  /**
+   * How long a stopped ACP turn may take to settle before the session log names the step it still waits on, in milliseconds.
+   */
+  public readonly stopReportWait: number;
 
   /**
    * Initializes the timings.
@@ -1838,9 +1844,10 @@ export declare class ProviderTimings {
    * @param modelListTimeout How long a model listing waits for an agent's `modelList` method, in milliseconds.
    * @param silenceLimit How long a session held open only by its background work stays open while that work is silent, in milliseconds.
    * @param idleLimit How long a kept session with no turn, or a kept process with no session left, stays open, in milliseconds.
+   * @param stopReportWait How long a stopped ACP turn may take to settle before the session log names the step it still waits on, in milliseconds.
    * @throws ArgumentOutOfRangeException when a value is not a positive integer.
    */
-  public constructor(versionTimeout: number, signInCheckTimeout: number, initializeTimeout: number, requestTimeout: number, interruptTimeout: number, interruptGrace: number, stopGrace: number, killWait: number, abortGrace: number, streamInterval: number, resumeRetryDelay: number, wakeGrace?: number, taskOutputInterval?: number, accountTimeout?: number, modelListTimeout?: number, silenceLimit?: number, idleLimit?: number);
+  public constructor(versionTimeout: number, signInCheckTimeout: number, initializeTimeout: number, requestTimeout: number, interruptTimeout: number, interruptGrace: number, stopGrace: number, killWait: number, abortGrace: number, streamInterval: number, resumeRetryDelay: number, wakeGrace?: number, taskOutputInterval?: number, accountTimeout?: number, modelListTimeout?: number, silenceLimit?: number, idleLimit?: number, stopReportWait?: number);
 
   /**
    * Returns the production timings.
@@ -2543,10 +2550,13 @@ export declare class Resources {
   public static readonly grokDefaultPermissionMode: string;
   /** The tool through which Grok calls every MCP tool: `use_tool`. */
   public static readonly grokRoutedMcpTool: string;
-  public static readonly grokStdioArguments: readonly string[];
+  /** Grok's `agent` command and its options before the model and effort: `agent`, `--no-leader`. */
+  public static readonly grokAgentCommandArguments: readonly string[];
+  /** The `agent` subcommand that serves ACP over standard input and output, after the model and effort: `stdio`. */
+  public static readonly grokStdioCommand: string;
   public static readonly grokModelArgument: string;
-  /** The launch argument that turns Grok's own sub-agents off, for a turn in a mode other than Default: `--no-subagents`. */
-  public static readonly grokNoSubAgentsArgument: string;
+  /** The variable that turns Grok's own sub-agents off, set to `grokDisabledValue` for a turn in a read-only mode: `GROK_SUBAGENTS`. */
+  public static readonly grokSubAgentsVariable: string;
   public static readonly grokEffortArgument: string;
   public static readonly acpInitialize: string;
   public static readonly acpAuthenticate: string;
@@ -2802,6 +2812,22 @@ export declare class Resources {
   public static readonly xaiExitPlanModeTool: string;
   /** The `x.ai/exit_plan_mode` field that holds the plan: `planContent`. */
   public static readonly xaiPlanContentField: string;
+  public static readonly xaiHooksRunMethods: readonly string[];
+  public static readonly xaiHooksField: string;
+  public static readonly xaiHookDecisionsField: string;
+  public static readonly xaiHookDecisionField: string;
+  public static readonly xaiHookDeny: string;
+  public static readonly xaiHookReasonField: string;
+  public static readonly xaiHookCallbackIdsField: string;
+  public static readonly xaiHookEventField: string;
+  public static readonly xaiPreToolUseEvent: string;
+  /** The event name Grok's `x.ai/hooks/run` request carries for a tool call it is about to run, its hook event's serialized name: `pre_tool_use`. */
+  public static readonly xaiPreToolUseWireEvent: string;
+  public static readonly xaiToolUseIdField: string;
+  public static readonly xaiToolNameField: string;
+  public static readonly xaiReadOnlyField: string;
+  public static readonly xaiMcpToolSeparator: string;
+  public static readonly grokReadOnlyHookId: string;
   /** The `x.ai/exit_plan_mode` outcome of an approved plan: `approved`. */
   public static readonly xaiApprovedOutcome: string;
 
@@ -3123,6 +3149,7 @@ export declare class Resources {
    * The ACP session update that sends the agent's plan: `plan`.
    */
   public static readonly acpPlanUpdate: string;
+  public static readonly acpCurrentModeUpdate: string;
   public static readonly acpEntriesField: string;
   public static readonly acpPlanStatuses: Readonly<Record<string, PlanStepStatus>>;
   public static readonly planDetailId: string;
@@ -3465,6 +3492,7 @@ export declare class Resources {
   public static readonly acpAlreadyStarted: string;
   public static readonly acpDisconnected: string;
   public static readonly acpTooManyRequests: string;
+  public static readonly acpGatedRequestRefused: string;
   public static readonly acpDidNotStop: string;
   public static readonly acpFrameTooLarge: string;
   public static readonly acpInvalidFrame: string;
@@ -3755,6 +3783,7 @@ export declare class Resources {
   public static readonly modelListTimeoutParameterName: string;
   public static readonly silenceLimitParameterName: string;
   public static readonly idleLimitParameterName: string;
+  public static readonly stopReportWaitParameterName: string;
   /**
    * Codex local-image input discriminator.
    */
@@ -4145,6 +4174,10 @@ export declare class Resources {
    */
   public static readonly processTreeFreezeRounds: number;
   /**
+   * How long `formatProcessEndScript` waits, in all, for the processes it ends to exit, in milliseconds: 2000.
+   */
+  public static readonly processExitWait: number;
+  /**
    * How often `ProcessTree` looks whether a tree it sent `SIGTERM` has ended, so the grace ends early once it has, in milliseconds: 100.
    */
   public static readonly processTreeGracePoll: number;
@@ -4154,6 +4187,11 @@ export declare class Resources {
    * How long one of `ProcessTree`'s listings may take by default, in milliseconds: 30 seconds, since one `Get-CimInstance` takes seconds on Windows.
    */
   public static readonly processListTimeout: number;
+  /**
+   * How long `ProcessTree` waits for its kept PowerShell to answer one script, in milliseconds: 5 seconds, at most half of the listing time,
+   * before it runs the script in a new PowerShell with the rest of that time and the rest of the stop's scripts there too.
+   */
+  public static readonly powershellSessionAnswerLimit: number;
   /**
    * The process listings `ProcessTree` runs: `ps -A -o pid=,ppid=,lstart=` with `LC_ALL=C`, or one `Get-CimInstance Win32_Process` on Windows; and
    * the pattern of their lines, a process id, its parent's, and its start: `ps`'s start time, to the second, or the milliseconds since the epoch.
@@ -4170,20 +4208,8 @@ export declare class Resources {
   public static readonly powershellExecutable: string;
   public static readonly powershellCommandArguments: readonly string[];
   /**
-   * The Windows Management listing of the processes with their parents and starts, which `powershellProcessListScript` falls back to.
-   */
-  public static readonly powershellCimProcessListScript: string;
-  /**
-   * The C# type `powershellProcessListScript` adds to its PowerShell once, and the type's source: it lists the processes from the system's process
-   * snapshot, each with the start it reads through the process's handle. A process gets `unknown` as its start when it can't be opened, such as
-   * another user's, or when a second snapshot, taken after the starts, doesn't show its id under the same parent, so a start read from a process
-   * that took a listed id meanwhile is never paired with the earlier parent. It throws when the system gives no snapshot.
-   */
-  public static readonly powershellProcessListType: string;
-  public static readonly powershellProcessListSource: string;
-  /**
-   * The processes on Windows with their parents and starts, a line each: through `powershellProcessListType`, which answers in milliseconds
-   * where a Windows Management listing takes a few hundred, or through `powershellCimProcessListScript` where PowerShell can't add the type, or its listing fails or is empty.
+   * The processes on Windows with their parents and starts, a line each, through one Windows Management listing, with `unknown` as the start
+   * of a process Windows Management gives none for.
    */
   public static readonly powershellProcessListScript: string;
   public static readonly powershellProcessListArguments: readonly string[];
@@ -4841,6 +4867,10 @@ export declare class Resources {
    * Milliseconds a kept process with no session left stays open: 30 minutes.
    */
   public static readonly idleLimit: number;
+  /**
+   * Milliseconds a stopped ACP turn may take to settle before the session log names the step it still waits on: a minute, past the interrupt grace.
+   */
+  public static readonly stopReportWait: number;
   /**
    * Milliseconds after its last turn that a Claude chat which may compact while idle does so: 54 minutes, inside Claude's one-hour prompt cache.
    */
@@ -6231,12 +6261,26 @@ export declare class Resources {
   public static formatTaskProcessUnknown(providerName: string): string;
   public static formatAcpTerminalUnknown(terminalId: string): string;
   public static formatAcpTerminalOutside(providerName: string, directory: string): string;
+  /**
+   * The line a Windows tree's end writes to its log when a round's script fails, so the tree may still run.
+   * @param round The round, counted from 1.
+   * @param failure The failure's type.
+   */
+  public static formatTreeEndRoundFailed(round: number, failure: string): string;
+
+  /**
+   * The line a Windows tree's end writes to its log when a process of the tree still shows after its last round.
+   * @param processes Each process still listed, as its id and its start in milliseconds since the epoch.
+   */
+  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string;
+
   public static formatTaskProcessGone(providerName: string): string;
 
   /**
    * The PowerShell script that ends a round of a tree on Windows, then lists the processes again: it opens each process by its id and takes its handle
    * before it reads the start, and ends it through that same handle, which keeps its id from being reused, only when the process started when the
-   * listing said, to the millisecond.
+   * listing said, to the millisecond. After each end it waits for the process to exit, all of them within `processExitWait` of the script's start,
+   * so the listing that follows doesn't show a process still exiting.
    * @param processIds The processes, parents first.
    * @param starts Their starts, in milliseconds since the epoch, as the listing gave them.
    */
@@ -6654,6 +6698,9 @@ export declare class Resources {
    * @returns Such as "Cursor couldn't leave its plan mode once the plan was approved: Mode refused".
    */
   public static formatPlanModeKept(provider: string, error: string): string;
+  public static formatChatModeKeptOut(provider: string, error: string): string;
+  public static formatReadOnlyChatRefused(provider: string, tool: string): string;
+  public static formatReadOnlyToolRefused(provider: string, tool: string): string;
 
   /**
    * Formats the note of a to-do list notification that couldn't be read, which leaves the reply's plan as it was.
@@ -6670,6 +6717,33 @@ export declare class Resources {
    * @returns Such as "Cursor's plan couldn't be read, so TeamRun cancelled it: $.plan is blank".
    */
   public static formatPlanUnread(provider: string, error: string): string;
+  /**
+   * Notes on a woken reply that the provider, started to approve its own tools, keeps doing so in this reply.
+   * @param kind The provider's display name.
+   * @returns Such as "Grok was started to approve its own tools, so it still doesn't ask before using them in this reply; the chat's mode applies in full from
+   * Grok's next reply.".
+   */
+  public static formatWakeStillApproves(kind: string): string;
+  /**
+   * Notes on a woken reply that the provider refused the switch to the chat's current mode.
+   * @param kind The provider's display name.
+   * @param reason Why it refused.
+   * @returns Such as "Grok couldn't switch this reply to the chat's current mode, so it runs in the mode it had: Mode refused".
+   */
+  public static formatWakeModeKept(kind: string, reason: string): string;
+  /**
+   * Notes on a woken reply whose chat's mode differs from its session's that the steps before the switch may have run in the earlier mode.
+   * @param kind The provider's display name.
+   * @returns Such as "Grok began this reply on its own, so the steps it took before switching to the chat's current mode may have run in the mode it had.".
+   */
+  public static formatWakeBeganInEarlierMode(kind: string): string;
+  /**
+   * Logs a woken reply's mode note that couldn't be added.
+   * @param kind The provider kind's id.
+   * @param reason Why it couldn't be added.
+   * @returns Such as "[grok] A woken reply's mode note was lost: The turn ended".
+   */
+  public static formatWakeModeNoteLost(kind: string, reason: string): string;
   /**
    * Describes a turn whose session stays in an unrestricted mode after TeamRun tried to switch it to the default.
    * @param kind The provider's display name.
@@ -6902,6 +6976,35 @@ export declare class Resources {
    * @returns The text.
    */
   public static formatBlockedServersUnnoted(kind: string, reason: string): string;
+  /**
+   * The steps a stopped ACP turn waits on, as its stop's log line names them.
+   */
+  public static readonly turnStepStart: string;
+  public static readonly turnStepPrompt: string;
+  public static readonly turnStepAnswer: string;
+  public static readonly turnStepHandled: string;
+  public static readonly turnStepBlockedServers: string;
+  public static readonly turnStepFinish: string;
+  public static readonly turnStepCompaction: string;
+  public static readonly turnStepSteers: string;
+  public static readonly turnStepRelease: string;
+  /**
+   * Formats the log line for a stopped ACP turn that hasn't settled within `ProviderTimings.stopReportWait`.
+   * @param kind The provider kind's id.
+   * @param step The step it still waits on.
+   * @param subAgents Its sub-agents' states when it was stopped, from {@link Resources.formatSubAgentState}, or empty for none.
+   * @returns The text.
+   */
+  public static formatTurnStopStuck(kind: string, step: string, subAgents: string): string;
+  /**
+   * Formats a sub-agent's state for a stopped turn's log line.
+   * @param toolCallId The tool call that started it.
+   * @param status Its status.
+   * @param background Whether it runs in the background.
+   * @param kept Whether the turn keeps it past its end.
+   * @returns The text.
+   */
+  public static formatSubAgentState(toolCallId: string, status: import("@noldova/teamrun.protocol").SubAgentStatus, background: boolean, kept: boolean): string;
   /**
    * Formats the log line for a read of Claude's shared MCP server states that stopped on an error.
    * @param reason Why it stopped.
@@ -7801,9 +7904,10 @@ export declare class ClaudeAdapter implements IProviderAdapter {
    */
   public readonly takesTeamRunTools: boolean;
   /**
-   * The `claude` provider.
+   * The `claude` provider, its profile's usual folder, which is also its one person folder, decided from TeamRun's own environment
+   * until `refreshDescriptorAsync` decides it from the environment Claude Code is given.
    */
-  public readonly descriptor: ProviderKind;
+  public get descriptor(): ProviderKind;
   /**
    * The usual folder, and `CLAUDE_CONFIG_DIR` when it names another; a profile folder holds `.claude.json`, `settings.json`,
    * `projects`, `history.jsonl`, `statsig` or `todos`.
@@ -7849,6 +7953,12 @@ export declare class ClaudeAdapter implements IProviderAdapter {
    * How many turns are running.
    */
   public get activeRunCount(): number;
+
+  /**
+   * Rebuilds the descriptor with the usual folder that `CLAUDE_CONFIG_DIR` names in the environment Claude Code is given, or `~/.claude`,
+   * as its profile's usual folder and its one person folder.
+   */
+  public refreshDescriptorAsync(): Promise<void>;
 
   /**
    * Claude Code's sign-in command through the copy its turns run, with nothing started (`TerminalSignIn.of`).
@@ -10763,8 +10873,12 @@ export declare class ProcessTerminator {
  * Lists processes with their parents and starts, and ends a tree. A process counts as the tree's only through a parent that started no later than
  * it, and not through a parent id the listing shows another process holding now.
  * On Windows it ends the tree in rounds, each one PowerShell script that opens each listed process by id, ends it through that handle only when it
- * started when the listing said, parents first, and lists again, until no new process shows under the tree, at most `processTreeFreezeRounds`
- * rounds; its listings and rounds run in its `IPowershellSession` when it has one, and otherwise each in a new PowerShell.
+ * started when the listing said, parents first, waits for it to exit, and lists again, until no process of the tree shows, at most
+ * `processTreeFreezeRounds` rounds, so one whose end failed is ended again in the next round; after the last round, or a round whose script fails,
+ * it stops with the tree reported ended even if a process of it still shows, and writes to its log which processes still showed or which round
+ * failed. Its listings and rounds run in its `IPowershellSession` when it has
+ * one, and otherwise each in a new PowerShell, and a script the session
+ * fails or runs out of time on runs once more in a new PowerShell, so a stalled session doesn't leave the tree running.
  * Elsewhere it sends `SIGSTOP` to each process of the tree and lists again until no new process shows under it, at most `processTreeFreezeRounds`
  * listings, so a parent can't start its next process meanwhile; then `SIGTERM` and `SIGCONT` to each it stopped. Once those have ended, or after
  * the grace, it holds what is left still the same way, new children included, and sends `SIGKILL` to each. A process whose signal fails, such as
@@ -10783,7 +10897,7 @@ export declare class ProcessTree implements IProcessTree, IOrphanSweep {
    * @param read Reads a process's environment file for `endOrphaned`, throwing when it can't; the file system by default.
    */
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
-    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string);
+    kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string, log?: ILog | null);
 
   /** @inheritdoc */
   public endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;
@@ -10895,17 +11009,21 @@ export declare class SharedMcpLaunch {
  * On Windows a `.cmd` or `.bat` command found through `PATH` and `PATHEXT` runs through `COMSPEC` with arguments it quotes itself and whose
  * metacharacters it escapes twice, as cross-spawn does for npm's shims, since a batch file that passes `%*` on has cmd read them again.
  * So the server ends with it, it first starts a watch, its own script run as `--watch` apart from it and fed by a pipe from it, then the server,
- * and writes the watch, as soon as the server has started, a line of the server's process id and the times around its start. When the pipe
+ * and writes the watch, as soon as the server has started, a line of the server's process id, and `exited` once the server exits. When the pipe
  * ends, however the launcher ended, a watch with that line sends `SIGTERM` to the server's process group, and `SIGKILL` after
  * `graceMilliseconds` if it is still there. Outside Windows the server starts held: `/bin/sh` in a process group of its own waits for a line on
  * its fourth descriptor, which the launcher writes only after the watch's line, and then runs the command in its own place, without the
  * `PWD` and `SHLVL` it sets unless the server names them, or answers on it that the command isn't found, which the launcher reports as Node
  * does; a launcher killed before the watch's line closes that descriptor and the command never starts. On Windows, where ending the launcher
- * ends only the server and leaves what the server started, the watch ends, through one PowerShell run comparing times in UTC, the server if
- * it still runs and each process under it that started no earlier than its parent; when another process holds the server's id, one that started
- * outside those times, it ends nothing. A watch on Windows whose pipe ends without that line ends, the same way, each process its launcher
- * started after it, other than itself and before any later process took the launcher's id, with what those started, and none while the launcher
- * still runs.
+ * ends only the server and leaves what the server started, the watch ends, through a PowerShell run comparing only the times Windows gives the
+ * processes, the server if it started after the watch, from the launcher, and hasn't exited, and each process under it that started no earlier
+ * than its parent; otherwise each process the server's id started after the watch and before the process that now holds the id, if any. A
+ * watch on Windows whose pipe ends without that line ends, the same way, each process its launcher started after it, other than itself and
+ * before any later process took the launcher's id, with what those started, and none while the launcher
+ * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one with the
+ * rest of `windowsEndMilliseconds`, which is ended too if it hasn't ended by then. The watch on Windows gets the launcher's errors and writes there a
+ * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end, can't start or exits with an error, a line when a launcher
+ * ended before its server left nothing of the server to end, and nothing otherwise.
  */
 export declare class SharedMcpLauncher {
   /**
@@ -10962,6 +11080,17 @@ export declare class SharedMcpLauncher {
   public static readonly graceMilliseconds: number;
 
   /**
+   * How long the watch on Windows waits for its PowerShell to end before it ends it and runs the same script once more in a new one, in
+   * milliseconds.
+   */
+  public static readonly powershellAnswerMilliseconds: number;
+
+  /**
+   * How long the watch on Windows gives its PowerShells in all, the first and the one that runs once more, in milliseconds.
+   */
+  public static readonly windowsEndMilliseconds: number;
+
+  /**
    * @param platform The platform, as `process.platform`.
    * @param environment The launcher's own environment.
    * @param program The program that runs the watch, as `process.execPath`.
@@ -10969,11 +11098,12 @@ export declare class SharedMcpLauncher {
    * @param host The launcher's own process; `process` by default.
    * @param start Starts a process; `spawn` by default.
    * @param isFile Whether a path is a file; by default, whether it exists and is one.
-   * @param delayAsync Waits a number of milliseconds; `setTimeout` of `node:timers/promises` by default.
+   * @param delayAsync Waits a number of milliseconds, until the signal aborts; `setTimeout` of `node:timers/promises` by default.
+   * @param now The time, in milliseconds, for a PowerShell's time; `performance.now` by default.
    */
   public constructor(platform: string, environment: NodeJS.ProcessEnv, program: string, script: string, host?: ISharedMcpLauncherHost,
     start?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess, isFile?: (file: string) => boolean,
-    delayAsync?: (milliseconds: number) => Promise<unknown>);
+    delayAsync?: (milliseconds: number, signal?: AbortSignal) => Promise<unknown>, now?: () => number);
 
   /**
    * Runs the launcher or, after `watchOption`, the watch, and exits through the host; wrong arguments write their usage to the errors and exit
@@ -11355,9 +11485,11 @@ export declare class AcpClient {
   /**
    * Creates a single-use client with explicit launch environment and process ownership; its stop waits on the timer, by default `NodeTimer`.
    * Messages are framed as `framing` says, one per line by default. With `tree`, its stop ends what the agent started too.
+   * With `gate`, a request for one of its methods that the client can't hand on or answer, past the open-request cap, under an id already open, with no listener, or whose answer
+   * fails, is answered with the gate's refusal, `Resources.acpGatedRequestRefused`, never an error, since the agent lets the call go on after an error.
    */
   public constructor(command: ProcessCommand, environment: NodeJS.ProcessEnv, directory: string, starter: IProcessStarter, timings: ProviderTimings, timer?: ITimer,
-    framing?: MessageFraming, tree?: IProcessTree | null);
+    framing?: MessageFraming, tree?: IProcessTree | null, gate?: IAcpToolGate | null);
 
   /**
    * Starts the process; a second start throws.
@@ -11744,6 +11876,12 @@ export declare class PiTurn {
 
   /** How the turn ended, or `null` while it runs. */
   public get outcome(): TurnOutcome | null;
+
+  /**
+   * How the turn ended.
+   * @throws InvalidOperationException While the turn runs.
+   */
+  public get settledOutcome(): TurnOutcome;
 
   /** Why a failed turn failed, or `null`. */
   public get error(): string | null;
@@ -12823,6 +12961,12 @@ export interface IAcpAgent {
   readonly steering?: IAcpSteering;
 
   /**
+   * Asks TeamRun before each of the agent's tool calls, ahead of the agent's own permission rules, so a read-only chat can refuse a tool
+   * the person's rules would allow; absent for an agent with no such hook, where those rules answer without TeamRun.
+   */
+  readonly toolGate?: IAcpToolGate;
+
+  /**
    * Lists each model's effort levels with a command of the agent's own, run after the listing session; absent for an agent whose session
    * options name the levels.
    */
@@ -12881,7 +13025,7 @@ export interface IAcpPlanReader {
   readonly methods: readonly string[];
   /** The native kind the plan's approval shows, such as Cursor's `create_plan`. */
   readonly nativeKind: string;
-  /** Whether the agent leaves its plan mode by itself once told the plan is approved, as Grok does; a turn otherwise switches it out first. */
+  /** Whether the agent leaves its plan mode by itself, for its default mode, once told the plan is approved, as Grok does, and a turn then asks for the chat's mode once it reports its new mode, which applies from the agent's next turn; a turn otherwise switches it out first. */
   readonly leavesPlan: boolean;
   /**
    * The request's plan: its Markdown text and its to-dos as steps; `null` when the agent handed over no plan, and a turn then answers as if the
@@ -12894,6 +13038,37 @@ export interface IAcpPlanReader {
    * they dismissed it, the turn stopped or the request didn't read.
    */
   reply(params: JsonReader, approved: boolean | null): JsonObject;
+}
+
+/**
+ * An ACP agent's hook that asks the client before each tool call, ahead of the agent's own permission rules.
+ */
+export interface IAcpToolGate {
+  /**
+   * The hook request's method, as an extension method, then plain.
+   */
+  readonly methods: readonly string[];
+
+  /**
+   * The `_meta` entries that register the hook on `session/new`, `session/load` and `session/resume`, or `null` when `initialized`, the
+   * agent's `initialize` answer, doesn't offer a hook that can refuse a call, so none is registered.
+   */
+  metaOf(initialized: JsonReader): JsonObject | null;
+
+  /**
+   * Reads the call a hook request asks about, or `null` when it isn't a pre-tool request or names no call.
+   */
+  read(params: JsonReader): AcpGatedTool | null;
+
+  /**
+   * Whether the agent's merged tool updates for the call mark it read-only.
+   */
+  readOnly(update: JsonReader): boolean;
+
+  /**
+   * The answer: the call goes on when `refusal` is `null`, and is refused with it as the reason otherwise.
+   */
+  answer(refusal: string | null): JsonObject;
 }
 
 /**
@@ -13153,6 +13328,21 @@ export declare class AcpPermissionSwitch {
    * @throws ArgumentException when a part is blank.
    */
   public constructor(optionId: string, mode: string, onValue: string, offValue: string);
+}
+
+/**
+ * The tool call an ACP agent's pre-tool hook asks about.
+ */
+export declare class AcpGatedTool {
+  /** The call's id, as the agent's tool updates name it. */
+  public readonly toolUseId: string;
+  /** The MCP server and tool the call is for, or `null` when it isn't an MCP tool. */
+  public readonly mcp: AcpMcpTool | null;
+
+  /**
+   * @throws ArgumentException when `toolUseId` is blank.
+   */
+  public constructor(toolUseId: string, mcp: AcpMcpTool | null);
 }
 
 /**
@@ -13573,6 +13763,8 @@ export declare class GrokAgent implements IAcpAgent {
   public readonly ownMcpServers: IAcpOwnMcpServersReader;
   /** Grok's `x.ai/interject`. */
   public readonly steering: IAcpSteering;
+  /** Grok's `PreToolUse` client hook, `x.ai/hooks/run`. */
+  public readonly toolGate: IAcpToolGate;
   public readonly authMeta: JsonObject;
   public readonly initializeMeta: JsonObject | null;
   public readonly stopReasons: readonly string[];
@@ -15328,6 +15520,24 @@ export declare class GrokMcpServersReader implements IAcpOwnMcpServersReader {
 }
 
 /**
+ * Grok's `PreToolUse` client hook: registered under `_meta["x.ai/hooks"]` when Grok's `initialize` answer offers `deny`, asked through
+ * `x.ai/hooks/run` before each tool call and ahead of Grok's own permission rules, and read-only from the `_meta["x.ai/tool"].read_only` of the
+ * call's earlier `tool_call` update. Grok lets a call go on when the answer doesn't come within 30 seconds.
+ */
+export declare class GrokToolGate implements IAcpToolGate {
+  /** `x.ai/hooks/run`, as an extension method, then plain. */
+  public readonly methods: readonly string[];
+  /** @inheritdoc */
+  public metaOf(initialized: JsonReader): JsonObject | null;
+  /** Reads a `PreToolUse` request's `toolUseId`, and its `toolName` as `server__tool` when it has one `__`. */
+  public read(params: JsonReader): AcpGatedTool | null;
+  /** @inheritdoc */
+  public readOnly(update: JsonReader): boolean;
+  /** `{}` to go on, or `{ decision: "deny", reason }`. */
+  public answer(refusal: string | null): JsonObject;
+}
+
+/**
  * Gives Grok's running turn a person's message through `x.ai/interject`, its text and its content blocks; Grok queues it and reads it at the
  * turn's next safe point.
  */
@@ -15540,6 +15750,10 @@ export declare class AcpSubAgents {
    * Whether a background sub-agent it keeps past its turn still runs, or the agent hasn't yet answered the cancel of one the person's Stop ended.
    */
   public get isKeeping(): boolean;
+  /**
+   * Each sub-agent's state, from {@link Resources.formatSubAgentState}, joined by {@link Resources.listSeparator}; empty for none.
+   */
+  public get states(): string;
 
   /**
    * Keeps its background sub-agents running past the turn: the turn's end stops only the others, each kept one is a task, named by its Grok id, whose
@@ -16091,9 +16305,11 @@ export declare class AcpTurn implements IAcpClientListener {
    * @param plans Reads the agent's own plan requests; none by default. A plan request of the turn's session reports its plan text, and its
    * to-dos as the reply's plan, asks the person to Approve plan or Keep planning, reports the plan text again as approved or refused, and
    * answers the agent with the person's choice; a dismissed or stopped ask answers as cancelled.
-   * @param leavePlan Switches the session out of its plan mode once the person approved a plan, before the agent is answered, unless the
-   * reader's `leavesPlan` says the agent leaves it by itself; nothing by default.
-   * When it fails, the turn reports a note with `Resources.formatPlanModeKept` and the plan is still approved.
+   * @param leavePlan Called once the person approved a plan to switch the session out of its plan mode, into the chat's own mode; nothing by
+   * default. It is called before the agent is answered, and when it fails, the turn reports a note with `Resources.formatPlanModeKept` and the
+   * plan is still approved. When the reader's `leavesPlan` says the agent leaves its plan mode by itself, for its default mode, once answered,
+   * it is called instead at the session's next `current_mode_update`, without waiting for it, and a failure other than the run closing reports
+   * a note with `Resources.formatChatModeKeptOut`; for such an agent the mode it asks for applies from the agent's next turn.
    * @param approvedTools The names of TeamRun's tools the person approved for every call; none by default.
    * @param mcpToolOf Reads which MCP server and tool a permission request is for, as `IAcpAgent.mcpToolOf`; none by default. A request it reads
    * as TeamRun's server, `teamrun`, and a tool `readOnlyTools` lists is allowed once without asking; one for another tool of that server is asked
@@ -16105,6 +16321,14 @@ export declare class AcpTurn implements IAcpClientListener {
    * mode, by `leavePlan` or by the agent itself, `allowsAll` allows nothing, and a turn that fails to leave it keeps asking. False by default.
    * @param toDoList Reads the agent's own to-do list notifications; none by default. One of the turn's session, while the turn runs, reports
    * the list as the reply's plan.
+   * @param readOnlyChat Whether the chat's own mode, which a plan-first turn leaves its plan for, is read-only, such as Ask; false by default.
+   * Once the person approves the plan of such a turn, each permission request the rules above for TeamRun's tools don't settle is refused
+   * without asking, with a `Resources.formatReadOnlyChatRefused` note, whatever mode the agent reports, until the turn ends. For an agent whose
+   * reader's `leavesPlan` is set, the adapter's `leavePlan` then cancels the turn at that update, and the adapter goes on in the same reply
+   * with a new turn in the chat's mode, so a write the agent starts before the cancel lands is refused too.
+   * @param toolGate Answers the agent's pre-tool hook, whose methods the turn then answers; none by default. While `readOnlyChat` is set and the
+   * turn isn't planning, a call is refused, with a `Resources.formatReadOnlyToolRefused` note, unless the agent's earlier tool update for it
+   * marks it read-only or it is one of TeamRun's tools `readOnlyTools` lists; every other call goes on, and the agent's own rules decide.
    */
   public constructor(kindId: string, providerName: string, toolTitle: string, listener: ITurnListener, signal: AbortSignal, streamInterval: number,
     savedImageOf?: (tool: JsonReader, sessionId: string) => SavedImage | null, routedMcpTool?: string | null,
@@ -16112,7 +16336,7 @@ export declare class AcpTurn implements IAcpClientListener {
     imageFailureOf?: (tool: JsonReader) => JsonObject | null, questions?: IAcpQuestionReader | null, plans?: IAcpPlanReader | null,
     leavePlan?: (sessionId: string) => Promise<void>, approvedTools?: readonly string[], mcpToolOf?: (tool: JsonReader) => AcpMcpTool | null,
     readOnlyTools?: (signal: AbortSignal) => Promise<readonly string[]>, allowsAll?: boolean, planning?: boolean,
-    toDoList?: IAcpToDoListReader | null);
+    toDoList?: IAcpToDoListReader | null, readOnlyChat?: boolean, toolGate?: IAcpToolGate | null);
 
   /**
    * Whether the agent reported that its context is full, as Grok's failed `context_length` retry state does, so a failed prompt says so.
@@ -16152,6 +16376,24 @@ export declare class AcpTurn implements IAcpClientListener {
   public beginAsync(sessionId: string, resumed: boolean, observed: ObservedSettings, roleApplied?: import("@noldova/teamrun.protocol").RoleApplication | null): Promise<void>;
 
   /**
+   * Keeps the turn going past its prompt's next `cancelled` answer, which the adapter asks for when it cancels an approved plan's turn to
+   * go on in a new prompt in the chat's mode: that answer ends the text so far without finishing the turn.
+   */
+  public restartAfterCancel(): void;
+
+  /**
+   * Holds the end of a woken turn until a switch of its session's mode settles.
+   * @param settled Settles, never rejecting, once the switch is answered or given up.
+   */
+  public switchingMode(settled: Promise<void>): void;
+
+  /**
+   * Runs an action once the turn's mode switch settles, at once when there is none.
+   * @param then The action, such as ending the woken reply.
+   */
+  public afterModeSwitch(then: () => void): void;
+
+  /**
    * Flushes remaining text and stops delivery, except of the updates of the background sub-agents it keeps, and ends its other sub-agents as Stopped.
    * A turn whose signal was aborted keeps none: it cancels each kept sub-agent through the agent and ends it as Stopped, without waiting for the agent's answer.
    */
@@ -16161,6 +16403,10 @@ export declare class AcpTurn implements IAcpClientListener {
    * Whether a background sub-agent it keeps past its end still runs.
    */
   public get keepsSubAgents(): boolean;
+  /**
+   * Its sub-agents' states, as {@link AcpSubAgents.states} gives them.
+   */
+  public get subAgentStates(): string;
 
   /**
    * Keeps its background sub-agents running past its end, as `AcpSubAgents.keep` says.

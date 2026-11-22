@@ -12,7 +12,9 @@ import type { JsonValue } from "@noldova/context.json";
 import { CommandContribution, ContentPadding, DockSide, DocumentContribution, type IDocumentOptions, SettingsPageContribution, SettingsRow, StatusBarSide, TopBarActionContribution, TopBarActionState, TopBarSide,
   ViewContribution, WindowPartTokens } from "@noldova/desktop.window";
 import { GitFolder, GitFolderProvidedException } from "@noldova/git.window";
-import { Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName } from "@noldova/teamrun.protocol";
+import {
+  BackgroundTask, BackgroundTaskStatus, Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName, Organization
+} from "@noldova/teamrun.protocol";
 import { OwnersProvidedException, TerminalOwners, TerminalStartFolder } from "@noldova/terminal.window";
 import { DefaultTheme, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture } from "@noldova/ui.components.angular/testing";
@@ -37,6 +39,7 @@ import { McpServersViewComponent } from "../../src/app/components/mcp-servers-vi
 import { PlanViewComponent } from "../../src/app/components/plan-view/plan-view.component";
 import { ProjectsViewComponent } from "../../src/app/components/projects-view/projects-view.component";
 import { SubAgentsViewComponent } from "../../src/app/components/sub-agents-view/sub-agents-view.component";
+import { OrganizationViewComponent } from "../../src/app/components/organization-view/organization-view.component";
 import { TeammatesViewComponent } from "../../src/app/components/teammates-view/teammates-view.component";
 import { BackgroundTaskStoreService } from "../../src/app/services/background-task-store.service";
 import { ChatStoreService } from "../../src/app/services/chat-store.service";
@@ -44,12 +47,18 @@ import { ComposerDefaultService } from "../../src/app/services/composer-default.
 import { GitHubReferenceSource } from "../../src/app/services/github-reference-source";
 import { PlanUsageStatus } from "../../src/app/services/plan-usage-status";
 import { ChatPages } from "../../src/app/services/pages/chat-pages";
+import { ChatPagesResources } from "../../src/app/services/pages/chat-pages-resources";
+import { PageDocuments } from "../../src/app/services/pages/page-documents";
+import { TitleModelOptions } from "../../src/app/services/title-model-options";
+import { OrganizationCatalog } from "../../src/app/services/organization-catalog";
+import { OrganizationLayoutState } from "../../src/app/services/organization-layout-state";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
 import { TimeFormatService } from "../../src/app/services/time-format.service";
 import { UsageFormatterService } from "../../src/app/services/usage-formatter.service";
 import { TeamRunWindowPart } from "../../src/app/teamrun-window-part";
 import { Resources } from "../../src/resources";
+import { DeferredResponse } from "../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../fixtures/fake-window-part-context.fixture";
 import { RecordingWindowPartContext } from "../fixtures/recording-window-part-context.fixture";
 import { RootPaint } from "../fixtures/root-paint.fixture";
@@ -90,38 +99,42 @@ describe("TeamRun's window part", () => {
     expect(context.lines).toEqual([]);
   });
 
-  it("registers the Projects view in the left dock, Changes, Plans, Sub-agents and Background tasks in the right and Activity at the bottom, each shown at first, Plans and Sub-agents unpadded so their lists scroll to the pane's edges, and no view for Teammates, Providers or MCP servers", async () => {
+  it("places Explorer on the left; Background tasks, Pages, Plans and Sub-agents on the right, in an upper and a lower group; and Activity and Changes at the bottom. Each view is shown at first and unpadded, so its list scrolls to the pane's edges, and there is no view for Teammates, Providers or MCP servers", async () => {
     const context = new RecordingWindowPartContext();
 
     await createPart().activateAsync(context);
 
-    expect(context.views.map(t => [t.name, t.title, t.icon, t.defaultSide, t.isShownByDefault])).toEqual([
-      ["teamrun.projects", "Explorer", "folder_open", DockSide.Left, true],
-      ["teamrun.changes", "Changes", "difference", DockSide.Right, true],
-      ["teamrun.plan", "Plans", "checklist", DockSide.Right, true],
-      ["teamrun.subAgents", "Sub-agents", "device_hub", DockSide.Right, true],
-      ["teamrun.backgroundTasks", "Background tasks", "pending_actions", DockSide.Right, true],
-      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, true],
-      ["teamrun.activity", "Activity", "list_alt", DockSide.Bottom, true]
+    expect(context.views.map(t => [t.name, t.title, t.icon, t.defaultSide, t.defaultGroup, t.defaultOrder, t.isShownByDefault])).toEqual([
+      ["teamrun.projects", "Explorer", "folder_open", DockSide.Left, 0, 10, true],
+      ["teamrun.backgroundTasks", "Background tasks", "pending_actions", DockSide.Right, 0, 10, true],
+      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, 0, 30, true],
+      ["teamrun.plan", "Plans", "checklist", DockSide.Right, 1, 10, true],
+      ["teamrun.subAgents", "Sub-agents", "device_hub", DockSide.Right, 1, 20, true],
+      ["teamrun.activity", "Activity", "list_alt", DockSide.Bottom, 0, 10, true],
+      ["teamrun.changes", "Changes", "difference", DockSide.Bottom, 0, 20, true]
     ]);
     expect(context.views.map(t => t.padding)).toEqual(Array.from({ length: 7 }, () => ContentPadding.None));
-    expect(await Promise.all(context.views.map(t => t.loadComponent()))).toEqual([ProjectsViewComponent, ChangesViewComponent, PlanViewComponent, SubAgentsViewComponent,
-      BackgroundTasksViewComponent, PagesViewComponent, ActivityViewComponent]);
+    expect(await Promise.all(context.views.map(t => t.loadComponent()))).toEqual([ProjectsViewComponent, BackgroundTasksViewComponent, PagesViewComponent, PlanViewComponent,
+      SubAgentsViewComponent, ActivityViewComponent, ChangesViewComponent]);
   });
 
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {
-    const context = new RecordingWindowPartContext();
+    const organizationOf = (id: string, name: string, order: number): Organization =>
+      new Organization(id, name, null, order, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []);
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("labs", "Labs", 1).toJson(), organizationOf("team", "Team", 0).toJson()]);
     await createPart().activateAsync(context);
-    const shows = context.commands.slice(0, 5);
+    const shows = context.commands.slice(0, 6);
 
     expect(shows.map(t => [t.name, t.title, t.icon, t.defaultKey])).toEqual([
+      ["teamrun.showOrganization", "Show organization", "lan", null],
       ["teamrun.showTeammates", "Manage teammates", "group", null],
       ["teamrun.showProviders", "Manage providers", "key", null],
       ["teamrun.showMcpServers", "Manage MCP servers", "hub", null],
       ["teamrun.showComputerUseGrants", "Manage computer use", "desktop_windows", null],
       ["teamrun.showOutsideSessions", "Connect outside agents", "hub", null]
     ]);
-    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null]);
+    expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null, null]);
+    await shows[1]?.runAsync(null);
     await shows[0]?.runAsync(null);
     expect(context.openedDocuments).toEqual([
       { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
@@ -129,15 +142,39 @@ describe("TeamRun's window part", () => {
       { name: "teamrun.mcpServers", instance: "mcpServers", title: "MCP servers", options: undefined },
       { name: "teamrun.computerUseGrants", instance: "computerUseGrants", title: "Computer use", options: undefined },
       { name: "teamrun.outsideConnection", instance: "outsideConnection", title: "Outside sessions", options: undefined },
-      { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined }
+      { name: "teamrun.organization", instance: "team", title: "Team", options: undefined },
+      { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
+      { name: "teamrun.organization", instance: "team", title: "Team", options: undefined }
     ]);
     expect([context.dialogs, context.keptDocuments]).toEqual([[], []]);
   });
 
-  it("leaves Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
+  it("opens My organization's tab from Show organization when the list can't be read, so its view says why and offers Retry", async () => {
+    const context = new FakeWindowPartContext().fail(MethodName.OrganizationList, "The runtime is gone.");
+    await createPart().activateAsync(context);
+
+    expect([await context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null), context.openedDocuments])
+      .toEqual([null, [{ name: "teamrun.organization", instance: "my-organization", title: "Organization", options: undefined }]]);
+  });
+
+  it("opens the organization the newest listing names when a resync reloads the list while Show organization waits for it", async () => {
+    const first = new DeferredResponse();
+    const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()])];
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answers.shift() ?? Promise.resolve([]));
+    await createPart().activateAsync(context);
+
+    const running = context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null);
+    context.emit(EventName.StateResyncRequested, null);
+    first.resolve([new Organization("labs", "Labs", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()]);
+    await running;
+
+    expect(context.openedDocuments).toEqual([{ name: "teamrun.organization", instance: "team", title: "Team", options: undefined }]);
+  });
+
+  it("leaves Organization, Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {
     const context = new RecordingWindowPartContext();
     await createPart().activateAsync(context);
-    const names = ["teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
+    const names = ["teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection"];
 
     expect([declaration.contributes.views.filter(t => names.includes(t)), context.views.filter(t => names.includes(t.name))]).toEqual([[], []]);
     expect([declaration.contributes.documents.filter(t => names.includes(t)), context.documents.filter(t => names.includes(t.name)).map(t => t.name)]).toEqual([names, names]);
@@ -149,7 +186,7 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.commands.map(t => t.name)).toEqual(declaration.contributes.commands);
-    expect(context.commands.slice(5).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
+    expect(context.commands.slice(6).map(t => [t.name, t.title, t.icon, t.defaultKey?.text])).toEqual([
       ["teamrun.newConversation", "New chat", "edit_square", "Mod+N"],
       ["teamrun.openProject", "Open folder", "folder_open", "Mod+O"],
       ["teamrun.openBrowser", "Open browser", "language", undefined],
@@ -168,7 +205,7 @@ describe("TeamRun's window part", () => {
       ["teamrun.reload", "Load TeamRun's data again", "refresh", undefined],
       ["teamrun.newChatTerminal", "New chat terminal", "terminal", "Mod+Alt+Backquote"]
     ]);
-    expect([...context.commands.slice(12, 16), ...context.commands.slice(21)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
+    expect([...context.commands.slice(13, 17), ...context.commands.slice(22)].map(t => [t.defaultKey?.label("darwin"), t.defaultKey?.label("win32"),
       t.defaultKey?.label("linux")])).toEqual([["⌥↑", "Alt+Up", "Alt+Up"], ["⌥↓", "Alt+Down", "Alt+Down"], ["⇧⌘↑", "Ctrl+Shift+Up", "Ctrl+Shift+Up"],
       ["⇧⌘↓", "Ctrl+Shift+Down", "Ctrl+Shift+Down"], ["⌥⌘`", "Ctrl+Alt+`", "Ctrl+Alt+`"]]);
   });
@@ -349,9 +386,9 @@ describe("TeamRun's window part", () => {
     await createPart().activateAsync(context);
 
     expect(context.documents.map(t => [t.name, t.padding])).toEqual([["teamrun.conversation", ContentPadding.None], ["teamrun.image", ContentPadding.None],
-      ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
+      ["teamrun.organization", ContentPadding.None], ["teamrun.teammates", ContentPadding.None], ["teamrun.providers", ContentPadding.None], ["teamrun.mcpServers", ContentPadding.None],
       ["teamrun.computerUseGrants", ContentPadding.None], ["teamrun.outsideConnection", ContentPadding.None], ["teamrun.page", ContentPadding.None]]);
-    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, TeammatesViewComponent,
+    expect(await Promise.all(context.documents.map(t => t.loadComponent()))).toEqual([ConversationComponent, ImageDocumentComponent, OrganizationViewComponent, TeammatesViewComponent,
       ProvidersViewComponent, McpServersViewComponent, ComputerUseGrantsViewComponent, OutsideConnectionViewComponent, PageDocumentComponent]);
   });
 
@@ -500,6 +537,68 @@ describe("TeamRun's window part", () => {
     ChatStoreService.release(context);
   });
 
+  it("shows in the Tasks panel a command that ended while the runtime was away, once the runtime starts again", async () => {
+    const part = createPart();
+    const task = (status: BackgroundTaskStatus, exitCode: number | null, ended: string | null): BackgroundTask =>
+      new BackgroundTask("t1", SampleData.conversation.id, "r1", "codex", "make", status, exitCode, SampleData.timestamp, ended, null);
+    const context = SampleData.createContext().answer(MethodName.BackgroundTaskList, () => SampleData.tasks([task(BackgroundTaskStatus.Running, null, null)]));
+    await part.activateAsync(context);
+    const tasks = BackgroundTaskStoreService.of(context);
+    tasks.watch(SampleData.conversation.id);
+    await Wait.until(() => expect(tasks.tasksOf(SampleData.conversation.id).map(t => t.status)).toEqual([BackgroundTaskStatus.Running]));
+    context.answer(MethodName.BackgroundTaskList, () => SampleData.tasks([task(BackgroundTaskStatus.Completed, 0, SampleData.timestamp)]));
+
+    await expect(part.reconnectAsync()).resolves.toBe(true);
+
+    await Wait.until(() => expect(tasks.tasksOf(SampleData.conversation.id).map(t => t.status)).toEqual([BackgroundTaskStatus.Completed]));
+    BackgroundTaskStoreService.release(context);
+    ChatStoreService.release(context);
+  });
+
+  it("reads the projects' layout, the composer's default and a watched chat's pages again when the runtime starts again", async () => {
+    const part = createPart();
+    const context = SampleData.createContext().answerModule(ChatPagesResources.listName, () => []);
+    await part.activateAsync(context);
+    ProjectsLayoutService.of(context);
+    ComposerDefaultService.of(context);
+    ChatPages.of(context).watch(SampleData.conversation.id);
+    const reads = (): number[] => [context.count(MethodName.ProjectsLayoutRead), context.count(MethodName.ComposerDefaultRead),
+      context.requests.filter(t => t.method === ChatPagesResources.listName).length];
+    await Wait.until(() => expect(reads()).toEqual([1, 1, 1]));
+
+    await part.reconnectAsync();
+
+    await Wait.until(() => expect(reads()).toEqual([2, 2, 2]));
+    ProjectsLayoutService.release(context);
+    ComposerDefaultService.release(context);
+    ChatPages.release(context);
+    ChatStoreService.release(context);
+  });
+
+  it("reads its open page documents again when the runtime starts again, and its title model lists only once its store's state was read again", async () => {
+    const part = createPart();
+    const context = SampleData.createContext();
+    await part.activateAsync(context);
+    const store = ChatStoreService.of(context);
+    await Wait.until(() => expect(store.loaded()).toBe(true));
+    await Wait.until(() => expect(store.isBusy()).toBe(false));
+    let pages = 0;
+    const release = PageDocuments.onResync(context, () => {
+      pages += 1;
+    });
+    const reload = vi.spyOn(TitleModelOptions, "reload");
+
+    await expect(part.reconnectAsync()).resolves.toBe(true);
+    const reloaded = reload.mock.calls.map(t => t[0] === context);
+    context.fail(MethodName.ProjectList, "The runtime part is away.");
+    await expect(part.reconnectAsync()).resolves.toBe(false);
+
+    expect([pages, reloaded, reload.mock.calls.length]).toEqual([2, [true], 1]);
+    reload.mockRestore();
+    release();
+    ChatStoreService.release(context);
+  });
+
   it("gives computer use the border's colour, the window's accent, when activated, again when the runtime starts again, and on each theme change until deactivated",
     async () => {
       const part = createPart();
@@ -537,6 +636,8 @@ describe("TeamRun's window part", () => {
     const store = ChatStoreService.of(context);
     const tasks = BackgroundTaskStoreService.of(context);
     const layout = ProjectsLayoutService.of(context);
+    const organizationLayout = OrganizationLayoutState.of(context, "my-organization");
+    const organizations = OrganizationCatalog.of(context);
     const choice = ComposerDefaultService.of(context);
     const pages = ChatPages.of(context);
 
@@ -548,11 +649,15 @@ describe("TeamRun's window part", () => {
     expect(ChatStoreService.of(context)).not.toBe(store);
     expect(BackgroundTaskStoreService.of(context)).not.toBe(tasks);
     expect(ProjectsLayoutService.of(context)).not.toBe(layout);
+    expect(OrganizationLayoutState.of(context, "my-organization")).not.toBe(organizationLayout);
+    expect(OrganizationCatalog.of(context)).not.toBe(organizations);
     expect(ComposerDefaultService.of(context)).not.toBe(choice);
     expect(ChatPages.of(context)).not.toBe(pages);
     ChatStoreService.release(context);
     BackgroundTaskStoreService.release(context);
     ProjectsLayoutService.release(context);
+    OrganizationLayoutState.release(context);
+    OrganizationCatalog.release(context);
     ComposerDefaultService.release(context);
     ChatPages.release(context);
   });

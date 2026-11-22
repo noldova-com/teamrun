@@ -25,7 +25,8 @@ export class CopilotTestHost implements AsyncDisposable {
   public readonly command = new ProcessCommand(process.execPath, [fileURLToPath(new URL("./fake-acp-agent.fixture.js", import.meta.url))]);
   public readonly programs = new ProgramRecorder();
   public readonly terminator = new ProcessTerminator(process.platform);
-  public readonly timings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 100, 100, 5000, 100, 1, 10);
+  public readonly timings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 100, 100, 5000, 100, 1, 10, Resources.wakeGrace, Resources.taskOutputFollowInterval,
+    Resources.accountTimeout, Resources.modelListTimeout, Resources.silenceLimit, Resources.idleLimit, 10_000);
   public readonly timer = new HeldDelayTimer(this.timings.killWait);
   public readonly patientTimings = new ProviderTimings(2000, 2000, 60_000, 60_000, 100, 100, 100, 5000, 100, 1, 10);
   public readonly patientTimer = new HeldDelayTimer(this.patientTimings.killWait, Resources.modelCheckWait);

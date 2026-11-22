@@ -10,7 +10,7 @@ import { type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { TurnOutcome } from "@noldova/teamrun.core";
 import { ApprovalKind, ContextUsage, DetailKind, QuestionAnswer } from "@noldova/teamrun.protocol";
-import { DeltaStream, PiTurn, Resources } from "@noldova/teamrun.providers";
+import { DeltaStream, InvalidOperationException, PiTurn, Resources } from "@noldova/teamrun.providers";
 
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -136,8 +136,17 @@ export class PiTurnTests {
     await turn.drainAsync();
 
     Assert.areEqual(outcome, turn.outcome);
+    Assert.areEqual(outcome, turn.settledOutcome);
     Assert.areEqual(error, turn.error);
     Assert.isFalse(turn.hasUsage);
+  }
+
+  @TestMethod
+  public refusesItsSettledOutcomeWhileItRuns(): void {
+    const turn = PiTurnTests.turn(new RecordingTurnListener(), []);
+
+    Assert.throws(() => turn.settledOutcome, InvalidOperationException);
+    Assert.isNull(turn.outcome);
   }
 
   @TestMethod

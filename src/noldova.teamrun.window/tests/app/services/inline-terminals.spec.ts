@@ -392,6 +392,76 @@ describe("InlineTerminals", () => {
     expect([live, kept.saved]).toEqual([[], [["teamrun.chat/c1", first, ["$ ls", "a.txt"]]]]);
   });
 
+  it("shows an earlier Run's output at its block only once the chat's kept Runs saved it, keeping the block among its message's blocks until then", async () => {
+    const kept = new FakeKeptRuns();
+    inline = new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows), kept);
+    starter.sessions = ["s1", "s1"];
+    starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    let release = (): void => undefined;
+    kept.saveHeld = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const saving = new Promise<void>(resolve => {
+      kept.onSave = resolve;
+    });
+
+    const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    await saving;
+    const held = [shownOutput("teamrun.chat/c1", first), inline.blocksOf("teamrun.chat/c1", "m1")];
+    release();
+    await moving;
+
+    expect([held, shownOutput("teamrun.chat/c1", first)]).toEqual([[null, new Map([["body", new Set([2, 0])]])], ["$ ls", "a.txt"]]);
+  });
+
+  it("shows no earlier Run's output for a save that lands after its chat closed", async () => {
+    const kept = new FakeKeptRuns();
+    inline = new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows), kept);
+    starter.sessions = ["s1", "s1"];
+    starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    let release = (): void => undefined;
+    kept.saveHeld = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const saving = new Promise<void>(resolve => {
+      kept.onSave = resolve;
+    });
+
+    const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    await saving;
+    inline.close("teamrun.chat/c1");
+    release();
+    await moving;
+
+    expect([kept.saved.length, shownOutput("teamrun.chat/c1", first)]).toEqual([1, null]);
+  });
+
+  it("shows no earlier Run's output for a save that lands after a Run went back to its block", async () => {
+    const kept = new FakeKeptRuns();
+    inline = new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows), kept);
+    starter.sessions = ["s1", "s1", "s1"];
+    starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls", "a.txt"));
+    starter.outputs.set("run-2", new TerminalRunNotFoundException("s1", "run-2"));
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    let release = (): void => undefined;
+    kept.saveHeld = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const saving = new Promise<void>(resolve => {
+      kept.onSave = resolve;
+    });
+
+    const moving = inline.runAsync("teamrun.chat/c1", "pwd", null, [], second);
+    await saving;
+    await inline.runAsync("teamrun.chat/c1", "ls", null, [], first);
+    release();
+    await moving;
+
+    expect([kept.saved.length, inline.isLiveAt("teamrun.chat/c1", first), shownOutput("teamrun.chat/c1", first)]).toEqual([1, true, null]);
+  });
+
   it("shows a chat's kept Runs once, when the chat first shows, beside the outputs it holds, and none at the live terminal's block", async () => {
     const kept = new FakeKeptRuns();
     kept.runs = [FakeKeptRuns.runAt(first, "$ old"), FakeKeptRuns.runAt(second, "$ kept"), FakeKeptRuns.runAt(elsewhere, "$ stale")];
@@ -608,6 +678,8 @@ class FakeKeptRuns implements IKeptRuns {
   public readonly listed: string[] = [];
   public runs: readonly IStoredRun[] = [];
   public holds: boolean = false;
+  public saveHeld: Promise<void> = Promise.resolve();
+  public onSave: () => void = () => undefined;
   private readonly held: (() => void)[] = [];
 
   public static runAt(place: IRunPlace, ...lines: string[]): IStoredRun {
@@ -622,8 +694,10 @@ class FakeKeptRuns implements IKeptRuns {
     return new Promise(resolve => this.held.push(() => resolve(runs)));
   }
 
-  public save(owner: string, run: IStoredRun): void {
+  public save(owner: string, run: IStoredRun): Promise<void> {
     this.saved.push([owner, run.place, run.output.lines.map(t => t.text)]);
+    this.onSave();
+    return this.saveHeld;
   }
 
   public release(): void {

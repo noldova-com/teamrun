@@ -1,0 +1,223 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-2);
+  box-sizing: border-box;
+  width: 15rem;
+  padding: var(--nol-space-3);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: light-dark(var(--nol-panel), var(--nol-raised));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+}
+
+.who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name,
+.role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nol-text-strong);
+  font: inherit;
+  font-weight: var(--nol-weight-emphasis);
+  text-align: start;
+  cursor: pointer;
+}
+
+.name:hover {
+  text-decoration: underline;
+}
+
+.plain {
+  cursor: auto;
+}
+
+.plain:hover {
+  text-decoration: none;
+}
+
+.role {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.tune {
+  flex: none;
+}
+
+.remove {
+  flex: none;
+}
+
+.move {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  min-width: 0;
+  font-size: var(--nol-text-small);
+}
+
+.move-label {
+  color: var(--nol-text-muted);
+}
+
+.move-choice {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.status {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.now {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
+  min-width: 0;
+}
+
+.now-icon {
+  flex: none;
+  width: var(--nol-icon);
+  margin-top: 0.0625rem;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-icon);
+}
+
+.now-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: calc(var(--nol-space-1) + var(--nol-space-half));
+  min-width: 0;
+}
+
+.act .now-body {
+  column-gap: var(--nol-space-2);
+}
+
+.now-text {
+  flex: 1 1 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+.now-for {
+  flex: none;
+  color: var(--nol-text-muted);
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  white-space: nowrap;
+}
+
+.acts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nol-text-small);
+}
+
+.act {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nol-space-2);
+  padding: calc(var(--nol-space-1) + var(--nol-space-half)) var(--nol-space-2);
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-raised);
+}
+
+.usage {
+  --nol-meter-height: var(--nol-space-1);
+  --nol-meter-gap: var(--nol-space-2);
+  --nol-meter: calc(100% - var(--nol-meter-gap) - 2rem);
+}
+
+.usage:not(.nol-meter-warning) {
+  --nol-meter-color: var(--nol-text-muted);
+}
+
+.last {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.model {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+:host(.fluid) {
+  width: auto;
+}
+
+:host(.row) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--nol-space-1) var(--nol-space-2);
+  width: auto;
+  padding: var(--nol-space-2);
+  border: none;
+  background: var(--nol-panel);
+}
+
+:host(.row:hover) {
+  background: var(--nol-hover);
+}
+
+:host(.row) .head {
+  display: contents;
+}
+
+:host(.row) .who {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--nol-space-2);
+}
+
+:host(.row) > :not(.head) {
+  grid-column: 2;
+}

@@ -11,7 +11,6 @@ import { join } from "node:path";
 
 import {
   TeammatesService,
-  OrganizationMessagesService,
   OrganizationService,
   ApprovalsService,
   BackgroundTasksService,
@@ -48,6 +47,7 @@ import {
   ConversationCreateParams,
   type Event,
   EventName,
+  NodeTypeCreateParams,
   type Project,
   ProjectOpenParams,
   ProviderCreateParams,
@@ -93,7 +93,6 @@ export class CoreHost implements AsyncDisposable {
   public readonly providers: ProvidersService;
   public readonly teammates: TeammatesService;
   public readonly organization: OrganizationService;
-  public readonly organizationMessages: OrganizationMessagesService;
   public readonly kinds: ProviderKindsService;
   public readonly planUsage: PlanUsageService;
   public readonly engine: ConversationEngine;
@@ -146,14 +145,13 @@ export class CoreHost implements AsyncDisposable {
     this.windows = new WindowsService(this.events, this.conversations, 50);
     this.computerUseGrants = new ComputerUseGrantsService(this.rememberedGrants, this.conversations, this.teammates, this.appDescriptions,
       new ComputerUseGrantTimings(1_000, 60_000), this.timer);
-    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates);
+    this.kinds = new ProviderKindsService(this.registry, this.providers, this.events, this.planUsage, this.teammates, this.log);
     this.engine = new ConversationEngine(this.context, this.projects, this.conversations, this.messages, this.approvals,
       this.providers, this.teammates, this.registry, this.events, this.attachments, readHopLimit, this.log, readCommand, this.tasks, this.planUsage, tools,
       this.checkpoints, this.sharedServers, null, runsCommands ? this.commands : null, readTitleModel, readIdleCompaction, this.timer);
-    this.organizationMessages = new OrganizationMessagesService(this.context, this.organization, this.teammates, this.messages, this.engine, this.events);
     this.dispatcher = new RequestDispatcher(this.kinds, this.providers, this.projects, this.conversations,
       this.messages, this.approvals, this.engine, this.teammates, this.events, this.drafts, null, this.tasks, this.planUsage,
-      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization, this.organizationMessages);
+      this.readingPositions, this.windows, this.sharedServers, this.computerUseGrants, null, this.organization);
   }
 
   public static async createAsync(supportsFork: boolean = false, supportsSignIn: boolean = false, signInTimeout?: number, readHopLimit?: () => number,
@@ -184,6 +182,11 @@ export class CoreHost implements AsyncDisposable {
 
   public async createProviderAsync(kind: string = "fake", label: string = "Work"): Promise<Provider> {
     return this.providers.createAsync(new ProviderCreateParams(kind, label, join(this.directory.path, "profiles", label)));
+  }
+
+  public async typeAsync(organizationId: string = Resources.defaultOrganizationId): Promise<string> {
+    const found = (await this.organization.findAsync(organizationId))?.nodeTypes.at(0);
+    return found?.id ?? (await this.organization.createNodeTypeAsync(new NodeTypeCreateParams(organizationId, "Department"))).id;
   }
 
   public async providerOfAsync(kind: string = "fake"): Promise<Provider> {

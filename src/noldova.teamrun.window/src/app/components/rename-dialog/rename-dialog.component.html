@@ -6,10 +6,13 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<nol-dialog [title]="resources.renameTitle" (dismissed)="answered.emit(null)">
+<nol-dialog [title]="heading()" (dismissed)="answered.emit(null)">
   <form id="nol-teamrun-rename-form" class="nol-teamrun-field" (submit)="save($event)">
-    <input nol-text-field class="nol-teamrun-rename-title" name="title" [attr.aria-label]="resources.renameFieldLabel" [value]="title()"
-      (input)="edit($event)">
+    <input nol-text-field class="nol-teamrun-rename-title" name="title" [attr.aria-label]="fieldLabel()" [value]="title()"
+      [attr.aria-describedby]="refusal() ? messageId : null" [attr.aria-invalid]="refusal() ? true : null" (input)="edit($event)">
+    @if (refusal(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error" [attr.id]="messageId">{{ message }}</nol-field-message>
+    }
   </form>
   <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" (click)="answered.emit(null)">{{ resources.closeLabel }}</button>
   <button type="submit" form="nol-teamrun-rename-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ resources.saveLabel }}</button>

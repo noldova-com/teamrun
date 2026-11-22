@@ -36,7 +36,13 @@ import { HandoverSummariesMigration } from "../../models/migrations/handover-sum
 import { HandoverSummaryKindsMigration } from "../../models/migrations/handover-summary-kinds-migration.js";
 import { CheckpointFoldersMigration } from "../../models/migrations/checkpoint-folders-migration.js";
 import { DepartmentsMigration } from "../../models/migrations/departments-migration.js";
+import { NodeTypesMigration } from "../../models/migrations/node-types-migration.js";
+import { OrganizationMessagesDropMigration } from "../../models/migrations/organization-messages-drop-migration.js";
 import { OrganizationMessagesMigration } from "../../models/migrations/organization-messages-migration.js";
+import { TeammateLastRepliesMigration } from "../../models/migrations/teammate-last-replies-migration.js";
+import { TeammatePlacementsMigration } from "../../models/migrations/teammate-placements-migration.js";
+import { OrganizationsMigration } from "../../models/migrations/organizations-migration.js";
+import { UniqueIndexNamesMigration } from "../../models/migrations/unique-index-names-migration.js";
 
 export class MigrationCatalog {
   public static readonly all: readonly SqlMigration[] = [new InitialMigration(), new TeammatesMigration(), new DraftsMigration(), new ApprovalScopesMigration(),
@@ -48,5 +54,6 @@ export class MigrationCatalog {
     new MessageTextMigration(), new AccountLimitsMigration(), new SustainAttemptsMigration(),
     new SustainAttemptReasonsMigration(), new HandoverSummariesMigration(), new HandoverSummaryKindsMigration(),
     new CheckpointFoldersMigration(), new DepartmentsMigration(),
-    new OrganizationMessagesMigration()];
+    new OrganizationMessagesMigration(), new TeammateLastRepliesMigration(), new TeammatePlacementsMigration(),
+    new OrganizationMessagesDropMigration(), new OrganizationsMigration(), new UniqueIndexNamesMigration(), new NodeTypesMigration()];
 }

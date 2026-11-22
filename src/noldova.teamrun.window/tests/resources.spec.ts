@@ -6,9 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
+import { TeammateStatus } from "../src/app/enums/teammate-status";
 import { Resources } from "../src/resources";
 
 describe("Resources", () => {
@@ -36,11 +38,11 @@ describe("Resources", () => {
   });
 
   const texts = (value: unknown): readonly string[] => {
-    if (typeof value === "string" || typeof value === "function")
+    if (Object.isString(value) || Object.isFunction(value))
       return [String(value)];
     if (value instanceof Map)
       return [...value.values()].flatMap(t => texts(t));
-    if (typeof value === "object" && value !== null)
+    if (Object.isObject(value))
       return Object.values(value).flatMap(t => texts(t));
     return [];
   };
@@ -53,6 +55,10 @@ describe("Resources", () => {
   it("says a sign-in didn't finish before its command ended, and before it signed in for a terminal with no command", () => {
     expect([Resources.formatSignInUnfinished("cursor-agent login"), Resources.formatSignInUnfinished(null)])
       .toEqual(["Sign-in didn't finish: the terminal closed before cursor-agent login ended.", Resources.signInUnfinished]);
+  });
+
+  it("names an Organization chat after whom it talks to", () => {
+    expect(Resources.formatOrganizationChat("Ada")).toBe("Chat with Ada");
   });
 
   it("qualifies a TeamRun method or event name with the module's id", () => {
@@ -75,11 +81,11 @@ describe("Resources", () => {
     expect(Resources.formatTeammateError("Alice", "Reply in progress")).toBe("@Alice: Reply in progress");
   });
 
-  it("never calls a provider an account in a text it holds or writes", () => {
-    const all = Object.getOwnPropertyNames(Resources).flatMap(t => texts((Resources as unknown as Record<string, unknown>)[t]));
+  it("never calls a provider an account in a text it holds or writes, leaving the organization chart's icon name alone", () => {
+    const all = Object.getOwnPropertyNames(Resources).flatMap(t => texts(Object.getOwnPropertyDescriptor(Resources, t)?.value));
 
     expect(all.length).toBeGreaterThan(400);
-    expect(all.filter(t => /account/i.test(t))).toEqual([]);
+    expect(all.filter(t => /account/i.test(t) && t !== Resources.organizationEditIcon)).toEqual([]);
   });
 
   it("names a provider choice once when its label repeats the kind's name", () => {
@@ -88,6 +94,36 @@ describe("Resources", () => {
     expect(Resources.formatProviderChoice("Codex", "Work")).toBe("Codex · Work");
     expect(Resources.formatLocalProvider("Work")).toBe("Work · This computer");
     expect(Resources.formatReplyProvider("Claude Code")).toBe("·\u00a0Claude Code");
+  });
+
+  it("joins a teammate's role and department, leaving out what is missing, and gives nothing when both are", () => {
+    expect([Resources.formatOrganizationRoleIn("Review", "Design"), Resources.formatOrganizationRoleIn("", "Design"), Resources.formatOrganizationRoleIn("Review", null),
+      Resources.formatOrganizationRoleIn(null, null)]).toEqual(["Review · Design", "Design", "Review", null]);
+  });
+
+  it("asks before deleting a department or removing a member, saying where what it held goes", () => {
+    expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
+      Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
+      "Delete Design? Its departments move up to report to you, and its members leave every department.",
+      "Delete Web? Its departments and members move to Build.",
+      "Remove Alice from Design? Alice stays on the team, in no department."
+    ]);
+  });
+
+  it("counts the organization's teammates and departments, one in the singular", () => {
+    expect([Resources.formatOrganizationHeadcount(0, 0), Resources.formatOrganizationHeadcount(1, 1), Resources.formatOrganizationHeadcount(2, 3)])
+      .toEqual(["0 teammates in 0 departments", "1 teammate in 1 department", "2 teammates in 3 departments"]);
+  });
+
+  it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
+    expect([Resources.formatOrganizationDepartmentSummary([TeammateStatus.Idle, TeammateStatus.Working, TeammateStatus.Idle, TeammateStatus.UsageLimit]),
+      Resources.formatOrganizationDepartmentSummary([])]).toEqual(["1 working · 2 idle · 1 usage limit", ""]);
+  });
+
+  it("says how long a card's work has run in seconds, minutes, or hours and minutes, with how many more run, and what share of usage is used", () => {
+    expect([Resources.formatOrganizationNowFor(-1, 0), Resources.formatOrganizationNowFor(59_999, 0), Resources.formatOrganizationNowFor(312_000, 2),
+      Resources.formatOrganizationNowFor(3_600_000, 0), Resources.formatOrganizationNowFor(5_520_000, 1), Resources.formatOrganizationUsage(0.544)])
+      .toEqual(["0 s", "59 s", "5 min +2", "1 h 0 min", "1 h 32 min +1", "54%"]);
   });
 
   it("writes the composer's accessible names and unavailable choices", () => {
@@ -115,8 +151,8 @@ describe("Resources", () => {
   });
 
   it("says chat, never conversation, in every text it holds", () => {
-    const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : typeof t === "object" && t !== null ? Object.values(t) : [t]);
-    const texts = values.filter((t): t is string => typeof t === "string" && t.includes(" "));
+    const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : Object.isObject(t) ? Object.values(t) : [t]);
+    const texts = values.flatMap((t: unknown) => Object.isString(t) && t.includes(" ") ? [t] : []);
 
     expect(texts).toContain(Resources.newConversationLabel);
     expect(texts.filter(t => /conversation/i.test(t))).toEqual([]);
@@ -191,6 +227,12 @@ describe("Resources", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
   });
 
+  it("counts Focus's direct reports and a department's teammates in the singular for one and the plural for more", () => {
+    expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
+      Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
+      .toEqual(["Your 1 direct report", "Your 2 direct reports", "1 teammate", "2 teammates"]);
+  });
+
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {
     expect(Resources.formatDeleteWithFilesText("Scratch", 1)).toBe("\"Scratch\", its messages and the 1 file it holds are removed. This cannot be undone. "
       + "To keep the chat and its files, move it to a folder instead.");
@@ -248,14 +290,14 @@ describe("Resources", () => {
       "Choose an empty folder for this Antigravity profile, such as a new folder under profiles/antigravity in TeamRun's data folder. TeamRun installs Antigravity and signs it in with Google: choose Install here, then, after adding the provider, Sign in in its menu.");
     expect(Resources.profileHintFor("cursor")).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder; your own " +
       "Cursor setup stays separate. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile.");
+      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("cursor", true)).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder. " +
       "On this Mac, Cursor keeps its sign-in in the keychain, shared with your own Cursor CLI: signing in here replaces your Cursor CLI's sign-in, and signing " +
       "out signs it out too. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile.");
+      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("cursor", false, true)).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data " +
       "folder; your own Cursor setup stays separate. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login " +
-      "for this profile. Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile.");
+      "for this profile. Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("grok", true)).toBe(Resources.profileHintFor("grok"));
     expect(Resources.profileHintFor("grok", false, true)).toBe(Resources.profileHintFor("grok"));
     expect(Resources.profileHintFor("other")).toBe("Use the full path to the profile folder. Sign-in is managed by the provider's own application.");

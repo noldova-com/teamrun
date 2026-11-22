@@ -1,0 +1,110 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.kids {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: var(--nol-space-3);
+}
+
+.kids::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.kid {
+  position: relative;
+  padding: var(--nol-space-3) var(--nol-space-2) 0;
+}
+
+.kid::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.kid:first-child::before {
+  left: 50%;
+}
+
+.kid:last-child::before {
+  right: 50%;
+}
+
+.kid:only-child::before {
+  display: none;
+}
+
+.kid::after {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.reports {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--nol-teamrun-organization-columns), minmax(13.25rem, auto));
+  justify-content: center;
+  gap: var(--nol-space-3) var(--nol-space-4);
+  padding-top: calc(var(--nol-space-3) * 2);
+}
+
+.reports::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.reports::after {
+  position: absolute;
+  top: var(--nol-space-3);
+  right: 6.625rem;
+  left: 6.625rem;
+  border-top: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.report {
+  position: relative;
+}
+
+.report::before {
+  position: absolute;
+  top: calc(var(--nol-space-3) * -1);
+  left: 50%;
+  height: var(--nol-space-3);
+  border-left: 1px solid var(--nol-menu-border);
+  content: "";
+}
+
+.adds {
+  display: flex;
+  justify-content: center;
+  gap: var(--nol-space-2);
+  padding-top: var(--nol-space-3);
+}
+
+.nol-teamrun-organization-drop-over {
+  outline: var(--nol-border-width) dashed var(--nol-accent);
+  outline-offset: var(--nol-space-half);
+}

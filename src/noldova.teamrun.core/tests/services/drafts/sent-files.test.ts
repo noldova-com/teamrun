@@ -9,12 +9,14 @@
 import fs, { existsSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { dirname, join } from "node:path";
+import { mock } from "node:test";
 
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import {
   AttachmentInput, ConversationIdParams, ConversationRewindParams, DraftSaveParams, type MessageSendResult, MessageSendParams, ProjectIdParams, RequestedSettings
 } from "@noldova/teamrun.protocol";
 
+import { BusyFileError } from "../../fixtures/busy-file-error.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 
 @TestClass
@@ -73,16 +75,17 @@ export class SentFilesTests {
     const sent = SentFilesTests.pathOf(await SentFilesTests.sendAsync(host, deleted.id, "a.txt"));
     const target = await SentFilesTests.sendAsync(host, rewound.id, "b.txt");
     const later = SentFilesTests.pathOf(await SentFilesTests.sendAsync(host, rewound.id, "c.txt"));
-    const original = fs.rmSync;
+    const remove = mock.method(fs, "rmSync", (): void => {
+      throw new BusyFileError("Simulated busy file", null);
+    });
     try {
-      fs.rmSync = () => { throw Object.assign(new Error("Simulated busy file"), { code: "EBUSY" }); };
       syncBuiltinESMExports();
       await host.conversations.deleteAsync(new ConversationIdParams(deleted.id));
       await host.engine.rewindAsync(new ConversationRewindParams(rewound.id, target.sent.id, false));
       await host.drafts.sweepAsync();
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 

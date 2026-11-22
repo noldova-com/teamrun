@@ -11,9 +11,13 @@ import { builtinModules } from "node:module";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import { PackageCatalog } from "../packages/package-catalog.ts";
+import type { PackageManifest } from "../packages/package-manifest.ts";
+import { PackageException } from "../packages/package.exception.ts";
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import { SourceFile } from "../structure/source-file.ts";
 import { SourceTree } from "../structure/source-tree.ts";
+import { FoundMock } from "./found-mock.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
 export class GlobalMockCheck implements ICheck {
@@ -36,6 +40,8 @@ export class GlobalMockCheck implements ICheck {
   private static readonly IDENTIFIER: RegExp = /^[A-Za-z_$][\w$]*$/;
   private static readonly SPECIFIER_RENAME: RegExp = /\s+as\s+|\s*:\s*/;
   private static readonly NODE_PREFIX: string = "node:";
+  private static readonly FILE_SYSTEM_MODULES: ReadonlySet<string> = new Set(["fs", "fs/promises"]);
+  private static readonly TESTS_FOLDER: string = "tests";
   private static readonly LINE_SEPARATOR: string = "\n";
 
   private readonly root: string;
@@ -54,10 +60,28 @@ export class GlobalMockCheck implements ICheck {
       output.write("Found no test file under src/ or scripts/, so the check read nothing.\n");
       return false;
     }
-    const findings: string[] = [];
-    for (const file of testFiles)
-      for (const mock of GlobalMockCheck.findMocks(await readFile(path.join(this.root, file), "utf8")))
-        findings.push(`${file}:${mock.line}: mocks ${mock.form}, which every test running alongside it shares; inject the timing or the function instead, as README.md, Global mocks, says.`);
+    let packages: readonly PackageManifest[];
+    try {
+      packages = await new PackageCatalog(this.root).listPackagesAsync();
+    }
+    catch (error) {
+      if (!(error instanceof PackageException))
+        throw error;
+      output.write(`${error.message}\n`);
+      return false;
+    }
+    const isolated = new Set(packages.flatMap(t => t.isolatedTests.map(u => `${t.directory}/${GlobalMockCheck.TESTS_FOLDER}/${u}`)));
+    const findings: string[] = [...isolated].filter(t => !testFiles.includes(t))
+      .map(t => `${t}: is listed in its package's isolatedTests, but is no test file; take it off the list, as README.md, Global mocks, says.`);
+    for (const file of testFiles) {
+      const text = await readFile(path.join(this.root, file), "utf8");
+      const mocks = GlobalMockCheck.findMocks(text);
+      const isListed = isolated.has(file);
+      if (isListed && !mocks.some(t => GlobalMockCheck.isFileSystem(t.module)))
+        findings.push(`${file}: is listed in its package's isolatedTests, but mocks no node:fs function; take it off the list, as README.md, Global mocks, says.`);
+      for (const mock of mocks.filter(t => !isListed || !GlobalMockCheck.isFileSystem(t.module)))
+        findings.push(`${file}:${text.slice(0, mock.index).split(GlobalMockCheck.LINE_SEPARATOR).length}: mocks ${mock.form}, which every test running alongside it shares; inject the timing or the function instead, as README.md, Global mocks, says.`);
+    }
 
     for (const finding of findings)
       output.write(`${finding}\n`);
@@ -71,7 +95,11 @@ export class GlobalMockCheck implements ICheck {
     return GlobalMockCheck.FOLDERS.some(t => file.startsWith(t)) && file.split("/").some(t => SourceTree.TEST_FOLDERS.has(t));
   }
 
-  private static findMocks(text: string): readonly { line: number; form: string }[] {
+  private static isFileSystem(module: string | null): boolean {
+    return module !== null && GlobalMockCheck.FILE_SYSTEM_MODULES.has(module.replace(GlobalMockCheck.NODE_PREFIX, ""));
+  }
+
+  private static findMocks(text: string): readonly FoundMock[] {
     const names = new Set<string>([GlobalMockCheck.MOCK_NAME]);
     for (const regex of GlobalMockCheck.MOCK_BINDINGS)
       for (const match of text.matchAll(regex))
@@ -80,24 +108,23 @@ export class GlobalMockCheck implements ICheck {
     const globals = GlobalMockCheck.GLOBALS.join("|");
     const builtIns = GlobalMockCheck.findBuiltInBindings(text);
     const loads = `(?:\\(\\s*)?(?:await\\s+)?(?:import|require)\\s*\\(\\s*["'\`]((?:node:)?[\\w/]+)["'\`]`;
-    const mocks: { index: number; form: string }[] = [];
+    const mocks: FoundMock[] = [];
     for (const name of names) {
       const mock = GlobalMockCheck.escape(name);
       for (const match of text.matchAll(new RegExp(`(?<![\\w$])${mock}\\s*\\.\\s*timers\\b|\\{(?:[^{}]*,)?\\s*timers\\b[^{}]*\\}\\s*=\\s*(?:[\\w$]+\\s*\\.\\s*)*${mock}(?![\\w$]|\\s*[.([])`, "g")))
-        mocks.push({ index: match.index, form: "the timers with mock.timers" });
+        mocks.push(new FoundMock(match.index, "the timers with mock.timers", null));
       for (const match of text.matchAll(new RegExp(`(?<![\\w$])${mock}\\s*\\.\\s*(${GlobalMockCheck.KINDS.join("|")})\\s*\\(\\s*(?:globalThis\\s*\\.\\s*)?(${globals})\\b`, "g")))
-        mocks.push({ index: match.index, form: `a ${match[1] as string} of ${match[2] as string} with mock.${match[1] as string}` });
+        mocks.push(new FoundMock(match.index, `a ${match[1] as string} of ${match[2] as string} with mock.${match[1] as string}`, null));
       for (const [binding, module] of builtIns)
         for (const match of text.matchAll(new RegExp(`(?<![\\w$])${mock}\\s*\\.\\s*method\\s*\\(\\s*${GlobalMockCheck.escape(binding)}(?![\\w$])`, "g")))
-          mocks.push({ index: match.index, form: `a method of ${module} with mock.method` });
+          mocks.push(new FoundMock(match.index, `a method of ${module} with mock.method`, module));
       for (const match of text.matchAll(new RegExp(`(?<![\\w$])${mock}\\s*\\.\\s*method\\s*\\(\\s*${loads}`, "g")))
         if (GlobalMockCheck.isBuiltIn(match[1] as string))
-          mocks.push({ index: match.index, form: `a method of ${match[1] as string} with mock.method` });
+          mocks.push(new FoundMock(match.index, `a method of ${match[1] as string} with mock.method`, match[1] as string));
     }
     return mocks
       .filter(t => !SourceFile.isInString(text, t.index))
-      .sort((a, b) => a.index - b.index)
-      .map(t => ({ line: text.slice(0, t.index).split(GlobalMockCheck.LINE_SEPARATOR).length, form: t.form }));
+      .sort((a, b) => a.index - b.index);
   }
 
   private static findBuiltInBindings(text: string): ReadonlyMap<string, string> {

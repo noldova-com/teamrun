@@ -12,23 +12,26 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import "@noldova/context.core";
 import { expect, test } from "playwright/test";
 
 import { CodexDouble } from "./fixtures/codex-double.ts";
 import { LocalServer } from "./fixtures/local-server.ts";
-import { type IProcessStatus, TeamRunApp } from "./fixtures/teamrun-app.fixture.ts";
+import { ProcessStatus } from "./fixtures/process-status.ts";
+import { TeamRunApp } from "./fixtures/teamrun-app.fixture.ts";
 
 test.describe("the end-to-end fixture's environment", () => {
   test("gives the app the test's home through HOME on Linux and macOS, starts Codex's double from a shell shim, and keeps the other variables", () => {
-    for (const platform of ["linux", "darwin"] as const) {
+    const platforms: readonly NodeJS.Platform[] = ["linux", "darwin"];
+    for (const platform of platforms) {
       const environment = TeamRunApp.environmentOf(platform, { HOME: "/home/someone", PATH: "/usr/bin", CODEX_HOME: "/home/someone/.codex", LANG: "C", Path: "/kept" },
         { EXTRA: "1", HOME: "/ignored" }, "/tmp/tre-1/home", "/tmp/tre-1/bin", "/tmp/tre-1/codex.log");
       const shims = TeamRunApp.shimsOf(platform, "/tmp/tre-1/bin");
 
       expect(environment).toEqual({ LANG: "C", Path: "/kept", EXTRA: "1", HOME: "/tmp/tre-1/home", PATH: "/tmp/tre-1/bin:/usr/bin",
         [CodexDouble.LOG_VARIABLE]: "/tmp/tre-1/codex.log" });
-      expect(shims.map(t => t[0])).toEqual(["/tmp/tre-1/bin/codex"]);
-      expect(shims[0]?.[1]).toMatch(/^#!\/bin\/sh\nexec ".+" ".+codex-double\.ts" "\$@"\n$/);
+      expect(shims.map(t => t.file)).toEqual(["/tmp/tre-1/bin/codex"]);
+      expect(shims[0]?.script).toMatch(/^#!\/bin\/sh\nexec ".+" ".+codex-double\.ts" "\$@"\n$/);
     }
   });
 
@@ -41,15 +44,15 @@ test.describe("the end-to-end fixture's environment", () => {
 
     expect(environment).toEqual({ SystemRoot: "C:\\Windows", HOME: home, USERPROFILE: home, APPDATA: `${home}\\AppData\\Roaming`,
       LOCALAPPDATA: `${home}\\AppData\\Local`, PATH: "C:\\Temp\\tre-1\\bin;C:\\Windows", [CodexDouble.LOG_VARIABLE]: "C:\\Temp\\tre-1\\codex.log" });
-    expect(shims.map(t => t[0])).toEqual(["C:\\Temp\\tre-1\\bin\\codex.cmd"]);
-    expect(shims[0]?.[1]).toMatch(/^@".+" ".+codex-double\.ts" %\*\r\n$/);
+    expect(shims.map(t => t.file)).toEqual(["C:\\Temp\\tre-1\\bin\\codex.cmd"]);
+    expect(shims[0]?.script).toMatch(/^@".+" ".+codex-double\.ts" %\*\r\n$/);
   });
 
   test("makes the folders its home variables name on the platform it runs on", async () => {
     const app = new TeamRunApp();
     try {
       expect(Object.values(TeamRunApp.homeVariablesOf(process.platform, app.home)).filter(t => !existsSync(t))).toEqual([]);
-      expect(TeamRunApp.shimsOf(process.platform, path.join(app.work, "bin")).filter(t => !existsSync(t[0]))).toEqual([]);
+      expect(TeamRunApp.shimsOf(process.platform, path.join(app.work, "bin")).filter(t => !existsSync(t.file))).toEqual([]);
     }
     finally {
       await app.closeAsync(false);
@@ -87,7 +90,7 @@ test.describe("the end-to-end fixture's environment", () => {
   });
 });
 
-const statusOf = (pid: number, parent: number, start: string): IProcessStatus => ({ pid, parent, start, name: `p${pid}`, session: -1, state: "", command: "" });
+const statusOf = (pid: number, parent: number, start: string): ProcessStatus => new ProcessStatus(pid, `p${pid}`, start, parent, -1, "", "");
 
 test.describe("the end-to-end fixture's process checks", () => {
   test("counts a process as a child only when it started at or after its parent, since Windows keeps the parent id of a process whose parent ended", () => {
@@ -121,7 +124,7 @@ test.describe("the end-to-end fixture's local servers", () => {
     const server = createServer((_request, response) => response.end());
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
-    const port = typeof address === "object" && address !== null ? address.port : 0;
+    const port = Object.isObject(address) ? address.port : 0;
     const accepted = new Promise<void>(resolve => server.once("connection", () => resolve()));
     const socket = connect(port, "127.0.0.1");
     const ended = new Promise<void>(resolve => socket.once("close", () => resolve()));

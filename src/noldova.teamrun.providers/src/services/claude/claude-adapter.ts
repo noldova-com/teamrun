@@ -17,7 +17,7 @@ import "@noldova/context.core";
 import { Resources as CoreResources, type ForkRequest, type ILog, type IProviderAdapter, type IProviderKindInstallation, type ITimer, type ITurnListener, NodeTimer, PlanReading,
   ProfileSearch, SessionCarry, SharedMcpFailure, SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type TurnRequest, TurnOutcome, TurnResult, type TurnTools } from "@noldova/teamrun.core";
 import { RoleApplication, AuthStatus, DetailKind, ForkedSession, ObservedSettings, type OwnMcpServer, type Provider, ProviderKind,
-  ProviderContextWindows, ProviderModel, ProviderProfile, ProviderMode, ProviderModelList, type ProviderSignInCommand, ProviderSpeed, RequestedSettings, Resources as ProtocolResources, type SharedMcpServerDefinition }
+  ProfileFolderPath, ProviderContextWindows, ProviderModel, ProviderProfile, type ProviderMode, ProviderModelList, type ProviderSignInCommand, ProviderSpeed, RequestedSettings, Resources as ProtocolResources, type SharedMcpServerDefinition }
   from "@noldova/teamrun.protocol";
 
 import { ExecutableNotFoundException } from "../../exceptions/executable-not-found.exception.js";
@@ -51,6 +51,7 @@ import { ClaudeSignInReader } from "./claude-sign-in.reader.js";
 import { DeltaStream } from "../delta-stream.js";
 import { ClaudeChat } from "./claude-chat.js";
 import { ClaudeCompactionReader } from "./claude-compaction.reader.js";
+import { ClaudeModes } from "./claude-modes.js";
 import { ClaudeSessionFile } from "./claude-session-file.js";
 import { ClaudePlan } from "./claude-plan.js";
 import { ClaudeTasks } from "./claude-tasks.js";
@@ -62,21 +63,15 @@ export class ClaudeAdapter implements IProviderAdapter {
   private static readonly launch: SharedMcpLaunch = new SharedMcpLaunch();
   private static readonly speeds: readonly ProviderSpeed[] = [new ProviderSpeed(Resources.claudeStandardSpeed, Resources.claudeStandardSpeedName),
     new ProviderSpeed(Resources.claudeFastSpeed, Resources.claudeFastSpeedName)];
-  private static readonly modes: readonly ProviderMode[] = [
-    new ProviderMode(Resources.autoPermissionMode, Resources.claudeAutoModeName, Resources.claudeAutoModeDescription),
-    new ProviderMode(Resources.defaultPermissionMode, Resources.claudeManualModeName, Resources.claudeManualModeDescription),
-    new ProviderMode(Resources.acceptEditsPermissionMode, Resources.claudeAcceptEditsModeName, Resources.claudeAcceptEditsModeDescription),
-    new ProviderMode(Resources.planPermissionMode, Resources.claudePlanModeName, Resources.claudePlanModeDescription, false, true),
-    new ProviderMode(Resources.bypassPermissionMode, Resources.claudeBypassModeName, Resources.claudeBypassModeDescription, true)];
-  public readonly descriptor: ProviderKind;
   public readonly takesTeamRunTools: boolean = true;
   public readonly profileSearch: ProfileSearch;
-  public readonly modes: readonly ProviderMode[] = ClaudeAdapter.modes;
+  public readonly modes: readonly ProviderMode[] = ClaudeModes.all;
   public readonly defaultMode: string = Resources.acceptEditsPermissionMode;
   public readonly explorerMode: string = Resources.planPermissionMode;
   public readonly planMode: string = Resources.planPermissionMode;
   private readonly commands: CommandSource;
   private readonly baseEnvironment: NodeJS.ProcessEnv;
+  private kind: ProviderKind;
   private readonly homeDirectory: string;
   private readonly appVersion: string;
   private readonly queryFactory: IClaudeQueryFactory;
@@ -116,11 +111,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;
-    this.descriptor = new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
-      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand,
-        UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory)),
-      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
-      Resources.claudeOwnMcpServersShortNote, false, true);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory));
     this.profileSearch = new ProfileSearch(UsualFolder.places(baseEnvironment, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, homeDirectory),
       Resources.claudeProfileEntries);
     this.commands = new CommandSource(command, locate);
@@ -136,8 +127,17 @@ export class ClaudeAdapter implements IProviderAdapter {
     this.timer = timer;
   }
 
+  public get descriptor(): ProviderKind {
+    return this.kind;
+  }
+
   public get activeRunCount(): number {
     return this.runs.size + this.chats.size;
+  }
+
+  public async refreshDescriptorAsync(): Promise<void> {
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    this.kind = ClaudeAdapter.kindOf(UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory));
   }
 
   public async readSignInCommand(_provider: Provider): Promise<ProviderSignInCommand | null> {
@@ -159,7 +159,8 @@ export class ClaudeAdapter implements IProviderAdapter {
       return new SignInCheck(AuthStatus.Error, null, null, Resources.claudeNotFound);
 
     mkdirSync(provider.profileDir, { recursive: true });
-    const environment = { ...ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), provider.profileDir, this.appVersion), ...quiet };
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = { ...ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion), ...quiet };
     const own = command.withOrigin(this.originOf(provider));
     const version = await this.versionReader.read(own, environment);
     try {
@@ -184,7 +185,7 @@ export class ClaudeAdapter implements IProviderAdapter {
           t.supportsFastMode === true ? ClaudeAdapter.speeds : [], t.supportsFastMode === true ? Resources.claudeStandardSpeed : null,
           ClaudeAdapter.windowsOf(this.reportedWindows.get(ClaudeAdapter.effortKey(provider, t.resolvedModel ?? t.value)) ?? null));
       }),
-        await Promise.race([signedIn, timeout]).catch(() => null), false, null, false, ClaudeAdapter.modes, Resources.acceptEditsPermissionMode);
+        await Promise.race([signedIn, timeout]).catch(() => null), false, null, false, ClaudeModes.all, Resources.acceptEditsPermissionMode);
       this.listed.set(provider?.id ?? null, list.models);
       return list;
     });
@@ -210,9 +211,10 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
     const abort = new AbortController();
+    const passed = await this.readBeforeStartAsync();
     const query = this.queryFactory.start(ClaudeAdapter.emptyPrompt(), {
       pathToClaudeCodeExecutable: command.executable,
-      env: ClaudeEnvironment.build(await this.readBeforeStartAsync(), provider?.profileDir ?? null, this.appVersion),
+      env: ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider?.profileDir ?? null), this.appVersion),
       settingSources: [], strictMcpConfig: true, mcpServers: {}, plugins: [], tools: [], persistSession: false, abortController: abort
     }, this.originOf(provider));
     const run = new ClaudeRun(query, abort);
@@ -247,7 +249,8 @@ export class ClaudeAdapter implements IProviderAdapter {
     if (Object.isNull(command))
       throw new ExecutableNotFoundException(Resources.claudeNotFound);
 
-    const environment = ClaudeEnvironment.build(await this.runner.readEnvironmentAsync(this.baseEnvironment), provider.profileDir, this.appVersion);
+    const passed = await this.runner.readEnvironmentAsync(this.baseEnvironment);
+    const environment = ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider.profileDir), this.appVersion);
     const logout = command.withOrigin(this.originOf(provider)).withArguments(Resources.authArgument, Resources.logoutArgument);
     const result = await this.runner.run(logout, environment, this.timings.signInCheckTimeout);
     if (result.timedOut)
@@ -386,12 +389,8 @@ export class ClaudeAdapter implements IProviderAdapter {
     return JSON.stringify([provider?.id ?? null, model]);
   }
 
-  private static modeOf(requested: string | null): PermissionMode {
-    return (ClaudeAdapter.modes.find(t => t.id === requested)?.id ?? Resources.acceptEditsPermissionMode) as PermissionMode;
-  }
-
   private static startModeOf(request: TurnRequest): PermissionMode {
-    return request.requested.planFirst ? Resources.planPermissionMode : ClaudeAdapter.modeOf(request.requested.mode);
+    return request.requested.planFirst ? Resources.planPermissionMode : ClaudeModes.of(request.requested.mode);
   }
 
   public async plansFirst(nativeSessionIds: readonly string[]): Promise<void> {
@@ -438,13 +437,25 @@ export class ClaudeAdapter implements IProviderAdapter {
     return new ProcessOrigin(this.descriptor.id, provider?.id ?? null);
   }
 
+  private static kindOf(usual: string): ProviderKind {
+    return new ProviderKind(Resources.claudeKindId, Resources.claudeDisplayName, true, false, null,
+      new ProviderProfile(Resources.claudeConfigDirVariable, Resources.claudeSignInCommand, usual, null, {}, {}, [usual]),
+      true, null, false, null, false, Resources.claudeOwnMcpServersNote, ProviderAbilityTable.claude, false, false, undefined,
+      Resources.claudeOwnMcpServersShortNote, false, true);
+  }
+
+  private ownFolderOf(passed: NodeJS.ProcessEnv, profileDir: string | null): string | null {
+    const usual = UsualFolder.of(passed, Resources.claudeConfigDirVariable, Resources.claudeHomeFolderName, this.homeDirectory);
+    return Object.isNull(profileDir) || ProfileFolderPath.isSame(profileDir, usual) ? null : profileDir;
+  }
+
   private async runQuery(command: ProcessCommand, request: TurnRequest, resume: string | null, text: string, effort: EffortLevel | null,
     profileDir: string | null, listener: ITurnListener, signal: AbortSignal, shutdowns: number): Promise<ClaudeTurn> {
     const [chat, settle] = await this.openChat(command, request, resume, effort, profileDir, listener, shutdowns,
       await ServedToolNames.listAsync(request.tools, signal));
     const turn = new ClaudeTurn(listener, resume, new DeltaStream(listener, this.timings.streamInterval),
       Object.isNull(request.instructions) ? null : RoleApplication.Instructions, chat.tasks, this.timings.requestTimeout, chat.plan, chat.subAgents,
-      request.requested.planFirst ? () => chat.setPermissionMode(ClaudeAdapter.modeOf(request.requested.mode)) : null, request.requested.contextWindow);
+      request.requested.planFirst ? () => chat.setPermissionMode(ClaudeModes.of(request.requested.mode)) : null, request.requested.contextWindow);
     const asked = request.compacts ? null : request.command;
     const listed = Object.isNull(asked) ? [] : await chat.listedCommands(signal);
     const alone = !Object.isNull(asked) && listed.includes(AcpCommands.nameOf(asked)) ? asked : null;
@@ -521,7 +532,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       && !open.isClosed) {
       if (open.adopts(request.tools)) {
         if (!request.requested.planFirst)
-          await open.ensureMode(ClaudeAdapter.modeOf(request.requested.mode), listener);
+          await open.ensureMode(ClaudeModes.of(request.requested.mode), listener);
         return [open, null];
       }
       if (open.isServed && !Object.isNull(endpoint))
@@ -551,7 +562,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     }, new ClaudeTasks(this.timer, this.timings.taskOutputInterval), (Object.isNull(continued) ? undefined : this.plans.get(continued)) ?? new ClaudePlan(),
       undefined, served?.token ?? null, this.log, this.timings.requestTimeout, withheld ? (t, named) => this.ownServersStartedAsync(t, passed, [...fromProject, ...named]) : null,
       this.idleTimer, this.timings.silenceLimit, this.timings.idleLimit);
-    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, profileDir, this.appVersion, !request.isolated),
+    const environment: Record<string, string | undefined> = { ...ClaudeEnvironment.build(base, this.ownFolderOf(base, profileDir), this.appVersion, !request.isolated),
       [Resources.claudeSessionStateEventsVariable]: Resources.enabledValue, ...Object.fromEntries(Object.entries(request.environment)
         .filter(([name]) => (Object.isNull(served) && !withheld) || name !== ProtocolResources.senderTokenVariable)) };
     const trusted = !request.isolated && await this.trustsAsync(request);
@@ -756,7 +767,7 @@ export class ClaudeAdapter implements IProviderAdapter {
     chat: ClaudeChat,
     environment: Record<string, string | undefined>,
     trusted: boolean): Options {
-    const mode = ClaudeAdapter.modeOf(request.requested.mode);
+    const mode = ClaudeModes.of(request.requested.mode);
     const ownServers = ClaudeAdapter.startsOwnServers(request);
     const options: Options = {
       cwd: request.workingDirectory,

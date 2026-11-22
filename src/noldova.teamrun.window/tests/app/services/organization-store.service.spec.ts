@@ -6,17 +6,25 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { JsonValue } from "@noldova/context.json";
-import { Department, DepartmentMember, EventName, MethodName, Organization } from "@noldova/teamrun.protocol";
+import { signal } from "@angular/core";
 
+import type { JsonValue } from "@noldova/context.json";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
+import { Chat, Department, DepartmentMoveParams, MethodName, NodeType, Organization, OrganizationChat, OrganizationParent, TeammatePlacement } from "@noldova/teamrun.protocol";
+
+import { OrganizationScope } from "../../../src/app/services/organization-scope";
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
+import { Resources } from "../../../src/resources";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../fixtures/required.fixture";
+import { SampleData } from "../../fixtures/sample-data.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationStoreService", () => {
-  const organizationOf = (...names: readonly string[]): Organization =>
-    new Organization(names.map((t, i) => new Department(t, t, null, null, i, "c", "u")), []);
+  const organizationOf = (id: string, ...names: readonly string[]): Organization =>
+    new Organization(id, id, null, 0, "c", "u", [SampleData.departmentType], names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const namesOf = (store: OrganizationStoreService): string => store.organization().departments.map(t => t.name).join(",");
   let context: FakeWindowPartContext;
 
@@ -24,105 +32,253 @@ describe("OrganizationStoreService", () => {
     OrganizationStoreService.release(context);
   });
 
-  it("is one store per window part and starts from the organization the runtime lists", async () => {
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => organizationOf("Design").toJson());
-    const store = OrganizationStoreService.of(context);
+  it("shows the organization its scope names from the window part's one catalog, and an empty one until it is listed", async () => {
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("my-organization", "Design").toJson(),
+      organizationOf("second", "Web").toJson()]);
+    const scope = new OrganizationScope();
+    const instance = signal("organization");
+    scope.follow(instance);
+    const store = new OrganizationStoreService(context, scope);
+    const other = new OrganizationStoreService(context, new OrganizationScope());
+    const before = [store.id(), store.organization().name, namesOf(store)];
 
-    expect(store).toBe(OrganizationStoreService.of(context));
-    expect(namesOf(store)).toBe("");
     await Wait.until(() => expect(namesOf(store)).toBe("Design"));
-    expect(context.count(MethodName.OrganizationList)).toBe(1);
-    expect(store.loadError()).toBeNull();
+    instance.set("second");
+    const second = [store.id(), namesOf(store), namesOf(other)];
+    instance.set("gone");
+
+    expect([before, second, [store.id(), store.organization().name, namesOf(store)], context.count(MethodName.OrganizationList)])
+      .toEqual([["my-organization", Resources.organizationTitle, ""], ["second", "Web", "Design"], ["gone", Resources.organizationTitle, ""], 1]);
   });
 
-  it("applies each change event's whole organization", async () => {
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Organization.empty.toJson());
-    const store = OrganizationStoreService.of(context);
-    await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
-    const changed = new Organization([new Department("d1", "Design", null, "t1", 0, "c", "u")], [new DepartmentMember("t1", "d1")]);
-
-    context.emit(EventName.OrganizationChanged, changed.toJson());
-
-    expect(store.organization().toJson()).toEqual(changed.toJson());
-    expect(store.organization().departmentOf("t1")).toBe("d1");
-  });
-
-  it("reads the organization again after a resync rather than trusting the events it may have missed", async () => {
-    let listed = organizationOf("Design");
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => listed.toJson());
-    const store = OrganizationStoreService.of(context);
-    await Wait.until(() => expect(namesOf(store)).toBe("Design"));
-
-    listed = organizationOf("Design", "Web");
-    context.emit(EventName.StateResyncRequested, null);
-
-    await Wait.until(() => expect(namesOf(store)).toBe("Design,Web"));
-    expect(context.count(MethodName.OrganizationList)).toBe(2);
-  });
-
-  it("keeps a change event that arrives while a listing is on its way over the older listing", async () => {
-    let answer: () => Promise<JsonValue> = () => Promise.resolve(Organization.empty.toJson());
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
-    const store = OrganizationStoreService.of(context);
-    await store.reload();
-    const listing = new DeferredResponse();
-    answer = () => listing.promise;
-
-    const loading = store.reload();
-    context.emit(EventName.OrganizationChanged, organizationOf("Newer").toJson());
-    listing.resolve(organizationOf("Older").toJson());
-    await loading;
-
-    expect(namesOf(store)).toBe("Newer");
-  });
-
-  it("says why the listing failed and clears the failure once a listing succeeds", async () => {
+  it("reads the catalog again on reload and says why its listing failed", async () => {
     let fails = true;
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => {
-      if (fails)
-        throw new Error("The runtime is gone.");
-      return organizationOf("Design").toJson();
-    });
-    const store = OrganizationStoreService.of(context);
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => fails ? Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "The runtime is gone.")) : [organizationOf("my-organization", "Design").toJson()]);
+    const store = new OrganizationStoreService(context, new OrganizationScope());
 
-    await Wait.until(() => expect(store.loadError()).toBe("The runtime is gone."));
-    expect(namesOf(store)).toBe("");
+    await store.reload();
+    const said = store.loadError();
     fails = false;
-    context.emit(EventName.StateResyncRequested, null);
-    await Wait.until(() => expect(store.loadError()).toBeNull());
-    expect(namesOf(store)).toBe("Design");
-  });
-
-  it("says a listing failure that isn't an error in its own words", async () => {
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Promise.reject("The runtime stopped."));
-    const store = OrganizationStoreService.of(context);
-
     await store.reload();
 
-    expect(store.loadError()).toBe("The runtime stopped.");
+    expect([said, store.loadError(), namesOf(store)]).toEqual(["The runtime is gone.", null, "Design"]);
   });
 
-  it("drops a listing that fails after a newer change, and one that ends after the store is released", async () => {
-    let answer: () => Promise<JsonValue> = () => Promise.resolve(Organization.empty.toJson());
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
-    const store = OrganizationStoreService.of(context);
-    await store.reload();
-    const failing = new DeferredResponse();
-    const late = new DeferredResponse();
-    answer = () => failing.promise;
+  it("asks the runtime for each change to its organization's departments in its own words, and says nothing went wrong", async () => {
+    const asked: string[] = [];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("o2", "d1", "d2").toJson()]);
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMove, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet,
+      MethodName.TeammatePlace])
+      context.answer(method, t => {
+        asked.push(`${method} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(namesOf(store)).toBe("d1,d2"));
 
-    const failed = store.reload();
-    context.emit(EventName.OrganizationChanged, organizationOf("Newer").toJson());
-    failing.reject(new Error("Too late."));
-    await failed;
-    answer = () => late.promise;
-    const released = store.reload();
-    OrganizationStoreService.release(context);
-    late.resolve(organizationOf("Released").toJson());
-    await released;
+    const done = [await store.createDepartment("Design"), await store.createDepartment("UI", OrganizationParent.teammate("t1"), "t2"),
+      await store.renameDepartment("d1", "Craft"), await store.setLeader("d1", "t1"), await store.setLeader("d1", null),
+      await store.moveDepartment("d1", OrganizationParent.department("d2")), await store.placeTeammate("t1", OrganizationParent.department("d2")),
+      await store.placeTeammate("t1", null), await store.deleteDepartment("d1"), await store.setMember("t1", "d2"), await store.setMember("t1", null)];
 
-    expect(store.loadError()).toBeNull();
-    expect(namesOf(store)).toBe("Newer");
-    expect(OrganizationStoreService.of(context)).not.toBe(store);
+    expect([done, store.actionError()]).toEqual([new Array<boolean>(11).fill(true), null]);
+    expect(asked).toEqual([
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"department","parent":{"kind":"Person","id":null},"leaderId":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"UI","typeId":"department","parent":{"kind":"Teammate","id":"t1"},"leaderId":"t2"}`,
+      `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","name":"Craft"}`,
+      `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","leaderId":"t1"}`,
+      `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","leaderId":null}`,
+      `${MethodName.DepartmentMove} {"organizationId":"o2","departmentId":"d1","parent":{"kind":"Department","id":"d2"},"order":9007199254740991}`,
+      `${MethodName.TeammatePlace} {"organizationId":"o2","teammateId":"t1","parent":{"kind":"Department","id":"d2"},"order":9007199254740991}`,
+      `${MethodName.TeammatePlace} {"organizationId":"o2","teammateId":"t1","parent":null,"order":9007199254740991}`,
+      `${MethodName.DepartmentDelete} {"organizationId":"o2","departmentId":"d1"}`,
+      `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":"d2"}`,
+      `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":null}`
+    ]);
+  });
+
+  it("makes a Department type first when the organization has no node type, and makes no department when that fails", async () => {
+    const asked: string[] = [];
+    const untyped = new Organization("o2", "o2", null, 0, "c", "u", [], [], []);
+    let created: () => JsonValue = () => {
+      throw new RuntimeRequestException(FailureCode.Internal, "The disk is full.");
+    };
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [untyped.toJson()])
+      .answer(MethodName.NodeTypeCreate, t => {
+        asked.push(`${MethodName.NodeTypeCreate} ${JSON.stringify(t)}`);
+        return created();
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const failed = await store.createDepartment("Design");
+    const said = store.actionError();
+    created = () => new NodeType("t9", "Department", null, null, "c", "u").toJson();
+    const made = await store.createDepartment("Design");
+
+    expect([failed, said, made, store.actionError()]).toEqual([false, "The disk is full.", true, null]);
+    expect(asked).toEqual([
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
+    ]);
+  });
+
+  it("makes the Department type once for two departments added before the organization's change arrives", async () => {
+    const asked: string[] = [];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [new Organization("o2", "o2", null, 0, "c", "u", [], [], []).toJson()])
+      .answer(MethodName.NodeTypeCreate, t => {
+        asked.push(`${MethodName.NodeTypeCreate} ${JSON.stringify(t)}`);
+        return new NodeType("t9", "Department", null, null, "c", "u").toJson();
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const made = await Promise.all([store.createDepartment("Design"), store.createDepartment("Build")]);
+
+    expect(made).toEqual([true, true]);
+    expect(asked).toEqual([
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Build","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
+    ]);
+  });
+
+  it("takes the type another window made when making its own is refused, reading the organization again", async () => {
+    const asked: string[] = [];
+    const listings = [new Organization("o2", "o2", null, 0, "c", "u", [], [], []),
+      new Organization("o2", "o2", null, 0, "c", "u", [new NodeType("d7", "Department", null, null, "c", "u")], [], [])];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [Required.of(listings.shift()).toJson()])
+      .answer(MethodName.NodeTypeCreate, () => {
+        throw new RuntimeRequestException(FailureCode.Conflict, "A type named Department exists.");
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const made = await store.createDepartment("Design");
+
+    expect([made, store.actionError(), context.count(MethodName.OrganizationList)]).toEqual([true, null, 2]);
+    expect(asked).toEqual([`${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"d7","parent":{"kind":"Person","id":null},"leaderId":null}`]);
+  });
+
+  it("waits for the organization's listing before choosing a type for a department added while it is on its way", async () => {
+    const asked: string[] = [];
+    const listing = new DeferredResponse();
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => listing.promise)
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+
+    const making = store.createDepartment("Design");
+    listing.resolve([organizationOf("o2", "d1").toJson()]);
+
+    expect(await making).toBe(true);
+    expect([context.count(MethodName.NodeTypeCreate), asked]).toEqual([0,
+      [`${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"department","parent":{"kind":"Person","id":null},"leaderId":null}`]]);
+  });
+
+  it("sends each change only once the one before it is answered, so changes made within one round trip land in the order they were made", async () => {
+    const asked: string[] = [];
+    let release: () => void = () => undefined;
+    const held = new Promise<null>(resolve => release = () => resolve(null));
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("my-organization", "d1", "d2", "d3").toJson()])
+      .answer(MethodName.DepartmentMove, t => {
+        asked.push(DepartmentMoveParams.fromJson(t).departmentId);
+        return asked.length === 1 ? held : null;
+      });
+    const store = new OrganizationStoreService(context, new OrganizationScope());
+    await Wait.until(() => expect(namesOf(store)).toBe("d1,d2,d3"));
+
+    const first = store.moveDepartment("d1", OrganizationParent.department("d3"));
+    const second = store.moveDepartment("d2", OrganizationParent.department("d3"));
+    await Wait.until(() => expect(asked.length).toBe(1));
+    const whileHeld = asked.length;
+    release();
+    const done = [await first, await second];
+
+    expect([whileHeld, done, asked]).toEqual([1, [true, true], ["d1", "d2"]]);
+  });
+
+  it("refuses a move under itself or under a node it doesn't know before sending it, in the server's words", async () => {
+    const organization = new Organization("my-organization", "my-organization", null, 0, "c", "u", [SampleData.departmentType], [new Department("d1", "d1", "department", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("d2", "d2", "department", OrganizationParent.department("d1"), null, 0, "c", "u")], [new TeammatePlacement("t1", OrganizationParent.department("d2"), 0)]);
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organization.toJson()]);
+    const store = new OrganizationStoreService(context, new OrganizationScope());
+    await Wait.until(() => expect(namesOf(store)).toBe("d1,d2"));
+
+    const refused = [await store.moveDepartment("d1", OrganizationParent.department("d2")), store.actionError(),
+      await store.placeTeammate("t1", OrganizationParent.teammate("t1")), store.actionError(),
+      await store.placeTeammate("t1", OrganizationParent.department("gone")), store.actionError()];
+
+    expect([refused, context.count(MethodName.DepartmentMove), context.count(MethodName.TeammatePlace)]).toEqual([[false, organization.moveError(
+      OrganizationParent.department("d1"), OrganizationParent.department("d2")), false, organization.moveError(OrganizationParent.teammate("t1"),
+      OrganizationParent.teammate("t1")), false, organization.moveError(OrganizationParent.teammate("t1"), OrganizationParent.department("gone"))], 0, 0]);
+  });
+
+  it("says why a change failed, in its own words or not, and forgets it on the next change or when cleared", async () => {
+    let failure: unknown = new Error("A department can't move under one of its own.");
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("my-organization", "d1", "d2").toJson()])
+      .answer(MethodName.DepartmentMove, () => Promise.reject(failure))
+      .answer(MethodName.DepartmentDelete, () => null);
+    const store = new OrganizationStoreService(context, new OrganizationScope());
+    await Wait.until(() => expect(namesOf(store)).toBe("d1,d2"));
+
+    const moved = await store.moveDepartment("d1", OrganizationParent.department("d2"));
+    const said = store.actionError();
+    failure = "Busy";
+    await store.moveDepartment("d1", OrganizationParent.department("d2"));
+    const plain = store.actionError();
+    const deleted = await store.deleteDepartment("d1");
+    const afterSuccess = store.actionError();
+    await store.moveDepartment("d1", OrganizationParent.department("d2"));
+    store.clearActionError();
+    const cleared = store.actionError();
+
+    expect([moved, said, plain, deleted, afterSuccess, cleared])
+      .toEqual([false, "A department can't move under one of its own.", "Busy", true, null, null]);
+  });
+
+  it("opens a teammate's Organization chat in its organization, or says why it couldn't", async () => {
+    const chat = new Chat("c1", null, "Organization · Grok", "t", "t", false, null, null, false, null, false, [], false, false, null,
+      new OrganizationChat("my-organization", "grok"));
+    const asked: string[] = [];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [])
+      .answer(MethodName.OrganizationChatOpen, t => {
+        const opening = OrganizationChat.fromJson(t);
+        asked.push(`${opening.organizationId}/${opening.teammateId}`);
+        return opening.teammateId === "grok" ? chat.toJson() : Promise.reject(new Error("There is no teammate gone."));
+      });
+    const store = new OrganizationStoreService(context, new OrganizationScope());
+
+    const missing = await store.openOrganizationChat("gone");
+    const said = store.actionError();
+    const opened = await store.openOrganizationChat("grok");
+
+    expect([missing, said, opened?.toJson(), store.actionError(), asked])
+      .toEqual([null, "There is no teammate gone.", chat.toJson(), null, ["my-organization/gone", "my-organization/grok"]]);
   });
 });

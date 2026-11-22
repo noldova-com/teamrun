@@ -14,6 +14,7 @@ import { PageDocumentResources } from "./page-document-resources";
 
 export class PageDocuments {
   private static readonly releases: WeakMap<IWindowPartContext, () => void> = new WeakMap();
+  private static readonly resyncs: WeakMap<IWindowPartContext, Set<() => void>> = new WeakMap();
 
   public static register(context: IWindowPartContext): void {
     context.registerDocument(new DocumentContribution(PageDocumentResources.documentName,
@@ -29,6 +30,19 @@ export class PageDocuments {
   public static release(context: IWindowPartContext): void {
     PageDocuments.releases.get(context)?.();
     PageDocuments.releases.delete(context);
+  }
+
+  public static onResync(context: IWindowPartContext, listener: () => void): () => void {
+    const listeners = PageDocuments.resyncs.get(context) ?? new Set<() => void>();
+    const entry = (): void => listener();
+    PageDocuments.resyncs.set(context, listeners);
+    listeners.add(entry);
+    return () => listeners.delete(entry);
+  }
+
+  public static resync(context: IWindowPartContext): void {
+    for (const listener of [...PageDocuments.resyncs.get(context) ?? []])
+      listener();
   }
 
   public static open(context: IWindowPartContext, page: Page): void {

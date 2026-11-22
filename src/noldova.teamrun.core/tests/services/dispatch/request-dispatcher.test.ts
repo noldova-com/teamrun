@@ -10,15 +10,15 @@ import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync,
 import { dirname, join } from "node:path";
 
 import { ArgumentException } from "@noldova/context.exceptions";
-import { JsonException, JsonReader } from "@noldova/context.json";
+import { JsonException, type JsonObject, JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AppLook, ApprovalAsk, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
+import { AppLook, ApprovalAsk, ConversationEngine, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
   from "@noldova/teamrun.core";
 import { AcpAgentIdParams, AcpAgentListing, AcpLocalCommandAddParams, ComputerUseGrant, ComputerUseGrantIdParams, ProviderContextWindows, ProviderSignInCommand,
   type ITeammateChanges, TeammateFallback } from "@noldova/teamrun.protocol";
 import { ConversationPosition, ObservedSettings, PanelAnsweredParams, PanelName, PanelOutcome, PanelRequestedPayload, PlanUsage, PlanUsageParams, PlanWindow,
-  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateUsage, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
+  PlanWindowName, Provenance, ReadingPositionSaveParams, ReplyUsage, RunOutput, TeammateLastReply, TeammateUsage, TeammateWork, WindowFocusedParams, WindowIdParams } from "@noldova/teamrun.protocol";
 import { SharedMcpProviderSetParams, SharedMcpSecretSetParams, SharedMcpServer, SharedMcpServerDefinition, SharedMcpServerIdParams, SharedMcpServerListing,
   SharedMcpServerUpdateParams, SharedMcpSetting, SharedMcpSignInStarted, SharedMcpTeammateSetParams, SharedMcpTransport } from "@noldova/teamrun.protocol";
 import { SqlQuery } from "@noldova/context.data.sql";
@@ -27,9 +27,10 @@ import { MessageDelivery, WaitingMessage, WaitingMessageAddParams, WaitingMessag
 import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, ChatPlanFirstParams, ConversationMember, ConversationMemberParams, EventName, Harness,
   Teammate, TeammateCreateParams, TeammateUpdateParams, TeammateIdParams, DefaultTeammate, DefaultTeammateSetParams, ProjectsLayoutSaveParams,
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
-import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization }
-  from "@noldova/teamrun.protocol";
-import { OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
+import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, NodeType, NodeTypeCreateParams,
+  NodeTypeIdParams, NodeTypeUpdateParams, Organization, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
+import { OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams } from "@noldova/teamrun.protocol";
+import { OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
 import {
   AttachmentContent,
@@ -112,8 +113,67 @@ import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixtur
 import { FakeProviderKindInstallation } from "../../fixtures/fake-provider-kind-installation.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
+class RecordingEngine extends ConversationEngine {
+  public readonly forgotten: string[] = [];
+  public readonly planning: string[] = [];
+
+  public static of(host: CoreHost): RecordingEngine {
+    return new RecordingEngine(host.context, host.projects, host.conversations, host.messages, host.approvals, host.providers, host.teammates, host.registry,
+      host.events, host.attachments, undefined, host.log, undefined, host.tasks, host.planUsage, null, host.checkpoints, host.sharedServers, null, null, undefined,
+      undefined, host.timer);
+  }
+
+  public override async forgetAsync(conversationIds: readonly string[]): Promise<void> {
+    this.forgotten.push([...conversationIds].sort().join(","));
+    await super.forgetAsync(conversationIds);
+  }
+
+  public override async planFirstAsync(conversationId: string): Promise<void> {
+    this.planning.push(conversationId);
+    await super.planFirstAsync(conversationId);
+  }
+}
+
+class MethodCall {
+  public readonly method: MethodName;
+  public readonly payload: JsonObject;
+
+  public constructor(method: MethodName, payload: JsonObject) {
+    this.method = method;
+    this.payload = payload;
+  }
+}
+
+class ChatSeat {
+  public readonly conversation: Conversation;
+  public readonly teammate: Teammate;
+
+  public constructor(conversation: Conversation, teammate: Teammate) {
+    this.conversation = conversation;
+    this.teammate = teammate;
+  }
+}
+
+class TaskTeam {
+  public readonly chat: Conversation;
+  public readonly other: Conversation;
+  public readonly ada: Teammate;
+  public readonly stopped: string[];
+  public readonly listeners: ITurnListener[];
+
+  public constructor(chat: Conversation, other: Conversation, ada: Teammate, stopped: string[], listeners: ITurnListener[]) {
+    this.chat = chat;
+    this.other = other;
+    this.ada = ada;
+    this.stopped = stopped;
+    this.listeners = listeners;
+  }
+}
+
 @TestClass
 export class RequestDispatcherTests {
+  private static readonly mine: string = Resources.defaultOrganizationId;
+
   @TestMethod
   public async routesAProvidersOwnMcpServerListing(): Promise<void> {
     await using host = await CoreHost.createAsync();
@@ -158,13 +218,22 @@ export class RequestDispatcherTests {
       new ConversationIdParams(conversation.id).toJson())).length);
     Assert.areEqual("plan", ConversationMember.fromJson(await RequestDispatcherTests.succeed(host, MethodName.ConversationSetMemberMode,
       new ChatMemberModeParams(conversation.id, created.id, "plan").toJson())).mode);
-    Assert.areEqual("plan", (await host.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, created.id)))?.mode);
-    Assert.areEqual("high", ConversationMember.fromJson(await RequestDispatcherTests.succeed(host, MethodName.ConversationSetMemberSettings,
-      new ChatMemberSettingsParams(conversation.id, created.id, new ChatMemberSettings(null, "high")).toJson())).settings?.effort);
-    Assert.areEqual("high", (await host.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, created.id)))?.settings?.effort);
+    const planning = await host.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, created.id));
+    Assert.isNotNull(planning);
+    Assert.areEqual("plan", planning.mode);
+    const setting = ConversationMember.fromJson(await RequestDispatcherTests.succeed(host, MethodName.ConversationSetMemberSettings,
+      new ChatMemberSettingsParams(conversation.id, created.id, new ChatMemberSettings(null, "high")).toJson()));
+    Assert.isNotNull(setting.settings);
+    Assert.areEqual("high", setting.settings.effort);
+    const set = await host.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, created.id));
+    Assert.isNotNull(set);
+    Assert.isNotNull(set.settings);
+    Assert.areEqual("high", set.settings.effort);
     Assert.isTrue(Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.ConversationSetPlanFirst,
       new ChatPlanFirstParams(conversation.id, true).toJson())).planFirst);
-    Assert.isTrue((await host.conversations.findAsync(conversation.id))!.planFirst);
+    const planFirst = await host.conversations.findAsync(conversation.id);
+    Assert.isNotNull(planFirst);
+    Assert.isTrue(planFirst.planFirst);
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.ConversationRemoveMember, params));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.TeammateDelete, new TeammateIdParams(created.id).toJson()));
     Assert.areEqual(8, host.listener.count(EventName.StateInvalidated));
@@ -177,38 +246,73 @@ export class RequestDispatcherTests {
   @TestMethod
   public async routesOrganizationMethodsAndPublishesTheWholeOrganizationAfterEachChangeWithoutInvalidatingTheCatalog(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
     const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
 
-    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Design", null).toJson()));
-    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Web", null).toJson()));
-    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(ada.id, design.id).toJson()));
+    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", type, OrganizationParent.person).toJson()));
+    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Web", type, OrganizationParent.person).toJson()));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(RequestDispatcherTests.mine, ada.id, design.id).toJson()));
     const led = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentUpdate,
-      new DepartmentUpdateParams(design.id, "Product", ada.id).toJson()));
-    const moved = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMove, new DepartmentMoveParams(web.id, design.id, 0).toJson()));
-    const listed = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
-    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentDelete, new DepartmentIdParams(web.id).toJson()));
-    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.DepartmentUpdate, new DepartmentUpdateParams(design.id, undefined, bob.id).toJson()));
+      new DepartmentUpdateParams(RequestDispatcherTests.mine, design.id, "Product", ada.id).toJson()));
+    const moved = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMove, new DepartmentMoveParams(RequestDispatcherTests.mine, web.id, OrganizationParent.department(design.id), 0).toJson()));
+    const [listed] = RequestDispatcherTests.organizations(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
+    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.DepartmentMove,
+      new DepartmentMoveParams(RequestDispatcherTests.mine, design.id, OrganizationParent.department(web.id), 0).toJson()));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentDelete, new DepartmentIdParams(RequestDispatcherTests.mine, web.id).toJson()));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.TeammatePlace, new TeammatePlaceParams(RequestDispatcherTests.mine, bob.id, OrganizationParent.teammate(ada.id), 0).toJson()));
 
     Assert.areEqual(`Product,${ada.id},${design.id}`, `${led.name},${led.leaderId},${moved.parentId}`);
-    Assert.areEqual(JSON.stringify(listed.toJson()), JSON.stringify(changes()[4]?.toJson()));
-    Assert.areEqual(6, changes().length);
+    Assert.areEqual(JSON.stringify(listed?.toJson()), JSON.stringify(changes()[4]?.toJson()));
+    Assert.areEqual(7, changes().length);
     Assert.areEqual(1, changes().at(-1)?.departments.length);
+    Assert.areEqual(ada.id, changes().at(-1)?.managerOf(bob.id));
     Assert.areEqual(ErrorCode.InvalidParams, refused.info?.name);
     Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
   }
 
   @TestMethod
-  public async publishesTheOrganizationWhenADeletedTeammateLeavesItsDepartmentAndKnowsNoOrganizationMethodWithoutIt(): Promise<void> {
+  public async routesNodeTypeMethodsAndPublishesTheOrganizationAfterEach(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
+
+    const team = NodeType.fromJson(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeCreate, new NodeTypeCreateParams(RequestDispatcherTests.mine, "Team", "groups").toJson()));
+    const squad = NodeType.fromJson(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeUpdate,
+      new NodeTypeUpdateParams(RequestDispatcherTests.mine, team.id, "Squad", undefined, "#00ff00").toJson()));
+    const named = changes().map(t => t.nodeTypes.map(u => u.name).join("+"));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeDelete, new NodeTypeIdParams(RequestDispatcherTests.mine, team.id).toJson()));
+
+    Assert.areEqual("Team|Squad|groups|#00ff00", [team.name, squad.name, String(squad.icon), String(squad.color)].join("|"));
+    Assert.areEqual("Team,Squad", named.join(","));
+    Assert.areEqual(0, changes().at(-1)?.nodeTypes.length);
+    Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
+  }
+
+  @TestMethod
+  public async opensATeammatesOrganizationChatInTheDefaultOrganizationOnceAndReturnsTheSameChatAgain(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+
+    const opened = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(RequestDispatcherTests.mine, ada.id).toJson()));
+    const again = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(RequestDispatcherTests.mine, ada.id).toJson()));
+
+    Assert.isNotNull(opened.organizationChat);
+    Assert.areEqual(`${ada.id} ${opened.id}`, `${opened.organizationChat.teammateId} ${again.id}`);
+  }
+
+  @TestMethod
+  public async publishesTheOrganizationWhenADeletedTeammateLeavesItsDepartmentAndKnowsNoOrganizationMethodWithoutIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
+    const provider = await host.createProviderAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", null));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", type, OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(RequestDispatcherTests.mine, ada.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(RequestDispatcherTests.mine, design.id, undefined, ada.id));
 
     await RequestDispatcherTests.succeed(host, MethodName.TeammateDelete, new TeammateIdParams(bob.id).toJson());
     const outside = host.listener.count(EventName.OrganizationChanged);
@@ -218,38 +322,76 @@ export class RequestDispatcherTests {
       host.approvals, host.engine, host.teammates, host.events);
     const unknown = await without.dispatch(new Request("r", MethodName.OrganizationList, null));
     const carol = await host.teammates.createAsync(new TeammateCreateParams("Carol", null, provider.id, Harness.Provider, null, null));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(carol.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(RequestDispatcherTests.mine, carol.id, design.id));
     const deleted = await without.dispatch(new Request("r", MethodName.TeammateDelete, new TeammateIdParams(carol.id).toJson()));
 
     Assert.areEqual(0, outside);
     Assert.areEqual(1, published.length);
-    Assert.isNull(published[0]?.departments[0]?.leaderId);
-    Assert.areEqual(0, published[0]?.members.length);
+    const organization = published[0];
+    Assert.isDefined(organization);
+    const department = organization.departments[0];
+    Assert.isDefined(department);
+    Assert.isNull(department.leaderId);
+    Assert.areEqual(0, organization.members.length);
     Assert.areEqual(ErrorCode.UnknownMethod, unknown.info?.name);
     Assert.isFalse(deleted.hasErrors);
     Assert.areEqual(1, host.listener.count(EventName.OrganizationChanged));
   }
 
   @TestMethod
-  public async sendsStopsAndListsOrganizationMessagesAndKnowsNoneOfTheirMethodsWithoutThem(): Promise<void> {
+  public async createsRenamesAndDeletesOrganizationsPublishingEachAndOpensAChatInEach(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+    await host.organization.placeAsync(new TeammatePlaceParams(RequestDispatcherTests.mine, ada.id, OrganizationParent.person, 0));
 
-    const sent = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageSend,
-      new OrganizationMessageSendParams(OrganizationTarget.teammate(ada.id), "Hi").toJson()));
-    await host.engine.waitForIdle();
-    const stopped = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageStop, new MessageIdParams(sent.id).toJson()));
-    const listed = await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageList, null);
-    const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
-      host.approvals, host.engine, host.teammates, host.events);
-    const unknown = await Promise.all([MethodName.OrganizationMessageSend, MethodName.OrganizationMessageStop, MethodName.OrganizationMessageList]
-      .map(t => without.dispatch(new Request("r", t, null))));
+    const studio = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationCreate, new OrganizationCreateParams("Studio", null).toJson()));
+    const renamed = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationUpdate,
+      new OrganizationUpdateParams(studio.id, "Design studio", "/work/studio").toJson()));
+    const listed = RequestDispatcherTests.organizations(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
+    const mine = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen,
+      new OrganizationChat(RequestDispatcherTests.mine, ada.id).toJson()));
+    const other = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
+    const again = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
+    const invalidated = host.listener.count(EventName.StateInvalidated);
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.OrganizationDelete, new OrganizationIdParams(studio.id).toJson()));
+    const invalidatedByDelete = host.listener.count(EventName.StateInvalidated) - invalidated;
+    const unknown = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
+    const last = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationDelete, new OrganizationIdParams(RequestDispatcherTests.mine).toJson()));
 
-    Assert.areEqual(`${ada.id}:Started`, sent.recipients.map(t => `${t.teammateId}:${t.state}`).join());
-    Assert.areEqual(JSON.stringify(sent.toJson()), JSON.stringify(stopped.toJson()));
-    Assert.areEqual(JSON.stringify([stopped.toJson()]), JSON.stringify(listed));
-    Assert.areEqual("UnknownMethod,UnknownMethod,UnknownMethod", unknown.map(t => t.info?.name).join());
+    Assert.areEqual("My organization,Design studio", listed.map(t => t.name).join(","));
+    Assert.areEqual("/work/studio", renamed.folder);
+    Assert.areEqual("Studio,Design studio", host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload).name).join(","));
+    Assert.areEqual(JSON.stringify([{ organizationId: studio.id }]),
+      JSON.stringify(host.listener.events.filter(t => t.name === EventName.OrganizationRemoved).map(t => t.payload)));
+    Assert.areNotEqual(mine.id, other.id);
+    Assert.areEqual(other.id, again.id);
+    const storedOther = await host.conversations.findAsync(other.id);
+    const storedMine = await host.conversations.findAsync(mine.id);
+    Assert.isNotNull(storedOther);
+    Assert.isNotNull(storedMine);
+    Assert.isNull(storedOther.organizationChat);
+    Assert.isNotNull(storedMine.organizationChat);
+    Assert.areEqual(RequestDispatcherTests.mine, storedMine.organizationChat.organizationId);
+    Assert.areEqual(1, invalidatedByDelete);
+    Assert.areEqual(ErrorCode.NotFound, unknown.info?.name);
+    Assert.areEqual(ErrorCode.Conflict, last.info?.name);
+  }
+
+  @TestMethod
+  public async answersNothingAndPublishesNoChangeForAnOrganizationDeletedBeforeItsChangeIsRead(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const studio = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationCreate, new OrganizationCreateParams("Studio", null).toJson()));
+    const published = host.listener.count(EventName.OrganizationChanged);
+
+    const [renamed, deleted] = await Promise.all([
+      RequestDispatcherTests.succeed(host, MethodName.OrganizationUpdate, new OrganizationUpdateParams(studio.id, "Design studio", null).toJson()),
+      RequestDispatcherTests.succeed(host, MethodName.OrganizationDelete, new OrganizationIdParams(studio.id).toJson())
+    ]);
+
+    Assert.isNull(renamed);
+    Assert.isNull(deleted);
+    Assert.areEqual(published, host.listener.count(EventName.OrganizationChanged));
   }
 
   @TestMethod
@@ -414,6 +556,26 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
+  public async readsAndSavesTheOrganizationLayoutAndTellsEveryWindowWithoutAnOrganizationChange(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const layout = { collapsed: ["d1"], cardsShow: { usage: true } };
+
+    const mine = new OrganizationIdParams(RequestDispatcherTests.mine).toJson();
+
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutRead, mine));
+    Assert.areEqual(JSON.stringify(layout), JSON.stringify(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutSave,
+      new OrganizationLayoutSaveParams(RequestDispatcherTests.mine, layout).toJson())));
+    Assert.areEqual(JSON.stringify(layout), JSON.stringify(await RequestDispatcherTests.succeed(host, MethodName.OrganizationLayoutRead, mine)));
+    Assert.areEqual(JSON.stringify([{ organizationId: RequestDispatcherTests.mine, layout }]),
+      JSON.stringify(host.listener.events.filter(t => t.name === EventName.OrganizationLayoutUpdated).map(t => t.payload)));
+    Assert.areEqual(0, host.listener.count(EventName.OrganizationChanged));
+
+    Assert.isTrue((await host.dispatcher.dispatch(new Request("bad", MethodName.OrganizationLayoutSave, { organizationId: RequestDispatcherTests.mine, layout: ["d1"] }))).hasErrors);
+    Assert.areEqual(ErrorCode.NotFound, (await host.dispatcher.dispatch(new Request("gone", MethodName.OrganizationLayoutRead, { organizationId: "gone" }))).info?.name);
+    Assert.areEqual(1, host.listener.count(EventName.OrganizationLayoutUpdated));
+  }
+
+  @TestMethod
   public async readsAndSavesTheProjectsLayoutAndTellsEveryWindowWithoutInvalidatingTheCatalog(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const layout = { pinnedChats: ["c1"], projectOrder: ["p2", "p1"] };
@@ -478,7 +640,8 @@ export class RequestDispatcherTests {
 
     Assert.areEqual(ProviderKindInstallState.NotInstalled, ProviderKindInstallation.fromJson(listed[0]?.toJson()).state);
     Assert.areEqual(ProviderKindInstallState.NotInstalled, ProviderKindInstallation.fromJson(await installing).state);
-    Assert.isTrue(installation.signal!.aborted);
+    Assert.isNotNull(installation.signal);
+    Assert.isTrue(installation.signal.aborted);
   }
 
   @TestMethod
@@ -504,6 +667,30 @@ export class RequestDispatcherTests {
     const listed = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ProviderToolList, null));
 
     Assert.areEqual(JSON.stringify([tool.toJson()]), JSON.stringify(listed.map(t => ProviderTool.fromJson(t.toJson()).toJson())));
+  }
+
+  @TestMethod
+  public async listsEachKindAsItsRefreshedDescriptorSaysAndItsLastOneWhenTheRefreshFailsWritingTheFailureToTheLog(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const refreshed = new FakeProviderAdapter("refreshed");
+    refreshed.refreshDescriptorAsync = () => {
+      refreshed.descriptor = new ProviderKind("refreshed", "Refreshed provider", true, false, null);
+      return Promise.resolve();
+    };
+    const failing = new FakeProviderAdapter("failing");
+    failing.refreshDescriptorAsync = () => Promise.reject(new Error("The environment couldn't be read."));
+    const refusing = new FakeProviderAdapter("refusing");
+    refusing.refreshDescriptorAsync = () => Promise.reject("refused");
+    host.registry.register(refreshed);
+    host.registry.register(failing);
+    host.registry.register(refusing);
+
+    const kinds = await RequestDispatcherTests.succeed(host, MethodName.ProviderKindList, null);
+
+    Assert.areEqual("fake:Fake provider,refreshed:Refreshed provider,failing:Fake provider,refusing:Fake provider",
+      RequestDispatcherTests.objects(kinds).map(t => ProviderKind.fromJson(t.toJson())).map(t => `${t.id}:${t.displayName}`).join(","));
+    Assert.areEqual(JSON.stringify([Resources.formatDescriptorNotRefreshed("failing", "Error"), Resources.formatDescriptorNotRefreshed("refusing", "string")]),
+      JSON.stringify(host.log.lines));
   }
 
   @TestMethod
@@ -538,6 +725,8 @@ export class RequestDispatcherTests {
     Assert.areEqual(0, RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ConversationListEmpty, new ProjectIdParams(project.id).toJson())).length);
     const sendParams = new MessageSendParams(conversation.id, "Hello", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id);
     const sent = MessageSendResult.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessageSend, sendParams.toJson()));
+    const firstReply = sent.replies[0];
+    Assert.isDefined(firstReply);
     const pageParams = new MessagePageParams(conversation.id, null, null, 1);
     const page = MessagePage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessagePage, pageParams.toJson()));
     Assert.areEqual(1, page.messages.length);
@@ -546,7 +735,7 @@ export class RequestDispatcherTests {
     await host.until("the approval", async () => (await host.approvals.listAsync(new ConversationIdParams(conversation.id))).length === 1, host.runs());
     const open = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.MessageListOpen, null));
     const pending = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ApprovalListPending, null));
-    Assert.areEqual(sent.replies[0]!.id, Message.fromJson(open[0]?.toJson()).id);
+    Assert.areEqual(firstReply.id, Message.fromJson(open[0]?.toJson()).id);
     Assert.areEqual(1, pending.length);
     const approvals = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ApprovalList, new ConversationIdParams(conversation.id).toJson()));
     const decided = Approval.fromJson(await RequestDispatcherTests.succeed(host, MethodName.ApprovalDecide, new ApprovalDecideParams(Approval.fromJson(approvals[0]?.toJson()).id, "accept").toJson()));
@@ -558,10 +747,10 @@ export class RequestDispatcherTests {
     Assert.areEqual(0, ReplyPage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessagePlanPage, pageParams.toJson())).replies.length);
     Assert.areEqual(0, ReplyPage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessageSubAgentsPage, pageParams.toJson())).replies.length);
     const summary = ReplySummary.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessageSummary,
-      new MessageIdParams(sent.replies[0]!.id).toJson()));
-    const details = Message.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessageDetails, new MessageIdParams(sent.replies[0]!.id).toJson()));
-    Assert.areEqual(sent.replies[0]!.id, summary.preview.id);
-    Assert.areEqual(sent.replies[0]!.id, details.id);
+      new MessageIdParams(firstReply.id).toJson()));
+    const details = Message.fromJson(await RequestDispatcherTests.succeed(host, MethodName.MessageDetails, new MessageIdParams(firstReply.id).toJson()));
+    Assert.areEqual(firstReply.id, summary.preview.id);
+    Assert.areEqual(firstReply.id, details.id);
     Assert.isFalse(details.details.some(t => t.kind === "Text"));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.MessageSummary, new MessageIdParams("missing").toJson()));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.MessageDetails, new MessageIdParams("missing").toJson()));
@@ -728,7 +917,9 @@ export class RequestDispatcherTests {
       new ProviderEnabledParams(provider.id, false).toJson()));
 
     Assert.isFalse(disabled.enabled);
-    Assert.isFalse((await host.providers.findAsync(provider.id))!.enabled);
+    const stored = await host.providers.findAsync(provider.id);
+    Assert.isNotNull(stored);
+    Assert.isFalse(stored.enabled);
     Assert.areEqual(1, host.listener.count(EventName.StateInvalidated));
     Assert.areEqual(1, host.listener.count(EventName.ProviderUpdated));
   }
@@ -781,22 +972,26 @@ export class RequestDispatcherTests {
   public async listsAndStopsAReplysBackgroundTasksAfterTheReplyEndsAndForgetsThemWithTheChat(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
-    host.adapter.afterDetails = () => host.adapter.lastListener!.onTaskStartedAsync(new TaskStart("item-1", "npm run dev", () =>
-      host.adapter.lastListener!.onTaskEndedAsync(new TaskEnd("item-1", BackgroundTaskStatus.Stopped, 143))));
+    host.adapter.afterDetails = () => RequestDispatcherTests.listenerOf(host).onTaskStartedAsync(new TaskStart("item-1", "npm run dev", () =>
+      RequestDispatcherTests.listenerOf(host).onTaskEndedAsync(new TaskEnd("item-1", BackgroundTaskStatus.Stopped, 143))));
     const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "Start the server", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
-    host.adapter.lastListener!.onTaskOutput("item-1", "ready on 5173\n");
+    const reply = sent.replies[0];
+    Assert.isDefined(reply);
+    RequestDispatcherTests.listenerOf(host).onTaskOutput("item-1", "ready on 5173\n");
     await host.until("the task output event", () => host.listener.count(EventName.BackgroundTaskOutput) === 1);
 
     const page = BackgroundTaskPage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.BackgroundTaskList,
       new BackgroundTaskListParams(conversation.id, null, 10).toJson()));
     const listed = page.tasks;
+    const task = listed[0];
+    Assert.isDefined(task);
     const read = BackgroundTask.fromJson(await RequestDispatcherTests.succeed(host, MethodName.BackgroundTaskRead,
-      new BackgroundTaskIdParams(listed[0]!.id).toJson()));
+      new BackgroundTaskIdParams(task.id).toJson()));
     const stopped = BackgroundTask.fromJson(await RequestDispatcherTests.succeed(host, MethodName.BackgroundTaskStop,
-      new BackgroundTaskIdParams(listed[0]!.id).toJson()));
+      new BackgroundTaskIdParams(task.id).toJson()));
     const missing = await host.dispatcher.dispatch(new Request("r", MethodName.BackgroundTaskStop, new BackgroundTaskIdParams("missing").toJson()));
-    const replyStatus = (await host.messages.findAsync(sent.replies[0]!.id))?.status;
+    const replyStatus = (await host.messages.findAsync(reply.id))?.status;
     const cleared = BackgroundTasksClearedPayload.fromJson(await RequestDispatcherTests.succeed(host, MethodName.BackgroundTaskClearFinished,
       new ConversationIdParams(conversation.id).toJson()));
     const afterClear = BackgroundTaskPage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.BackgroundTaskList,
@@ -807,10 +1002,10 @@ export class RequestDispatcherTests {
 
     Assert.areEqual("Completed", replyStatus);
     Assert.areEqual("1:false:0", [listed.length, page.hasLater, page.count].join(":"));
-    Assert.areEqual(sent.replies[0]!.id, listed[0]!.messageId);
-    Assert.areEqual("fake", listed[0]!.kind);
-    Assert.areEqual(BackgroundTaskStatus.Running, listed[0]!.status);
-    Assert.isNull(listed[0]!.output);
+    Assert.areEqual(reply.id, task.messageId);
+    Assert.areEqual("fake", task.kind);
+    Assert.areEqual(BackgroundTaskStatus.Running, task.status);
+    Assert.isNull(task.output);
     Assert.areEqual("ready on 5173\n", read.output);
     Assert.areEqual(BackgroundTaskStatus.Stopped, stopped.status);
     Assert.areEqual(143, stopped.exitCode);
@@ -852,14 +1047,18 @@ export class RequestDispatcherTests {
       new ConversationIdParams(chat.id).toJson()));
     const edited = WaitingMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.WaitingMessageEdit,
       new WaitingMessageEditParams(added.id, send("Sooner")).toJson()));
-    const removed = await RequestDispatcherTests.succeed(host, MethodName.WaitingMessageRemove, new WaitingMessageIdParams(listed.messages[1]?.id ?? "").toJson());
+    const never = listed.messages[1];
+    Assert.isDefined(never);
+    const removed = await RequestDispatcherTests.succeed(host, MethodName.WaitingMessageRemove, new WaitingMessageIdParams(never.id).toJson());
     const now = WaitingMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.WaitingMessageSendNow, new WaitingMessageIdParams(added.id).toJson()));
     await host.adapter.requested(2);
     await host.engine.shutdown();
 
     Assert.areEqual("Later,Never", listed.messages.map(t => t.message.text).join(","));
-    Assert.areEqual(`Sooner|true|${MessageDelivery.StopAndSend}`, [edited.message.text, removed === null, now.delivery].join("|"));
-    Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(running.replies[0]?.id ?? ""))?.status);
+    Assert.areEqual(`Sooner|true|${MessageDelivery.StopAndSend}`, [edited.message.text, Object.isNull(removed), now.delivery].join("|"));
+    const runningReply = running.replies[0];
+    Assert.isDefined(runningReply);
+    Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(runningReply.id))?.status);
     Assert.isTrue(host.adapter.requests[1]?.prompt.includes("Sooner") === true, String(host.adapter.requests[1]?.prompt));
   }
 
@@ -922,11 +1121,15 @@ export class RequestDispatcherTests {
     const draft = Draft.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DraftSave, draftParams.toJson()));
     const prepared = MessageAttachment.fromJson(await RequestDispatcherTests.succeed(host, MethodName.AttachmentPrepare,
       new AttachmentInput("prepared.txt", "text/plain", "YQ==", null).toJson()));
-    const saved = sent.sent.attachments[0]!.path;
+    const sentAttachment = sent.sent.attachments[0];
+    const draftAttachment = draft.attachments[0];
+    Assert.isDefined(sentAttachment);
+    Assert.isDefined(draftAttachment);
+    const saved = sentAttachment.path;
 
     const message = await RequestDispatcherTests.succeed(host, MethodName.AttachmentRead, new AttachmentReadParams(conversation.id, saved).toJson());
     const drafted = await RequestDispatcherTests.succeed(host, MethodName.AttachmentRead,
-      new AttachmentReadParams(conversation.id, draft.attachments[0]!.path).toJson());
+      new AttachmentReadParams(conversation.id, draftAttachment.path).toJson());
 
     Assert.areEqual(JSON.stringify(new AttachmentContent("notes.txt", "text/plain", 5, "aGVsbG8=").toJson()), JSON.stringify(AttachmentContent.fromJson(message).toJson()));
     Assert.areEqual(JSON.stringify(new AttachmentContent("draft.png", "image/png", 3, "AAEC").toJson()), JSON.stringify(AttachmentContent.fromJson(drafted).toJson()));
@@ -950,14 +1153,18 @@ export class RequestDispatcherTests {
     const draft = Draft.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DraftSave, draftParams.toJson()));
     const prepared = MessageAttachment.fromJson(await RequestDispatcherTests.succeed(host, MethodName.AttachmentPrepare,
       new AttachmentInput("prepared.txt", "text/plain", "YQ==", null).toJson()));
-    const saved = sent.sent.attachments[0]!.path;
+    const sentAttachment = sent.sent.attachments[0];
+    const draftAttachment = draft.attachments[0];
+    Assert.isDefined(sentAttachment);
+    Assert.isDefined(draftAttachment);
+    const saved = sentAttachment.path;
 
     const message = await RequestDispatcherTests.succeed(host, MethodName.AttachmentShare, new AttachmentReadParams(conversation.id, saved).toJson());
     const drafted = await RequestDispatcherTests.succeed(host, MethodName.AttachmentShare,
-      new AttachmentReadParams(conversation.id, draft.attachments[0]!.path).toJson());
+      new AttachmentReadParams(conversation.id, draftAttachment.path).toJson());
 
-    Assert.areEqual(JSON.stringify({ ...sent.sent.attachments[0]!.toJson(), path: realpathSync(saved) }), JSON.stringify(message));
-    Assert.areEqual(JSON.stringify({ ...draft.attachments[0]!.toJson(), path: realpathSync(draft.attachments[0]!.path) }), JSON.stringify(drafted));
+    Assert.areEqual(JSON.stringify({ ...sentAttachment.toJson(), path: realpathSync(saved) }), JSON.stringify(message));
+    Assert.areEqual(JSON.stringify({ ...draftAttachment.toJson(), path: realpathSync(draftAttachment.path) }), JSON.stringify(drafted));
     for (const params of [new AttachmentReadParams(conversation.id, prepared.path), new AttachmentReadParams(other.id, saved),
       new AttachmentReadParams("missing", saved)]) {
       const refused = await host.dispatcher.dispatch(new Request("r1", MethodName.AttachmentShare, params.toJson()));
@@ -1137,12 +1344,12 @@ export class RequestDispatcherTests {
     const reader = new WrittenImageReader();
 
     const read = await RequestDispatcherTests.succeed(host, MethodName.WrittenImageRead,
-      new WrittenImageReadParams(conversation.id, "reply", reader.markdownImagePathOf("./out/drawn.png", project.rootPath)!).toJson());
+      new WrittenImageReadParams(conversation.id, "reply", RequestDispatcherTests.found(reader.markdownImagePathOf("./out/drawn.png", project.rootPath))).toJson());
 
     Assert.areEqual(JSON.stringify(new AttachmentContent("drawn.png", "image/png", png.length, png.toString("base64")).toJson()),
       JSON.stringify(AttachmentContent.fromJson(read).toJson()));
-    for (const path of [join(project.rootPath, "out", "other.png"), reader.markdownImagePathOf("out/missing.png", project.rootPath)!,
-      reader.markdownImagePathOf("out/fake.png", project.rootPath)!]) {
+    for (const path of [join(project.rootPath, "out", "other.png"), RequestDispatcherTests.found(reader.markdownImagePathOf("out/missing.png", project.rootPath)),
+      RequestDispatcherTests.found(reader.markdownImagePathOf("out/fake.png", project.rootPath))]) {
       const refused = await host.dispatcher.dispatch(new Request("r1", MethodName.WrittenImageRead, new WrittenImageReadParams(conversation.id, "reply", path).toJson()));
       Assert.areEqual(ErrorCode.NotFound, refused.info?.name);
     }
@@ -1164,11 +1371,11 @@ export class RequestDispatcherTests {
     const reader = new WrittenImageReader();
 
     const read = await RequestDispatcherTests.succeed(host, MethodName.WrittenImageRead,
-      new WrittenImageReadParams(conversation.id, "reply", reader.linkedPathOf("out/linked.png", project.rootPath)!).toJson());
+      new WrittenImageReadParams(conversation.id, "reply", RequestDispatcherTests.found(reader.linkedPathOf("out/linked.png", project.rootPath))).toJson());
 
     Assert.areEqual(JSON.stringify(new AttachmentContent("linked.png", "image/png", png.length, png.toString("base64")).toJson()),
       JSON.stringify(AttachmentContent.fromJson(read).toJson()));
-    for (const path of [reader.linkedPathOf("out/other.png", project.rootPath)!, reader.linkedPathOf("out/notes.md", project.rootPath)!]) {
+    for (const path of [RequestDispatcherTests.found(reader.linkedPathOf("out/other.png", project.rootPath)), RequestDispatcherTests.found(reader.linkedPathOf("out/notes.md", project.rootPath))]) {
       const refused = await host.dispatcher.dispatch(new Request("r1", MethodName.WrittenImageRead, new WrittenImageReadParams(conversation.id, "reply", path).toJson()));
       Assert.areEqual(ErrorCode.NotFound, refused.info?.name);
     }
@@ -1268,7 +1475,9 @@ export class RequestDispatcherTests {
     const [conversation, other] = [await host.createConversationAsync(), await host.createConversationAsync()];
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "Hello", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
-    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null)))[1]?.id ?? "";
+    const replyMessage = (await host.messages.listAsync(new MessageListParams(conversation.id, null)))[1];
+    Assert.isDefined(replyMessage);
+    const reply = replyMessage.id;
     const output = new RunOutput(conversation.id, reply, "body", 0, { lines: [], cutLines: 3 });
     const changes = (await host.context.database.changeFeed.readAfterAsync(0)).length;
 
@@ -1327,13 +1536,7 @@ export class RequestDispatcherTests {
   @TestMethod
   public async hasTheEngineForgetADeletedChatAndEachChatOfAForgottenProject(): Promise<void> {
     await using host = await CoreHost.createAsync();
-    const forgotten: string[] = [];
-    const engine = new Proxy(host.engine, { get: (target, name, receiver): unknown => name === "forgetAsync"
-      ? (conversationIds: readonly string[]): Promise<void> => {
-        forgotten.push([...conversationIds].sort().join(","));
-        return target.forgetAsync(conversationIds);
-      }
-      : Reflect.get(target, name, receiver) });
+    const engine = RecordingEngine.of(host);
     const dispatcher = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, engine, host.teammates, host.events);
     const project = await host.openProjectAsync();
@@ -1345,19 +1548,13 @@ export class RequestDispatcherTests {
 
     Assert.isFalse(deletion.hasErrors);
     Assert.isFalse(forgetting.hasErrors);
-    Assert.areEqual(JSON.stringify([deleted.id, kept.map(t => t.id).sort().join(",")]), JSON.stringify(forgotten));
+    Assert.areEqual(JSON.stringify([deleted.id, kept.map(t => t.id).sort().join(",")]), JSON.stringify(engine.forgotten));
   }
 
   @TestMethod
   public async hasTheEngineTellTheProvidersOnlyWhenAChatsPlanFirstTurnsOn(): Promise<void> {
     await using host = await CoreHost.createAsync();
-    const planning: string[] = [];
-    const engine = new Proxy(host.engine, { get: (target, name, receiver): unknown => name === "planFirstAsync"
-      ? (conversationId: string): Promise<void> => {
-        planning.push(conversationId);
-        return target.planFirstAsync(conversationId);
-      }
-      : Reflect.get(target, name, receiver) });
+    const engine = RecordingEngine.of(host);
     const dispatcher = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, engine, host.teammates, host.events);
     const conversation = await host.createConversationAsync();
@@ -1366,8 +1563,10 @@ export class RequestDispatcherTests {
     const off = await dispatcher.dispatch(new Request("r2", MethodName.ConversationSetPlanFirst, new ChatPlanFirstParams(conversation.id, false).toJson()));
 
     Assert.isFalse(on.hasErrors || off.hasErrors);
-    Assert.areEqual(JSON.stringify([conversation.id]), JSON.stringify(planning));
-    Assert.isFalse((await host.conversations.findAsync(conversation.id))?.planFirst ?? true);
+    Assert.areEqual(JSON.stringify([conversation.id]), JSON.stringify(engine.planning));
+    const stored = await host.conversations.findAsync(conversation.id);
+    Assert.isNotNull(stored);
+    Assert.isFalse(stored.planFirst);
   }
 
   @TestMethod
@@ -1442,6 +1641,22 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
+  public async listsEachTeammatesLastReply(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, (await host.createProviderAsync()).id, Harness.Provider, null, null));
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+
+    const empty = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
+    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.Text, "Done.", null, "t")], provenance, "t", "t", "t2", [], ada.id, "Ada"));
+    const listed = await RequestDispatcherTests.succeed(host, MethodName.TeammateLastReplyList, null);
+
+    Assert.areEqual("[]", JSON.stringify(empty));
+    Assert.areEqual(JSON.stringify([new TeammateLastReply(ada.id, conversation.id, "reply", "Done.", "t2").toJson()]), JSON.stringify(listed));
+  }
+
+  @TestMethod
   public async listsTeammateUsage(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
@@ -1460,6 +1675,22 @@ export class RequestDispatcherTests {
     Assert.areEqual("[]", JSON.stringify(empty));
     Assert.areEqual(JSON.stringify([new TeammateUsage(ada.id, conversation.id, "reply", "t", "t2", usage).toJson()]),
       JSON.stringify(listed.map(t => t.toJson())));
+  }
+
+  @TestMethod
+  public async readsATeammatesWorkAndRefusesParamsWithoutATeammate(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const conversation = await host.createConversationAsync(project);
+    const provenance = new Provenance(null, new RequestedSettings("fake", null, null), new ObservedSettings(null, null, null, null), null, false);
+    await host.messages.insertAsync(new Message("reply", conversation.id, 0, MessageAuthor.Provider, null, MessageStatus.Completed, [], provenance, "t", "t",
+      "2026-11-20T09:00:00.000Z", [], "tm-ada", "Ada"));
+
+    const work = TeammateWork.fromJson(await RequestDispatcherTests.succeed(host, MethodName.TeammateWorkRead, new TeammateIdParams("tm-ada").toJson()));
+    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.TeammateWorkRead, {}));
+
+    Assert.areEqual(JSON.stringify(new TeammateWork("tm-ada", project.rootPath, [project.rootPath], []).toJson()), JSON.stringify(work.toJson()));
+    Assert.areEqual(ErrorCode.InvalidParams, refused.info?.name);
   }
 
   @TestMethod
@@ -1530,7 +1761,7 @@ export class RequestDispatcherTests {
       new SharedMcpProviderSetParams(created.id, provider.id, true).toJson()));
     const off = SharedMcpServer.fromJson(await RequestDispatcherTests.succeed(host, MethodName.SharedMcpTeammateSet,
       new SharedMcpTeammateSetParams(created.id, alice.id, SharedMcpSetting.Off).toJson()));
-    const listed = (await RequestDispatcherTests.succeed(host, MethodName.SharedMcpServerList, null) as unknown[]).map(t => SharedMcpServerListing.fromJson(t));
+    const listed = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.SharedMcpServerList, null)).map(t => SharedMcpServerListing.fromJson(t.toJson()));
     const invalidations = host.listener.count(EventName.StateInvalidated);
     const deleted = await RequestDispatcherTests.succeed(host, MethodName.SharedMcpServerDelete, new SharedMcpServerIdParams(created.id).toJson());
 
@@ -1540,7 +1771,7 @@ export class RequestDispatcherTests {
     Assert.areEqual(JSON.stringify(off.toJson()), JSON.stringify(listed[0]?.server.toJson()));
     Assert.isNull(deleted);
     Assert.areEqual(invalidations + 1, host.listener.count(EventName.StateInvalidated));
-    Assert.areEqual(0, (await RequestDispatcherTests.succeed(host, MethodName.SharedMcpServerList, null) as unknown[]).length);
+    Assert.areEqual(0, RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.SharedMcpServerList, null)).length);
     const without = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, host.engine, host.teammates, host.events);
     const unsupported = await without.dispatch(new Request("r1", MethodName.SharedMcpServerList, null));
@@ -1603,13 +1834,15 @@ export class RequestDispatcherTests {
 
     Assert.areEqual(JSON.stringify([["g1", "Release notes", "com.example.notes", "Notes", "iVBORw0KGgo="]]),
       JSON.stringify(listed.map(t => [t.id, t.chatTitle, t.app, t.appName, t.appIcon])));
-    Assert.isFalse(host.appDescriptions.signals[0]?.aborted ?? true);
+    const describing = host.appDescriptions.signals[0];
+    Assert.isDefined(describing);
+    Assert.isFalse(describing.aborted);
     Assert.isNull(revoked);
     Assert.areEqual(0, host.rememberedGrants.grants.length);
     Assert.areEqual(JSON.stringify([ErrorCode.NotFound, ["g1"]]), JSON.stringify([again.info?.name, again.info?.arguments]));
     Assert.areEqual(JSON.stringify([ErrorCode.UnknownMethod, MethodName.ComputerUseGrantList]), JSON.stringify([unsupported.info?.name, unsupported.info?.arguments[0]]));
     controller.abort();
-    Assert.isTrue(host.appDescriptions.signals[0]?.aborted ?? false);
+    Assert.isTrue(describing.aborted);
   }
 
   @TestMethod
@@ -1664,10 +1897,16 @@ export class RequestDispatcherTests {
     }));
 
     await RequestDispatcherTests.succeed(host, MethodName.ConversationRemoveMember, new ConversationMemberParams(chat.id, ada.id).toJson());
-    await lateAsync(listeners[0]!, "late-1");
+    const adaInChat = listeners[0];
+    const bobInChat = listeners[1];
+    const adaInOther = listeners[2];
+    Assert.isDefined(adaInChat);
+    Assert.isDefined(bobInChat);
+    Assert.isDefined(adaInOther);
+    await lateAsync(adaInChat, "late-1");
     await RequestDispatcherTests.succeed(host, MethodName.TeammateDelete, new TeammateIdParams(ada.id).toJson());
-    await lateAsync(listeners[2]!, "late-2", true);
-    await lateAsync(listeners[1]!, "bob-late");
+    await lateAsync(adaInOther, "late-2", true);
+    await lateAsync(bobInChat, "bob-late");
 
     Assert.areEqual(JSON.stringify(["task-1", "late-1", "task-3", "late-2"]), JSON.stringify(stopped));
     Assert.areEqual(JSON.stringify([["run bob-late", "Running"], ["run task-2", "Running"], ["run task-1", "Stopped"]]),
@@ -1678,10 +1917,10 @@ export class RequestDispatcherTests {
   @TestMethod
   public async routesTheSubAgentMethodsToTheEngineWhichRefusesATokenOfNoRunningTurn(): Promise<void> {
     await using host = await CoreHost.createAsync();
-    const requests = [[MethodName.SubAgentStart, new SubAgentStartParams("gone", "helper", "Check", "Run the tests.").toJson()],
-      [MethodName.SubAgentWait, new SubAgentWaitParams("gone", [], 0).toJson()], [MethodName.SubAgentStop, new SubAgentStopParams("gone", "s1").toJson()]] as const;
+    const requests = [new MethodCall(MethodName.SubAgentStart, new SubAgentStartParams("gone", "helper", "Check", "Run the tests.").toJson()),
+      new MethodCall(MethodName.SubAgentWait, new SubAgentWaitParams("gone", [], 0).toJson()), new MethodCall(MethodName.SubAgentStop, new SubAgentStopParams("gone", "s1").toJson())];
 
-    const refused = await Promise.all(requests.map(([method, payload]) => host.dispatcher.dispatch(new Request("r", method, payload))));
+    const refused = await Promise.all(requests.map(t => host.dispatcher.dispatch(new Request("r", t.method, t.payload))));
 
     Assert.areEqual(JSON.stringify([ErrorCode.Unauthorized, ErrorCode.Unauthorized, ErrorCode.Unauthorized]), JSON.stringify(refused.map(t => t.info?.name)));
   }
@@ -1712,21 +1951,21 @@ export class RequestDispatcherTests {
     Assert.areEqual(JSON.stringify([[[], [rows.at(0)?.toolUseId]]]), JSON.stringify(waits.map(t => [t.ended, t.running])));
   }
 
-  private static async teamWithTasks(host: CoreHost): Promise<{ chat: Conversation; other: Conversation; ada: Teammate; stopped: string[];
-    listeners: ITurnListener[] }> {
+  private static async teamWithTasks(host: CoreHost): Promise<TaskTeam> {
     const project = await host.openProjectAsync();
     const chat = await host.createConversationAsync(project);
     const other = await host.createConversationAsync(project);
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
-    for (const [conversation, teammate] of [[chat, ada], [chat, bob], [other, ada]] as const)
-      await host.conversations.addMemberAsync(new ConversationMemberParams(conversation.id, teammate.id));
+    const seats = [new ChatSeat(chat, ada), new ChatSeat(chat, bob), new ChatSeat(other, ada)];
+    for (const seat of seats)
+      await host.conversations.addMemberAsync(new ConversationMemberParams(seat.conversation.id, seat.teammate.id));
     const stopped: string[] = [];
     const listeners: ITurnListener[] = [];
     let count = 0;
     host.adapter.afterDetails = async () => {
-      const listener = host.adapter.lastListener!;
+      const listener = RequestDispatcherTests.listenerOf(host);
       listeners.push(listener);
       const id = `task-${String(++count)}`;
       await listener.onTaskStartedAsync(new TaskStart(id, `run ${id}`, async () => {
@@ -1734,15 +1973,30 @@ export class RequestDispatcherTests {
         await listener.onTaskEndedAsync(new TaskEnd(id, BackgroundTaskStatus.Stopped, 143));
       }));
     };
-    for (const [conversation, teammate] of [[chat, ada], [chat, bob], [other, ada]] as const) {
-      await host.engine.sendAsync(new MessageSendParams(conversation.id, "Start the server", null, null, [], [], teammate.id));
+    for (const seat of seats) {
+      await host.engine.sendAsync(new MessageSendParams(seat.conversation.id, "Start the server", null, null, [], [], seat.teammate.id));
       await host.engine.waitForIdle();
     }
-    return { chat, other, ada, stopped, listeners };
+    return new TaskTeam(chat, other, ada, stopped, listeners);
+  }
+
+  private static found(path: string | null): string {
+    Assert.isNotNull(path);
+    return path;
+  }
+
+  private static listenerOf(host: CoreHost): ITurnListener {
+    const listener = host.adapter.lastListener;
+    Assert.isNotNull(listener);
+    return listener;
   }
 
   private static async tasksOfAsync(host: CoreHost, conversationId: string): Promise<string[][]> {
     return (await host.tasks.listAsync(new ConversationIdParams(conversationId))).map(t => [t.command, t.status]);
+  }
+
+  private static organizations(value: unknown): readonly Organization[] {
+    return JsonReader.fromValue({ organizations: value }).readObjectArray("organizations").map(t => Organization.fromJson(t.toJson(), t.path));
   }
 
   private static async succeed(host: CoreHost, method: MethodName, payload: unknown): Promise<unknown> {

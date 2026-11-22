@@ -14,18 +14,13 @@ import type { AppServerClientInfo } from "../../models/app-server-client-info.js
 import { CommandSource } from "../../models/command-source.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
-import { Resources } from "../../resources.js";
 import { AcpAdapter } from "../acp/acp-adapter.js";
-import { CommandRunner } from "../process/command-runner.js";
-import { PowershellSession } from "../process/powershell-session.js";
-import { ProcessTree } from "../process/process-tree.js";
 import { OpencodeAgent } from "./opencode-agent.js";
 
 export class OpencodeAdapter extends AcpAdapter {
   public constructor(command: ProcessCommand | null, environment: NodeJS.ProcessEnv, formerProfileDirectory: string, clientInfo: AppServerClientInfo,
     starter: IProcessStarter, timings: ProviderTimings, timer: ITimer = new NodeTimer(),
-    processTree: IProcessTree = new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace,
-      undefined, PowershellSession.shared),
+    processTree?: IProcessTree,
     locate: () => ProcessCommand | null = CommandSource.none, log: ILog | null = null) {
     super(new OpencodeAgent(command, environment, formerProfileDirectory, locate), clientInfo, starter, timings, timer, null, log, processTree);
   }

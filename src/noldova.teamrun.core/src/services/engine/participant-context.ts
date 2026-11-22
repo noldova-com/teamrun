@@ -90,7 +90,7 @@ export class ParticipantContext {
       else
         before = page.messages[0]!.sequence;
     }
-    const text = ParticipantContext.promptOf(sent) ?? this.textOf(sent, teammates);
+    const text = this.askedTextOf(sent, reply, teammates);
     const asked = Object.isNull(sent.sender) ? text : this.prefixOf(sent, titles, [], false, true) + text;
     if (Object.isNull(reply.teammateId) && lines.size === 0)
       return asked;
@@ -111,7 +111,7 @@ export class ParticipantContext {
     const teammates = await this.teammatesAsync();
     const titles = await this.titlesAsync([...chat, sent]);
     const all = this.turnsOf(reply, sent, chat, teammates, titles);
-    const text = ParticipantContext.promptOf(sent) ?? this.textOf(sent, teammates);
+    const text = this.askedTextOf(sent, reply, teammates);
     const asked = this.prefixOf(sent, titles, [], false, true) + text;
     const lines = new Map<number, string>([...all.map((t): [number, string] => [t.sequence, t.text]), [sent.sequence, asked]]);
     const closes = this.closesOf(reply, sent, handOffs, lines, teammates);
@@ -233,6 +233,17 @@ export class ParticipantContext {
       return [];
     });
     return ParticipantContext.formatted(message, parts.filter(t => t.trim().length > 0).join(Resources.lineSeparator).trim(), teammates);
+  }
+
+  private askedTextOf(sent: Message, reply: Message, teammates: ReadonlyMap<string, Teammate>): string {
+    const prompt = ParticipantContext.promptOf(sent);
+    if (!Object.isNull(prompt))
+      return prompt;
+    const text = this.textOf(sent, teammates);
+    const role = sent.details.filter(t => t.kind === DetailKind.Text
+      && ParticipantContext.fieldOf(t.payload, Resources.organizationRoleTeammateIdField) === reply.teammateId)
+      .map(t => ParticipantContext.fieldOf(t.payload, Resources.organizationRoleField)).find(t => Object.isString(t));
+    return Object.isString(role) ? Resources.formatOrganizationRolePrompt(role, text) : text;
   }
 
   private static promptOf(message: Message): string | null {

@@ -23,6 +23,7 @@ import {
   TeammateCreateParams,
   TeammateUpdateParams,
   TeammateIdParams,
+  TeammatePlaceParams,
   SharedMcpProviderSetParams,
   SharedMcpServerDefinition,
   SharedMcpServerIdParams,
@@ -35,9 +36,16 @@ import {
   DepartmentCreateParams,
   DepartmentIdParams,
   DepartmentMemberSetParams,
-  OrganizationMessageSendParams,
+  OrganizationLayoutSaveParams,
+  OrganizationCreateParams,
+  OrganizationIdParams,
+  OrganizationUpdateParams,
+  OrganizationChat,
   DepartmentMoveParams,
   DepartmentUpdateParams,
+  NodeTypeCreateParams,
+  NodeTypeIdParams,
+  NodeTypeUpdateParams,
   WaitingMessageAddParams,
   WaitingMessageEditParams,
   WaitingMessageIdParams,
@@ -115,7 +123,6 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { IAcpAgentsService } from "../../interfaces/i-acp-agents.service.js";
 import type { ISharedMcpServersService } from "../../interfaces/i-shared-mcp-servers.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
-import type { IOrganizationMessagesService } from "../../interfaces/i-organization-messages.service.js";
 import type { IOrganizationService } from "../../interfaces/i-organization.service.js";
 import type { IWindowsService } from "../../interfaces/i-windows.service.js";
 import { Resources } from "../../resources.js";
@@ -130,7 +137,7 @@ export class RequestDispatcher {
     MethodName.ProviderCreate, MethodName.ProviderUpdate,
     MethodName.ProviderSetEnabled, MethodName.ProviderDelete, MethodName.SharedMcpServerCreate, MethodName.SharedMcpServerUpdate,
     MethodName.SharedMcpServerDelete, MethodName.SharedMcpProviderSet, MethodName.SharedMcpTeammateSet, MethodName.SharedMcpSecretSet,
-    MethodName.SharedMcpSignOut
+    MethodName.SharedMcpSignOut, MethodName.OrganizationDelete
   ]);
   private readonly events: IEventSink | null;
   private readonly kinds: IProviderKindsService;
@@ -150,7 +157,6 @@ export class RequestDispatcher {
   private readonly sharedServers: ISharedMcpServersService | null;
   private readonly acpAgents: IAcpAgentsService | null;
   private readonly organization: IOrganizationService | null;
-  private readonly organizationMessages: IOrganizationMessagesService | null;
   private readonly computerUseGrants: IComputerUseGrantsService | null;
 
   public constructor(
@@ -172,10 +178,9 @@ export class RequestDispatcher {
     sharedServers: ISharedMcpServersService | null = null,
     computerUseGrants: IComputerUseGrantsService | null = null,
     acpAgents: IAcpAgentsService | null = null,
-    organization: IOrganizationService | null = null, organizationMessages: IOrganizationMessagesService | null = null) {
+    organization: IOrganizationService | null = null) {
     this.acpAgents = acpAgents;
     this.organization = organization;
-    this.organizationMessages = organizationMessages;
     this.events = events;
     this.kinds = kinds;
     this.providers = providers;
@@ -243,25 +248,32 @@ export class RequestDispatcher {
       }
       case MethodName.TeammateDelete: {
         const params = TeammateIdParams.fromJson(payload);
-        if (await this.teammates.deleteAsync(params) && !Object.isNull(this.organization))
-          await this.publishOrganizationAsync(this.organization);
+        const departed = await this.teammates.deleteAsync(params);
+        if (!Object.isNull(this.organization))
+          for (const organizationId of departed)
+            await this.publishOrganizationAsync(this.organization, organizationId);
         this.tasks?.stopTeammate(params.teammateId, null);
         this.engine.forgetTeammate(params.teammateId, null);
         return null;
       }
       case MethodName.OrganizationList:
+      case MethodName.OrganizationCreate:
+      case MethodName.OrganizationUpdate:
+      case MethodName.OrganizationDelete:
       case MethodName.DepartmentCreate:
       case MethodName.DepartmentUpdate:
       case MethodName.DepartmentMove:
       case MethodName.DepartmentDelete:
       case MethodName.DepartmentMemberSet:
+      case MethodName.NodeTypeCreate:
+      case MethodName.NodeTypeUpdate:
+      case MethodName.NodeTypeDelete:
+      case MethodName.TeammatePlace:
+      case MethodName.OrganizationLayoutRead:
+      case MethodName.OrganizationLayoutSave:
         return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
-      case MethodName.OrganizationMessageSend:
-        return (await RequestDispatcher.require(this.organizationMessages, method).sendAsync(OrganizationMessageSendParams.fromJson(payload))).toJson();
-      case MethodName.OrganizationMessageStop:
-        return (await RequestDispatcher.require(this.organizationMessages, method).stopAsync(MessageIdParams.fromJson(payload))).toJson();
-      case MethodName.OrganizationMessageList:
-        return (await RequestDispatcher.require(this.organizationMessages, method).listAsync()).map(t => t.toJson());
+      case MethodName.OrganizationChatOpen:
+        return (await this.engine.openOrganizationChatAsync(OrganizationChat.fromJson(payload))).toJson();
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerCreate:
@@ -375,7 +387,7 @@ export class RequestDispatcher {
       case MethodName.FirstLaunchFinish:
         return (await this.providers.finishFirstLaunchAsync()).toJson();
       case MethodName.ProviderKindList:
-        return this.kinds.list().map(t => t.toJson());
+        return (await this.kinds.listAsync()).map(t => t.toJson());
       case MethodName.ProviderListModels:
         return [...await this.kinds.listModelsAsync(ProviderListModelsParams.fromJson(payload))];
       case MethodName.ProviderModelCatalog:
@@ -444,7 +456,9 @@ export class RequestDispatcher {
       case MethodName.ConversationResponderSet:
         return (await this.engine.setResponderAsync(ConversationResponderParams.fromJson(payload))).toJson();
       case MethodName.ConversationMove: {
-        const moved = await this.conversations.moveAsync(ConversationMoveParams.fromJson(payload));
+        const params = ConversationMoveParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.conversationId, Resources.chatMoveChange);
+        const moved = await this.conversations.moveAsync(params);
         await this.engine.releaseFolderAsync(moved.id);
         return moved.toJson();
       }
@@ -457,10 +471,16 @@ export class RequestDispatcher {
       }
       case MethodName.ConversationFolderCount:
         return await this.conversations.countFolderFilesAsync(ConversationIdParams.fromJson(payload));
-      case MethodName.ChatFolderAttach:
-        return (await this.conversations.attachFolderAsync(ChatFolderAttachParams.fromJson(payload), t => this.projects.checkFolderAsync(t, null))).toJson();
-      case MethodName.ChatFolderDetach:
-        return (await this.conversations.detachFolderAsync(ConversationIdParams.fromJson(payload))).toJson();
+      case MethodName.ChatFolderAttach: {
+        const params = ChatFolderAttachParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.chatId, Resources.chatAttachChange);
+        return (await this.conversations.attachFolderAsync(params, t => this.projects.checkFolderAsync(t, null))).toJson();
+      }
+      case MethodName.ChatFolderDetach: {
+        const params = ConversationIdParams.fromJson(payload);
+        await this.engine.requireNothingRunningAsync(params.conversationId, Resources.chatDetachChange);
+        return (await this.conversations.detachFolderAsync(params)).toJson();
+      }
       case MethodName.ConversationRewind:
         return (await this.engine.rewindAsync(ConversationRewindParams.fromJson(payload))).toJson();
       case MethodName.ConversationSearch:
@@ -529,6 +549,10 @@ export class RequestDispatcher {
         return (await this.kinds.readPlanUsageAsync(PlanUsageParams.fromJson(payload)))?.toJson() ?? null;
       case MethodName.TeammateUsageList:
         return (await this.messages.listTeammateUsageAsync()).map(t => t.toJson());
+      case MethodName.TeammateLastReplyList:
+        return (await this.messages.listTeammateLastRepliesAsync()).map(t => t.toJson());
+      case MethodName.TeammateWorkRead:
+        return (await this.messages.readTeammateWorkAsync(TeammateIdParams.fromJson(payload).teammateId)).toJson();
       case MethodName.BackgroundTaskList:
         return (await RequestDispatcher.require(this.tasks, method).pageAsync(BackgroundTaskListParams.fromJson(payload))).toJson();
       case MethodName.BackgroundTaskRead:
@@ -618,31 +642,97 @@ export class RequestDispatcher {
   }
 
   private async organizeAsync(organization: IOrganizationService, method: string, payload: JsonValue): Promise<JsonValue> {
-    let result: JsonValue = null;
     switch (method) {
       case MethodName.OrganizationList:
-        return (await organization.listAsync()).toJson();
-      case MethodName.DepartmentCreate:
-        result = (await organization.createAsync(DepartmentCreateParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentUpdate:
-        result = (await organization.updateAsync(DepartmentUpdateParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentMove:
-        result = (await organization.moveAsync(DepartmentMoveParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentDelete:
-        await organization.deleteAsync(DepartmentIdParams.fromJson(payload));
-        break;
-      default:
-        await organization.setMemberAsync(DepartmentMemberSetParams.fromJson(payload));
+        return (await organization.listAsync()).map(t => t.toJson());
+      case MethodName.OrganizationCreate: {
+        const created = await organization.createOrganizationAsync(OrganizationCreateParams.fromJson(payload));
+        this.publish(new Event(EventName.OrganizationChanged, created.toJson()));
+        return created.toJson();
+      }
+      case MethodName.OrganizationUpdate: {
+        const params = OrganizationUpdateParams.fromJson(payload);
+        await organization.updateOrganizationAsync(params);
+        return await this.publishOrganizationAsync(organization, params.organizationId);
+      }
+      case MethodName.OrganizationDelete: {
+        const params = OrganizationIdParams.fromJson(payload);
+        await organization.deleteOrganizationAsync(params);
+        this.publish(new Event(EventName.OrganizationRemoved, params.toJson()));
+        return null;
+      }
+      case MethodName.OrganizationLayoutRead:
+        return await organization.readLayoutAsync(OrganizationIdParams.fromJson(payload));
+      case MethodName.OrganizationLayoutSave: {
+        const params = OrganizationLayoutSaveParams.fromJson(payload);
+        const layout = await organization.saveLayoutAsync(params);
+        this.publish(new Event(EventName.OrganizationLayoutUpdated, params.toJson()));
+        return layout;
+      }
+      case MethodName.DepartmentCreate: {
+        const params = DepartmentCreateParams.fromJson(payload);
+        const department = await organization.createAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentUpdate: {
+        const params = DepartmentUpdateParams.fromJson(payload);
+        const department = await organization.updateAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentMove: {
+        const params = DepartmentMoveParams.fromJson(payload);
+        const department = await organization.moveAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentDelete: {
+        const params = DepartmentIdParams.fromJson(payload);
+        await organization.deleteAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      case MethodName.NodeTypeCreate: {
+        const params = NodeTypeCreateParams.fromJson(payload);
+        const type = await organization.createNodeTypeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return type.toJson();
+      }
+      case MethodName.NodeTypeUpdate: {
+        const params = NodeTypeUpdateParams.fromJson(payload);
+        const type = await organization.updateNodeTypeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return type.toJson();
+      }
+      case MethodName.NodeTypeDelete: {
+        const params = NodeTypeIdParams.fromJson(payload);
+        await organization.deleteNodeTypeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      case MethodName.TeammatePlace: {
+        const params = TeammatePlaceParams.fromJson(payload);
+        await organization.placeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      default: {
+        const params = DepartmentMemberSetParams.fromJson(payload);
+        await organization.setMemberAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
     }
-    await this.publishOrganizationAsync(organization);
-    return result;
   }
 
-  private async publishOrganizationAsync(organization: IOrganizationService): Promise<void> {
-    this.publish(new Event(EventName.OrganizationChanged, (await organization.listAsync()).toJson()));
+  private async publishOrganizationAsync(organization: IOrganizationService, organizationId: string): Promise<JsonValue> {
+    const found = await organization.findAsync(organizationId);
+    if (Object.isNull(found))
+      return null;
+    const json = found.toJson();
+    this.publish(new Event(EventName.OrganizationChanged, json));
+    return json;
   }
 
   private publish(event: Event): void {

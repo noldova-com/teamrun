@@ -14,6 +14,7 @@ import { MessageFraming } from "../../enums/message-framing.js";
 import { AcpConnectionException } from "../../exceptions/acp-connection.exception.js";
 import { AcpRequestException } from "../../exceptions/acp-request.exception.js";
 import type { IAcpClientListener } from "../../interfaces/i-acp-client-listener.js";
+import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import { PendingRequest } from "../../models/pending-request.js";
@@ -35,6 +36,7 @@ export class AcpClient {
   private readonly closed = Promise.withResolvers<void>();
   private child: StartedProcess | null = null;
   private listener: IAcpClientListener | null = null;
+  private readonly gate: IAcpToolGate | null;
   private nextId: number = 0;
   private buffered: string = String.empty;
   private stopping: boolean = false;
@@ -51,7 +53,7 @@ export class AcpClient {
 
   public constructor(command: ProcessCommand, environment: NodeJS.ProcessEnv, directory: string,
     starter: IProcessStarter, timings: ProviderTimings, timer: ITimer = new NodeTimer(), framing: MessageFraming = MessageFraming.Lines,
-    tree: IProcessTree | null = null) {
+    tree: IProcessTree | null = null, gate: IAcpToolGate | null = null) {
     this.command = command;
     this.environment = environment;
     this.directory = directory;
@@ -60,6 +62,7 @@ export class AcpClient {
     this.timer = timer;
     this.framing = framing;
     this.tree = tree;
+    this.gate = gate;
   }
 
   public start(): void {
@@ -241,8 +244,10 @@ export class AcpClient {
     if (!Object.isUndefined(method)) {
       const params = message.hasField(Resources.paramsField) ? message.readObject(Resources.paramsField) : JsonReader.fromValue({});
       if (Object.isString(id) || Object.isNumber(id)) {
+        const refusal = Object.isNull(this.gate) || !this.gate.methods.includes(method) ? null : this.gate.answer(Resources.acpGatedRequestRefused);
         if (this.reverseRequests.size >= Resources.acpMaximumPending || this.reverseRequests.has(id)) {
-          this.write({ jsonrpc: Resources.acpJsonRpcVersion, id, error: { code: Resources.acpUnsupportedCode, message: Resources.acpTooManyRequests } });
+          this.write(Object.isNull(refusal) ? { jsonrpc: Resources.acpJsonRpcVersion, id, error: { code: Resources.acpUnsupportedCode, message: Resources.acpTooManyRequests } }
+            : { jsonrpc: Resources.acpJsonRpcVersion, id, result: refusal });
           return;
         }
         this.reverseRequests.add(id);
@@ -252,8 +257,9 @@ export class AcpClient {
           return listener.onRequest(String(id), method, params);
         });
         void response.then(result => this.write({ jsonrpc: Resources.acpJsonRpcVersion, id, result }),
-          (error: unknown) => this.write({ jsonrpc: Resources.acpJsonRpcVersion, id, error: error instanceof AcpRequestException && !Object.isNull(error.code)
-            ? { code: error.code, message: error.message } : { code: Resources.acpUnsupportedCode, message: Resources.acpUnsupportedRequest } }))
+          (error: unknown) => this.write(!Object.isNull(refusal) ? { jsonrpc: Resources.acpJsonRpcVersion, id, result: refusal }
+            : { jsonrpc: Resources.acpJsonRpcVersion, id, error: error instanceof AcpRequestException && !Object.isNull(error.code)
+              ? { code: error.code, message: error.message } : { code: Resources.acpUnsupportedCode, message: Resources.acpUnsupportedRequest } }))
           .finally(() => this.reverseRequests.delete(id));
       }
       else {

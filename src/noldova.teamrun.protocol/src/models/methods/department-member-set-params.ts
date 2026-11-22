@@ -13,16 +13,20 @@ import { JsonReader, type JsonObject } from "@noldova/context.json";
 import { Resources } from "../../resources.js";
 
 export class DepartmentMemberSetParams {
+  public readonly organizationId: string;
   public readonly teammateId: string;
   public readonly departmentId: string | null;
 
   public constructor(
+    organizationId: string,
     teammateId: string,
     departmentId: string | null) {
+    ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
     ArgumentException.throwIfNullOrWhitespace(teammateId, Resources.teammateIdField);
     if (!Object.isNull(departmentId))
       ArgumentException.throwIfNullOrWhitespace(departmentId, Resources.departmentIdField);
 
+    this.organizationId = organizationId;
     this.teammateId = teammateId;
     this.departmentId = departmentId;
   }
@@ -30,12 +34,14 @@ export class DepartmentMemberSetParams {
   public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams {
     const reader = JsonReader.fromValue(value, path);
     return new DepartmentMemberSetParams(
+      reader.readNonBlankString(Resources.organizationIdField),
       reader.readNonBlankString(Resources.teammateIdField),
       reader.readNullableString(Resources.departmentIdField));
   }
 
   public toJson(): JsonObject {
     return {
+      [Resources.organizationIdField]: this.organizationId,
       [Resources.teammateIdField]: this.teammateId,
       [Resources.departmentIdField]: this.departmentId
     };

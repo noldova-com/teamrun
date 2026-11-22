@@ -19,6 +19,7 @@ import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
 import type { IAcpQuestionReader } from "../../interfaces/i-acp-question.reader.js";
 import type { IAcpSubAgent } from "../../interfaces/i-acp-sub-agent.js";
 import type { IAcpToDoListReader } from "../../interfaces/i-acp-to-do-list.reader.js";
+import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import { AcpField } from "../../models/acp-field.js";
 import type { AcpMcpTool } from "../../models/acp-mcp-tool.js";
 import { SavedImage } from "../../models/saved-image.js";
@@ -57,6 +58,11 @@ export class AcpTurn implements IAcpClientListener {
   private readonly readOnlyTools: (signal: AbortSignal) => Promise<readonly string[]>;
   private readonly allowsAll: boolean;
   private planning: boolean;
+  private leavingPlan: string | null = null;
+  private readonly readOnlyChat: boolean;
+  private readonly toolGate: IAcpToolGate | null;
+  private refusesWrites: boolean = false;
+  private restarting: boolean = false;
   private readonly asking: Map<string, AbortController> = new Map();
   private readonly cancelled: Set<string> = new Set();
   private readonly tools: Map<string, JsonObject> = new Map();
@@ -81,6 +87,7 @@ export class AcpTurn implements IAcpClientListener {
   private notice: RegExp | null = null;
   private refusalOf: (text: string) => Error | null = () => null;
   private refused: Error | null = null;
+  private modeSwitch: Promise<void> = Promise.resolve();
 
   public constructor(kindId: string, providerName: string, toolTitle: string, listener: ITurnListener, signal: AbortSignal, streamInterval: number,
     savedImageOf: (tool: JsonReader, sessionId: string) => SavedImage | null = () => null, routedMcpTool: string | null = null,
@@ -90,7 +97,7 @@ export class AcpTurn implements IAcpClientListener {
     leavePlan: (sessionId: string) => Promise<void> = () => Promise.resolve(), approvedTools: readonly string[] = [],
     mcpToolOf: (tool: JsonReader) => AcpMcpTool | null = () => null,
     readOnlyTools: (signal: AbortSignal) => Promise<readonly string[]> = () => Promise.resolve([]), allowsAll: boolean = false,
-    planning: boolean = false, toDoList: IAcpToDoListReader | null = null) {
+    planning: boolean = false, toDoList: IAcpToDoListReader | null = null, readOnlyChat: boolean = false, toolGate: IAcpToolGate | null = null) {
     this.kindId = kindId;
     this.providerName = providerName;
     this.toolTitle = toolTitle;
@@ -113,6 +120,8 @@ export class AcpTurn implements IAcpClientListener {
     this.allowsAll = allowsAll;
     this.planning = planning;
     this.toDoList = toDoList;
+    this.readOnlyChat = readOnlyChat;
+    this.toolGate = toolGate;
   }
 
   public async beginAsync(sessionId: string, resumed: boolean, observed: ObservedSettings, roleApplied: RoleApplication | null = null): Promise<void> {
@@ -121,6 +130,18 @@ export class AcpTurn implements IAcpClientListener {
     this.active = true;
     await this.listener.onStartedAsync(new TurnStart(sessionId, resumed, roleApplied));
     await this.listener.onObservedAsync(observed);
+  }
+
+  public restartAfterCancel(): void {
+    this.restarting = true;
+  }
+
+  public switchingMode(settled: Promise<void>): void {
+    this.modeSwitch = settled;
+  }
+
+  public afterModeSwitch(then: () => void): void {
+    void this.modeSwitch.then(then);
   }
 
   public async finishAsync(): Promise<void> {
@@ -149,6 +170,10 @@ export class AcpTurn implements IAcpClientListener {
 
   public get keepsSubAgents(): boolean {
     return this.subAgents.isKeeping;
+  }
+
+  public get subAgentStates(): string {
+    return this.subAgents.states;
   }
 
   public keepSubAgents(cancel: (subAgentId: string) => Promise<boolean>, ended: (wake: TurnWake | null) => void): void {
@@ -320,6 +345,12 @@ export class AcpTurn implements IAcpClientListener {
         await this.onChildUpdateAsync(owner, update);
       }
     }
+    else if (kind === Resources.acpCurrentModeUpdate && !Object.isNull(this.leavingPlan)) {
+      const leaving = this.leavingPlan;
+      this.leavingPlan = null;
+      void this.leavePlan(leaving).catch((error: unknown) => FailureDescriber.isClosedRun(error) ? undefined
+        : this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatChatModeKeptOut(this.providerName, FailureDescriber.describe(error)), null, null)));
+    }
     else if (kind === Resources.acpPlanUpdate) {
       this.lastCompaction = undefined;
       await this.flushContentAsync();
@@ -349,6 +380,8 @@ export class AcpTurn implements IAcpClientListener {
       return this.askQuestions(id, params, this.questions);
     if (!Object.isNull(this.plans) && this.plans.methods.includes(method))
       return this.reviewPlan(id, params, this.plans);
+    if (!Object.isNull(this.toolGate) && this.toolGate.methods.includes(method))
+      return this.gateAsync(params, this.toolGate);
     if (method !== Resources.acpRequestPermission)
       throw new AcpConnectionException(Resources.acpUnsupportedRequest);
     if (!this.canAsk || params.readNonBlankString(Resources.sessionIdField) !== this.sessionId)
@@ -377,7 +410,7 @@ export class AcpTurn implements IAcpClientListener {
       if (this.signal.aborted || !this.active)
         return { outcome: { outcome: Resources.acpCancelled } };
       if (!listed)
-        return this.refuseAsync(tool, options, routed.shown, scope);
+        return this.refuseAsync(tool, options, Resources.formatRoutedMcpToolRefused(this.providerName, AcpTurn.cleaned(routed.shown)), scope);
       const allow = options.find(t => t.outcome === ApprovalOutcome.Approved);
       if (this.approvedTools.includes(routed.shown.slice(Resources.routedTeamRunToolPrefix.length)) && !Object.isUndefined(allow))
         return { outcome: { outcome: Resources.acpSelected, optionId: allow.id } };
@@ -391,6 +424,8 @@ export class AcpTurn implements IAcpClientListener {
       if (readOnly && !Object.isUndefined(allow))
         return { outcome: { outcome: Resources.acpSelected, optionId: allow.id } };
     }
+    if (this.refusesWrites)
+      return this.refuseAsync(tool, options, Resources.formatReadOnlyChatRefused(this.providerName, title), scope);
     const allowed = this.allowsAll && !this.planning ? options.find(t => t.outcome === ApprovalOutcome.Approved) : undefined;
     if (!Object.isUndefined(allowed))
       return { outcome: { outcome: Resources.acpSelected, optionId: allowed.id } };
@@ -464,8 +499,13 @@ export class AcpTurn implements IAcpClientListener {
     const decided = PlanDetails.text(plan.text, !approved, approved);
     if (!Object.isNull(decided))
       await this.listener.onDetailAsync(decided);
-    if (approved)
-      this.planning = !reader.leavesPlan && await this.leavePlan(sessionId).then(() => false, async (error: unknown) => {
+    this.refusesWrites = approved && this.readOnlyChat;
+    if (approved && reader.leavesPlan) {
+      this.planning = false;
+      this.leavingPlan = sessionId;
+    }
+    else if (approved)
+      this.planning = await this.leavePlan(sessionId).then(() => false, async (error: unknown) => {
         await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatPlanModeKept(this.providerName, FailureDescriber.describe(error)), null, null));
         return true;
       });
@@ -536,6 +576,11 @@ export class AcpTurn implements IAcpClientListener {
   public async onResponseAsync(method: string, result: JsonReader | null = null): Promise<void> {
     if (method !== Resources.acpSessionPrompt)
       return;
+    if (this.restarting && result?.readOptionalString(Resources.acpStopReasonField) === Resources.acpCancelled) {
+      this.restarting = false;
+      await this.flushContentAsync();
+      return;
+    }
     if (result?.readOptionalString(Resources.acpStopReasonField) === Resources.acpEndTurn)
       await this.subAgents.endWithTurnAsync();
     await this.finishAsync();
@@ -750,8 +795,38 @@ export class AcpTurn implements IAcpClientListener {
     return listed.includes(name.slice(Resources.routedTeamRunToolPrefix.length));
   }
 
-  private async refuseAsync(tool: JsonReader, options: readonly ApprovalOption[], name: string, scope: string | null): Promise<JsonValue> {
-    await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatRoutedMcpToolRefused(this.providerName, AcpTurn.cleaned(name)), null, null));
+  private async gateAsync(params: JsonReader, gate: IAcpToolGate): Promise<JsonValue> {
+    if (!this.readOnlyChat || this.planning)
+      return gate.answer(null);
+    try {
+      return await this.readOnlyGateAsync(params, gate);
+    }
+    catch {
+      return gate.answer(Resources.formatReadOnlyToolRefused(this.providerName, this.toolTitle));
+    }
+  }
+
+  private async readOnlyGateAsync(params: JsonReader, gate: IAcpToolGate): Promise<JsonValue> {
+    const gated = gate.read(params);
+    const key = Object.isNull(gated) ? undefined
+      : [...this.tools.keys()].find(t => t === gated.toolUseId || t.endsWith(`${Resources.requestIdSeparator}${gated.toolUseId}`));
+    const call = Object.isUndefined(key) ? undefined : this.tools.get(key);
+    const update = JsonReader.fromValue(call ?? {});
+    if (!Object.isNull(gated) && (gate.readOnly(update) || await this.listsReadOnlyAsync(gated.mcp)))
+      return gate.answer(null);
+    const note = Resources.formatReadOnlyToolRefused(this.providerName, update.readOptionalString(Resources.titleField) ?? gated?.mcp?.tool ?? this.toolTitle);
+    await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, note, null, null));
+    if (!Object.isUndefined(key))
+      await this.denyAsync(key);
+    return gate.answer(note);
+  }
+
+  private async listsReadOnlyAsync(mcp: AcpMcpTool | null): Promise<boolean> {
+    return mcp?.server === ProtocolResources.mcpServerName && (await this.readOnlyTools(this.signal).catch((): readonly string[] => [])).includes(mcp.tool);
+  }
+
+  private async refuseAsync(tool: JsonReader, options: readonly ApprovalOption[], note: string, scope: string | null): Promise<JsonValue> {
+    await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, note, null, null));
     const toolCallId = tool.readOptionalString(Resources.acpToolCallIdField);
     if (!Object.isUndefined(toolCallId))
       await this.denyAsync(AcpTurn.keyOf(toolCallId, scope));

@@ -53,7 +53,7 @@ test("a teammate shows a page from its chat's folder and is refused a file outsi
 
     await app.submitAsync(`${CodexDouble.PAGE_PREFIX}options.html`);
     await expect(page.getByRole("tab", { name: CodexDouble.PAGE_TITLE, exact: true })).toBeVisible({ timeout: 60_000 });
-    await page.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    await TeamRunApp.showTabAsync(page, "Onboarding");
     await expect(panel.getByText(/^page: v1 made by \S/)).toBeVisible({ timeout: 60_000 });
     expect(pagesOf(path.join(pages, chatId))).toEqual(["<h1>Draft</h1>"]);
 
@@ -112,9 +112,9 @@ test("a teammate on an ACP provider lists, reads and edits a Codex teammate's pa
   const pages = path.join(app.dataFolder, "modules", "teamrun", "pages");
 
   await app.submitAsync(`${CodexDouble.PAGE_PREFIX}options.html`);
-  const pageTab = page.getByRole("tab", { name: CodexDouble.PAGE_TITLE, exact: true });
+  const pageTab = TeamRunApp.tabOf(page, CodexDouble.PAGE_TITLE);
   await expect(pageTab).toBeVisible({ timeout: 60_000 });
-  await page.getByRole("tab", { name: "Onboarding", exact: true }).click();
+  await TeamRunApp.showTabAsync(page, "Onboarding");
   await expect(panel.getByText(/^page: v1 made by \S/)).toBeVisible({ timeout: 60_000 });
   const listed = app.run(["teamrun", "list-providers", "--json"]);
   const acpId = /"id":"([^"]+)","kind":"local-pages-double"/.exec(listed)?.[1];
@@ -135,7 +135,7 @@ test("a teammate on an ACP provider lists, reads and edits a Codex teammate's pa
 
   await expect(pageTab).toHaveAttribute("aria-selected", "false");
   await expect(card.getByRole("button")).toHaveCount(0);
-  await pageTab.click();
+  await TeamRunApp.showTabAsync(page, CodexDouble.PAGE_TITLE);
   await expect(pageTab).toHaveAttribute("aria-selected", "true", { timeout: 60_000 });
   const pageDocument = page.locator("nol-teamrun-page-document");
   await expect(pageDocument.locator(".nol-teamrun-page-authors")).toHaveText(new RegExp(`^v2 · Made by .+ · Edited by ${SECOND} · `), { timeout: 60_000 });

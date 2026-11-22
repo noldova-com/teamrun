@@ -10,17 +10,19 @@ import type { SqlTransaction } from "@noldova/context.data.sql";
 import type { Conversation, Message, MessageIdParams, MessageSender, MessageSendParams, MessageSendResult, ProviderMode, RequestedSettings,
   Teammate } from "@noldova/teamrun.protocol";
 
+import type { ReplyMode } from "../models/reply-mode.js";
 import type { ReplyWork } from "../models/reply-work.js";
+import type { SendAllowance } from "../models/send-allowance.js";
 import type { WorkFolder } from "../models/work-folder.js";
 
 export interface IEngineCallbacks {
   requireConversationAsync(id: string, transaction?: SqlTransaction): Promise<Conversation>;
   requireTeammateAsync(id: string, transaction?: SqlTransaction): Promise<Teammate>;
   capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean>;
-  sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null, signal: AbortSignal | undefined,
-    outside?: MessageSender | null, queues?: boolean): Promise<MessageSendResult>;
+  sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null, signal: AbortSignal | undefined,
+    outside?: MessageSender | null): Promise<MessageSendResult>;
   refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
-  toolModeOfAsync(open: { readonly reply: Message; readonly mode: ProviderMode | null }): Promise<ProviderMode | null>;
+  toolModeOfAsync(open: ReplyMode): Promise<ProviderMode | null>;
   modeIn(requested: RequestedSettings): ProviderMode | null;
   nameOf(reply: Message): string;
   cancelAsync(params: MessageIdParams): Promise<Message>;

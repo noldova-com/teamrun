@@ -36,6 +36,7 @@ export class AcpChannel implements IAcpClientListener {
   private observed: ObservedSettings | null = null;
   private waking: { promptId: string; turn: AcpTurn; target: WakeTurn } | null = null;
   private released: boolean = false;
+  private switching: number = 0;
   private woken: AcpTurn[] = [];
   private readonly commands: AcpCommands;
   private readonly terminals: AcpTerminals | null;
@@ -59,7 +60,7 @@ export class AcpChannel implements IAcpClientListener {
   }
 
   public get isIdle(): boolean {
-    return (this.tasks?.isIdle ?? true) && (this.terminals?.isIdle ?? true) && Object.isNull(this.waking) && this.expected.size === 0 && !this.turns.some(t => t.keepsSubAgents);
+    return (this.tasks?.isIdle ?? true) && (this.terminals?.isIdle ?? true) && Object.isNull(this.waking) && this.expected.size === 0 && this.switching === 0 && !this.turns.some(t => t.keepsSubAgents);
   }
 
   public async releaseAsync(): Promise<void> {
@@ -202,8 +203,13 @@ export class AcpChannel implements IAcpClientListener {
     this.waking = null;
     await waking.turn.finishAsync();
     this.woken = this.woken.filter(t => t.keepsSubAgents);
-    waking.target.end(this.resultOf(stopReason, this.sessionId!, this.observed!));
-    this.settle();
+    const result = this.resultOf(stopReason, this.sessionId!, this.observed!);
+    this.switching++;
+    waking.turn.afterModeSwitch(() => {
+      waking.target.end(result);
+      this.switching--;
+      this.settle();
+    });
   }
 
   private settle(): void {

@@ -75,6 +75,17 @@
       "group": "Images"
     },
     {
+      "name": "teamrun.organizationMessageFlow",
+      "title": "Show messages moving in the organization",
+      "description": "Shows each message moving along the lines of the Organization view's Tree, from the teammate or person who writes it to the one it goes to: a slow, faint flow of small pulses while it is written, a brighter pulse when it is sent, then a glow on the receiver's card. Off, or when the system asks for reduced motion, the Tree stays still.",
+      "type": { "kind": "Boolean" },
+      "default": true,
+      "locality": "Shared",
+      "scopes": [],
+      "page": "TeamRun",
+      "group": "Organization"
+    },
+    {
       "name": "teamrun.newTerminals",
       "title": "New terminals",
       "description": "Whether a terminal from the terminal panel's +, Toggle Terminal's first open or a shell in its shell menu is a general one, or belongs to the chat on screen and shows only with that chat. New terminal and New chat terminal open their own kind either way.",

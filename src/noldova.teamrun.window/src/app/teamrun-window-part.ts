@@ -27,6 +27,9 @@ import { Resources } from "../resources";
 import { PagesViewComponent } from "./components/pages/pages-view/pages-view.component";
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
+import { OrganizationCatalog } from "./services/organization-catalog";
+import { OrganizationFlowService } from "./services/organization-flow.service";
+import { OrganizationLayoutService } from "./services/organization-layout.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
 import { BrowserAvailability } from "./services/browser-availability";
 import { ChatPageAction } from "./services/chat-page-action";
@@ -34,6 +37,7 @@ import { ChatStoreService } from "./services/chat-store.service";
 import { ChatTerminals } from "./services/chat-terminals";
 import { ComputerUseBorder } from "./services/computer-use-border";
 import { ComposerDefaultService } from "./services/composer-default.service";
+import { EngineResync } from "./services/engine-resync";
 import { GitHubReferenceSource } from "./services/github-reference-source";
 import { ImageViewerService } from "./services/image-viewer.service";
 import { InlineTerminals } from "./services/inline-terminals";
@@ -80,19 +84,24 @@ export class TeamRunWindowPart implements IWindowPart {
       (starter, kept) => new InlineTerminals(starter, EmbeddedTerminal.open, kept));
     this.chatTerminals = terminals;
     context.registerView(new ViewContribution(Resources.projectsViewName, Resources.explorerTitle, Resources.projectsViewIcon, DockSide.Left, true,
-      () => import("./components/projects-view/projects-view.component").then(t => t.ProjectsViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Right, true,
-      () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.planViewName, Resources.plansTitle, Resources.planViewIcon, DockSide.Right, true,
-      () => import("./components/plan-view/plan-view.component").then(t => t.PlanViewComponent), ContentPadding.None));
-    context.registerView(new ViewContribution(Resources.subAgentsViewName, Resources.subAgentsTitle, Resources.subAgentsViewIcon, DockSide.Right, true,
-      () => import("./components/sub-agents-view/sub-agents-view.component").then(t => t.SubAgentsViewComponent), ContentPadding.None));
+      () => import("./components/projects-view/projects-view.component").then(t => t.ProjectsViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.backgroundTasksViewName, Resources.backgroundTasksTitle, Resources.backgroundTasksViewIcon, DockSide.Right, true,
-      () => import("./components/background-tasks-view/background-tasks-view.component").then(t => t.BackgroundTasksViewComponent), ContentPadding.None));
+      () => import("./components/background-tasks-view/background-tasks-view.component").then(t => t.BackgroundTasksViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.pagesViewName, Resources.pagesTitle, Resources.pagesViewIcon, DockSide.Right, true,
-      () => Promise.resolve(PagesViewComponent), ContentPadding.None));
+      () => Promise.resolve(PagesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 30 }));
+    context.registerView(new ViewContribution(Resources.planViewName, Resources.plansTitle, Resources.planViewIcon, DockSide.Right, true,
+      () => import("./components/plan-view/plan-view.component").then(t => t.PlanViewComponent), ContentPadding.None, { defaultGroup: 1, defaultOrder: 10 }));
+    context.registerView(new ViewContribution(Resources.subAgentsViewName, Resources.subAgentsTitle, Resources.subAgentsViewIcon, DockSide.Right, true,
+      () => import("./components/sub-agents-view/sub-agents-view.component").then(t => t.SubAgentsViewComponent), ContentPadding.None, { defaultGroup: 1, defaultOrder: 20 }));
     context.registerView(new ViewContribution(Resources.activityViewName, Resources.activityTitle, Resources.activityViewIcon, DockSide.Bottom, true,
-      () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None));
+      () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
+    context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Bottom, true,
+      () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
+    context.registerCommand(new CommandContribution(Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon, null, async () => {
+      const organization = await OrganizationCatalog.of(context).firstAsync();
+      context.openDocument(Resources.organizationDocumentName, organization?.id ?? Resources.organizationDocumentInstance, organization?.name ?? Resources.organizationTitle);
+      return null;
+    }));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,
@@ -113,6 +122,8 @@ export class TeamRunWindowPart implements IWindowPart {
       context.registerSearchSource(source);
     context.registerDocument(new DocumentContribution(Resources.conversationDocumentName, () => import("./components/conversation/conversation.component").then(t => t.ConversationComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.imageDocumentName, () => import("./components/image-document/image-document.component").then(t => t.ImageDocumentComponent), ContentPadding.None));
+    context.registerDocument(new DocumentContribution(Resources.organizationDocumentName,
+      () => import("./components/organization-view/organization-view.component").then(t => t.OrganizationViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.teammatesDocumentName, () => import("./components/teammates-view/teammates-view.component").then(t => t.TeammatesViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.providersDocumentName, () => import("./components/providers-view/providers-view.component").then(t => t.ProvidersViewComponent), ContentPadding.None));
     context.registerDocument(new DocumentContribution(Resources.mcpServersDocumentName, () => import("./components/mcp-servers-view/mcp-servers-view.component").then(t => t.McpServersViewComponent), ContentPadding.None));
@@ -129,12 +140,19 @@ export class TeamRunWindowPart implements IWindowPart {
   }
 
   public reconnectAsync(): Promise<boolean> {
-    if (Object.isNull(this.activeContext))
+    const context = this.activeContext;
+    if (Object.isNull(context))
       return Promise.resolve(false);
-    PanelRequests.reportAgain(this.activeContext);
-    SubAgentsBadge.reload(this.activeContext);
-    ComputerUseBorder.reload(this.activeContext);
-    return ChatStoreService.resync(this.activeContext);
+    PanelRequests.reportAgain(context);
+    SubAgentsBadge.reload(context);
+    ComputerUseBorder.reload(context);
+    EngineResync.request(context);
+    PagesViewComponent.resync(context);
+    return ChatStoreService.resync(context).then(t => {
+      if (t)
+        TitleModelOptions.reload(context);
+      return t;
+    });
   }
 
   public async deactivateAsync(): Promise<void> {
@@ -162,6 +180,8 @@ export class TeamRunWindowPart implements IWindowPart {
       PageDocuments.release(this.activeContext);
       BackgroundTaskStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
+      OrganizationLayoutService.release(this.activeContext);
+      OrganizationFlowService.release(this.activeContext);
       TeammateStatusStoreService.release(this.activeContext);
       ProjectsLayoutService.release(this.activeContext);
       ComposerDefaultService.release(this.activeContext);

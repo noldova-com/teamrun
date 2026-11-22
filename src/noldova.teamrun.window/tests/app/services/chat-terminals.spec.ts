@@ -86,9 +86,9 @@ describe("ChatTerminals", () => {
   });
 
   it("runs a reply's shell code block of every language it knows in its chat's own terminal, in the chat's folder, with the shells its language names, on any system, since Terminal picks an installed one", async () => {
-    const ran: [string, TerminalShellKind[]][] = [["bash", [TerminalShellKind.Bash]], ["Bash", [TerminalShellKind.Bash]], ["sh", [TerminalShellKind.Bash, TerminalShellKind.Zsh]],
+    const ran: ReadonlyMap<string, readonly TerminalShellKind[]> = new Map<string, readonly TerminalShellKind[]>([["bash", [TerminalShellKind.Bash]], ["Bash", [TerminalShellKind.Bash]], ["sh", [TerminalShellKind.Bash, TerminalShellKind.Zsh]],
       ["SHELL", [TerminalShellKind.Bash, TerminalShellKind.Zsh]], ["zsh", [TerminalShellKind.Zsh]], ["PowerShell", [TerminalShellKind.PowerShell]],
-      ["pwsh", [TerminalShellKind.PowerShell]], ["cmd", [TerminalShellKind.CommandPrompt]]];
+      ["pwsh", [TerminalShellKind.PowerShell]], ["cmd", [TerminalShellKind.CommandPrompt]]]);
     const runs: unknown[][] = [];
     const runner: ITerminalRunner = { runAsync: (...parts) => {
       runs.push(parts);
@@ -96,11 +96,11 @@ describe("ChatTerminals", () => {
     } };
     terminals = ChatTerminals.provide(context, store, runner);
 
-    for (const [language] of ran)
+    for (const language of ran.keys())
       terminals.run("c2", new ShellRun("npm ci\nnpm test", language));
 
-    await Wait.until(() => expect(runs).toHaveLength(ran.length));
-    expect(runs).toEqual(ran.map(([, kinds]) => ["teamrun.chat/c2", "npm ci\nnpm test", "D:\\repo", kinds]));
+    await Wait.until(() => expect(runs).toHaveLength(ran.size));
+    expect(runs).toEqual([...ran.values()].map(kinds => ["teamrun.chat/c2", "npm ci\nnpm test", "D:\\repo", kinds]));
     expect(notices()).toEqual([]);
   });
 
@@ -324,7 +324,7 @@ describe("ChatTerminals", () => {
     await Wait.until(() => expect(TerminalOwners.shown).toBe("teamrun.chat/c2"));
   });
 
-  it("reads a chat's kept Runs from the runtime when it shows, keeps an earlier Run's output there, and posts a read or a keep that fails or a list that isn't one", async () => {
+  it("reads a chat's kept Runs from the runtime when it shows, keeps an earlier Run's output there, and posts a read or a keep that fails, still showing the output it didn't keep, or a list that isn't one", async () => {
     const starter = new FakeRunStarter();
     starter.sessions = ["s1", "s1"];
     starter.outputs.set("run-1", FakeRunStarter.outputOf("$ ls"));
@@ -351,6 +351,7 @@ describe("ChatTerminals", () => {
     await Wait.until(() => expect(starter.runs).toHaveLength(1));
     terminals.run("c2", new ShellRun("pwd", "bash", 1), { messageId: "m1", site: "body", block: 1 });
     await Wait.until(() => expect(notices()).toHaveLength(1));
+    await Wait.until(() => expect(terminals?.inlineTerminals?.outputAt("teamrun.chat/c2", first)?.lines.map(t => t.text)).toEqual(["$ ls"]));
     await store.conversationInView("c3");
     await Wait.until(() => expect(notices()).toHaveLength(2));
     await store.conversationInView("c1");

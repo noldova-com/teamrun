@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { afterNextRender, Component, effect, ElementRef, inject, Injector, type Signal, signal, untracked, viewChild, type WritableSignal }
+import { afterNextRender, Component, DestroyRef, effect, ElementRef, inject, Injector, type Signal, signal, untracked, viewChild, type WritableSignal }
   from "@angular/core";
 
 import "@noldova/context.core";
@@ -29,13 +29,16 @@ import {
 } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { CatalogReads } from "../../models/catalog-reads";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FocusAfterDelete } from "../../models/focus-after-delete";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ConversationActions } from "../../services/conversation-actions";
+import { EngineResync } from "../../services/engine-resync";
 import { FormatterService } from "../../services/formatter.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -47,7 +50,7 @@ import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.comp
     ConfigurationTableFillDirective, ConfigurationTableRowActionsDirective, ConfigurationTableShareDirective, IconButtonComponent, TooltipDirective],
   providers: [ChatStoreService.provider, ComposerDefaultService.provider],
   templateUrl: "./teammates-view.component.html",
-  styleUrl: "../settings-view.css"
+  styleUrls: ["../settings-view.css", "../failure-row.css"]
 })
 export class TeammatesViewComponent {
   protected readonly resources: typeof Resources = Resources;
@@ -60,11 +63,13 @@ export class TeammatesViewComponent {
   private readonly choices: ComposerChoicesService = inject(ComposerChoicesService);
   private readonly defaults: ComposerDefaultService = inject(ComposerDefaultService);
   private readonly injector: Injector = inject(Injector);
+  private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly changeDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("changeDefaultButton", { read: ElementRef });
   private readonly clearDefaultButton: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("clearDefaultButton", { read: ElementRef });
   private readonly formatter: FormatterService = inject(FormatterService);
   private readonly usage: UsageFormatterService = inject(UsageFormatterService);
   private readonly catalogs: WritableSignal<ReadonlyMap<string, ModelCatalog>> = signal(new Map());
+  private readonly catalogReads: CatalogReads = new CatalogReads();
   private readonly report: (message: string) => void = t => this.error.set(t);
 
   public constructor() {
@@ -75,12 +80,18 @@ export class TeammatesViewComponent {
           this.chooseDefault();
         });
     });
+    const resynced: WritableSignal<number> = signal(0);
+    inject(DestroyRef).onDestroy(EngineResync.on(this.context, () => resynced.update(u => u + 1)));
     effect(() => {
+      resynced();
       const providers = this.store.providers();
+      const defaultTeammate = this.store.defaultTeammate();
       const chosen = new Set(this.store.teammates().filter(t => !Object.isNull(t.model) || !Object.isNull(t.effort)).map(t => t.providerId));
+      if (!Object.isNull(defaultTeammate) && !Object.isNull(defaultTeammate.providerId))
+        chosen.add(defaultTeammate.providerId);
       untracked(() => {
         for (const provider of providers.filter(t => chosen.has(t.id)))
-          void this.store.modelCatalogs.load(provider.kind, provider.id).then(t => this.catalogs.update(u => new Map(u).set(provider.id, t)));
+          this.catalogReads.follow(provider.id, this.store.modelCatalogs.load(provider.kind, provider.id), t => this.catalogs.update(u => new Map(u).set(provider.id, t)));
       });
     });
   }
@@ -181,14 +192,25 @@ export class TeammatesViewComponent {
   }
 
   protected remove(teammate: Teammate): void {
+    const control = document.activeElement;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.deleteTeammateLabel, Resources.formatDeleteTeammate(teammate.name), Resources.deleteTeammateLabel,
       null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)
-        void this.store.deleteTeammate(teammate, this.report);
+        void this.delete(teammate, control);
     });
+  }
+
+  private async delete(teammate: Teammate, control: Element | null): Promise<void> {
+    const ids = [...this.host.querySelectorAll<HTMLElement>(".nol-teamrun-item[data-teammate]")].map(t => t.dataset["teammate"]);
+    const at = ids.indexOf(teammate.id);
+    const neighbour = ids[at + 1] ?? ids[at - 1];
+    if (await this.store.deleteTeammate(teammate, this.report))
+      FocusAfterDelete.later(this.injector, control,
+        () => Object.isUndefined(neighbour) ? null : this.host.querySelector<HTMLElement>(`.nol-teamrun-item[data-teammate="${CSS.escape(neighbour)}"] .nol-teamrun-delete`),
+        () => this.host.querySelector<HTMLElement>(".nol-teamrun-add"));
   }
 
   private connectionName(kind: string, provider: Provider): string {

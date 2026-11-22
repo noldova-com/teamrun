@@ -1044,6 +1044,35 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async switchesAWakeToTheModeTheChatHoldsWhenItStarts(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-woken", "none", null, []),
+      SdkMessages.taskStarted("s-woken", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-woken", "Started")),
+      SdkMessages.taskNotification("s-woken", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("33333333-3333-3333-3333-333333333333", [SdkMessages.text("The server stopped")], "claude-opus-5"),
+      SdkMessages.success("s-woken", "Stopped"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, false, undefined, Resources.defaultPermissionMode);
+    const woken = listener.wakeTurn.follow(new RecordingTurnListener(), new AbortController().signal);
+
+    await adapter.runTurn(new TurnRequest(null, host.directory.path, "Start", new RequestedSettings("claude", null, null, null, Resources.acceptEditsPermissionMode),
+      null, [], null, null), listener, new AbortController().signal);
+    const turnModes = query.permissionModes.join(",");
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, reply.outcome);
+    Assert.areEqual(`|${Resources.defaultPermissionMode}`, `${turnModes}|${query.permissionModes.join(",")}`);
+  }
+
+  @TestMethod
   @TestData(true)
   @TestData(false)
   public async saysTeamRunsToolsAreUnavailableInAWakeWhoseTokenIsRefusedAndResumesTheNextTurnOnANewChat(expired: boolean): Promise<void> {
@@ -1739,7 +1768,7 @@ export class ClaudeAdapterTests {
     Assert.isNull((await adapter.forkSession(new ForkRequest(null, host.directory.path, "session-1", "turn-1", new RequestedSettings("claude", null, null)))).providerId);
     Assert.isFalse(adapter.descriptor.supportsSignIn);
     Assert.areEqual("true:null", [adapter.descriptor.supportsSignOut, adapter.descriptor.signOutCommand ?? "null"].join(":"));
-    Assert.areEqual(JSON.stringify({ variable: "CLAUDE_CONFIG_DIR", signInCommand: "claude auth login", usualFolder: "/work/claude-home", toolCommand: null, signInVariables: {}, signInValues: {}, personFolders: [] }),
+    Assert.areEqual(JSON.stringify({ variable: "CLAUDE_CONFIG_DIR", signInCommand: "claude auth login", usualFolder: "/work/claude-home", toolCommand: null, signInVariables: {}, signInValues: {}, personFolders: ["/work/claude-home"] }),
       JSON.stringify(host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: "/work/claude-home" }).descriptor.profile?.toJson()));
     Assert.areEqual(join(homedir(), ".claude"), host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: "" }).descriptor.profile?.usualFolder);
     Assert.areEqual([join(homedir(), ".claude"), "/work/claude-home"].join(),
@@ -2035,6 +2064,86 @@ export class ClaudeAdapterTests {
     Assert.isTrue(failed.error?.includes("ENOENT") ?? false);
     Assert.areEqual(AuthStatus.Error, timedOut.authStatus);
     Assert.areEqual("Unexpected output from the sign-in check: ", timedOut.error);
+  }
+
+  @TestMethod
+  public async namesNoConfigFolderToClaudeCodeForAProviderInItsUsualFolderAndItsOwnToAnyOther(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "env", CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings,
+      host.directory.resolve("home"));
+    const usual = host.createProvider("acc-1", join("home", ".claude"));
+    const own = host.createProvider("acc-2", "claude-profile");
+    const turnFolder = async (provider: Provider, session: string): Promise<string | undefined> => {
+      host.factory.next = new FakeClaudeQuery([SdkMessages.init(session, "none", null, []), SdkMessages.success(session, "ok")]);
+      await adapter.runTurn(host.createRequest("Hi", provider), new RecordingTurnListener(), new AbortController().signal);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
+    const signOutFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.signOut(provider);
+      return host.starter.environments.at(-1)?.["CLAUDE_CONFIG_DIR"];
+    };
+    const listFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.listModels(provider);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
+    const usageFolder = async (provider: Provider): Promise<string | undefined> => {
+      await adapter.readPlanUsage(provider);
+      return host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    };
+
+    const checked = [(await adapter.checkSignIn(usual)).identity?.email, (await adapter.checkSignIn(own)).identity?.email];
+    const turns = [await turnFolder(usual, "s-1"), await turnFolder(own, "s-2")];
+    const lists = [await listFolder(usual), await listFolder(own)];
+    const usages = [await usageFolder(usual), await usageFolder(own)];
+    const signOuts = [await signOutFolder(usual), await signOutFolder(own)];
+
+    Assert.areEqual(JSON.stringify(["unset", host.directory.resolve("claude-profile")]), JSON.stringify(checked));
+    Assert.isUndefined(turns[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), turns[1]);
+    Assert.isUndefined(lists[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), lists[1]);
+    Assert.isUndefined(usages[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), usages[1]);
+    Assert.isUndefined(signOuts[0]);
+    Assert.areEqual(host.directory.resolve("claude-profile"), signOuts[1]);
+  }
+
+  @TestMethod
+  public async makesTheFolderThePassedOnEnvironmentNamesItsProfilesUsualAndPersonFolderOnceItsDescriptorIsRefreshed(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings, host.directory.resolve("home"));
+    host.starter.current = { CLAUDE_CONFIG_DIR: host.directory.resolve("claude-work") };
+    const folders = [host.directory.resolve(join("home", ".claude")), host.directory.resolve("claude-work")];
+    const terminalVariables = (): readonly (string | null)[] => folders.map(t => adapter.descriptor.profile?.personFolders.includes(t) === true ? null : t);
+
+    const before = [adapter.descriptor.profile?.usualFolder, terminalVariables()];
+    await adapter.refreshDescriptorAsync();
+    const after = [adapter.descriptor.profile?.usualFolder, terminalVariables()];
+
+    Assert.areEqual(JSON.stringify([folders[0], [null, folders[1]]]), JSON.stringify(before));
+    Assert.areEqual(JSON.stringify([folders[1], [folders[0], null]]), JSON.stringify(after));
+    Assert.areEqual(JSON.stringify([folders[1]]), JSON.stringify(adapter.descriptor.profile?.personFolders));
+  }
+
+  @TestMethod
+  public async takesClaudeCodesUsualFolderFromTheEnvironmentItPassesOnNotTeamRunsOwn(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CLAUDE_OUTPUT: "env", CLAUDE_CONFIG_DIR: undefined }, host.command, host.timings,
+      host.directory.resolve("home"));
+    host.starter.current = { CLAUDE_CONFIG_DIR: host.directory.resolve("claude-work") };
+    const home = host.createProvider("acc-1", join("home", ".claude"));
+    host.factory.next = new FakeClaudeQuery([SdkMessages.init("s-1", "none", null, []), SdkMessages.success("s-1", "ok")]);
+
+    const checked = (await adapter.checkSignIn(home)).identity?.email;
+    await adapter.runTurn(host.createRequest("Hi", home), new RecordingTurnListener(), new AbortController().signal);
+    const turn = host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    await adapter.listModels(home);
+    const list = host.factory.lastOptions?.env?.["CLAUDE_CONFIG_DIR"];
+    await adapter.signOut(home);
+    const signOut = host.starter.environments.at(-1)?.["CLAUDE_CONFIG_DIR"];
+
+    const folder = host.directory.resolve(join("home", ".claude"));
+    Assert.areEqual(JSON.stringify([folder, folder, folder, folder]), JSON.stringify([checked, turn, list, signOut]));
   }
 
   @TestMethod
@@ -2390,6 +2499,41 @@ export class ClaudeAdapterTests {
     Assert.areEqual(TurnOutcome.Completed, reply.outcome);
     Assert.areEqual("acceptEdits", String(host.factory.lastOptions?.permissionMode));
     Assert.areEqual("plan|plan,acceptEdits", `${asked}|${warm.permissionModes.join(",")}`);
+  }
+
+  @TestMethod
+  public async leavesAPlanFirstWakesPlanForTheModeTheChatHoldsWhenTheWakeStarts(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const warm = new FakeClaudeQuery([new WaitForInputStep(), SdkMessages.init("s-never", "none", null, []),
+      SdkMessages.taskStarted("s-never", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.success("s-never", "Started")),
+      SdkMessages.taskNotification("s-never", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("11111111-1111-1111-1111-111111111111", [SdkMessages.toolUse("tu-1", "ExitPlanMode", { plan: "# Restart" })], "claude-opus-5"),
+      new ToolAskStep("ExitPlanMode", { plan: "# Restart" }, "tu-1"),
+      SdkMessages.user("22222222-2222-2222-2222-222222222222", [SdkMessages.toolResult("tu-1", "User has approved your plan.")]),
+      SdkMessages.success("s-never", "Restarted"), new WaitForCloseStep()]);
+    host.factory.next = warm;
+    const listener = new RecordingTurnListener();
+    listener.wakeTurn = new WakeTurn({}, true, undefined, Resources.defaultPermissionMode);
+    const follower = new RecordingTurnListener();
+    follower.decisions.push("allow");
+    let asked = String.empty;
+    const decide = follower.onApprovalRequested.bind(follower);
+    follower.onApprovalRequested = (ask, signal) => {
+      asked = warm.permissionModes.join(",");
+      return decide(ask, signal);
+    };
+    const woken = listener.wakeTurn.follow(follower, new AbortController().signal);
+
+    await adapter.runTurn(new TurnRequest(null, host.directory.path, "Start", new RequestedSettings("claude", null, null, null, "acceptEdits", false), null, [],
+      null, null), listener, new AbortController().signal);
+    const reply = await woken;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, reply.outcome);
+    Assert.areEqual("acceptEdits", String(host.factory.lastOptions?.permissionMode));
+    Assert.areEqual(`plan|plan,${Resources.defaultPermissionMode}`, `${asked}|${warm.permissionModes.join(",")}`);
   }
 
   @TestMethod

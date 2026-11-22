@@ -17,8 +17,10 @@ export class ModelCatalogCache {
   private readonly fetchModels: (kind: string, providerId: string | null, refresh: boolean, workingDirectory: string | null) => Promise<ProviderModelList>;
   private readonly cached: Map<string, ModelCatalog> = new Map();
   private readonly pending: Map<string, Promise<ModelCatalog>> = new Map();
+  private readonly expired: WeakSet<ModelCatalog> = new WeakSet();
   private readonly loads: WritableSignal<number> = signal(0);
   private readonly now: () => number;
+  private generation: number = 0;
 
   public constructor(fetchModels: (kind: string, providerId: string | null, refresh: boolean, workingDirectory: string | null) => Promise<ProviderModelList>, now: () => number) {
     this.fetchModels = fetchModels;
@@ -28,24 +30,35 @@ export class ModelCatalogCache {
   public load(kind: string, providerId: string | null, refresh: boolean = false, workingDirectory: string | null = null): Promise<ModelCatalog> {
     const key = JSON.stringify([kind, providerId, workingDirectory]);
     const cached = this.cached.get(key);
-    if (!refresh && !Object.isUndefined(cached) && !cached.awaitsTurn && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
+    if (!refresh && !Object.isUndefined(cached) && !cached.failed && !cached.awaitsTurn && !this.expired.has(cached) && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
       return Promise.resolve(cached);
     const pending = this.pending.get(key);
     if (!Object.isUndefined(pending))
       return pending;
     if (this.pending.size >= Resources.maximumModelCatalogs)
       return Promise.resolve(ModelCatalogCache.failed(cached, this.now()));
+    const generation = this.generation;
     const request = this.fetch(kind, providerId, refresh, workingDirectory, cached).then(t => {
+      if (generation !== this.generation)
+        return t;
       this.cached.delete(key);
       this.cached.set(key, t);
-      if (this.cached.size > Resources.maximumModelCatalogs)
-        this.cached.delete(this.cached.keys().next().value!);
+      const oldest = this.cached.keys().next();
+      if (this.cached.size > Resources.maximumModelCatalogs && !oldest.done)
+        this.cached.delete(oldest.value);
       this.pending.delete(key);
       this.loads.update(u => u + 1);
       return t;
     });
     this.pending.set(key, request);
     return request;
+  }
+
+  public expire(): void {
+    this.generation++;
+    this.pending.clear();
+    for (const catalog of this.cached.values())
+      this.expired.add(catalog);
   }
 
   public loadedOf(kind: string, providerId: string | null): ModelCatalog | undefined {

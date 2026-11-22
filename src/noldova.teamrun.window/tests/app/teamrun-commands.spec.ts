@@ -180,7 +180,7 @@ describe("TeamRun's commands", () => {
         await held.promise;
       else
         chosen.add(params.conversationId);
-      return null;
+      return first.withResponder(params.responder).toJson();
     });
 
     const kept = store.setResponder(first.id, new ConversationResponder("alice"));
@@ -319,7 +319,7 @@ describe("TeamRun's commands", () => {
     expect(open.isEnabled(null)).toBe(false);
   });
 
-  it("opens a new Browser tab on an empty page in the links profile each time, with no key, is offered only while the Browser module is on, and says so when it can't", async () => {
+  it("opens a new Browser tab on an empty page in the person's own browsing each time, with no key, is offered only while the Browser module is on, and says so when it can't", async () => {
     await load();
     const open = command(Resources.openBrowserCommand);
     const listening = context.dependencyListeners.size;
@@ -331,12 +331,12 @@ describe("TeamRun's commands", () => {
       expect(open.isEnabled(null)).toBe(true);
       await open.runAsync(null);
       await open.runAsync(null);
-      expect(context.ranCommands).toEqual([{ name: "browser.openPage", commandArguments: { profileKey: "links" } },
-        { name: "browser.openPage", commandArguments: { profileKey: "links" } }]);
+      expect(context.ranCommands).toEqual([{ name: "browser.openPage", commandArguments: {} },
+        { name: "browser.openPage", commandArguments: {} }]);
       vi.spyOn(context, "runCommandAsync").mockRejectedValueOnce(new Error("The Browser stopped."));
       await open.runAsync(null);
       await Wait.until(() => expect(context.shownNotices(Resources.chatActionFailedNotice).map(t => [t.key, t.title, t.text]))
-        .toEqual([[Resources.formatNoticeKey(ChatAction.OpenBrowser, "links"), "Couldn't open the Browser", "The Browser stopped."]]));
+        .toEqual([[Resources.formatNoticeKey(ChatAction.OpenBrowser, "browser.openPage"), "Couldn't open the Browser", "The Browser stopped."]]));
 
       context.changeDependency("browser", false);
       expect(open.isEnabled(null)).toBe(false);
@@ -378,7 +378,7 @@ describe("TeamRun's commands", () => {
 
       context.changeDependency("browser", true);
       await open.runAsync(null);
-      expect(context.ranCommands).toEqual([{ name: "browser.openPage", commandArguments: { profileKey: "links" } }]);
+      expect(context.ranCommands).toEqual([{ name: "browser.openPage", commandArguments: {} }]);
     }
     finally {
       BrowserAvailability.release(context);

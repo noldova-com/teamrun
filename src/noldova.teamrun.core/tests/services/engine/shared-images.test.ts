@@ -10,10 +10,12 @@ import { createHash } from "node:crypto";
 import fs, { existsSync, mkdirSync, readFileSync, readdirSync, utimesSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { basename, join } from "node:path";
+import { mock } from "node:test";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ConversationEngine, Resources, SharedImages } from "@noldova/teamrun.core";
 import { ErrorCode, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { BusyFileError } from "../../fixtures/busy-file-error.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
@@ -77,11 +79,9 @@ export class SharedImagesTests {
     const folder = join(directory.path, "shared-images");
     mkdirSync(folder);
     const now = Date.now();
-    for (const [name, at] of [["ended.png", now - 2 * SharedImagesTests.LIFETIME], ["ended.png.partial", now - 2 * SharedImagesTests.LIFETIME],
-      ["shared.png", now]] as const) {
-      writeFileSync(join(folder, name), "x");
-      utimesSync(join(folder, name), at / 1000, at / 1000);
-    }
+    for (const name of ["ended.png", "ended.png.partial"])
+      SharedImagesTests.writeAt(join(folder, name), now - 2 * SharedImagesTests.LIFETIME);
+    SharedImagesTests.writeAt(join(folder, "shared.png"), now);
     mkdirSync(join(folder, "nested"));
 
     new SharedImages(folder, 30, SharedImagesTests.LIFETIME, () => now).clean();
@@ -101,10 +101,9 @@ export class SharedImagesTests {
     utimesSync(join(folder, "busy.png"), ended, ended);
     const log = new RecordingLog();
     const images = new SharedImages(folder, 30, SharedImagesTests.LIFETIME, Date.now, log);
-    const original = fs.rmSync;
-    fs.rmSync = () => {
-      throw Object.assign(new Error("The file is in use."), { code: "EBUSY", syscall: "rm" });
-    };
+    const remove = mock.method(fs, "rmSync", (): void => {
+      throw new BusyFileError("The file is in use.", "rm");
+    });
     syncBuiltinESMExports();
     let full: string;
     try {
@@ -112,7 +111,7 @@ export class SharedImagesTests {
       full = Assert.throws(() => images.keep(Buffer.alloc(20, 1), "image/png"), ServiceException).info.name;
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 
@@ -133,16 +132,15 @@ export class SharedImagesTests {
     utimesSync(join(folder, "ended.png"), ended, ended);
     const log = new RecordingLog();
     const images = new SharedImages(folder, 30, SharedImagesTests.LIFETIME, Date.now, log);
-    const original = fs.rmSync;
-    fs.rmSync = () => {
+    const remove = mock.method(fs, "rmSync", (): void => {
       throw new TypeError("Not the file system's.");
-    };
+    });
     syncBuiltinESMExports();
     try {
       Assert.throws(() => images.clean(), TypeError);
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 
@@ -160,16 +158,15 @@ export class SharedImagesTests {
     utimesSync(join(folder, "ended.png"), ended, ended);
     const log = new RecordingLog();
     const images = new SharedImages(folder, 30, SharedImagesTests.LIFETIME, Date.now, log);
-    const original = fs.rmSync;
-    fs.rmSync = () => {
+    const remove = mock.method(fs, "rmSync", (): void => {
       throw new TypeError("Not the file system's.");
-    };
+    });
     syncBuiltinESMExports();
     try {
       Assert.throws(() => images.keep(Buffer.alloc(20, 1), "image/png"), TypeError);
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 
@@ -185,22 +182,22 @@ export class SharedImagesTests {
     const name = `${SharedImagesTests.sha256(bytes)}.png`;
     const calls: string[] = [];
     const [write, rename] = [fs.writeFileSync, fs.renameSync];
-    fs.writeFileSync = (...args: Parameters<typeof fs.writeFileSync>): void => {
+    const writing = mock.method(fs, "writeFileSync", (...args: Parameters<typeof write>): void => {
       const [file, , options] = args;
       calls.push(`write ${basename(String(file))} ${Object.isString(options) || Object.isNullOrUndefined(options) ? "unflushed" : String(options.flush)}`);
       write(...args);
-    };
-    fs.renameSync = (...args: Parameters<typeof fs.renameSync>): void => {
+    });
+    const renaming = mock.method(fs, "renameSync", (...args: Parameters<typeof rename>): void => {
       calls.push(`rename ${basename(String(args[1]))}`);
       rename(...args);
-    };
+    });
     syncBuiltinESMExports();
     try {
       images.keep(bytes, "image/png");
     }
     finally {
-      fs.writeFileSync = write;
-      fs.renameSync = rename;
+      writing.mock.restore();
+      renaming.mock.restore();
       syncBuiltinESMExports();
     }
 
@@ -235,5 +232,10 @@ export class SharedImagesTests {
 
   private static sha256(bytes: Buffer): string {
     return createHash("sha256").update(bytes).digest("hex");
+  }
+
+  private static writeAt(path: string, at: number): void {
+    writeFileSync(path, "x");
+    utimesSync(path, at / 1000, at / 1000);
   }
 }

@@ -76,6 +76,11 @@ export class AcpSubAgents {
     return this.ofChild(agentId) ?? this.link(agentId);
   }
 
+  public get states(): string {
+    return [...this.agents.values()].map(t => Resources.formatSubAgentState(t.toolCallId, t.agent.status, t.agent.isBackground, this.isKept(t)))
+      .join(Resources.listSeparator);
+  }
+
   public get isKeeping(): boolean {
     return this.kept.size > 0 || this.cancelling.size > 0;
   }

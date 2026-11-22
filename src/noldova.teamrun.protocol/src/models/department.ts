@@ -10,12 +10,15 @@ import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException, JsonReader, type JsonObject } from "@noldova/context.json";
 
+import { OrganizationNodeKind } from "../enums/organization-node-kind.js";
 import { Resources } from "../resources.js";
+import { OrganizationParent } from "./organization-parent.js";
 
 export class Department {
   public readonly id: string;
   public readonly name: string;
-  public readonly parentId: string | null;
+  public readonly typeId: string;
+  public readonly parent: OrganizationParent;
   public readonly leaderId: string | null;
   public readonly order: number;
   public readonly createdAt: string;
@@ -24,17 +27,17 @@ export class Department {
   public constructor(
     id: string,
     name: string,
-    parentId: string | null,
+    typeId: string,
+    parent: OrganizationParent,
     leaderId: string | null,
     order: number,
     createdAt: string,
     updatedAt: string) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
     Department.validateName(name);
-    if (!Object.isNull(parentId))
-      ArgumentException.throwIfNullOrWhitespace(parentId, Resources.parentIdField);
-    if (parentId === id)
-      throw new ArgumentException(Resources.departmentOwnParent, Resources.parentIdField);
+    ArgumentException.throwIfNullOrWhitespace(typeId, Resources.typeIdField);
+    if (parent.kind === OrganizationNodeKind.Department && parent.id === id)
+      throw new ArgumentException(Resources.departmentOwnParent, Resources.parentField);
     if (!Object.isNull(leaderId))
       ArgumentException.throwIfNullOrWhitespace(leaderId, Resources.leaderIdField);
     Department.validateOrder(order);
@@ -43,11 +46,16 @@ export class Department {
 
     this.id = id;
     this.name = name;
-    this.parentId = parentId;
+    this.typeId = typeId;
+    this.parent = parent;
     this.leaderId = leaderId;
     this.order = order;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+  }
+
+  public get parentId(): string | null {
+    return this.parent.kind === OrganizationNodeKind.Department ? this.parent.id : null;
   }
 
   public static validateName(name: string): void {
@@ -72,7 +80,8 @@ export class Department {
     return new Department(
       reader.readNonBlankString(Resources.idField),
       Department.readName(reader),
-      reader.readNullableString(Resources.parentIdField),
+      reader.readNonBlankString(Resources.typeIdField),
+      Department.readParent(reader),
       reader.readNullableString(Resources.leaderIdField),
       reader.readInteger(Resources.orderField),
       reader.readNonBlankString(Resources.createdAtField),
@@ -83,12 +92,18 @@ export class Department {
     return {
       [Resources.idField]: this.id,
       [Resources.nameField]: this.name,
-      [Resources.parentIdField]: this.parentId,
+      [Resources.typeIdField]: this.typeId,
+      [Resources.parentField]: this.parent.toJson(),
       [Resources.leaderIdField]: this.leaderId,
       [Resources.orderField]: this.order,
       [Resources.createdAtField]: this.createdAt,
       [Resources.updatedAtField]: this.updatedAt
     };
+  }
+
+  private static readParent(reader: JsonReader): OrganizationParent {
+    const parent = reader.readObject(Resources.parentField);
+    return OrganizationParent.fromJson(parent.toJson(), parent.path);
   }
 
   private static allowsName(name: string): boolean {

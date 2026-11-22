@@ -22,7 +22,7 @@ import {
   type ApprovalDecideParams,
   BackgroundTaskStatus,
   type Conversation,
-  type ConversationResponder,
+  ConversationCreateParams,
   type ConversationResponderParams,
   ConversationIdParams,
   type ConversationRewindParams,
@@ -38,11 +38,15 @@ import {
   MessageAuthor,
   MessageDetail,
   MessageIdParams,
+  MessageSendAbandonedPayload,
+  MessageSendingPayload,
   MessageSendParams,
   MessageSendResult,
   MessageSender,
   MessageStatus,
   ObservedSettings,
+  type OrganizationChat,
+  OrganizationParent,
   Provenance,
   type ProviderMode,
   type McpToolCallParams,
@@ -88,7 +92,6 @@ import type { IEventSink } from "../../interfaces/i-event-sink.js";
 import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
-import type { IOrganizationSender } from "../../interfaces/i-organization-sender.js";
 import type { IOutsideMessages } from "../../interfaces/i-outside-messages.js";
 import type { IPermissionAsker } from "../../interfaces/i-permission-asker.js";
 import type { ISenderSends } from "../../interfaces/i-sender-sends.js";
@@ -124,6 +127,17 @@ import type { TurnWake } from "../../models/turn-wake.js";
 import { WakeTurn } from "../../models/wake-turn.js";
 import { WorkFolder } from "../../models/work-folder.js";
 import { ConversationTitle } from "../../models/conversation-title.js";
+import { CarriedSession } from "../../models/carried-session.js";
+import { HandOffResult } from "../../models/hand-off-result.js";
+import { LostWake } from "../../models/lost-wake.js";
+import { MovedSettings } from "../../models/moved-settings.js";
+import type { ReplyMode } from "../../models/reply-mode.js";
+import { SendAllowance } from "../../models/send-allowance.js";
+import { StoppedReply } from "../../models/stopped-reply.js";
+import { StoppedSubAgents } from "../../models/stopped-sub-agents.js";
+import { SustainedSettings } from "../../models/sustained-settings.js";
+import { UsableResponder } from "../../models/usable-responder.js";
+import { WrittenImageFolder } from "../../models/written-image-folder.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
@@ -136,9 +150,12 @@ import { SustainRouter } from "../sustain/sustain-router.js";
 import { SustainAttempts } from "../sustain/sustain-attempts.js";
 import { HandoverSummaries } from "../sustain/handover-summaries.js";
 import { ProjectActivity } from "../projects/project-activity.js";
+import { OrganizationService } from "../organization/organization.service.js";
+import { OrganizationChatOpening } from "../../models/organization-chat-opening.js";
 import { EngineServices } from "./engine-services.js";
 import { KeptSessions } from "./kept-sessions.js";
 import { McpToolCalls } from "./mcp-tool-calls.js";
+import { MentionCheck } from "./mention-check.js";
 import { OutsideMessages } from "./outside-messages.js";
 import { PermissionAsks } from "./permission-asks.js";
 import { ChatTitles } from "./chat-titles.js";
@@ -150,7 +167,7 @@ import { CommandRun } from "./command-run.js";
 import { StoppedCommands } from "./stopped-commands.js";
 import { SubAgentRun } from "./sub-agent-run.js";
 
-export class ConversationEngine implements IConversationEngine, IOrganizationSender, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
+export class ConversationEngine implements IConversationEngine, IOutsideMessages, IPermissionAsker, ISenderSends, ISenderTokens {
   private readonly adoptedSenders: Map<ReplyWork, string> = new Map();
   private readonly teammates: ITeammatesService;
   private readonly sharedFailures: ReportedSharedMcpFailures = new ReportedSharedMcpFailures();
@@ -188,6 +205,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private readonly commandStarter: ICommandStarter | null;
   private readonly titles: ChatTitles;
   private readonly outside: OutsideMessages;
+  private readonly organization: OrganizationService;
   private readonly toolCalls: McpToolCalls;
   private readonly permissions: PermissionAsks;
   private readonly keptSessions: KeptSessions;
@@ -263,7 +281,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       requireConversationAsync: (id, transaction) => this.requireConversationAsync(id, transaction),
       requireTeammateAsync: (id, transaction) => this.requireTeammateAsync(id, transaction),
       capEndsTasksAsync: (teammate, chatId) => this.capEndsTasksAsync(teammate, chatId),
-      sendMessageAsync: (params, prompt, allowed, signal, outside, queues) => this.sendMessageAsync(params, prompt, allowed, signal, outside, queues),
+      sendMessageAsync: (params, prompt, allowed, signal, outside) => this.sendMessageAsync(params, prompt, allowed, signal, outside),
       refuseRaisedModeAsync: params => this.refuseRaisedModeAsync(params),
       toolModeOfAsync: open => this.toolModeOfAsync(open),
       modeIn: requested => this.modeIn(requested),
@@ -281,6 +299,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       track: (chatId, work) => this.track(chatId, work),
       settleSafelyAsync: (conversationId, settleAsync) => this.settleSafelyAsync(conversationId, settleAsync)
     };
+    this.organization = new OrganizationService(context);
     this.outside = new OutsideMessages(services, callbacks);
     this.toolCalls = new McpToolCalls(services, this.state, callbacks);
     this.permissions = new PermissionAsks(services, this.state, callbacks);
@@ -352,7 +371,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return ProjectImageReader.share(folder.path, params.path, folder.isStored ? null : this.sharedImages);
   }
 
-  private async writtenImageFolderOfAsync(params: WrittenImageReadParams): Promise<{ readonly path: string; readonly isStored: boolean }> {
+  private async writtenImageFolderOfAsync(params: WrittenImageReadParams): Promise<WrittenImageFolder> {
     const conversation = await this.requireConversationAsync(params.conversationId);
     const folder = await this.requireWorkFolderAsync(conversation, false);
     const message = await this.messages.findAsync(params.messageId);
@@ -361,12 +380,12 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       throw notFound;
     const reader = new WrittenImageReader();
     if (message.details.some(t => reader.storedPathOf(t) === params.path))
-      return { path: join(this.context.dataDirectory, Resources.imagesDirectoryName), isStored: true };
+      return new WrittenImageFolder(join(this.context.dataDirectory, Resources.imagesDirectoryName), true);
     if (!reader.pathsOf(message, folder.path).includes(params.path) && !reader.markdownImagePathsOf(message, folder.path).includes(params.path)
       && !reader.markdownLinkImagePathsOf(message, folder.path).includes(params.path)
       && !message.details.some(t => reader.generatedPathOf(t, folder.path) === params.path))
       throw notFound;
-    return { path: folder.path, isStored: false };
+    return new WrittenImageFolder(folder.path, false);
   }
 
   public async sendAsync(params: MessageSendParams, signal?: AbortSignal): Promise<MessageSendResult> {
@@ -405,19 +424,40 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   public async sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult> {
-    return this.sendMessageAsync(params, null, { starts }, undefined);
+    return this.sendMessageAsync(params, null, new SendAllowance(starts), undefined);
+  }
+
+  public announceSend(params: MessageSendParams): string | null {
+    const turn = Object.isNull(params.senderToken) ? undefined : this.state.turns.get(params.senderToken);
+    const teammateId = turn?.message.teammateId ?? null;
+    if (Object.isUndefined(turn) || Object.isNull(teammateId))
+      return null;
+    const sendId = Guid.createVersion7().toString();
+    this.events.publish(new Event(EventName.MessageSending,
+      new MessageSendingPayload(sendId, turn.message.conversationId, teammateId, params.conversationId).toJson()));
+    return sendId;
+  }
+
+  public abandonSend(sendId: string): void {
+    this.events.publish(new Event(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload(sendId).toJson()));
   }
 
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId: string | null = null): Promise<string> {
     return this.outside.sendOutsideAsync(teammateId, text, label, chatId);
   }
 
-  public async startOutsideAsync(teammateId: string, text: string, label: string): Promise<MessageSendResult> {
-    const teammate = await this.requireTeammateAsync(teammateId);
-    const provider = await this.providers.findAsync(teammate.providerId);
-    if (!this.canReply(provider))
-      throw new ServiceException(ErrorCode.Conflict, Resources.formatAccountCannotReply(teammate.name, provider?.label ?? null), [teammateId]);
-    return this.outside.startOutsideAsync(teammateId, text, label);
+  public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
+    const teammate = await this.requireTeammateAsync(chat.teammateId);
+    const opening = await this.context.database.connection.runInTransactionAsync(async transaction => {
+      if (Object.isNull(await this.organization.findAsync(chat.organizationId, transaction)))
+        throw new ServiceException(ErrorCode.NotFound, Resources.formatOrganizationNotFound(chat.organizationId), [chat.organizationId]);
+      const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
+      return Object.isNull(known) ? new OrganizationChatOpening(await this.conversations.createAsync(new ConversationCreateParams(null,
+        Resources.formatOrganizationChatTitle(teammate.name), teammate.id), transaction, chat), true) : new OrganizationChatOpening(known, false);
+    });
+    if (opening.made)
+      this.events.publish(new Event(EventName.StateInvalidated, null));
+    return opening.conversation;
   }
 
   public listOutsideChatsAsync(): Promise<readonly JsonObject[]> {
@@ -436,13 +476,32 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return this.outside.forgetOutsideAsync();
   }
 
-  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: { readonly starts: string | null } | null,
-    signal: AbortSignal | undefined, outside: MessageSender | null = null, queues: boolean = false): Promise<MessageSendResult> {
+  private async organizationRoleAsync(conversation: Conversation, sender: MessageSender | null, transaction: SqlTransaction): Promise<JsonObject | null> {
+    const chat = conversation.organizationChat;
+    if (Object.isNull(chat) || !Object.isNull(sender))
+      return null;
+    const organization = await this.organization.findAsync(chat.organizationId, transaction);
+    if (Object.isNull(organization) || Object.isNull(organization.parentOf(OrganizationParent.teammate(chat.teammateId))))
+      return null;
+    const teammates = await this.teammates.listAsync(transaction);
+    const department = organization.departments.find(t => t.id === organization.departmentOf(chat.teammateId));
+    const place = Object.isUndefined(department) ? Resources.organizationNoDepartment
+      : department.leaderId === chat.teammateId ? Resources.formatOrganizationLeader(department.name) : Resources.formatOrganizationMember(department.name);
+    const managerId = organization.managerOf(chat.teammateId);
+    const manager = teammates.find(t => t.id === managerId)?.name ?? Resources.organizationReportsToPerson;
+    return {
+      [Resources.organizationRoleField]: Resources.formatOrganizationRole(place, manager),
+      [Resources.organizationRoleTeammateIdField]: chat.teammateId
+    };
+  }
+
+  private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null,
+    signal: AbortSignal | undefined, outside: MessageSender | null = null): Promise<MessageSendResult> {
     if (!Object.isNull(params.senderToken) && !Object.isNull(params.requested) && !Object.isNull(params.requested.mode)) {
       this.requireTurn(params.senderToken);
       await this.refuseUnrestrictedAsync(params.requested, params.requested.mode, params.providerId);
     }
-    let plan = await this.planSendAsync(params, true, null, outside, queues);
+    let plan = await this.planSendAsync(params, true, null, outside);
     if (!Object.isNull(plan.origin)) {
       const shown = Object.isNull(allowed) ? await this.permissions.askSendAsync(plan.origin, await this.askOfAsync(plan), params.text, signal) : allowed.starts;
       plan = await this.planSendAsync(params, true, plan.origin);
@@ -462,16 +521,17 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       const { message, pending, wake, opening, joined, joining } = await this.context.database.connection.runInTransactionAsync(async transaction => {
         await this.requireUnmovedAsync(conversation, transaction);
         const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id, transaction)) || !Object.isNull(this.findGroup(conversation.id));
-        const joining = Object.isNull(sender) && !queues ? null : this.findGroup(conversation.id);
+        const joining = Object.isNull(sender) ? null : this.findGroup(conversation.id);
         if (busy && Object.isNull(joining))
           throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
         if (!Object.isNull(origin) && (Object.isNull(params.senderToken) || this.state.turns.get(params.senderToken) !== origin))
           throw new ServiceException(ErrorCode.Unauthorized, Resources.senderTurnEnded, []);
-        if (!Object.isNull(group) && joining !== group && !queues)
+        if (!Object.isNull(group) && joining !== group)
           throw new ServiceException(ErrorCode.Conflict, Resources.replyEndedWhileSent, [conversation.id]);
         const sequence = await this.messages.nextSequenceAsync(conversation.id, transaction);
         const opening = ConversationEngine.openingOf(conversation, sequence, params.text, attachments);
-        const question = new MessageDetail(0, DetailKind.Text, params.text, Object.isNull(prompt) ? null : { [Resources.promptField]: prompt }, now);
+        const told = Object.isNull(prompt) ? await this.organizationRoleAsync(conversation, sender ?? outside, transaction) : { [Resources.promptField]: prompt };
+        const question = new MessageDetail(0, DetailKind.Text, params.text, told, now);
         const details = String.isNullOrEmpty(params.text) ? [] : [question];
         const note = new MessageDetail(details.length, DetailKind.Note, Resources.formatChainStopped(limit), { source: Resources.handOffSource }, now);
         const message = new Message(Guid.createVersion7().toString(), conversation.id, sequence, MessageAuthor.User, null,
@@ -579,7 +639,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const now = new Date().toISOString();
     const interrupted: Message[] = [];
     const ended = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const stopped: { readonly open: Message; readonly withoutSubAgents: Message; readonly message: Message; readonly cancelled: readonly Approval[] }[] = [];
+      const stopped: StoppedReply[] = [];
       for (const open of await this.messages.listOpenAsync(transaction)) {
         const note = new MessageDetail(open.details.length, DetailKind.Note, Resources.replyInterruptedByStop, null, now);
         const withoutSubAgents = ConversationEngine.stopSubAgents(open);
@@ -589,7 +649,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
         await this.messages.updateAsync(message, transaction);
         for (const approval of cancelled)
           await this.approvals.updateAsync(approval, transaction);
-        stopped.push({ open, withoutSubAgents, message, cancelled });
+        stopped.push(new StoppedReply(open, withoutSubAgents, message, cancelled));
       }
       return stopped;
     });
@@ -601,15 +661,15 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       interrupted.push(message);
     }
     const left = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const stopped: (readonly [Message, Message])[] = [];
+      const stopped: StoppedSubAgents[] = [];
       for (const running of await this.messages.listWithRunningSubAgentsAsync(transaction)) {
         const message = ConversationEngine.stopSubAgents(running);
         await this.messages.updateAsync(message, transaction);
-        stopped.push([running, message]);
+        stopped.push(new StoppedSubAgents(running, message));
       }
       return stopped;
     });
-    for (const [running, message] of left) {
+    for (const { running, message } of left) {
       this.publishStopped(running, message);
       this.events.publish(new Event(EventName.MessageUpdated, message.toJson()));
     }
@@ -631,8 +691,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     }
     for (const wake of await this.wakes.listAsync(ChatWakeState.Waiting))
       await this.settleSafelyAsync(wake.chatId, async () => {
-        const [text, end] = await this.lostOfAsync(wake);
-        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, text, null), end);
+        const lost = await this.lostOfAsync(wake);
+        await this.deliverWakeAsync(wake.settled(ChatWakeState.Ready, lost.text, null), lost.end);
       });
     for (const conversationId of unsent)
       await this.permissions.sendAnswersAsync(conversationId);
@@ -649,6 +709,28 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
 
   public releaseFolderAsync(conversationId: string): Promise<void> {
     return this.keptSessions.releaseFolderAsync(conversationId);
+  }
+
+  public async requireNothingRunningAsync(conversationId: string, change: string): Promise<void> {
+    const running = await this.runningWorkAsync(conversationId);
+    if (running.length > 0)
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatChatWorkRunning(change, running), [conversationId]);
+  }
+
+  private async runningWorkAsync(conversationId: string): Promise<readonly string[]> {
+    const tasks = await this.runningTasksAsync(conversationId);
+    let kept = false;
+    for (const [messageId, run] of this.state.runs) {
+      const message = run.isOpen && !tasks.some(t => t.messageId === messageId) ? await this.messages.findAsync(messageId) : null;
+      kept ||= message?.conversationId === conversationId && !Object.isNull(message.endedAt);
+    }
+    return [...tasks.map(t => Object.isNull(t.subAgentId) ? Resources.formatRunningCommand(t.command) : Resources.formatRunningHelper(t.command)),
+      ...(kept ? [Resources.runningReplyWork] : [])];
+  }
+
+  private async runningTasksAsync(chatId: string): Promise<readonly BackgroundTask[]> {
+    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
+    return listed.filter(t => t.status === BackgroundTaskStatus.Running);
   }
 
   public sweepFoldersAsync(signal: AbortSignal): Promise<void> {
@@ -950,24 +1032,24 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return Object.isUndefined(item) || Object.isNull(provenance) ? null : new TitleModel(item.provider, provenance.requested.kind, provenance.requested.model);
   }
 
-  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null, outside: MessageSender | null = null,
-    queues: boolean = false): Promise<SendPlan> {
+  private async planSendAsync(params: MessageSendParams, prepare: boolean, allowedFor: ReplyWork | null = null,
+    outside: MessageSender | null = null): Promise<SendPlan> {
     const conversation = await this.requireConversationAsync(params.conversationId);
     const folder = await this.requireWorkFolderAsync(conversation, prepare);
     const origin = Object.isNull(params.senderToken) ? null : allowedFor ?? this.requireTurn(params.senderToken);
     const sender = Object.isNull(origin) ? null : await this.senderOfAsync(origin);
     const group = this.findGroup(conversation.id);
     const busy = !Object.isNull(await this.messages.findOpenReplyAsync(conversation.id)) || !Object.isNull(group);
-    if (busy && (Object.isNull(group) || (Object.isNull(sender) && !queues)))
+    if (busy && (Object.isNull(group) || Object.isNull(sender)))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
 
     const mentions: Teammate[] = [];
     for (const id of new Set(params.mentionedTeammateIds))
       mentions.push(await this.requireTeammateAsync(id));
     const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
-    const resolved = !Object.isNull(outside) ? [] : Object.isNull(sender) ? MentionResolver.resolve(params.text, available)
-      : MentionResolver.resolveTeammateText(params.text, available);
-    if (resolved.length !== mentions.length || resolved.some((t, index) => t.teammateId !== mentions[index]?.id))
+    const matches = !Object.isNull(outside) ? mentions.length === 0
+      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender));
+    if (!matches)
       throw new ServiceException(ErrorCode.Conflict, Resources.mentionsChanged, []);
     const called = Object.isNull(sender) ? mentions : mentions.filter(t => t.id !== sender.teammateId);
     const responder = called.length > 0 || Object.isNull(params.responderTeammateId) ? null : await this.requireTeammateAsync(params.responderTeammateId);
@@ -977,8 +1059,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       throw new ServiceException(ErrorCode.InvalidParams, Resources.formatMemberNotFound(conversation.id, responder.id), [conversation.id, responder.id]);
     const byChoice = called.length === 0 && !Object.isNull(sender) && Object.isNull(responder) && Object.isNull(params.requested);
     const usable = byChoice ? await this.usableResponderOfAsync(conversation, sender) : null;
-    const choice = usable?.[0] ?? null;
-    const participants = called.length > 0 ? called : answersItself ? [] : !byChoice ? [responder] : Object.isNull(usable) ? [] : [usable[1]];
+    const choice = usable?.responder ?? null;
+    const participants = called.length > 0 ? called : answersItself ? [] : !byChoice ? [responder] : Object.isNull(usable) ? [] : [usable.teammate];
     const requested = choice?.requested ?? params.requested;
     const providerId = Object.isNull(choice) ? params.providerId : choice.providerId;
     if (Object.isNull(sender) && Object.isNull(providerId) && !Object.isNull(requested) && participants.includes(null))
@@ -1005,19 +1087,19 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       starts.length === 0 ? Resources.sendStartsNoOne : starts.join(Resources.sendStartsSeparator));
   }
 
-  private async usableResponderOfAsync(conversation: Conversation, sender: MessageSender): Promise<readonly [ConversationResponder, Teammate | null] | null> {
+  private async usableResponderOfAsync(conversation: Conversation, sender: MessageSender): Promise<UsableResponder | null> {
     const chosen = conversation.responder;
     if (Object.isNull(chosen))
       return null;
     if (!Object.isNull(chosen.teammateId)) {
       const teammate = await this.teammates.findAsync(chosen.teammateId);
       return chosen.teammateId === sender.teammateId || Object.isNull(teammate)
-        || Object.isNull(await this.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, chosen.teammateId))) ? null : [chosen, teammate];
+        || Object.isNull(await this.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, chosen.teammateId))) ? null : new UsableResponder(chosen, teammate);
     }
-    const kind = chosen.requested!.kind;
+    const kind = chosen.requested?.kind;
     const provider = Object.isNull(chosen.providerId) ? null : await this.providers.findAsync(chosen.providerId);
-    return (Object.isNull(sender.teammateId) && sender.conversationId === conversation.id) || !this.registry.has(kind)
-      || provider?.kind !== kind || provider?.enabled !== true ? null : [chosen, null];
+    return Object.isUndefined(kind) || (Object.isNull(sender.teammateId) && sender.conversationId === conversation.id) || !this.registry.has(kind)
+      || provider?.kind !== kind || provider?.enabled !== true ? null : new UsableResponder(chosen, null);
   }
 
   private async requireTeammateAsync(id: string, transaction?: SqlTransaction): Promise<Teammate> {
@@ -1065,8 +1147,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private async capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean> {
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(chatId));
-    if (!listed.some(t => t.status === BackgroundTaskStatus.Running))
+    if ((await this.runningTasksAsync(chatId)).length === 0)
       return false;
     for (const provider of await this.providers.listAsync())
       if (provider.id === teammate.providerId && this.registry.has(provider.kind)
@@ -1090,7 +1171,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   }
 
   private static isJsonObject(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private async startedRequestedAsync(reply: Message, transaction?: SqlTransaction): Promise<RequestedSettings> {
@@ -1105,12 +1186,24 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       .withPlanFirst(planFirst);
   }
 
+  private async wakeRequestedAsync(source: Message, requested: RequestedSettings, transaction?: SqlTransaction): Promise<RequestedSettings> {
+    const mode = Object.isNull(source.teammateId) ? await this.responderModeAsync(source.conversationId, requested, transaction)
+      : (await this.startedRequestedAsync(source, transaction)).mode;
+    return mode === requested.mode ? requested
+      : new RequestedSettings(requested.kind, requested.model, requested.effort, requested.speed, mode, requested.planFirst, requested.contextWindow);
+  }
+
+  private async responderModeAsync(conversationId: string, requested: RequestedSettings, transaction?: SqlTransaction): Promise<string | null> {
+    const chosen = (await this.conversations.findAsync(conversationId, transaction))?.responder?.requested ?? null;
+    return Object.isNull(chosen) || chosen.kind !== requested.kind ? requested.mode : chosen.mode;
+  }
+
   private async plansFirstAsync(conversationId: string, kind: string, teammateId: string | null, transaction?: SqlTransaction): Promise<boolean> {
     return (await this.conversations.findAsync(conversationId, transaction))?.plansFirst(teammateId) === true
       && !String.isNullOrWhitespace(this.registry.get(kind).planMode ?? null);
   }
 
-  private async toolModeOfAsync(open: { readonly reply: Message; readonly mode: ProviderMode | null }): Promise<ProviderMode | null> {
+  private async toolModeOfAsync(open: ReplyMode): Promise<ProviderMode | null> {
     const requested = await this.startedRequestedAsync(open.reply);
     const chosen = Object.isNull(open.reply.teammateId) ? this.chosenModes.get(open.reply.conversationId)?.get(requested.kind) : undefined;
     const current = chosen ?? this.modeIn(requested);
@@ -1166,50 +1259,16 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
 
   private async handOffAsync(item: ReplyWork, work: ReplyWork[]): Promise<void> {
     const handed = await this.context.database.connection.runInTransactionAsync(async transaction => {
-      const finished = await this.messages.findAsync(item.message.id, transaction);
-      if (Object.isNull(finished) || Object.isNull(finished.teammateId) || finished.status !== MessageStatus.Completed || item.run.isCancelled)
+      const found = await this.messages.findAsync(item.message.id, transaction);
+      if (Object.isNull(found))
         return null;
-      const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
-      const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
-      const mentions = MentionResolver.resolveTeammateText(text, available);
-      if (mentions.length === 0)
-        return null;
-      const skipped = new Set([finished.teammateId, item.trigger.sender?.teammateId, ...item.sentTo]);
-      const others: Teammate[] = [];
-      for (const addressed of MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId)))
-        others.push((await this.teammates.findAsync(addressed.teammateId, transaction))!);
-      const limit = this.readHopLimit();
-      const stopped = others.length > 0 && item.hop >= limit;
-      const now = new Date().toISOString();
-      const stored = stopped
-        ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, Resources.formatChainStopped(limit),
-          { source: Resources.handOffSource }, now))
-        : finished.withMentions(mentions);
-      const sequence = await this.messages.nextSequenceAsync(finished.conversationId, transaction);
-      const pending: ReplyWork[] = [];
-      const waiting: ReplyWork[] = [];
-      for (const teammate of stopped ? [] : others) {
-        const open = work.find(t => t.message.teammateId === teammate.id && !t.isEnded && Object.isNull(t.wake));
-        if (!Object.isUndefined(open)) {
-          waiting.push(open);
-          continue;
-        }
-        const next = await this.prepareReplyAsync(teammate, null, null, stored, sequence + pending.length, now, item.hop + 1, item.chain, null, transaction);
-        if (!Object.isNull(next))
-          pending.push(next);
-      }
-      let joined = false;
-      for (const teammate of stopped ? [] : others) {
-        const member = new ConversationMemberParams(finished.conversationId, teammate.id);
-        if (Object.isNull(await this.conversations.findMemberAsync(member, transaction))) {
-          await this.conversations.addMemberAsync(member, transaction);
-          joined = true;
-        }
-      }
-      await this.messages.updateAsync(stored, transaction);
-      for (const next of pending)
-        await this.messages.insertAsync(next.message, transaction);
-      return { stored, pending, waiting, joined };
+      const finished = item.run.isStoppedAfterTurn && found.status === MessageStatus.Completed
+        ? found.withStatus(MessageStatus.Cancelled, new Date().toISOString()) : found;
+      const handed = await this.handOffOfAsync(item, work, finished, transaction);
+      if (!Object.isNull(handed) || finished === found)
+        return handed;
+      await this.messages.updateAsync(finished, transaction);
+      return new HandOffResult(finished, [], [], false);
     });
     if (Object.isNull(handed))
       return;
@@ -1227,6 +1286,56 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       this.events.publish(new Event(EventName.MessageCreated, next.message.toJson()));
     if (joined)
       this.events.publish(new Event(EventName.StateInvalidated, null));
+  }
+
+  private async handOffOfAsync(item: ReplyWork, work: ReplyWork[], finished: Message, transaction: SqlTransaction)
+    : Promise<HandOffResult | null> {
+    if (Object.isNull(finished.teammateId))
+      return null;
+    const halted = item.run.isCancelled;
+    if (finished.status !== MessageStatus.Completed && !halted)
+      return null;
+    const text = finished.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join(Resources.lineSeparator);
+    const teammates = await this.teammates.listAsync(transaction);
+    const available = teammates.map(t => new TeammateMention(t.id, t.name));
+    const mentions = MentionResolver.resolveTeammateText(text, available);
+    if (mentions.length === 0)
+      return null;
+    const skipped = new Set([finished.teammateId, item.trigger.sender?.teammateId, ...item.sentTo]);
+    const others = MentionResolver.resolveAddressed(text, available).filter(t => !skipped.has(t.teammateId))
+      .flatMap(t => teammates.filter(u => u.id === t.teammateId));
+    const limit = this.readHopLimit();
+    const stopped = others.length > 0 && (halted || item.hop >= limit);
+    const now = new Date().toISOString();
+    const note = halted ? Resources.formatHandOffStopped(others.map(t => t.name)) : Resources.formatChainStopped(limit);
+    const stored = stopped
+      ? finished.withMentions(mentions).withDetail(new MessageDetail(finished.details.length, DetailKind.Note, note, { source: Resources.handOffSource }, now))
+      : finished.withMentions(mentions);
+    const sequence = await this.messages.nextSequenceAsync(finished.conversationId, transaction);
+    const pending: ReplyWork[] = [];
+    const waiting: ReplyWork[] = [];
+    for (const teammate of stopped ? [] : others) {
+      const open = work.find(t => t.message.teammateId === teammate.id && !t.isEnded && Object.isNull(t.wake));
+      if (!Object.isUndefined(open)) {
+        waiting.push(open);
+        continue;
+      }
+      const next = await this.prepareReplyAsync(teammate, null, null, stored, sequence + pending.length, now, item.hop + 1, item.chain, null, transaction);
+      if (!Object.isNull(next))
+        pending.push(next);
+    }
+    let joined = false;
+    for (const teammate of stopped ? [] : others) {
+      const member = new ConversationMemberParams(finished.conversationId, teammate.id);
+      if (Object.isNull(await this.conversations.findMemberAsync(member, transaction))) {
+        await this.conversations.addMemberAsync(member, transaction);
+        joined = true;
+      }
+    }
+    await this.messages.updateAsync(stored, transaction);
+    for (const next of pending)
+      await this.messages.insertAsync(next.message, transaction);
+    return new HandOffResult(stored, pending, waiting, joined);
   }
 
   private async isIdleAsync(chatId: string, transaction?: SqlTransaction, held: boolean = false): Promise<boolean> {
@@ -1385,117 +1494,140 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async executeRepliesAsync(work: ReplyWork[], folder: WorkFolder): Promise<void> {
     const context = new ParticipantContext(this.messages, this.teammates, this.conversations);
     let checked: Promise<FolderState> | null = null;
+    const failures: unknown[] = [];
     try {
       for (let index = 0; index < work.length; index++) {
         const item = work[index]!;
         const reply = item.message;
-        if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
-          const conversation = await this.conversations.findAsync(reply.conversationId);
-          checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
-          await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
-        }
-        if (item.run.isCancelled)
-          await this.stopAsync(item);
-        if (item.isEnded) {
-          this.releaseWake(item);
-          continue;
-        }
-        this.replyHops.set(reply.conversationId, (this.replyHops.get(reply.conversationId) ?? new Map<string, number>()).set(reply.id, item.hop));
-        item.start();
-        if (!Object.isNull(item.wake)) {
-          await (this.followed.get(item) ?? this.followWithToolsAsync(item, item.wake, folder));
-          this.followed.delete(item);
-          this.releaseWake(item);
+        try {
+          if (!item.run.isCancelled && !item.isEnded && Object.isNull(item.wake)) {
+            const conversation = await this.conversations.findAsync(reply.conversationId);
+            checked ??= this.projects.checkFolderAsync(folder.path, conversation?.projectId ?? null);
+            await this.failIfUnableAsync(item, folder, await checked, !Object.isNullOrUndefined(conversation?.attachedFolder));
+          }
+          if (item.run.isCancelled)
+            await this.stopAsync(item);
+          if (item.isEnded) {
+            this.releaseWake(item);
+            continue;
+          }
+          this.replyHops.set(reply.conversationId, (this.replyHops.get(reply.conversationId) ?? new Map<string, number>()).set(reply.id, item.hop));
+          item.start();
+          if (!Object.isNull(item.wake)) {
+            await (this.followed.get(item) ?? this.followWithToolsAsync(item, item.wake, folder));
+            this.followed.delete(item);
+            this.releaseWake(item);
+            await this.handOffAsync(item, work);
+            item.end();
+            continue;
+          }
+          if (await this.handOffUsageAsync(item, work, index))
+            continue;
+          const conversation = (await this.conversations.findAsync(reply.conversationId))!;
+          const member = Object.isNull(reply.teammateId) ? null
+            : await this.conversations.findMemberAsync(new ConversationMemberParams(reply.conversationId, reply.teammateId));
+          const { sustained, requested, handover, posted, kept } = await this.movedOfAsync(item, member, context);
+          const fork = Object.isNull(reply.teammateId) ? conversation.forkedSession : null;
+          const useFork = !Object.isNull(fork) && fork.matches(requested.kind, item.provider?.id ?? null);
+          const resume = Object.isNull(reply.teammateId)
+            ? (conversation.sessionReset ? null : useFork ? fork.nativeSessionId
+              : await this.messages.findResumableSessionAsync(reply.conversationId, requested.kind, item.provider?.id ?? null))
+            : !Object.isNull(kept) ? kept : Object.isNull(item.continued) ? await this.sessionOnAsync(member, item.provider) : null;
+          const freshPrompt = Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, null, false, item.handOffs)
+            : await context.createAsync(item.continued, item.trigger, null, false, item.handOffs) + Resources.transcriptSeparator
+              + Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
+          const prompt = Object.isNull(resume) ? handover?.text ?? freshPrompt
+            : Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, resume, useFork, item.handOffs)
+              : Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
+          const command = await this.readCommand();
+          const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
+          const environment = { ...command?.environment, ...SenderEnvironment.of(token) };
+          const compacts = ParticipantContext.asksToCompact(item.trigger);
+          const slashCommand = ParticipantContext.commandOf(item.trigger);
+          const run = this.createRun(item, folder, requested, posted ?? item.message);
+          this.state.turns.set(token, item);
+          this.state.replyRuns.set(item, run);
+          const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
+          try {
+            const shared = await this.sharedOfAsync(item.provider, reply.teammateId, folder.path);
+            const descriptor = this.registry.get(requested.kind).descriptor;
+            const refusal = compacts ? descriptor.reasonAgainst(ProviderAbility.Compact) : null;
+            if (!Object.isNull(refusal))
+              await run.answerAsync(Resources.formatCompactRefused(descriptor.displayName, refusal));
+            else if (compacts && Object.isNull(resume))
+              await run.answerAsync(Resources.nothingToCompact);
+            else {
+              const adapter = this.registry.get(requested.kind);
+              const hasTools = !Object.isNull(this.tools) && adapter.takesTeamRunTools === true;
+              const instructionsOf = (tools: boolean): string => Resources.formatTeammateInstructions(item.instructions, command?.words ?? null, tools,
+                adapter.backgroundSubAgentsNote ?? null);
+              const stopped = compacts || !Object.isNull(slashCommand) ? [] : this.stoppedCommands.of(reply.conversationId, reply.teammateId);
+              const awaited = !compacts && await this.isAwaitedAsync(reply);
+              const told = (text: string): string => {
+                const asked = awaited ? `${text}${Resources.transcriptSeparator}${Resources.awaitedReplyNote}` : text;
+                return stopped.length === 0 ? asked : `${Resources.formatStoppedCommands(stopped)}${Resources.transcriptSeparator}${asked}`;
+              };
+              await run.executeAsync(adapter, new TurnRequest(item.provider, folder.path, told(prompt), requested, resume,
+                item.trigger.attachments, instructionsOf(hasTools), told(freshPrompt), environment, compacts, tools, shared.servers,
+                useFork ? fork.resumeAt : null, t => this.adoptSender(t, token), shared.values, hasTools ? instructionsOf(false) : null, false, slashCommand,
+                this.readIdleCompaction()), shared.notes, sustained?.note ?? null, Object.isNull(resume) ? this.handoverNoteOf(told(prompt), handover, item.provider) : null,
+                !Object.isNull(posted));
+              if ((await this.messages.findAsync(reply.id))?.status === MessageStatus.Completed)
+                this.stoppedCommands.told(reply.conversationId, reply.teammateId, stopped);
+            }
+          }
+          finally {
+            this.state.turns.delete(token);
+            try {
+              this.toolCalls.closeTools(tools);
+            }
+            finally {
+              try {
+                this.releaseAdopted(item);
+                await this.noteLimitAsync(item.provider, run);
+                this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
+              }
+              finally {
+                await this.forgetChildrenAsync(item);
+              }
+            }
+          }
+          if (Object.isNull(reply.teammateId) && !Object.isNullOrUndefined((await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId)) {
+            if (conversation.sessionReset)
+              await this.conversations.setSessionResetAsync(conversation.id, false);
+            if (useFork)
+              await this.conversations.setForkedSessionAsync(conversation.id, null);
+          }
+          const continuation = await this.continueAfterLimitAsync(item, run);
+          if (!Object.isNull(continuation))
+            work.splice(index + 1, 0, continuation);
           await this.handOffAsync(item, work);
           item.end();
-          continue;
         }
-        if (await this.handOffUsageAsync(item, work, index))
-          continue;
-        const conversation = (await this.conversations.findAsync(reply.conversationId))!;
-        const member = Object.isNull(reply.teammateId) ? null
-          : await this.conversations.findMemberAsync(new ConversationMemberParams(reply.conversationId, reply.teammateId));
-        const { sustained, requested, handover, posted, kept } = await this.movedOfAsync(item, member, context);
-        const fork = Object.isNull(reply.teammateId) ? conversation.forkedSession : null;
-        const useFork = !Object.isNull(fork) && fork.matches(requested.kind, item.provider?.id ?? null);
-        const resume = Object.isNull(reply.teammateId)
-          ? (conversation.sessionReset ? null : useFork ? fork.nativeSessionId
-            : await this.messages.findResumableSessionAsync(reply.conversationId, requested.kind, item.provider?.id ?? null))
-          : !Object.isNull(kept) ? kept : Object.isNull(item.continued) ? await this.sessionOnAsync(member, item.provider) : null;
-        const freshPrompt = Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, null, false, item.handOffs)
-          : await context.createAsync(item.continued, item.trigger, null, false, item.handOffs) + Resources.transcriptSeparator
-            + Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
-        const prompt = Object.isNull(resume) ? handover?.text ?? freshPrompt
-          : Object.isNull(item.continued) ? await context.createAsync(reply, item.trigger, resume, useFork, item.handOffs)
-            : Resources.formatSustainContinued(ConversationEngine.writtenOf(item.continued));
-        const command = await this.readCommand();
-        const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
-        const environment = { ...command?.environment, ...SenderEnvironment.of(token) };
-        const compacts = ParticipantContext.asksToCompact(item.trigger);
-        const slashCommand = ParticipantContext.commandOf(item.trigger);
-        const run = this.createRun(item, folder, requested, posted ?? item.message);
-        this.state.turns.set(token, item);
-        this.state.replyRuns.set(item, run);
-        const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
-        try {
-          const shared = await this.sharedOfAsync(item.provider, reply.teammateId, folder.path);
-          const descriptor = this.registry.get(requested.kind).descriptor;
-          const refusal = compacts ? descriptor.reasonAgainst(ProviderAbility.Compact) : null;
-          if (!Object.isNull(refusal))
-            await run.answerAsync(Resources.formatCompactRefused(descriptor.displayName, refusal));
-          else if (compacts && Object.isNull(resume))
-            await run.answerAsync(Resources.nothingToCompact);
-          else {
-            const adapter = this.registry.get(requested.kind);
-            const hasTools = !Object.isNull(this.tools) && adapter.takesTeamRunTools === true;
-            const instructionsOf = (tools: boolean): string => Resources.formatTeammateInstructions(item.instructions, command?.words ?? null, tools,
-              adapter.backgroundSubAgentsNote ?? null);
-            const stopped = compacts || !Object.isNull(slashCommand) ? [] : this.stoppedCommands.of(reply.conversationId, reply.teammateId);
-            const awaited = !compacts && await this.isAwaitedAsync(reply);
-            const told = (text: string): string => {
-              const asked = awaited ? `${text}${Resources.transcriptSeparator}${Resources.awaitedReplyNote}` : text;
-              return stopped.length === 0 ? asked : `${Resources.formatStoppedCommands(stopped)}${Resources.transcriptSeparator}${asked}`;
-            };
-            await run.executeAsync(adapter, new TurnRequest(item.provider, folder.path, told(prompt), requested, resume,
-              item.trigger.attachments, instructionsOf(hasTools), told(freshPrompt), environment, compacts, tools, shared.servers,
-              useFork ? fork.resumeAt : null, t => this.adoptSender(t, token), shared.values, hasTools ? instructionsOf(false) : null, false, slashCommand,
-              this.readIdleCompaction()), shared.notes, sustained?.note ?? null, Object.isNull(resume) ? this.handoverNoteOf(told(prompt), handover, item.provider) : null,
-              !Object.isNull(posted));
-            if ((await this.messages.findAsync(reply.id))?.status === MessageStatus.Completed)
-              this.stoppedCommands.told(reply.conversationId, reply.teammateId, stopped);
+        catch (error) {
+          this.followed.delete(item);
+          this.releaseWake(item);
+          failures.push(error);
+          try {
+            await this.failPendingRepliesAsync([item], error);
+          }
+          catch (unwritten) {
+            failures.push(unwritten);
+          }
+          finally {
+            item.end();
           }
         }
-        finally {
-          this.state.turns.delete(token);
-          this.releaseAdopted(item);
-          await this.noteLimitAsync(item.provider, run);
-          this.keptSessions.noteSession(reply.conversationId, requested.kind, (await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId);
-          await this.forgetChildrenAsync(item);
-          this.toolCalls.closeTools(tools);
-        }
-        if (Object.isNull(reply.teammateId) && !Object.isNullOrUndefined((await this.messages.findAsync(reply.id))?.provenance?.nativeSessionId)) {
-          if (conversation.sessionReset)
-            await this.conversations.setSessionResetAsync(conversation.id, false);
-          if (useFork)
-            await this.conversations.setForkedSessionAsync(conversation.id, null);
-        }
-        const continuation = await this.continueAfterLimitAsync(item, run);
-        if (!Object.isNull(continuation))
-          work.splice(index + 1, 0, continuation);
-        await this.handOffAsync(item, work);
-        item.end();
       }
-    }
-    catch (error) {
-      await this.failPendingRepliesAsync(work, error);
-      throw error;
+      if (failures.length > 0)
+        throw failures[0];
     }
     finally {
       this.closeGroup(work);
     }
   }
 
-  private async sustainedAsync(item: ReplyWork, carry: SessionCarry | null): Promise<{ readonly requested: RequestedSettings; readonly note: string | null } | null> {
+  private async sustainedAsync(item: ReplyWork, carry: SessionCarry | null): Promise<SustainedSettings | null> {
     const reply = item.message;
     const teammate = Object.isNull(reply.teammateId) ? null : await this.teammates.findAsync(reply.teammateId);
     if (Object.isNull(teammate) || !teammate.sustain)
@@ -1512,8 +1644,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       return null;
     if (entry === own) {
       const started = await this.startedRequestedAsync(reply);
-      return { requested: started, note: await this.sustain.isOutAsync(teammate) ? null
-        : Resources.formatSustainReturned(this.kindNameOf(provider), provider.label, started.model) };
+      return new SustainedSettings(started, await this.sustain.isOutAsync(teammate) ? null
+        : Resources.formatSustainReturned(this.kindNameOf(provider), provider.label, started.model));
     }
     const mode = await this.chatModeOfAsync(teammate, provider.kind, reply.conversationId, await this.answersOutsideAsync(reply));
     const requested = new RequestedSettings(provider.kind, entry.model, entry.effort, null, mode, false, null)
@@ -1521,12 +1653,10 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const left = await this.providers.findAsync(from ?? own.providerId);
     const note = from === entry.providerId || Object.isNull(left) ? null
       : ConversationEngine.movedNoteOf(carry, this.kindNameOf(provider), provider.label, entry.model, left.label);
-    return { requested, note };
+    return new SustainedSettings(requested, note);
   }
 
-  private async movedOfAsync(item: ReplyWork, member: ConversationMember | null, context: ParticipantContext): Promise<{
-    readonly sustained: { readonly requested: RequestedSettings; readonly note: string | null } | null; readonly requested: RequestedSettings;
-    readonly handover: HandoverPrompt | null; readonly posted: Message | null; readonly kept: string | null; }> {
+  private async movedOfAsync(item: ReplyWork, member: ConversationMember | null, context: ParticipantContext): Promise<MovedSettings> {
     let summary: Promise<ChatSummary | null> | null = null;
     let posted: Message | null = null;
     for (;;) {
@@ -1537,19 +1667,19 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       const teammateId = reply.teammateId;
       if (Object.isNull(teammateId) || Object.isNull(provider) || (Object.isNull(first) && Object.isNull(item.continued))
         || (Object.isNull(item.continued) && !Object.isNull(await this.sessionOnAsync(member, provider))))
-        return { sustained: first, requested, handover: null, posted, kept: null };
+        return new MovedSettings(first, requested, null, posted, null);
       const carried = await this.carryOfAsync(member, provider);
       const sustained = Object.isNull(carried) ? first : await this.sustainedAsync(item, carried.carry);
       const note = sustained?.note ?? null;
       if (carried?.carry === SessionCarry.Carried)
-        return { sustained, requested, handover: null, posted, kept: carried.sessionId };
+        return new MovedSettings(sustained, requested, null, posted, carried.sessionId);
       summary ??= await context.compactedAsync(reply, item.continued) ? this.summaryOfAsync(item, teammateId, member, provider, requested, context, async () => {
         posted = await this.postMovedAsync(reply, note);
       }) : Promise.resolve(null);
       const handover = await context.createHandoverAsync(reply, item.trigger, item.continued, item.handOffs,
         await this.messages.findWindowTokensAsync(provider.id, requested.model), item.instructions, await summary);
       if (!Object.isNull(handover) || await this.triedElseRecordNoRoomAsync(item, teammateId, provider.id))
-        return { sustained, requested, handover, posted, kept: null };
+        return new MovedSettings(sustained, requested, handover, posted, null);
     }
   }
 
@@ -1684,7 +1814,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     return Resources.formatSustainMoved(kind, label, model, from);
   }
 
-  private async carryOfAsync(member: ConversationMember | null, provider: Provider): Promise<{ readonly carry: SessionCarry; readonly sessionId: string } | null> {
+  private async carryOfAsync(member: ConversationMember | null, provider: Provider): Promise<CarriedSession | null> {
     if (Object.isNull(member) || Object.isNull(member.nativeSessionId))
       return null;
     const session = member.nativeSessionId;
@@ -1694,7 +1824,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     if (Object.isUndefined(from) || from.id === provider.id || from.kind !== provider.kind || !adapter.descriptor.carriesSessions
       || Object.isUndefined(adapter.carrySession))
       return null;
-    return { carry: await adapter.carrySession(from, provider, session), sessionId: session };
+    return new CarriedSession(await adapter.carrySession(from, provider, session), session);
   }
 
   private async accountOfSessionAsync(member: ConversationMember): Promise<string | undefined> {
@@ -1815,8 +1945,9 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     };
     const note = new MessageDetail(0, DetailKind.Note, wake.compaction ? Resources.idleCompactionNote : Resources.formatWakeNote(wake.command), payload, now);
     const token = randomBytes(Resources.senderTokenBytes).toString("base64url");
-    const turn = new WakeTurn(SenderEnvironment.of(token), await this.plansFirstAsync(source.conversationId, provenance.requested.kind, source.teammateId),
-      t => this.adoptSender(t, token));
+    const requested = await this.wakeRequestedAsync(source, provenance.requested);
+    const turn = new WakeTurn(SenderEnvironment.of(token), await this.plansFirstAsync(source.conversationId, requested.kind, source.teammateId),
+      t => this.adoptSender(t, token), requested.mode);
     const hop = this.replyHops.get(source.conversationId)?.get(source.id);
     if (Object.isUndefined(hop) || this.state.closing)
       return null;
@@ -1832,7 +1963,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
         return null;
       const created = new Message(Guid.createVersion7().toString(), source.conversationId, await this.messages.nextSequenceAsync(source.conversationId, transaction),
         MessageAuthor.Provider, source.id, MessageStatus.Pending, [note],
-        new Provenance(provider?.id ?? null, provenance.requested, new ObservedSettings(null, null, null, null), null, false),
+        new Provenance(provider?.id ?? null, requested, new ObservedSettings(null, null, null, null), null, false),
         now, null, null, [], teammate?.id ?? null, teammate?.name ?? null);
       await this.messages.insertAsync(created, transaction);
       return created;
@@ -1866,8 +1997,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
   private async compactsWhenIdleAsync(conversation: Conversation): Promise<boolean> {
     if (!this.readIdleCompaction() || conversation.sessionReset || !await this.isIdleAsync(conversation.id))
       return false;
-    const listed = Object.isNull(this.tasks) ? [] : await this.tasks.listAsync(new ConversationIdParams(conversation.id));
-    return !listed.some(t => t.status === BackgroundTaskStatus.Running);
+    return (await this.runningTasksAsync(conversation.id)).length === 0;
   }
 
   private runGroup(key: string, work: ReplyWork[], folder: WorkFolder, lease: string): void {
@@ -1913,6 +2043,10 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const folders = this.context.chatFolders;
     if (!Object.isNull(conversation.attachedFolder))
       return WorkFolder.attached(conversation.attachedFolder);
+    const folder = Object.isNull(conversation.organizationChat) || !Object.isNull(conversation.projectId) ? null
+      : (await this.organization.findAsync(conversation.organizationChat.organizationId, transaction))?.folder ?? null;
+    if (!Object.isNull(folder))
+      return WorkFolder.attached(folder);
     if (Object.isNull(conversation.projectId))
       return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
     const project = await this.projects.findAsync(conversation.projectId, transaction);
@@ -1933,14 +2067,18 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     this.state.replyRuns.set(item, run);
     for (const resume of this.state.runWaits.get(item) ?? [])
       resume();
-    await wake.useToolsAsync(tools);
     try {
+      await wake.useToolsAsync(tools);
       await this.messages.setCheckpointFolderAsync(item.message.id, folder.id);
       await run.followAsync(wake);
     }
     finally {
-      await this.forgetChildrenAsync(item);
-      this.toolCalls.closeTools(tools);
+      try {
+        this.toolCalls.closeTools(tools);
+      }
+      finally {
+        await this.forgetChildrenAsync(item);
+      }
     }
   }
 
@@ -1975,7 +2113,7 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
           return null;
         const now = new Date().toISOString();
         const note = new MessageDetail(current.details.length, DetailKind.Error, error instanceof Error ? error.message : String(error), null, now);
-        const ended = current.withDetail(note).withStatus(MessageStatus.Failed, now);
+        const ended = current.withDetail(note).withStatus(item.run.isCancelled ? MessageStatus.Cancelled : MessageStatus.Failed, now);
         await this.messages.updateAsync(ended, transaction);
         return ended;
       });
@@ -2262,10 +2400,13 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     const teammate = Object.isNull(source.teammateId) ? null : await this.teammates.findAsync(source.teammateId, transaction);
     let work: ReplyWork | null;
     try {
-      work = await this.prepareReplyAsync(teammate, provenance.requested, provenance.providerId, trigger, sequence, createdAt, hop, null, null, transaction);
+      work = await this.prepareReplyAsync(teammate, await this.wakeRequestedAsync(source, provenance.requested, transaction), provenance.providerId, trigger,
+        sequence, createdAt, hop, null, null, transaction);
     }
     catch (error) {
-      return Resources.formatWakeProviderRefused((error as Error).message);
+      if (!(error instanceof ServiceException))
+        throw error;
+      return Resources.formatWakeProviderRefused(error.message);
     }
     if (Object.isNull(work))
       return Resources.wakeProviderUnavailable;
@@ -2314,16 +2455,16 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
       .join(Resources.transcriptSeparator);
   }
 
-  private async lostOfAsync(wake: ChatWake): Promise<readonly [string, string]> {
+  private async lostOfAsync(wake: ChatWake): Promise<LostWake> {
     switch (wake.kind) {
       case ChatWakeKind.SubAgent:
-        return [Resources.formatSubAgentWakeLost(wake.watchedIds[0]!), ProtocolResources.wakeLostEnd];
+        return new LostWake(Resources.formatSubAgentWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd);
       case ChatWakeKind.Command:
-        return [Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd];
+        return new LostWake(Resources.formatCommandWakeLost(wake.watchedIds.join(Resources.listSeparator)), ProtocolResources.wakeLostEnd);
       case ChatWakeKind.Reply: {
         const watched = await this.conversations.findAsync(wake.watchedChatId);
-        return Object.isNull(watched) ? [Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd]
-          : [Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd];
+        return Object.isNull(watched) ? new LostWake(Resources.formatWakeChatDeleted(wake.watchedChatId), ProtocolResources.wakeChatDeletedEnd)
+          : new LostWake(Resources.formatWakeLost(watched.title, wake.watchedChatId), ProtocolResources.wakeLostEnd);
       }
     }
   }

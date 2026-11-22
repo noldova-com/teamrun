@@ -12,6 +12,7 @@ import { ApprovalAsk, type ITurnListener, QuestionAsk, TurnDetail, TurnOutcome }
 import { ApprovalKind, ApprovalOption, ApprovalOutcome, ApprovalQuestion, ApprovalScope, ContextUsage, DetailKind, type QuestionAnswer, QuestionOption,
   ReplyUsage, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
+import { InvalidOperationException } from "../../exceptions/invalid-operation.exception.js";
 import { Resources } from "../../resources.js";
 import type { DeltaStream } from "../delta-stream.js";
 import { FailureDescriber } from "../failure-describer.js";
@@ -35,7 +36,7 @@ export class PiTurn {
   private currentOutcome: TurnOutcome | null = null;
   private currentError: string | null = null;
   private work: Promise<void> = Promise.resolve();
-  private failure: { readonly error: unknown } | null = null;
+  private failures: unknown[] = [];
 
   public constructor(listener: ITurnListener, stream: DeltaStream, reply: (message: JsonObject) => void, approvedTools: readonly string[] = []) {
     this.listener = listener;
@@ -45,6 +46,12 @@ export class PiTurn {
   }
 
   public get outcome(): TurnOutcome | null {
+    return this.currentOutcome;
+  }
+
+  public get settledOutcome(): TurnOutcome {
+    if (Object.isNull(this.currentOutcome))
+      throw new InvalidOperationException(Resources.turnNotSettled);
     return this.currentOutcome;
   }
 
@@ -70,10 +77,10 @@ export class PiTurn {
       work = this.work;
       await work;
     } while (work !== this.work);
-    const failure = this.failure;
-    this.failure = null;
-    if (!Object.isNull(failure))
-      throw failure.error;
+    const failures = this.failures;
+    this.failures = [];
+    if (failures.length > 0)
+      throw failures[0];
   }
 
   public finishAsync(): Promise<void> {
@@ -97,7 +104,7 @@ export class PiTurn {
 
   private enqueue(work: () => Promise<void>): void {
     this.work = this.work.then(work).catch((error: unknown) => {
-      this.failure ??= { error };
+      this.failures.push(error);
     });
   }
 

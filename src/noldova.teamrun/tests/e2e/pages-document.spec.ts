@@ -75,27 +75,27 @@ test("a page a teammate shows opens as its own document with the page in its vie
     await expect.poll(shownText, TeamRunApp.pollOf(60_000)).toEqual(["Draft"]);
     await testInfo.attach("page-document", { body: await page.screenshot(), contentType: "image/png" });
 
-    await page.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    await TeamRunApp.showTabAsync(page, "Onboarding");
     await expect(panel.getByRole("combobox", { name: "Message", exact: true })).toBeEditable();
     await app.sendAsync(`${CodexDouble.EDIT_PAGE_PREFIX}Draft => Final`);
 
-    await page.getByRole("tab", { name: CodexDouble.PAGE_TITLE, exact: true }).click({ timeout: 60_000 });
+    await TeamRunApp.showTabAsync(page, CodexDouble.PAGE_TITLE);
     await expect(pageDocument.locator(".nol-teamrun-page-bar-message")).toHaveText(/^\S.* updated this page to v2 just now\.$/u, { timeout: 60_000 });
     await expect(pageDocument.locator(".nol-teamrun-page-authors")).toHaveText(/^v2 · Made by \S/u);
     await expect.poll(shownText, TeamRunApp.pollOf(60_000)).toEqual(["Final"]);
     await testInfo.attach("page-updated", { body: await page.screenshot(), contentType: "image/png" });
 
     writeFileSync(path.join(folder, "options.html"), "<!doctype html><title>Options</title><h1>Shown again</h1>");
-    await page.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    await TeamRunApp.showTabAsync(page, "Onboarding");
     await expect(panel.getByRole("combobox", { name: "Message", exact: true })).toBeEditable();
     await app.submitAsync(`${CodexDouble.RESHOW_PAGE_PREFIX}options.html`);
 
-    await page.getByRole("tab", { name: CodexDouble.PAGE_TITLE, exact: true }).click({ timeout: 60_000 });
+    await TeamRunApp.showTabAsync(page, CodexDouble.PAGE_TITLE);
     await expect(pageDocument.locator(".nol-teamrun-page-bar-message")).toHaveText(/^\S.* updated this page to v3 just now\.$/u, { timeout: 60_000 });
     await expect.poll(shownText, TeamRunApp.pollOf(60_000)).toEqual(["Shown again"]);
 
     writeFileSync(path.join(folder, "sandbox.html"), SANDBOX_PAGE);
-    await page.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    await TeamRunApp.showTabAsync(page, "Onboarding");
     await expect(panel.getByRole("combobox", { name: "Message", exact: true })).toBeEditable();
     await app.submitAsync(`${CodexDouble.PAGE_PREFIX}sandbox.html`);
     const sandboxText = (): Promise<string> => app.electronApp.evaluate(async ({ webContents }) => String(await webContents.getAllWebContents()

@@ -11,6 +11,7 @@ import fs, { writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { devNull } from "node:os";
 import { join } from "node:path";
+import { mock } from "node:test";
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ImageSizeReader } from "@noldova/teamrun.core";
@@ -46,12 +47,13 @@ export class ImageSizeReaderTests {
   public namesAnSvgFromItsRootElementAfterItsPrologue(): void {
     const prologue = "\uFEFF<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- drawn - by hand -->\n"
       + "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\" [ <!ENTITY a \"b\"> ]>\n";
-    const svgs = ["<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "<svg>", `${prologue}<svg\nviewBox="0 0 2 1">`, `<!---->${" ".repeat(64 * 1024)}<svg/>`,
+    const svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"/>";
+    const svgs = [svg, "<svg>", `${prologue}<svg\nviewBox="0 0 2 1">`, `<!---->${" ".repeat(64 * 1024)}<svg/>`,
       "<svgs/>", "<html><svg/></html>", "text <svg/>", "<!-- open <svg/>", "<!-- a -- b --><svg/>", "<?xml version=\"1.0\"><svg/>"];
 
     Assert.areEqual("image/svg+xml,image/svg+xml,image/svg+xml,null,null,null,null,null,null,null",
       svgs.map(t => String(ImageSizeReader.mediaTypeOf(Buffer.from(t, "utf8")))).join(","));
-    Assert.isNull(ImageSizeReader.readBuffer(Buffer.from(svgs[0]!, "utf8")));
+    Assert.isNull(ImageSizeReader.readBuffer(Buffer.from(svg, "utf8")));
   }
 
   @TestMethod
@@ -121,10 +123,10 @@ export class ImageSizeReaderTests {
     writeFileSync(filled, Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(1024 * 1024, 0xff)]));
     let reads = 0;
     const original = fs.readSync;
-    fs.readSync = new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
+    const read = mock.method(fs, "readSync", (...args: Parameters<typeof original>): number => {
       reads++;
-      return Reflect.apply(target, self, args);
-    } });
+      return original(...args);
+    });
     syncBuiltinESMExports();
     try {
       const size = ImageSizeReader.readFile(far);
@@ -133,7 +135,7 @@ export class ImageSizeReaderTests {
       Assert.isNull(ImageSizeReader.readFile(filled));
     }
     finally {
-      fs.readSync = original;
+      read.mock.restore();
       syncBuiltinESMExports();
     }
 

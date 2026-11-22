@@ -35,7 +35,7 @@ export class GrokPlanReaderTests {
   }
 
   @TestMethod
-  public async approvesGroksPlanUnderBothNamesWithoutSwitchingItsSessionSinceGrokLeavesPlanByItself(): Promise<void> {
+  public async approvesGroksPlanUnderBothNamesAndTellsTheAdapterItWasApproved(): Promise<void> {
     const run = async (method: string): Promise<string> => {
       const listener = new RecordingTurnListener();
       listener.decisions.push(Resources.acpApprovePlanOption);
@@ -47,15 +47,18 @@ export class GrokPlanReaderTests {
         });
       await turn.beginAsync("grok-session", false, new ObservedSettings("grok", null, null, null));
       const reply = await turn.onRequest("3", method, JsonReader.fromValue({ sessionId: "grok-session", toolCallId: "tc-1", planContent: "# Tidy\n\nDrop stale entries." }));
+      const atReply = left.length;
+      await turn.onNotificationAsync(Resources.acpSessionUpdate, JsonReader.fromValue({ sessionId: "grok-session", update: { sessionUpdate: Resources.acpCurrentModeUpdate,
+        currentModeId: "default" } }));
       const plans = listener.details.filter(t => t.kind === DetailKind.Plan).map(t => String(ReplyPlan.fromJson(t.payload).approved));
-      return [JSON.stringify(reply), plans.join(","), listener.asks.map(t => `${t.nativeKind}:${t.summary}`).join(","), String(left.length)].join(" ");
+      return [JSON.stringify(reply), plans.join(","), listener.asks.map(t => `${t.nativeKind}:${t.summary}`).join(","), `${atReply}>${left.join(",")}`].join(" ");
     };
 
     const [prefixed, plain] = Resources.xaiExitPlanModeMethods;
     Assert.isDefined(prefixed);
     Assert.isDefined(plain);
 
-    Assert.areEqual(JSON.stringify([`{"outcome":"approved"} false,true exit_plan_mode:Tidy 0`, `{"outcome":"approved"} false,true exit_plan_mode:Tidy 0`]),
+    Assert.areEqual(JSON.stringify([`{"outcome":"approved"} false,true exit_plan_mode:Tidy 0>grok-session`, `{"outcome":"approved"} false,true exit_plan_mode:Tidy 0>grok-session`]),
       JSON.stringify([await run(prefixed), await run(plain)]));
   }
 }

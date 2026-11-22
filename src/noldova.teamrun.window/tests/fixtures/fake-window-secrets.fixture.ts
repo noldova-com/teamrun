@@ -7,7 +7,8 @@
  */
 
 import "@noldova/context.core";
-import type { IWindowSecrets } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { type IWindowSecrets, RuntimeRequestException } from "@noldova/desktop.window";
 
 export class FakeWindowSecrets implements IWindowSecrets {
   public readonly values: Map<string, string> = new Map();
@@ -17,14 +18,14 @@ export class FakeWindowSecrets implements IWindowSecrets {
 
   public saveAsync(name: string, value: string): Promise<void> {
     if (!Object.isNull(this.refusal))
-      return Promise.reject(new Error(this.refusal));
+      return Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, this.refusal));
     this.values.set(name, value);
     return Promise.resolve();
   }
 
   public removeAsync(name: string): Promise<void> {
     if (!Object.isNull(this.removalRefusal))
-      return Promise.reject(new Error(this.removalRefusal));
+      return Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, this.removalRefusal));
     this.removed.push(name);
     this.values.delete(name);
     return Promise.resolve();

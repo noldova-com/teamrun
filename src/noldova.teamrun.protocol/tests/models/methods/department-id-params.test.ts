@@ -15,14 +15,16 @@ import { DepartmentIdParams } from "@noldova/teamrun.protocol";
 export class DepartmentIdParamsTests {
   @TestMethod
   public preservesItsFieldsAndRejectsMalformedValues(): void {
-    const json = new DepartmentIdParams("d1").toJson();
+    const json = new DepartmentIdParams("o1", "d1").toJson();
 
     Assert.areEqual(JSON.stringify(json), JSON.stringify(DepartmentIdParams.fromJson(json).toJson()));
-    Assert.areEqual("$.input.departmentId", Assert.throws(() => DepartmentIdParams.fromJson({ departmentId: 42 }, "$.input"), JsonException).path);
+    Assert.areEqual("$.input.departmentId", Assert.throws(() => DepartmentIdParams.fromJson({ organizationId: "o1", departmentId: 42 }, "$.input"), JsonException).path);
   }
 
   @TestMethod
   public validatesConstructorArguments(): void {
-    Assert.throws(() => new DepartmentIdParams(" "), ArgumentException);
+    Assert.areEqual("organizationId", Assert.throws(() => new DepartmentIdParams(" ", "d1"), ArgumentException).parameterName);
+    Assert.areEqual("$.input.organizationId", Assert.throws(() => DepartmentIdParams.fromJson({ departmentId: "d1" }, "$.input"), JsonException).path);
+    Assert.throws(() => new DepartmentIdParams("o1", " "), ArgumentException);
   }
 }

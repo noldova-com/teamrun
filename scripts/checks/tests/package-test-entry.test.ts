@@ -7,11 +7,15 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, it } from "node:test";
 
 import * as testing from "@noldova/context.testing";
 
 import { PackageTestEntry } from "../package-test-entry.ts";
+import { EntryRun } from "./fixtures/entry-run.fixture.ts";
 
 const reportPassingClass = (environment: NodeJS.ProcessEnv): string => {
   let text = "";
@@ -49,5 +53,87 @@ describe("PackageTestEntry's reporter", () => {
     assert.match(text, /Passed:\s+1/u);
     assert.match(text, /Failed:\s+1/u);
     assert.match(text, /Skipped:\s+1/u);
+  });
+});
+
+const folders: string[] = [];
+
+const runFilesAsync = async (environment: NodeJS.ProcessEnv, unloadable: readonly string[] = []): Promise<EntryRun> => {
+  const folder = mkdtempSync(path.join(tmpdir(), "package-test-entry-"));
+  folders.push(folder);
+  const testing = import.meta.resolve("@noldova/context.testing");
+  for (const name of ["first", "second", "third"]) {
+    const className = `${name.charAt(0).toUpperCase()}${name.slice(1)}Tests`;
+    writeFileSync(path.join(folder, `${name}.test.js`), [
+      `import { TestClass, TestMethod } from ${JSON.stringify(testing)};`,
+      `export class ${className} { passes() {} }`,
+      `TestMethod(${className}.prototype.passes);`,
+      `TestClass(${className});`,
+      ""
+    ].join("\n"));
+  }
+  for (const name of unloadable)
+    writeFileSync(path.join(folder, `${name}.test.js`), `throw new Error("${name}.test.js was loaded.");\n`);
+  const result = path.join(folder, "result.json");
+  const exitCode = await new PackageTestEntry(["@noldova/teamrun.sample", folder], { ...environment, [PackageTestEntry.RESULT_VARIABLE]: result,
+    [PackageTestEntry.SKIP_DETAILS_VARIABLE]: "true" }).runAsync();
+  let files: readonly string[] = [];
+  try {
+    const written: unknown = JSON.parse(readFileSync(result, "utf8"));
+    if (typeof written === "object" && written !== null && "files" in written && Array.isArray(written.files))
+      files = written.files.map(String).sort();
+  }
+  catch {
+    files = [];
+  }
+  return new EntryRun(exitCode, files);
+};
+
+describe("PackageTestEntry with isolated test files", () => {
+  afterEach(() => {
+    for (const folder of folders.splice(0))
+      rmSync(folder, { recursive: true, force: true });
+  });
+
+  it("runs only the one file it is given to run alone", async () => {
+    const { exitCode, files } = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.sample/second.test.js" });
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(files, ["@noldova/teamrun.sample/second.test.js"]);
+  });
+
+  it("loads no test file but the one it runs alone", async () => {
+    const { exitCode, files } = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.sample/second.test.js" }, ["fourth"]);
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(files, ["@noldova/teamrun.sample/second.test.js"]);
+  });
+
+  it("fails without a result when the file to run alone belongs to no package it is given or doesn't exist", async () => {
+    const unknown = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.other/second.test.js" });
+    const missing = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.sample/fifth.test.js" });
+
+    assert.deepEqual([unknown.exitCode, unknown.files], [1, []]);
+    assert.deepEqual([missing.exitCode, missing.files], [1, []]);
+  });
+
+  it("leaves the isolated files to their own processes when it claims test files", async () => {
+    const claims = mkdtempSync(path.join(tmpdir(), "package-test-claims-"));
+    folders.push(claims);
+    const { exitCode, files } = await runFilesAsync({ [PackageTestEntry.CLAIMS_VARIABLE]: claims,
+      [PackageTestEntry.ISOLATED_VARIABLE]: JSON.stringify(["@noldova/teamrun.sample/first.test.js", "@noldova/teamrun.sample/third.test.js"]) });
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(files, ["@noldova/teamrun.sample/second.test.js"]);
+  });
+
+  it("claims every file when none is isolated, and fails without a result when the isolated list isn't a list of files", async () => {
+    const claims = mkdtempSync(path.join(tmpdir(), "package-test-claims-"));
+    folders.push(claims);
+    const every = await runFilesAsync({ [PackageTestEntry.CLAIMS_VARIABLE]: claims });
+    const refused = await runFilesAsync({ [PackageTestEntry.CLAIMS_VARIABLE]: mkdtempSync(path.join(claims, "next-")), [PackageTestEntry.ISOLATED_VARIABLE]: "{" });
+
+    assert.deepEqual([every.exitCode, every.files], [0, ["@noldova/teamrun.sample/first.test.js", "@noldova/teamrun.sample/second.test.js", "@noldova/teamrun.sample/third.test.js"]]);
+    assert.deepEqual([refused.exitCode, refused.files], [1, []]);
   });
 });

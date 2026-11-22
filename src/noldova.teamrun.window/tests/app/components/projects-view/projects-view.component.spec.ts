@@ -26,17 +26,30 @@ import {
   ConversationListParams,
   ConversationMoveParams,
   ConversationRenameParams,
+  Department,
   ErrorCode,
   EventName,
+  Harness,
+  Message,
+  MessageAuthor,
   MessagePageParams,
   MessageStatus,
   MethodName,
+  Organization,
+  OrganizationChat,
+  OrganizationCreateParams,
+  OrganizationIdParams,
+  OrganizationParent,
+  OrganizationUpdateParams,
   Project,
   ProjectFolderChange,
   ProjectIdParams,
   ProjectOpenParams,
   ProjectsLayoutSaveParams,
-  QuestionOption
+  QuestionOption,
+  Resources as ProtocolResources,
+  Teammate,
+  TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { AnnouncementPoliteness, Announcer, DefaultTheme, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme, PointerFixture } from "@noldova/ui.components.angular/testing";
@@ -45,10 +58,14 @@ import { userEvent } from "vitest/browser";
 import { ConversationComponent } from "../../../../src/app/components/conversation/conversation.component";
 import { ProjectsViewComponent } from "../../../../src/app/components/projects-view/projects-view.component";
 import { ChatAction } from "../../../../src/app/enums/chat-action";
+import { ProjectsGroup } from "../../../../src/app/enums/projects-group";
+import { TeammateStatus } from "../../../../src/app/enums/teammate-status";
 import { BrowserAvailability } from "../../../../src/app/services/browser-availability";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { CommandTargetsService } from "../../../../src/app/services/command-targets.service";
+import { OrganizationCatalog } from "../../../../src/app/services/organization-catalog";
 import { ProjectsLayoutService } from "../../../../src/app/services/projects-layout.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { TeamRunCommands } from "../../../../src/app/teamrun-commands";
 import { Resources } from "../../../../src/resources";
@@ -56,6 +73,7 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -64,6 +82,47 @@ describe("ProjectsViewComponent", () => {
   const other = new Conversation("c3", "p2", "Other talk", "2026-09-12T08:00:00.000Z", "2026-09-12T08:00:00.000Z");
   const scratchOf = (id: string, title: string, at: string): Conversation => new Conversation(id, null, title, at, at, false, null, null, false, `/data/chats/${id}`);
   const scratch = scratchOf("c5", "Scratch", "2026-09-13T08:00:00.000Z");
+  const at = "2026-09-14T08:00:00.000Z";
+  const teammateOf = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
+  const grok = teammateOf("grok", "Grok");
+  const opus = teammateOf("opus", "Opus 1");
+  const agy = teammateOf("agy", "Agy");
+  const builder = teammateOf("builder", "Builder");
+  const sol = teammateOf("sol", "Sol");
+  const mia = teammateOf("mia", "Mia");
+  const nova = teammateOf("nova", "Nova");
+  const zed = teammateOf("zed", "Zed");
+  const departmentOf = (id: string, name: string, parentId: string | null, leaderId: string | null, order: number): Department =>
+    new Department(id, name, "department", OrganizationParent.departmentOrPerson(parentId), leaderId, order, "c", "u");
+  const placementOf = (teammateId: string, departmentId: string | null, order: number): TeammatePlacement =>
+    new TeammatePlacement(teammateId, OrganizationParent.departmentOrPerson(departmentId), order);
+  const organization = SampleData.organizationOf([
+    departmentOf("devops", "DevOps", null, "sol", 1),
+    departmentOf("marketing", "Marketing", null, null, 0),
+    departmentOf("infra", "Infra", "devops", null, 0)
+  ], [placementOf("grok", null, 0), placementOf("opus", null, 1), placementOf("sol", "devops", 0), placementOf("agy", "devops", 1), placementOf("builder", "devops", 2),
+    placementOf("mia", "infra", 0)]);
+  const labs = new Organization("labs", "Labs", null, 1, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [departmentOf("research", "Research", null, null, 0)],
+    [placementOf("nova", "research", 0)]);
+  const organizationChatOf = (id: string, teammate: Teammate, organizationId: string = ProtocolResources.defaultOrganizationId): Conversation =>
+    new Conversation(id, null, teammate.name, at, at, false, null, null, false, `/data/chats/${id}`, false, [], false, false, null, new OrganizationChat(organizationId, teammate.id));
+  const myOrganizationKey = Resources.formatOrganizationExplorerKey(ProtocolResources.defaultOrganizationId);
+  const grokChat = organizationChatOf("o1", grok);
+  const infra = `DevOps${Resources.departmentPathSeparator}Infra`;
+  const createOrganization = async (configure: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
+    await create(t => {
+      t.answer(MethodName.TeammateList, () => [grok, opus, agy, builder, sol, mia, nova, zed].map(u => u.toJson()))
+        .answer(MethodName.OrganizationList, () => [organization.toJson(), labs.toJson()]);
+      configure(t);
+    });
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-teammate-row")).not.toBeNull());
+    await settle();
+  };
+  const names = (): string[] => texts(".nol-teamrun-organization-name, .nol-teamrun-teammate-name");
+  const organizationRow = (name: string): HTMLElement => find<HTMLElement>(".nol-teamrun-organization-row", name);
+  const teammateRow = (name: string): HTMLElement => find<HTMLElement>(".nol-teamrun-teammate-row", name);
+  const opened = (): string[] => context.openedDocuments.map(t => `${t.name} ${t.instance}`);
+
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<ProjectsViewComponent>;
   let store: ChatStoreService;
@@ -198,6 +257,8 @@ describe("ProjectsViewComponent", () => {
     BrowserAvailability.release(context);
     ProjectsLayoutService.release(context);
     ChatStoreService.release(context);
+    OrganizationCatalog.release(context);
+    TeammateStatusStoreService.release(context);
     localStorage.removeItem(Resources.projectsLayoutStorageKey);
     vi.restoreAllMocks();
   });
@@ -290,7 +351,7 @@ describe("ProjectsViewComponent", () => {
     context.answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)]);
     context.answer(MethodName.ConversationListMembers, t => {
       if (ConversationIdParams.fromJson(t).conversationId === second.id)
-        throw Object.assign(new Error(`Conversation ${second.id} was not found.`), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: [second.id] } });
+        throw new RefusedError(`Conversation ${second.id} was not found.`, ErrorCode.NotFound, second.id);
       return [];
     });
 
@@ -604,6 +665,52 @@ describe("ProjectsViewComponent", () => {
     expect(ConversationIdParams.fromJson(requestOf(MethodName.ConversationDelete)).conversationId).toBe("c2");
     await Wait.until(() => expect(nested()).not.toContain(second.title));
     expect(document.querySelector("nol-teamrun-confirm-dialog")).toBeNull();
+  });
+
+  it("moves the focus to the next row of its tree once a chat is deleted, to New chat once the chat's group is gone, and leaves a focus the person moved meanwhile", async () => {
+    conversations = [SampleData.conversation, second, other, scratch];
+    let deleting = new DeferredResponse();
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => 0).answer(MethodName.ConversationDelete, () => deleting.promise));
+    const remove = async (title: string): Promise<void> => {
+      deleting = new DeferredResponse();
+      conversationRow(title).focus();
+      await choose(conversationRow(title), Resources.deleteConversationLabel);
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+    };
+    const rows = [...element().querySelectorAll(`#${Resources.projectsGroupId} [role="treeitem"]`)];
+    const next = rows[rows.indexOf(conversationRow(second.title)) + 1];
+
+    await remove(second.title);
+    deleting.resolve(null);
+    await Wait.until(() => expect(document.activeElement).toBe(next));
+    await remove(scratch.title);
+    deleting.resolve(null);
+    await Wait.until(() => expect(document.activeElement).toBe(part(element(), ".nol-teamrun-action")));
+    await remove(other.title);
+    const outside = document.body.appendChild(document.createElement("button"));
+    outside.focus();
+    deleting.resolve(null);
+    await Wait.until(() => expect(element().textContent).not.toContain(other.title));
+    await settle();
+    const kept = document.activeElement === outside;
+    outside.remove();
+
+    expect([Object.isUndefined(next), kept]).toEqual([false, true]);
+  });
+
+  it("moves the focus to the row before once the last row of its tree is deleted", async () => {
+    conversations = [SampleData.conversation, second, other];
+    await create(t => t.answer(MethodName.ConversationFolderCount, () => 0).answer(MethodName.ConversationDelete, () => null));
+    const rows = [...element().querySelectorAll<HTMLElement>(`#${Resources.projectsGroupId} [role="treeitem"]`)];
+    const last = conversationRow(other.title);
+    const before = itemAt(rows, rows.length - 2);
+
+    last.focus();
+    await choose(last, Resources.deleteConversationLabel);
+    await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+
+    await Wait.until(() => expect(document.activeElement).toBe(before));
+    expect([rows.at(-1) === last, last.isConnected, before.isConnected]).toEqual([true, false, true]);
   });
 
   it("attaches the folder the person chooses to a chat without a project, then offers to replace it after a confirm or detach it, and offers neither in a project", async () => {
@@ -962,10 +1069,10 @@ describe("ProjectsViewComponent", () => {
     expect(texts(".nol-teamrun-action .nol-teamrun-label")).toEqual([Resources.newConversationLabel, Resources.openProjectLabel, Resources.openBrowserLabel]);
   });
 
-  it("opens a new empty Browser tab in the links profile from Open browser, by mouse and by Enter and Space, one tab for each", async () => {
+  it("opens a new empty Browser tab in the person's own browsing from Open browser, by mouse and by Enter and Space, one tab for each", async () => {
     await create(withBrowser);
     const openBrowser = action(Resources.openBrowserLabel);
-    const opened = { name: Resources.browserOpenPageCommand, commandArguments: { profileKey: "links" } };
+    const opened = { name: Resources.browserOpenPageCommand, commandArguments: {} };
 
     await userEvent.click(openBrowser);
     expect(context.ranCommands).toEqual([opened]);
@@ -1974,6 +2081,17 @@ describe("ProjectsViewComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
+    it("centres a teammate's status dot in the twistie's column and starts its name where a department's name starts", async () => {
+      await createOrganization();
+      const centre = (target: Element): number => (box(target).left + box(target).right) / 2;
+      const department = organizationRow("Marketing");
+      const teammate = teammateRow("Grok");
+
+      AppearanceFixture.expectPixels(box(part(teammate, ".nol-teamrun-teammate-name")).left, box(part(department, ".nol-teamrun-organization-name")).left);
+      AppearanceFixture.expectPixels(centre(part(teammate, "nol-teamrun-teammate-status .dot")), centre(part(department, ".nol-teamrun-twistie")));
+      AppearanceFixture.expectPixels(box(part(teammate, ".nol-teamrun-twistie")).width, box(part(department, ".nol-teamrun-twistie")).width);
+    });
+
     it("puts a missing folder's glyph after the project's name, within the row's inset, keeps the row's height and mutes only that name", async () => {
       await create(withMissingFolder);
       const missing = projectRow(SampleData.otherProject.name);
@@ -2349,6 +2467,26 @@ describe("ProjectsViewComponent", () => {
       expect([style.textTransform, style.letterSpacing]).toEqual(["none", "normal"]);
     });
 
+    it("hangs an organization's twistie in the gutter centred on the headings' icons, a department's one nested step in, and starts a department's name with its teammates' names", async () => {
+      await createOrganization();
+      const top = organizationRow(organization.name);
+      const department = organizationRow("Marketing");
+      const topTwistie = part(top, ".nol-teamrun-twistie");
+      const twistie = part(department, ".nol-teamrun-twistie");
+      const name = part(department, ".nol-teamrun-organization-name");
+      const icon = box(part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), ".nol-section-header-icon"));
+
+      for (const row of [top, department])
+        AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
+      AppearanceFixture.expectPixels(box(topTwistie).left + box(topTwistie).width / 2, icon.left + icon.width / 2);
+      AppearanceFixture.expectPixels(box(topTwistie).right, box(top).left);
+      AppearanceFixture.expectPixels(box(twistie).right, box(department).left);
+      AppearanceFixture.expectPixels(box(twistie).left - box(topTwistie).left, AppearanceFixture.measureLook("icon") + space(1));
+      AppearanceFixture.expectPixels(box(twistie).top + box(twistie).height / 2, box(name).top + box(name).height / 2);
+      AppearanceFixture.expectPixels(box(name).left, box(part(teammateRow("Grok"), ".nol-teamrun-teammate-name")).left);
+      AppearanceFixture.expectPixels(box(name).left, box(part(organizationRow("DevOps"), ".nol-teamrun-organization-name")).left);
+    });
+
     it("indents a project's conversations one step past its name, and ends each row's actions as far from the row's end as a tab's close button", async () => {
       await create();
       const conversation = conversationRow(second.title);
@@ -2465,6 +2603,21 @@ describe("ProjectsViewComponent", () => {
       actions.focus();
       await Wait.until(() => expect(getComputedStyle(actions).opacity).toBe("1"));
     });
+
+    it("sets the Organizations group's organization as a project, a teammate in no department as a project's chat, and a department's teammate a step further, each a tree row high", async () => {
+      await createOrganization();
+      const project = projectRow(SampleData.project.name);
+      const chat = conversationRow(SampleData.conversation.title);
+      const top = organizationRow(organization.name);
+      const step = AppearanceFixture.measureLook("icon") + AppearanceFixture.measureLook("space-1");
+      const nameLeft = (row: HTMLElement, selector: string): number => box(part(row, selector)).left;
+
+      AppearanceFixture.expectPixels(nameLeft(top, ".nol-teamrun-organization-name"), nameLeft(project, ".nol-teamrun-project-name"));
+      AppearanceFixture.expectPixels(nameLeft(teammateRow("Grok"), ".nol-teamrun-teammate-name"), nameLeft(chat, ".nol-teamrun-conversation-title"));
+      AppearanceFixture.expectPixels(nameLeft(teammateRow("Agy"), ".nol-teamrun-teammate-name"), nameLeft(chat, ".nol-teamrun-conversation-title") + step);
+      for (const row of [top, organizationRow("DevOps"), teammateRow("Grok"), teammateRow("Agy")])
+        AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
+    });
   });
 
   it("shows a row's actions without a fade, and rearranges rows during a drag without a transition, when the person prefers reduced motion", async () => {
@@ -2484,6 +2637,417 @@ describe("ProjectsViewComponent", () => {
     finally {
       await EmulatedMediaFixture.resetAsync();
     }
+  });
+
+  describe("the Organizations group", () => {
+    it("lists each organization with its own teammates in no department first, with no group for them, then each department by its path with its teammates by name, and keeps Organization chats out of Chats", async () => {
+      conversations = [SampleData.conversation, scratch, grokChat];
+      await createOrganization();
+      const levels = [...element().querySelectorAll(".nol-teamrun-organization-list [role='treeitem']")].map(t => t.getAttribute("aria-level"));
+
+      expect(headers()).toEqual([Resources.projectsViewTitle, Resources.chatsTitle, Resources.organizationsTitle]);
+      expect(names()).toEqual([organization.name, "Grok", "Opus 1", "Marketing", "DevOps", "Agy", "Builder", "Sol", "DevOps \u203a Infra", "Mia", "Labs", "Research", "Nova"]);
+      expect(levels).toEqual(["1", "2", "2", "2", "2", "3", "3", "3", "2", "3", "1", "2", "3"]);
+      expect(chats()).toEqual([scratch.title]);
+      expect(/no department/iu.test(element().querySelector(".nol-teamrun-organization-list")?.textContent ?? "")).toBe(false);
+    });
+
+    it("folds a department and the organization from their twisties, saving each", async () => {
+      await createOrganization();
+      part(organizationRow("DevOps"), ".nol-teamrun-twistie").click();
+      await settle();
+      const folded = [names(), organizationRow("DevOps").getAttribute("aria-expanded"), layout.layout().isProjectCollapsed("devops")];
+      part(organizationRow(organization.name), ".nol-teamrun-twistie").click();
+      await settle();
+
+      expect(folded).toEqual([[organization.name, "Grok", "Opus 1", "Marketing", "DevOps", infra, "Mia", "Labs", "Research", "Nova"], "false", true]);
+      await Wait.until(() => expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ProjectsLayoutSave))
+        .map(t => ProjectsLayoutSaveParams.fromJson(t.parameters).layout[Resources.collapsedProjectsField])).toEqual([["devops"], ["devops", myOrganizationKey]]));
+      expect(names()).toEqual([organization.name, "Labs", "Research", "Nova"]);
+    });
+
+    it("starts a department folded before a restart still folded", async () => {
+      await createOrganization(t => t.answer(MethodName.ProjectsLayoutRead, () => ({ [Resources.collapsedProjectsField]: ["infra"] })));
+
+      expect([names().includes("Mia"), organizationRow(infra).getAttribute("aria-expanded")]).toEqual([false, "false"]);
+    });
+
+    it("collapses the group from its title, saving it", async () => {
+      await createOrganization();
+      part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), ".nol-section-header-toggle").click();
+      await settle();
+
+      expect([names(), layout.layout().isGroupCollapsed(ProjectsGroup.Organizations)]).toEqual([[], true]);
+    });
+
+    it("opens a teammate's Organization chat in its own organization from its row, asking the engine for one when the teammate has none there yet", async () => {
+      conversations = [SampleData.conversation, organizationChatOf("o3", grok, labs.id), grokChat];
+      await createOrganization(t => t.answer(MethodName.OrganizationChatOpen, () => organizationChatOf("o2", nova, labs.id).toJson()));
+
+      part(teammateRow("Grok"), ".nol-teamrun-teammate-name").click();
+      await settle();
+      const existing = [opened(), context.count(MethodName.OrganizationChatOpen)];
+      teammateRow("Nova").focus();
+      await userEvent.keyboard("{Enter}");
+      await Wait.until(() => expect(opened()).toHaveLength(2));
+      const asked = OrganizationChat.fromJson(requestOf(MethodName.OrganizationChatOpen));
+
+      expect(existing).toEqual([[`${Resources.conversationDocumentName} o1`], 0]);
+      expect([opened()[1], asked.organizationId, asked.teammateId]).toEqual([`${Resources.conversationDocumentName} o2`, labs.id, nova.id]);
+    });
+
+    it("opens nothing when the engine refuses a teammate's Organization chat", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationChatOpen, "No chat."));
+
+      part(teammateRow("Opus 1"), ".nol-teamrun-teammate-name").click();
+      await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
+      await settle();
+
+      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat.")]]);
+    });
+
+    it("lists a teammate placed in two organizations under each, and opens from each row that organization's own Organization chat for it", async () => {
+      const both = labs.withTree(labs.departments, [...labs.placements, placementOf("grok", null, 0)]);
+      conversations = [SampleData.conversation, grokChat, organizationChatOf("o3", grok, labs.id)];
+      await createOrganization(t => t.answer(MethodName.OrganizationList, () => [organization.toJson(), both.toJson()]));
+      const rows = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(".nol-teamrun-teammate-row")].filter(u => u.textContent?.includes("Grok") === true);
+      const listed = rows().length;
+      for (const row of rows()) {
+        part(row, ".nol-teamrun-teammate-name").click();
+        await settle();
+      }
+
+      expect([listed, opened(), context.count(MethodName.OrganizationChatOpen)]).toEqual([2, [`${Resources.conversationDocumentName} o1`,
+        `${Resources.conversationDocumentName} o3`], 0]);
+    });
+
+    it("opens each organization's own Organization view, under its name, from the organization's name, by Enter and from its row menu", async () => {
+      await createOrganization();
+      const views = (): string[] => context.openedDocuments.map(t => `${t.name} ${t.instance} ${t.title}`);
+      const mine = `${Resources.organizationDocumentName} ${organization.id} ${organization.name}`;
+
+      part(organizationRow(organization.name), ".nol-teamrun-organization-name").click();
+      organizationRow(organization.name).focus();
+      await userEvent.keyboard("{Enter}");
+      await choose(organizationRow(organization.name), Resources.openOrganizationLabel);
+      part(organizationRow(labs.name), ".nol-teamrun-organization-name").click();
+
+      expect(views()).toEqual([mine, mine, mine, `${Resources.organizationDocumentName} ${labs.id} ${labs.name}`]);
+    });
+
+    it("marks a teammate whose Organization chat is shown, and shows the chat rows' spinner while its reply runs", async () => {
+      conversations = [SampleData.conversation, grokChat];
+      const running = new Message("m9", "o1", 1, MessageAuthor.Provider, "m8", MessageStatus.Running, [], SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
+      await createOrganization(t => t.answer(MethodName.MessageListOpen, () => [running.toJson()]));
+      await store.conversationInView("o1");
+      await settle();
+
+      expect([teammateRow("Grok").getAttribute("aria-selected"), teammateRow("Grok").classList.contains("nol-teamrun-selected"), teammateRow("Opus 1").getAttribute("aria-selected")])
+        .toEqual(["true", true, "false"]);
+      expect([!Object.isNull(teammateRow("Grok").querySelector(".nol-teamrun-working nol-spinner")), teammateRow("Opus 1").querySelector(".nol-teamrun-working")]).toEqual([true, null]);
+    });
+
+    it("keeps an Organization chat out of Pinned and out of a project it was moved into, and still marks it on its teammate's row", async () => {
+      const moved = new Conversation("o5", SampleData.project.id, opus.name, at, at, false, null, null, false, "/data/chats/o5", false, [], false, false, null,
+        new OrganizationChat(organization.id, opus.id));
+      conversations = [SampleData.conversation, grokChat, moved];
+      await createOrganization();
+      layout.togglePin(grokChat.id);
+      await settle();
+      await store.conversationInView(moved.id);
+      await settle();
+
+      expect([layout.pinnedConversations(), headers().includes(Resources.pinnedTitle), pinned()]).toEqual([[grokChat.id], false, []]);
+      expect(nested()).not.toContain(opus.name);
+      expect([teammateRow("Opus 1").getAttribute("aria-selected"), teammateRow("Grok").getAttribute("aria-selected")]).toEqual(["true", "false"]);
+    });
+
+    it("lists a teammate under a teammate with that teammate's department, a department under a teammate by its own path, and an empty organization beside a full one", async () => {
+      const team = new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [
+        new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u"),
+        new Department("design", "Design", "department", OrganizationParent.teammate(grok.id), null, 0, "c", "u")
+      ], [
+        new TeammatePlacement(grok.id, OrganizationParent.person, 0),
+        new TeammatePlacement(zed.id, OrganizationParent.teammate(grok.id), 0),
+        new TeammatePlacement(opus.id, OrganizationParent.department("ops"), 0),
+        new TeammatePlacement(mia.id, OrganizationParent.teammate(opus.id), 0),
+        new TeammatePlacement(builder.id, OrganizationParent.department("design"), 0)
+      ]);
+      const empty = new Organization("empty", "Empty", null, 1, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []);
+      await create(t => t.answer(MethodName.TeammateList, () => [grok, opus, builder, mia, zed].map(u => u.toJson()))
+        .answer(MethodName.OrganizationList, () => [team.toJson(), empty.toJson()]));
+      await Wait.until(() => expect(names()).toContain(empty.name));
+      const levels = [...element().querySelectorAll(".nol-teamrun-organization-list [role='treeitem']")].map(t => t.getAttribute("aria-level"));
+
+      expect(names()).toEqual([team.name, "Grok", "Zed", "Ops", "Mia", "Opus 1", "Design", "Builder", empty.name]);
+      expect(levels).toEqual(["1", "2", "2", "2", "3", "3", "2", "3", "1"]);
+    });
+
+    it("shows the Organizations group for an organization with no teammate and no department, and none while there is no organization", async () => {
+      await create(t => t.answer(MethodName.TeammateList, () => [grok].map(u => u.toJson()))
+        .answer(MethodName.OrganizationList, () => [SampleData.organizationOf([], []).toJson()]));
+      await Wait.until(() => expect(names()).toEqual([organization.name]));
+      const shown = headers();
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
+      await settle();
+
+      expect(shown).toEqual([Resources.projectsViewTitle, Resources.organizationsTitle]);
+      expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
+    });
+
+    it("creates an organization from \"+\" on the group's header with the name the person saves, and leaves it when they close the dialog", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationCreate, u => new Organization("studio", OrganizationCreateParams.fromJson(u).name, null, 2,
+        SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()));
+      const header = find<HTMLElement>("nol-section-header", Resources.organizationsTitle);
+      const add = part(header, "button.nol-teamrun-new-organization");
+      const creates = (): OrganizationCreateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationCreate))
+        .map(t => OrganizationCreateParams.fromJson(t.parameters));
+
+      add.click();
+      await settle();
+      const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      const shown = [document.querySelector("nol-teamrun-rename-dialog .nol-dialog-title")?.textContent, field?.value, field?.getAttribute("aria-label"),
+        document.querySelector<HTMLButtonElement>("nol-teamrun-rename-dialog .nol-teamrun-save")?.disabled];
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+      const closed = creates().length;
+      add.click();
+      await settle();
+      const again = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      if (Object.isNull(again))
+        throw new Error("The new organization dialog shows no name field.");
+      again.value = " Studio ";
+      again.dispatchEvent(new Event("input"));
+      await settle();
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-save");
+      await Wait.until(() => expect(creates()).toEqual([new OrganizationCreateParams("Studio", null)]));
+      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 2, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson());
+      await settle();
+
+      expect([add.getAttribute("aria-label"), add.hasAttribute("nolsectionheaderaction")]).toEqual([Resources.newOrganizationTitle, true]);
+      expect([shown, closed]).toEqual([[Resources.newOrganizationTitle, "", Resources.organizationNameFieldLabel, true], 0]);
+      expect(names().at(-1)).toBe("Studio");
+    });
+
+    const organizationMenu = async (name: string): Promise<string[]> => {
+      organizationRow(name).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const updates = (): OrganizationUpdateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationUpdate))
+      .map(t => OrganizationUpdateParams.fromJson(t.parameters));
+    const withFolder = (folder: string | null): Organization => new Organization(organization.id, organization.name, folder, organization.order,
+      SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], organization.departments, organization.placements);
+
+    it("renames an organization with the name the person saves, under the organization's own heading, and leaves it when they close the dialog", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationUpdate, () => null));
+
+      await choose(organizationRow(organization.name), Resources.renameConversationLabel);
+      const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      const shown = [document.querySelector("nol-teamrun-rename-dialog .nol-dialog-title")?.textContent, field?.value, field?.getAttribute("aria-label")];
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+      const closed = updates().length;
+      await choose(organizationRow(organization.name), Resources.renameConversationLabel);
+      const again = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      if (Object.isNull(again))
+        throw new Error("The rename dialog shows no name field.");
+      again.value = " Studio ";
+      again.dispatchEvent(new Event("input"));
+      await settle();
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-save");
+
+      expect([shown, closed]).toEqual([[Resources.renameOrganizationTitle, organization.name, Resources.organizationNameFieldLabel], 0]);
+      await Wait.until(() => expect(updates()).toEqual([new OrganizationUpdateParams(organization.id, "Studio", undefined)]));
+      expect(document.querySelector("nol-teamrun-rename-dialog")).toBeNull();
+    });
+
+    it("limits a new or renamed organization's name to the engine's limit in the dialog, saying the limit", async () => {
+      await createOrganization();
+      const limitOf = async (open: () => Promise<void>): Promise<unknown[]> => {
+        await open();
+        const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+        if (Object.isNull(field))
+          throw new Error("The dialog shows no name field.");
+        const saveAt = async (length: number): Promise<unknown[]> => {
+          field.value = "a".repeat(length);
+          field.dispatchEvent(new Event("input"));
+          await settle();
+          return [document.querySelector<HTMLButtonElement>("nol-teamrun-rename-dialog .nol-teamrun-save")?.disabled,
+            document.querySelector("nol-teamrun-rename-dialog .nol-teamrun-dialog-error")?.textContent?.trim() ?? null];
+        };
+        const shown = [await saveAt(Resources.organizationNameMaxLength + 1), await saveAt(Resources.organizationNameMaxLength)];
+        await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+        return shown;
+      };
+
+      const created = await limitOf(async () => {
+        part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), "button.nol-teamrun-new-organization").click();
+        await settle();
+      });
+      const renamed = await limitOf(() => choose(organizationRow(organization.name), Resources.renameConversationLabel));
+
+      const expected = [[true, Resources.formatNameTooLong(Resources.organizationNameMaxLength)], [false, null]];
+      expect([created, renamed]).toEqual([expected, expected]);
+      expect(new OrganizationCreateParams("a".repeat(Resources.organizationNameMaxLength), null).name).toHaveLength(Resources.organizationNameMaxLength);
+      expect(() => new OrganizationCreateParams("a".repeat(Resources.organizationNameMaxLength + 1), null)).toThrow();
+    });
+
+    it("sets, changes and clears an organization's default folder from its row menu, showing the folder as the row's tooltip", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationUpdate, () => null));
+      const tooltip = (): string => {
+        const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-organization-row")).find(t => t.nativeElement === organizationRow(organization.name));
+        if (Object.isUndefined(found))
+          throw new Error("The organization's row is not shown.");
+        return found.injector.get(TooltipDirective).text();
+      };
+      const before = [await organizationMenu(organization.name), tooltip()];
+
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+      const unchosen = [context.folderChoices, updates().length];
+      context.chosenFolder = "D:/studio";
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+      await Wait.until(() => expect(updates()).toHaveLength(1));
+      context.emit(EventName.OrganizationChanged, withFolder("D:/studio").toJson());
+      await settle();
+      const after = [await organizationMenu(organization.name), tooltip()];
+      context.chosenFolder = "E:/other";
+      await choose(organizationRow(organization.name), Resources.changeOrganizationFolderLabel);
+      await choose(organizationRow(organization.name), Resources.clearOrganizationFolderLabel);
+      await Wait.until(() => expect(updates()).toHaveLength(3));
+
+      expect(before).toEqual([[Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel, Resources.organizationDeleteLabel],
+        organization.name]);
+      expect(unchosen).toEqual([1, 0]);
+      expect(after).toEqual([[Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.changeOrganizationFolderLabel, Resources.clearOrganizationFolderLabel,
+        Resources.organizationDeleteLabel], "D:/studio"]);
+      expect(updates()).toEqual([new OrganizationUpdateParams(organization.id, undefined, "D:/studio"),
+        new OrganizationUpdateParams(organization.id, undefined, "E:/other"), new OrganizationUpdateParams(organization.id, undefined, null)]);
+    });
+
+    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and offers no delete for the last one", async () => {
+      const novaChat = organizationChatOf("o9", nova, labs.id);
+      conversations = [novaChat];
+      await createOrganization(t => t.answer(MethodName.OrganizationDelete, () => null));
+      const before = chats();
+      const deletes = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationDelete))
+        .map(t => OrganizationIdParams.fromJson(t.parameters).organizationId);
+
+      await choose(organizationRow(labs.name), Resources.organizationDeleteLabel);
+      const asked = [document.querySelector("nol-teamrun-confirm-dialog .nol-dialog-title")?.textContent, dialogText()];
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+      const cancelled = deletes().length;
+      await choose(organizationRow(labs.name), Resources.organizationDeleteLabel);
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+      await Wait.until(() => expect(deletes()).toEqual([labs.id]));
+      conversations = [novaChat.withoutOrganizationChat()];
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(labs.id).toJson());
+      context.emit(EventName.StateInvalidated, null);
+      await Wait.until(() => expect(chats()).toEqual([nova.name]));
+
+      expect(before).toEqual([]);
+      expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: labs.id });
+      expect([asked, cancelled]).toEqual([[Resources.deleteOrganizationTitle, Resources.formatDeleteOrganizationText(labs.name)], 0]);
+      expect([names().includes(labs.name), await organizationMenu(organization.name)])
+        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel]]);
+    });
+
+    it("logs an organization change the engine refuses", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationUpdate, "Taken."));
+      context.chosenFolder = "D:/studio";
+
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+
+      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("RuntimeRequestException: Taken.")));
+    });
+
+    const teammateMenu = async (name: string): Promise<string[]> => {
+      teammateRow(name).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const teammateMoveMenu = async (name: string): Promise<string[]> => {
+      await choose(teammateRow(name), Resources.moveToProjectLabel);
+      const labels = menuLabels();
+      await userEvent.keyboard("{Escape}");
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const teammateTooltip = (name: string): string => {
+      const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-teammate-row")).find(t => t.nativeElement === teammateRow(name));
+      if (Object.isUndefined(found))
+        throw new Error("The teammate's row is not shown.");
+      return found.injector.get(TooltipDirective).text();
+    };
+    const grokInFolder = grokChat.withAttachedFolder("D:/grok", at);
+    const opusInProject = organizationChatOf("o6", opus).withProjectId(SampleData.project.id, at);
+
+    it("shows where each teammate's Organization chat works on hover: its folder, its project's folder, the organization's folder or the teammate's name", async () => {
+      conversations = [SampleData.conversation, grokInFolder, opusInProject];
+      await createOrganization();
+      const before = [teammateTooltip("Grok"), teammateTooltip("Opus 1"), teammateTooltip("Agy")];
+      context.emit(EventName.OrganizationChanged, withFolder("D:/org").toJson());
+      await settle();
+
+      expect([before, teammateTooltip("Agy")]).toEqual([["D:/grok", SampleData.project.rootPath, "Agy"], "D:/org"]);
+    });
+
+    it("offers a teammate's row the chat's folder actions, opening its Organization chat first when it has none", async () => {
+      conversations = [SampleData.conversation, grokInFolder, opusInProject];
+      await createOrganization(t => t.answer(MethodName.OrganizationChatOpen, () => organizationChatOf("o7", agy).toJson())
+        .answer(MethodName.ChatFolderAttach, u => organizationChatOf("o7", agy).withAttachedFolder(ChatFolderAttachParams.fromJson(u).folder, at).toJson())
+        .answer(MethodName.ChatFolderDetach, () => grokChat.toJson())
+        .answer(MethodName.ConversationMove, u => opusInProject.withProjectId(ConversationMoveParams.fromJson(u).projectId, at).toJson()));
+      const menus = [await teammateMenu("Agy"), await teammateMenu("Grok"), await teammateMenu("Opus 1")];
+      const moves = [await teammateMoveMenu("Agy"), await teammateMoveMenu("Grok")];
+      await choose(teammateRow("Opus 1"), Resources.moveToAnotherProjectLabel);
+      const opusMoves = menuLabels();
+      await pick(SampleData.otherProject.name);
+      await Wait.until(() => expect(context.count(MethodName.ConversationMove)).toBe(1));
+      await choose(teammateRow("Grok"), Resources.moveToProjectLabel);
+      await pick(Resources.moveToFolderLabel);
+      const unchosen = context.folderChoices;
+      await choose(teammateRow("Grok"), Resources.detachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.ChatFolderDetach)).toBe(1));
+      context.chosenFolder = "D:/agy";
+      await choose(teammateRow("Agy"), Resources.attachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.ChatFolderAttach)).toBe(1));
+      const attached = ChatFolderAttachParams.fromJson(requestOf(MethodName.ChatFolderAttach));
+
+      expect(menus).toEqual([[Resources.moveToProjectLabel, Resources.attachFolderLabel],
+        [Resources.moveToProjectLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel], [Resources.moveToAnotherProjectLabel]]);
+      expect(moves).toEqual([[SampleData.project.name, SampleData.otherProject.name, Resources.moveToFolderLabel],
+        [SampleData.project.name, SampleData.otherProject.name, Resources.moveToFolderLabel]]);
+      expect(opusMoves).toEqual([SampleData.otherProject.name, Resources.moveToFolderLabel]);
+      expect([ConversationMoveParams.fromJson(requestOf(MethodName.ConversationMove)).projectId, unchosen]).toEqual([SampleData.otherProject.id, 1]);
+      expect([ConversationIdParams.fromJson(requestOf(MethodName.ChatFolderDetach)).conversationId, context.count(MethodName.OrganizationChatOpen)])
+        .toEqual([grokChat.id, 1]);
+      expect([attached.chatId, attached.folder]).toEqual(["o7", "D:/agy"]);
+    });
+
+    it("leaves a teammate's folder alone when the engine opens it no Organization chat", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationChatOpen, "No chat."));
+      context.chosenFolder = "D:/agy";
+
+      await choose(teammateRow("Agy"), Resources.attachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
+      await settle();
+
+      expect([context.folderChoices, context.count(MethodName.ChatFolderAttach)]).toEqual([0, 0]);
+    });
+
+    it("shows each teammate's status as a dot alone before its name, named for a screen reader", async () => {
+      await createOrganization();
+      const dot = part(teammateRow("Grok"), "nol-teamrun-teammate-status .dot");
+
+      expect([dot.getAttribute("role"), dot.getAttribute("aria-label"), teammateRow("Grok").querySelector("nol-teamrun-teammate-status .label")])
+        .toEqual(["img", Resources.teammateStatusLabels[TeammateStatus.Idle], null]);
+    });
   });
 
   describe("under forced colours and at 200% zoom", () => {

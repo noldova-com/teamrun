@@ -21,10 +21,12 @@ import {
   AttachmentInput,
   AuthStatus,
   ChatIdParams,
+  ChatResponderParams,
   ComposerDefaultSaveParams,
   Conversation,
   ConversationIdParams,
   ConversationListParams,
+  type Department,
   DetailKind,
   Draft,
   DraftSaveParams,
@@ -36,6 +38,9 @@ import {
   MessageStatus,
   MethodName,
   ObservedSettings,
+  NodeType,
+  Organization,
+  OrganizationLayoutSaveParams,
   Project,
   ProjectListing,
   ProjectsLayoutSaveParams,
@@ -51,6 +56,8 @@ import {
   ProviderModel,
   ProviderModelList,
   RequestedSettings,
+  Resources as ProtocolResources,
+  type TeammatePlacement,
   WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
 
@@ -87,9 +94,15 @@ export class SampleData {
     SampleData.timestamp,
     null);
 
+  public static readonly departmentType: NodeType = new NodeType("department", "Department", null, null, SampleData.timestamp, SampleData.timestamp);
+
+  public static organizationOf(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
+    return new Organization(ProtocolResources.defaultOrganizationId, "My organization", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], departments, placements);
+  }
+
   public static abilities(overrides: Partial<Record<ProviderAbility, AbilityCell>> = {}): ProviderAbilities {
-    const works = Object.fromEntries(Object.values(ProviderAbility).map(t => [t, AbilityCell.works(AbilitySource.Acp)])) as Record<ProviderAbility, AbilityCell>;
-    return new ProviderAbilities({ ...works, ...overrides });
+    return ProviderAbilities.fromJson({ [ProtocolResources.cellsField]: Object.fromEntries(Object.values(ProviderAbility)
+      .map(t => [t, (overrides[t] ?? AbilityCell.works(AbilitySource.Acp)).toJson()])) });
   }
 
   public static detail(sequence: number, kind: DetailKind, text: string): MessageDetail {
@@ -142,6 +155,7 @@ export class SampleData {
       .answer(MethodName.ReadingPositionSave, () => null)
       .answer(MethodName.RunOutputList, () => [])
       .answer(MethodName.RunOutputSave, () => null)
+      .answerModule("teamrun.pageList", () => [])
       .answer(MethodName.AttachmentPrepare, t => {
         const input = AttachmentInput.fromJson(t);
         return new MessageAttachment(input.name, input.mediaType, 0, `D:/data/attachments/drafts/${input.name}`).toJson();
@@ -156,11 +170,13 @@ export class SampleData {
       .answer(MethodName.BackgroundTaskList, () => SampleData.tasks([]))
       .answer(MethodName.ConversationListMembers, () => [])
       .answer(MethodName.WaitingMessageList, t => new WaitingMessagesPayload(ChatIdParams.fromJson(t).chatId, []).toJson())
-      .answer(MethodName.ConversationResponderSet, () => null)
+      .answer(MethodName.ConversationResponderSet, t => SampleData.conversation.withResponder(ChatResponderParams.fromJson(t).responder).toJson())
       .answer(MethodName.ConversationListEmpty, () => [])
       .answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)])
       .answer(MethodName.ProjectsLayoutRead, () => null)
       .answer(MethodName.ProjectsLayoutSave, t => ProjectsLayoutSaveParams.fromJson(t).layout)
+      .answer(MethodName.OrganizationLayoutRead, () => null)
+      .answer(MethodName.OrganizationLayoutSave, t => OrganizationLayoutSaveParams.fromJson(t).layout)
       .answer(MethodName.ComposerDefaultRead, () => null)
       .answer(MethodName.ComposerDefaultSave, t => ComposerDefaultSaveParams.fromJson(t).choice)
       .answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.project.id ? [SampleData.conversation.toJson()] : [])

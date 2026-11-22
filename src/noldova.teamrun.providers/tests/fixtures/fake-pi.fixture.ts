@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,8 +15,10 @@ import { fileURLToPath } from "node:url";
 type Json = { [key: string]: unknown };
 
 export class FakePi {
+  private static readonly STARTING_MODEL: Json = { id: "sonnet-9", name: "Sonnet 9", provider: "anthropic", reasoning: true, input: ["text", "image"], contextWindow: 200000 };
+  private static readonly EXTENSION_MODEL: Json = { id: "model-1", provider: "from-an-extension", reasoning: true };
   private static readonly MODELS: readonly Json[] = [
-    { id: "sonnet-9", name: "Sonnet 9", provider: "anthropic", reasoning: true, input: ["text", "image"], contextWindow: 200000 },
+    FakePi.STARTING_MODEL,
     { id: "gpt-9", provider: "openai", reasoning: false, contextWindow: 400000 },
     { id: "gpt-10", provider: "openai", reasoning: true, thinkingLevelMap: { minimal: null, xhigh: "xhigh", max: null } }];
   private static readonly COMMANDS: readonly Json[] = [
@@ -25,7 +29,8 @@ export class FakePi {
   private readonly scenario: string = process.env["TEAMRUN_FAKE_PI_TURN"] ?? "text";
   private readonly log: string | undefined = process.env["TEAMRUN_FAKE_PI_LOG"];
   private readonly sessions: string = process.env["TEAMRUN_FAKE_PI_SESSIONS"] ?? process.cwd();
-  private model: Json = FakePi.MODELS[0]!;
+  private model: Json = FakePi.STARTING_MODEL;
+  private available: readonly Json[] = FakePi.MODELS;
   private thinkingLevel: string = "medium";
   private sessionFile: string | null = null;
   private holding: boolean = false;
@@ -59,7 +64,13 @@ export class FakePi {
       extra: process.env["TEAMRUN_FAKE_PI_EXTRA"] ?? null, toolsUrl: process.env["TEAMRUN_PI_TOOLS_URL"] ?? null,
       toolsToken: process.env["TEAMRUN_PI_TOOLS_TOKEN"] ?? null, sharedServers: process.env["TEAMRUN_PI_SHARED_SERVERS"] ?? null });
     const session = args.indexOf("--session");
-    this.sessionFile = args.includes("--no-session") ? null : session >= 0 ? args[session + 1]! : this.newSession([]);
+    this.sessionFile = args.includes("--no-session") ? null : session >= 0 ? args[session + 1] ?? String.empty : this.newSession([]);
+    if (!args.includes("--no-extensions"))
+      this.available = [...FakePi.MODELS, FakePi.EXTENSION_MODEL];
+    const settings = this.settings();
+    this.model = this.available.find(t => t["provider"] === settings["defaultProvider"] && t["id"] === settings["defaultModel"]) ?? this.model;
+    if (Object.isString(settings["defaultThinkingLevel"]))
+      this.thinkingLevel = settings["defaultThinkingLevel"];
     if (process.env["TEAMRUN_FAKE_PI_DEFAULT"] === "none")
       this.model = {};
     if (process.env["TEAMRUN_FAKE_PI_DEFAULT"] === "unknown")
@@ -89,7 +100,7 @@ export class FakePi {
     this.record(command);
     const id = command["id"];
     const type = String(command["type"]);
-    const answer = (data?: unknown): void => this.write({ id, type: "response", command: type, success: true, ...data === undefined ? {} : { data } });
+    const answer = (data?: unknown): void => this.write({ id, type: "response", command: type, success: true, ...Object.isUndefined(data) ? {} : { data } });
     const refuse = (error: string): void => this.write({ id, type: "response", command: type, success: false, error });
     switch (type) {
       case "extension_ui_response":
@@ -110,11 +121,11 @@ export class FakePi {
           return;
         }
         answer({ ...Object.keys(this.model).length === 0 ? {} : { model: this.model, thinkingLevel: this.thinkingLevel },
-          sessionId: `session-${String(process.pid)}`, ...this.sessionFile === null ? {} : { sessionFile: this.sessionFile } });
+          sessionId: `session-${String(process.pid)}`, ...Object.isNull(this.sessionFile) ? {} : { sessionFile: this.sessionFile } });
         return;
       case "set_model": {
-        const model = FakePi.MODELS.find(t => t["provider"] === command["provider"] && t["id"] === command["modelId"]);
-        if (model === undefined)
+        const model = this.available.find(t => t["provider"] === command["provider"] && t["id"] === command["modelId"]);
+        if (Object.isUndefined(model))
           refuse(`Model not found: ${String(command["provider"])}/${String(command["modelId"])}`);
         else {
           this.model = model;
@@ -168,7 +179,7 @@ export class FakePi {
       case "abort":
         if (this.scenario !== "deaf")
           answer();
-        if (this.compacting !== null) {
+        if (!Object.isNull(this.compacting)) {
           this.write({ type: "compaction_end", reason: "manual", aborted: true, willRetry: false });
           this.compacting("Compaction cancelled");
           this.compacting = null;
@@ -208,7 +219,7 @@ export class FakePi {
       refuse("Agent is busy");
       return;
     }
-    if (this.sessionFile !== null && this.scenario !== "handled")
+    if (!Object.isNull(this.sessionFile) && this.scenario !== "handled")
       writeFileSync(this.sessionFile, JSON.stringify([...this.entries(), `entry-${String(this.entries().length + 1)}`]));
     answer({ disposition: this.scenario === "handled" ? "handled" : "started" });
     if (this.scenario === "handled")
@@ -301,7 +312,13 @@ export class FakePi {
   }
 
   private entries(): string[] {
-    return this.sessionFile !== null && existsSync(this.sessionFile) ? JSON.parse(readFileSync(this.sessionFile, "utf8")) as string[] : [];
+    return !Object.isNull(this.sessionFile) && existsSync(this.sessionFile) ? JSON.parse(readFileSync(this.sessionFile, "utf8")) as string[] : [];
+  }
+
+  private settings(): Json {
+    const folder = process.env["PI_CODING_AGENT_DIR"];
+    const file = Object.isUndefined(folder) ? null : join(folder, "settings.json");
+    return !Object.isNull(file) && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) as Json : {};
   }
 
   private newSession(entries: readonly string[]): string {
@@ -315,10 +332,10 @@ export class FakePi {
   }
 
   private record(entry: Json): void {
-    if (this.log !== undefined)
+    if (!Object.isUndefined(this.log))
       appendFileSync(this.log, `${JSON.stringify(entry)}\n`);
   }
 }
 
-if (resolve(process.argv[1]!) === fileURLToPath(import.meta.url))
+if (resolve(process.argv[1] ?? String.empty) === fileURLToPath(import.meta.url))
   new FakePi().run();

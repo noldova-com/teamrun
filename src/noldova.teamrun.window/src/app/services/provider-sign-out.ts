@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { AuthStatus, type Provider, type ProviderKind } from "@noldova/teamrun.protocol";
+import { AuthStatus, ProfileFolderPath, type Provider, type ProviderKind } from "@noldova/teamrun.protocol";
 import type { DialogService } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../resources";
@@ -16,7 +16,24 @@ import { ConfirmRequest } from "../models/confirm-request";
 import type { ChatStoreService } from "./chat-store.service";
 
 export class ProviderSignOut {
-  public static confirmAsync(dialogs: DialogService, store: ChatStoreService, provider: Provider): Promise<boolean> {
+  public static confirmAsync(dialogs: DialogService, store: ChatStoreService, provider: Provider, report: (message: string) => void): Promise<boolean> {
+    const refreshing = store.refreshProfileOf(provider);
+    return Object.isNull(refreshing) ? ProviderSignOut.ask(dialogs, store, provider)
+      : refreshing.then(() => ProviderSignOut.ask(dialogs, store, provider), () => {
+        report(Resources.signOutKindsNotRead);
+        return false;
+      });
+  }
+
+  public static async signOutAsync(store: ChatStoreService, provider: Provider, report: (message: string) => void): Promise<boolean | null> {
+    if (Object.isNull(store.signOutCommandOf(provider)))
+      return store.signOutProvider(provider.id, report);
+    const ended = await store.signOutInTerminal(provider.id, report);
+    return store.kinds().some(t => t.id === provider.kind && t.signOutEndsWithCommand) ? ended
+      : store.providers().some(t => t.id === provider.id && t.authStatus === AuthStatus.LoggedOut);
+  }
+
+  private static ask(dialogs: DialogService, store: ChatStoreService, provider: Provider): Promise<boolean> {
     const command = store.signOutCommandOf(provider);
     const kind = store.kinds().find(t => t.id === provider.kind)!;
     const dialog = dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
@@ -31,18 +48,10 @@ export class ProviderSignOut {
     }));
   }
 
-  public static async signOutAsync(store: ChatStoreService, provider: Provider, report: (message: string) => void): Promise<boolean | null> {
-    if (Object.isNull(store.signOutCommandOf(provider)))
-      return store.signOutProvider(provider.id, report);
-    const ended = await store.signOutInTerminal(provider.id, report);
-    return store.kinds().some(t => t.id === provider.kind && t.signOutEndsWithCommand) ? ended
-      : store.providers().some(t => t.id === provider.id && t.authStatus === AuthStatus.LoggedOut);
-  }
-
   private static messageOf(kind: ProviderKind, provider: Provider): string {
     if (!Object.isNull(kind.singleAccount) && !Object.isNull(kind.profile))
       return Resources.formatSignOutShared(provider.label, kind.displayName);
-    const personal = !Object.isNull(kind.singleAccount) || kind.profile?.personFolders.includes(provider.profileDir) === true;
+    const personal = !Object.isNull(kind.singleAccount) || kind.profile?.personFolders.some(t => ProfileFolderPath.isSame(t, provider.profileDir)) === true;
     return personal ? Resources.formatSignOutPersonal(provider.label, kind.displayName) : Resources.formatSignOut(provider.label, kind.displayName);
   }
 }

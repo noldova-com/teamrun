@@ -9,14 +9,16 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import "@noldova/context.core";
 import { expect } from "playwright/test";
 
-import { type IStartedProcess, TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
+import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
+import type { StartedProcess } from "./fixtures/started-process.ts";
 
 const DOUBLE: string = path.join(import.meta.dirname, "fixtures", "acp-fork-double.ts");
 const NAME: string = "Fork double";
 
-const hasEnded = (started: IStartedProcess | null | undefined): boolean => started === null || started === undefined || !TeamRunApp.isAlive(started);
+const hasEnded = (started: StartedProcess | null | undefined): boolean => Object.isNullOrUndefined(started) || !TeamRunApp.isAlive(started);
 
 test("Stop ends a child that an added ACP agent's command left holding its output after the command's first process exited", async ({ app }) => {
   test.skip(process.platform !== "linux", "Linux, where the fixture reads processes from /proc and the leftovers are found by the command's process group");

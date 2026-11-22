@@ -1,0 +1,28 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<svg class="lines">
+  @for (drawing of drawings(); track drawing.flow.id) {
+    @let stage = drawing.flow.stage;
+    @if (stage !== stages.Arrived) {
+      <path class="route" [class.writing]="stage === stages.Writing" [class.sent]="stage === stages.Sent" [class.abandoned]="stage === stages.Abandoned"
+        [attr.d]="drawing.route.path" [style.animation-duration.ms]="stage === stages.Abandoned ? resources.organizationFlowFadeDuration : resources.organizationFlowWritingDuration"
+        (animationend)="finished.emit(drawing.flow.id)" />
+    }
+  }
+</svg>
+@for (drawing of drawings(); track drawing.flow.id) {
+  @if (drawing.flow.stage === stages.Sent) {
+    <span class="pulse" [style.offset-path]="drawing.offsetPath" [style.animation-duration.ms]="resources.organizationFlowPulseDuration"
+      (animationend)="arrived.emit(drawing.flow.id)"></span>
+  } @else if (drawing.flow.stage === stages.Arrived) {
+    @let target = drawing.route.target;
+    <span class="glow" [style.left.px]="target.left" [style.top.px]="target.top" [style.width.px]="target.width" [style.height.px]="target.height"
+      [style.animation-duration.ms]="resources.organizationFlowGlowDuration" (animationend)="finished.emit(drawing.flow.id)"></span>
+  }
+}

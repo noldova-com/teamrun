@@ -15,7 +15,7 @@ import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { CaptureOutcome, ChangeStatus, CompareOutcome, PreviewOutcome, RestoreOutcome } from "@noldova/checkpoints.protocol";
-import { ApprovalAsk, ConversationEngine, QuestionAsk, Resources, TurnDetail, TurnOutcome } from "@noldova/teamrun.core";
+import { ApprovalAsk, ConversationEngine, QuestionAsk, RequestDispatcher, Resources, TurnDetail, TurnOutcome, UsageLimit } from "@noldova/teamrun.core";
 import {
   Approval,
   AttachmentInput,
@@ -33,6 +33,9 @@ import {
   ConversationRewindParams,
   ConversationRewindResult,
   ConversationRewoundPayload,
+  DepartmentCreateParams,
+  DepartmentMemberSetParams,
+  DepartmentUpdateParams,
   DetailEventPayload,
   DetailKind,
   ErrorCode,
@@ -54,14 +57,18 @@ import {
   RequestedSettings,
   MessageDetail,
   ObservedSettings,
+  OrganizationChat,
+  OrganizationParent,
   SubAgent,
   SubAgentStatus,
-  TeammateCreateParams
+  TeammateCreateParams,
+  TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { GitRepository } from "../../fixtures/git-repository.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
+import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
 export class ConversationEngineTests {
@@ -507,6 +514,190 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
+  public async givesTheOrganizationRoleLineOnlyToTheChatsTeammateBeforeTheWholeMessageWithItsAttachmentAndMentions(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const grokProvider = await host.createProviderAsync("fake", "Grok");
+    const benProvider = await host.createProviderAsync("fake", "Ben");
+    const grok = await host.teammates.createAsync(new TeammateCreateParams("Grok", null, grokProvider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, benProvider.id, Harness.Provider, null, null));
+    await host.organization.placeAsync(new TeammatePlaceParams(Resources.defaultOrganizationId, grok.id, OrganizationParent.person, 0));
+    const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, grok.id));
+
+    const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok @Ben look", null, null,
+      [new AttachmentInput("notes.txt", "text/plain", Buffer.from("notes").toString("base64"), null)], [grok.id, ben.id]));
+    await host.engine.waitForIdle();
+    const saved = (await host.messages.findAsync(result.sent.id))?.attachments[0];
+    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+    const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson);
+
+    Assert.areEqual(2, host.adapter.requests.length);
+    Assert.isTrue(promptOf(grokProvider.id).includes(Resources.formatOrganizationRolePrompt(role, "@Grok @Ben look")));
+    Assert.isFalse(promptOf(benProvider.id).includes(role));
+    Assert.areEqual("true true true true", [grokProvider, benProvider]
+      .flatMap(t => [promptOf(t.id).includes("@Ben look"), promptOf(t.id).includes(JSON.stringify(saved?.path ?? "missing"))]).join(" "));
+    Assert.areEqual("@Grok @Ben look", (await host.messages.findAsync(result.sent.id))?.details[0]?.text);
+  }
+
+  @TestMethod
+  public async tellsADepartmentsLeaderAndMemberTheirPlaceAndWhomTheyReportToAndReopensATeammatesChat(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
+    const leadProvider = await host.createProviderAsync("fake", "Lead");
+    const memberProvider = await host.createProviderAsync("fake", "Member");
+    const lead = await host.teammates.createAsync(new TeammateCreateParams("Lead", null, leadProvider.id, Harness.Provider, null, null));
+    const member = await host.teammates.createAsync(new TeammateCreateParams("Member", null, memberProvider.id, Harness.Provider, null, null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", type, OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, lead.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, member.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, lead.id));
+    const leadChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, lead.id));
+    const memberChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));
+    const reopened = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));
+
+    await host.engine.sendAsync(new MessageSendParams(leadChat.id, "@Lead Status?", null, null, [], [lead.id]));
+    await host.engine.sendAsync(new MessageSendParams(memberChat.id, "@Member Status?", null, null, [], [member.id]));
+    await host.engine.waitForIdle();
+    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+
+    Assert.areEqual(memberChat.id, reopened.id);
+    Assert.isTrue(promptOf(leadProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
+      Resources.organizationReportsToPerson)));
+    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead")));
+  }
+
+  @TestMethod
+  public async givesNoOrganizationRoleLineToATeammateOutsideTheOrganization(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync("fake", "Grok");
+    const grok = await host.teammates.createAsync(new TeammateCreateParams("Grok", null, provider.id, Harness.Provider, null, null));
+    const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, grok.id));
+
+    const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok look", null, null, [], [grok.id]));
+    await host.engine.waitForIdle();
+
+    Assert.isFalse((host.adapter.requests[0]?.prompt ?? "missing").includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment,
+      Resources.organizationReportsToPerson)));
+    Assert.isTrue((host.adapter.requests[0]?.prompt ?? String.empty).includes("look"));
+    Assert.isNull((await host.messages.findAsync(result.sent.id))?.details[0]?.payload ?? null);
+  }
+
+  @TestMethod
+  public async runsTheGroupsOtherRepliesWhenOneReplysFailureEscapes(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    host.adapter.steps = [(): void => {
+      if (host.adapter.requests.length === 1)
+        throw new TypeError("Ana's turn broke.");
+    }];
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+    const [failed, answered] = await Promise.all(result.replies.map(t => host.messages.findAsync(t.id)));
+
+    Assert.areEqual(2, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [failed?.teammateId, answered?.teammateId].join());
+    Assert.areEqual(MessageStatus.Failed, failed?.status);
+    Assert.areEqual(Resources.formatTurnFailed("Ana's turn broke."), failed?.details.at(-1)?.text);
+    Assert.areEqual(MessageStatus.Completed, answered?.status);
+  }
+
+  @TestMethod
+  public async keepsAReplyStoppedWhileItsTurnIsPreparedCancelledWhenThePreparationFails(): Promise<void> {
+    const stops: Promise<unknown>[] = [];
+    let conversationId = String.empty;
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      stops.push(host.engine.cancelConversationAsync(new ConversationIdParams(conversationId)).catch((error: unknown) => error));
+      return Promise.reject(new RangeError("The command settings are locked."));
+    });
+    conversationId = (await host.createConversationAsync()).id;
+
+    const result = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversationId, "One"));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+    const stopped = await Promise.all(stops);
+    const reply = await host.messages.findAsync(result.replies[0]?.id ?? String.empty);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.isTrue(stopped[0] instanceof RangeError);
+    Assert.areEqual(0, host.adapter.requests.length);
+    Assert.areEqual(MessageStatus.Cancelled, reply?.status);
+    Assert.areEqual(`${DetailKind.Error} The command settings are locked.`, reply?.details.map(t => `${t.kind} ${t.text}`).join());
+  }
+
+  @TestMethod
+  public async failsAReplyWhosePreparationThrowsAValueThatIsNotAnErrorWithThatValuesText(): Promise<void> {
+    const failure = "The command settings are locked.";
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      throw failure;
+    });
+    const conversation = await host.createConversationAsync();
+
+    const result = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "One"));
+    const ended = await host.engine.waitForIdle().then(() => null, (error: unknown) => error);
+    const reply = await host.messages.findAsync(result.replies[0]?.id ?? String.empty);
+
+    Assert.areEqual(failure, ended);
+    Assert.areEqual(MessageStatus.Failed, reply?.status);
+    Assert.areEqual(`${DetailKind.Error} ${failure}`, reply?.details.map(t => `${t.kind} ${t.text}`).join());
+  }
+
+  @TestMethod
+  public async closesAReplysToolsBeforeNotingItsUsageLimitAndWhenThatFails(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
+    const conversation = await host.createConversationAsync();
+    host.adapter.limits.set((await host.providerOfAsync()).id, new UsageLimit(null));
+    const endsWhenNoted: number[] = [];
+    host.planUsage.list = (): never => {
+      endsWhenNoted.push(tools.opened[0]?.ends ?? 0);
+      throw new RangeError("The plan usage is unreadable.");
+    };
+
+    await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "One"));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), RangeError);
+
+    Assert.areEqual(1, tools.opened.length);
+    Assert.areEqual(1, endsWhenNoted.at(-1));
+    Assert.areEqual(1, tools.opened[0]?.ends);
+  }
+
+  @TestMethod
+  public async runsTheGroupsOtherRepliesWhenWritingOneReplysFailureAlsoFails(): Promise<void> {
+    let reads = 0;
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, () => {
+      reads += 1;
+      return reads === 1 ? Promise.reject(new TypeError("The command settings are locked.")) : Promise.resolve(null);
+    });
+    const conversation = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const ana = await host.teammates.createAsync(new TeammateCreateParams("Ana", null, provider.id, Harness.Provider, null, null));
+    const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, provider.id, Harness.Provider, null, null));
+    host.events.subscribe({
+      onEvent: event => {
+        if (event.name === EventName.MessageUpdated && Message.fromJson(event.payload).status === MessageStatus.Failed)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    const result = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Ana @Ben go", null, null, [], [ana.id, ben.id]));
+    await Assert.throwsAsync(() => host.engine.waitForIdle(), TypeError);
+    const [failed, answered] = await Promise.all(result.replies.map(t => host.messages.findAsync(t.id)));
+
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.areEqual([ana.id, ben.id].join(), [failed?.teammateId, answered?.teammateId].join());
+    Assert.areEqual(MessageStatus.Failed, failed?.status);
+    Assert.areEqual(MessageStatus.Completed, answered?.status);
+  }
+
+  @TestMethod
   public async logsAReplyFailedBeforeItsRunByItsKindButNeverTheErrorsText(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
@@ -832,6 +1023,37 @@ export class ConversationEngineTests {
     Assert.areEqual(ApprovalStatus.Approved, decided.status);
     Assert.areEqual(2, (await host.messages.listAsync(ConversationEngineTests.list(conversation.id))).length);
     Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
+  public async neitherKeepsNorSendsTheAnswerToASecretPostedQuestion(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const turn = Promise.withResolvers<void>();
+    host.adapter.questionPosts = [ConversationEngineTests.postedSecret("msg-1"), ConversationEngineTests.postedSecret("msg-2")];
+    host.adapter.formatQuestionReply = (replyTo, question, answer) => `reply ${replyTo}: ${question} = ${answer}`;
+    host.adapter.holdTurn = () => turn.promise;
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Ask me"));
+    const posted = await ConversationEngineTests.postsAsync(host, conversation.id, 2);
+    const first = ConversationEngineTests.at(posted, 0);
+    const second = ConversationEngineTests.at(posted, 1);
+    const decided = await host.engine.decideAsync(new ApprovalDecideParams(first.id, Resources.answerOptionId,
+      [new QuestionAnswer("0", ["Web"], null), new QuestionAnswer("1", [], "hunter2")]));
+    const secretOnly = await host.engine.decideAsync(new ApprovalDecideParams(second.id, Resources.answerOptionId, [new QuestionAnswer("1", [], "hunter2")]));
+
+    host.adapter.questionPosts = [];
+    turn.resolve();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const messages = await host.messages.listAsync(ConversationEngineTests.list(conversation.id));
+
+    Assert.areEqual("0", decided.answers?.map(t => t.questionId).join(","));
+    Assert.areEqual("0", (await host.approvals.findAsync(first.id))?.answers?.map(t => t.questionId).join(","));
+    Assert.areEqual(0, secretOnly.answers?.length);
+    Assert.areEqual(JSON.stringify({ replyTo: "msg-2" }), JSON.stringify(secretOnly.payload));
+    Assert.areEqual(4, messages.length);
+    Assert.areEqual("> Which platform?\n> Pick one\n\nWeb", messages[2]?.details[0]?.text);
+    Assert.isFalse(host.adapter.requests.some(t => t.prompt.includes("hunter2")));
   }
 
   @TestMethod
@@ -1347,10 +1569,9 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  @TestData("capture", 0, MessageStatus.Cancelled)
-  @TestData("compare", 1, MessageStatus.Completed)
-  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndKeepsTheFinishedTurnWhileItCompares(held: "capture" | "compare", turns: number,
-    status: MessageStatus): Promise<void> {
+  @TestData("capture", 0)
+  @TestData("compare", 1)
+  public async stopsAReplyBeforeItsTurnWhileTheModuleCapturesAndAfterItWhileItCompares(held: "capture" | "compare", turns: number): Promise<void> {
     await using host = await CoreHost.createAsync();
     ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
@@ -1361,7 +1582,7 @@ export class ConversationEngineTests {
 
     const stopped = await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
 
-    Assert.areEqual(status, stopped.status);
+    Assert.areEqual(MessageStatus.Cancelled, stopped.status);
     Assert.isTrue(host.checkpoints.signals.at(-1)?.aborted ?? false);
     Assert.areEqual(turns, host.adapter.requests.length);
     Assert.areEqual(turns === 1, !Object.isNullOrUndefined(stopped.provenance?.nativeTurnId));
@@ -1785,6 +2006,64 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
+  @TestData("error")
+  @TestData("text")
+  public async saysTheFilesWereRestoredAndWhyWhenARewindCantRemoveItsMessagesAndRemovesThemOnASecondRewind(thrownAs: "error" | "text"): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
+    const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
+    host.adapter.writeFiles = { "base.txt": "reply\n" };
+    const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
+    await host.engine.waitForIdle();
+    const reason = thrownAs === "error" ? "The disk is full." : "database or disk is full";
+    const failure: unknown = thrownAs === "error" ? new Error(reason) : reason;
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    let failures = 1;
+    connection.runInTransactionAsync = async work => failures-- > 0
+      ? await runInTransactionAsync(async transaction => {
+        await work(transaction);
+        throw failure;
+      })
+      : await runInTransactionAsync(work);
+
+    const thrown = await Assert.throwsAsync(() => host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true)), ServiceException);
+    const kept = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length;
+    const restored = readFileSync(join(folder, "base.txt"), "utf8");
+    const again = await host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, true));
+
+    const described = RequestDispatcher.describe(thrown);
+    Assert.areEqual(`${ErrorCode.Internal}:${Resources.formatRewindNotSavedAfterRestore(reason)}:true:true`,
+      `${described.name}:${described.message}:${described.message.endsWith(`Rewind again to remove them. They couldn't be removed: ${reason}`)}:${thrown.cause === failure}`);
+    Assert.areEqual("2:one\n", `${kept}:${restored}`);
+    Assert.areEqual(2, again.removedMessageIds.length);
+    Assert.areEqual(0, (await host.messages.listAsync(new MessageListParams(conversation.id, null))).length);
+    Assert.areEqual(1, host.listener.count(EventName.ConversationRewound));
+  }
+
+  @TestMethod
+  public async failsARewindThatRestoresNoFilesWithItsOwnErrorWhenItsMessagesCantBeRemoved(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const folder = ConversationEngineTests.folder(join(host.directory.path, "repo"), { "base.txt": "one\n" });
+    const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
+    host.adapter.writeFiles = { "base.txt": "reply\n" };
+    const sent = await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Change"));
+    await host.engine.waitForIdle();
+    const failure = new Error("The disk is full.");
+    const connection = host.context.database.connection;
+    const runInTransactionAsync = connection.runInTransactionAsync.bind(connection);
+    connection.runInTransactionAsync = async work => await runInTransactionAsync(async transaction => {
+      await work(transaction);
+      throw failure;
+    });
+
+    const thrown = await Assert.throwsAsync(() => host.engine.rewindAsync(new ConversationRewindParams(conversation.id, sent.sent.id, false)), Error);
+
+    Assert.areEqual(failure, thrown);
+    Assert.areEqual("2:reply\n", `${(await host.messages.listAsync(new MessageListParams(conversation.id, null))).length}:${readFileSync(join(folder, "base.txt"), "utf8")}`);
+  }
+
+  @TestMethod
   public async failsAProjectChatsReplyWithoutStartingTheProviderWhileTheProjectsFolderIsMissingAndRunsItOnceTheFolderIsBack(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync("repo");
@@ -2169,6 +2448,13 @@ export class ConversationEngineTests {
     return new QuestionAsk(id, "request_user_input_async", [
       new ApprovalQuestion("0", "", "Which platform?\nPick one", [new QuestionOption("Desktop app", ""), new QuestionOption("Web", "")], false, true, false),
       new ApprovalQuestion("1", "", "Anything else?", [], false, true, false)
+    ]);
+  }
+
+  private static postedSecret(id: string): QuestionAsk {
+    return new QuestionAsk(id, "request_user_input_async", [
+      new ApprovalQuestion("0", "", "Which platform?\nPick one", [new QuestionOption("Desktop app", ""), new QuestionOption("Web", "")], false, true, false),
+      new ApprovalQuestion("1", "", "Your token?", [], false, true, true)
     ]);
   }
 

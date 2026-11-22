@@ -1,0 +1,27 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="resources.organizationNewDepartment" (dismissed)="closed.emit()">
+  <form id="nol-teamrun-department-form" class="nol-teamrun-form" novalidate (submit)="save($event)">
+    <label class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationDepartmentNameLabel }}</span>
+      <input #field nol-text-field class="nol-teamrun-department-name" name="name" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="name()"
+        [disabled]="saving()" (input)="edit()">
+    </label>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationLeaderLabel }}</span>
+      <nol-select class="nol-teamrun-department-leader" [label]="resources.organizationLeaderLabel" [options]="leaderOptions()" [value]="leaderId()"
+        [disabled]="saving()" (valueChange)="chooseLeader($event)" />
+    </div>
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="closed.emit()">{{ resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-department-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ resources.organizationCreateLabel }}</button>
+</nol-dialog>

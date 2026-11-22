@@ -4,13 +4,13 @@
   "displayName": "TeamRun",
   "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
   "parts": ["runtime", "window", "cli"],
-  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.3" },
-  "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.3", "git-github": "0.0.3" },
-  "noldovaDesktop": ">=0.0.10 <0.1.0",
+  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.7" },
+  "optionalDependencies": { "browser": "0.0.6", "computer-use": "0.0.2", "git": "0.0.6", "git-github": "0.0.6" },
+  "noldovaDesktop": ">=0.0.14 <0.1.0",
   "contributes": {
     "methods": [
-      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.organizationMessageSend", "teamrun.organizationMessageStop", "teamrun.organizationMessageList", "teamrun.departmentCreate", "teamrun.departmentUpdate",
-      "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.defaultTeammateRead",
+      "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.organizationCreate", "teamrun.organizationUpdate", "teamrun.organizationDelete", "teamrun.organizationChatOpen", "teamrun.departmentCreate", "teamrun.departmentUpdate",
+      "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.nodeTypeCreate", "teamrun.nodeTypeUpdate", "teamrun.nodeTypeDelete", "teamrun.teammatePlace", "teamrun.organizationLayoutRead", "teamrun.organizationLayoutSave", "teamrun.defaultTeammateRead",
       "teamrun.defaultTeammateSet", "teamrun.conversationAddMember",
       "teamrun.conversationRemoveMember", "teamrun.conversationSetMemberMode", "teamrun.conversationSetMemberSettings", "teamrun.conversationSetPlanFirst", "teamrun.conversationListMembers", "teamrun.attachmentPrepare", "teamrun.attachmentDiscard", "teamrun.attachmentRead", "teamrun.attachmentShare", "teamrun.attachmentExists", "teamrun.writtenImageRead", "teamrun.writtenImageShare", "teamrun.linkedFolderList", "teamrun.draftSave", "teamrun.draftRead", "teamrun.draftDiscard", "teamrun.readingPositionList", "teamrun.readingPositionSave", "teamrun.runOutputList", "teamrun.runOutputSave", "teamrun.dataFolderRead", "teamrun.firstLaunchRead", "teamrun.firstLaunchFinish", "teamrun.providerKindList",
       "teamrun.providerListModels", "teamrun.providerModelCatalog", "teamrun.providerKindInstallationList", "teamrun.providerKindInstall",
@@ -20,15 +20,15 @@
       "teamrun.conversationSearch", "teamrun.messageList", "teamrun.messageListOpen", "teamrun.messagePage", "teamrun.messageActivityPage",
       "teamrun.messageChangesPage", "teamrun.messagePlanPage", "teamrun.messageSubAgentsPage", "teamrun.messageSummary", "teamrun.messageDetails", "teamrun.messageSend", "teamrun.messageCancel", "teamrun.messageApprovePlan",
       "teamrun.conversationCancel", "teamrun.approvalList", "teamrun.approvalListPending", "teamrun.approvalDecide", "teamrun.planUsageList",
-      "teamrun.planUsageRead", "teamrun.teammateUsageList", "teamrun.backgroundTaskList", "teamrun.backgroundTaskStop", "teamrun.chatFind", "teamrun.messageSearch", "teamrun.subAgentStart", "teamrun.subAgentStop", "teamrun.subAgentWait", "teamrun.commandStart",
+      "teamrun.planUsageRead", "teamrun.teammateUsageList", "teamrun.teammateLastReplyList", "teamrun.backgroundTaskList", "teamrun.backgroundTaskStop", "teamrun.chatFind", "teamrun.messageSearch", "teamrun.subAgentStart", "teamrun.subAgentStop", "teamrun.subAgentWait", "teamrun.commandStart",
       "teamrun.backgroundTaskClearFinished", "teamrun.backgroundTaskRead", "teamrun.windowFocused", "teamrun.windowClosed", "teamrun.windowReload",
       "teamrun.panelAnswered", "teamrun.providerOwnMcpServerList", "teamrun.sharedMcpServerList", "teamrun.sharedMcpServerCreate", "teamrun.sharedMcpServerUpdate",
       "teamrun.sharedMcpServerDelete", "teamrun.sharedMcpProviderSet", "teamrun.sharedMcpTeammateSet", "teamrun.sharedMcpSecretSet",
       "teamrun.sharedMcpSignInStart", "teamrun.sharedMcpSignOut",
-      "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset",
+      "teamrun.messageDetailsAfter", "teamrun.computerUseGrantList", "teamrun.computerUseGrantRevoke", "teamrun.outsideConnectionRead", "teamrun.outsideTokenReset", "teamrun.teammateWorkRead",
       "teamrun.waitingMessageAdd", "teamrun.waitingMessageList", "teamrun.waitingMessageEdit", "teamrun.waitingMessageRemove",
       "teamrun.waitingMessageSendNow",
-      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList"
+      "teamrun.pageOpen", "teamrun.pageRead", "teamrun.pageRestore", "teamrun.pageList", "teamrun.pageEditedList"
     ],
     "events": [
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.messageCreated", "teamrun.messageUpdated",
@@ -36,11 +36,11 @@
       "teamrun.approvalUpdated", "teamrun.providerUpdated", "teamrun.providerSignInsChanged", "teamrun.providerKindsChanged", "teamrun.providerKindInstallationChanged",
       "teamrun.conversationRewound", "teamrun.conversationDeleted", "teamrun.signInLink", "teamrun.planUsageUpdated", "teamrun.backgroundTaskUpdated",
       "teamrun.backgroundTaskOutput", "teamrun.backgroundTasksCleared", "teamrun.projectsLayoutUpdated", "teamrun.projectFolderChanged", "teamrun.composerDefaultUpdated",
-      "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged", "teamrun.organizationChanged", "teamrun.organizationMessageUpdated",
-      "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
+      "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged", "teamrun.organizationChanged", "teamrun.organizationRemoved", "teamrun.organizationLayoutUpdated",
+      "teamrun.messageSending", "teamrun.messageSendAbandoned", "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
     ],
     "commands": [
-      "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",
+      "teamrun.showOrganization", "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",
       "teamrun.stopReply", "teamrun.previousConversation", "teamrun.nextConversation", "teamrun.moveRowUp", "teamrun.moveRowDown",
       "teamrun.chooseDefaultTeammate", "teamrun.showDataFolder", "teamrun.openChat", "teamrun.enableProvider", "teamrun.reload", "teamrun.newChatTerminal"
     ],
@@ -49,9 +49,9 @@
     "statusBarItems": ["teamrun.planUsage"],
     "topBarActions": ["teamrun.chatPage"],
     "menus": ["teamrun.chats"],
-    "documents": ["teamrun.conversation", "teamrun.image", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
+    "documents": ["teamrun.conversation", "teamrun.image", "teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
     "placeholders": ["teamrun.noChat"],
-    "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
+    "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.organizationMessageFlow", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
     "settingsPages": ["teamrun.abilities"],
     "tools": [
       "teamrun_list_projects", "teamrun_list_chats", "teamrun_list_messages", "teamrun_list_approvals", "teamrun_list_providers",

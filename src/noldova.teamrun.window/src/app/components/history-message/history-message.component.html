@@ -140,7 +140,7 @@ LICENSE file in the root directory of this source tree.
     }
   </ng-template>
   @for (segment of errorSegments(); track segment.key) {
-    <ng-template [nolMessageSlot]="errorSlotOf(segment)">
+    <ng-template [nolMessageSlot]="errorSlotOf(segment)" [nolMessageSlotAttached]="stoppedErrors().has(segment.detail)">
       @if (areSlotsShown() && stoppedErrors().has(segment.detail)) {
         <p class="reply-stopped" role="status">{{ segment.detail?.text }}</p>
       } @else if (areSlotsShown()) {

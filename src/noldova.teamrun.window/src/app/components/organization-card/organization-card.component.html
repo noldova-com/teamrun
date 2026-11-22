@@ -1,0 +1,123 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div class="head">
+  <nol-teamrun-teammate-avatar [teammate]="teammate()" [decorative]="true" />
+  <div class="who">
+    @if (editing()) {
+      <span class="name plain">{{ teammate().name }}</span>
+    } @else {
+      <button type="button" class="name" [attr.aria-label]="resources.formatOrganizationMessageNamed(teammate().name)" (click)="message.emit()">{{ teammate().name }}</button>
+    }
+    @if (shape() === shapes.Fluid) {
+      @if (roleLine(); as line) {
+        <span class="role">{{ line }}</span>
+      }
+    } @else if (teammate().role; as role) {
+      <span class="role">{{ role }}</span>
+    }
+  </div>
+  @if (shape() === shapes.Fluid && !editing()) {
+    <button type="button" nol-icon-button class="chat" [icon]="resources.organizationBoardMessageIcon" [label]="resources.formatOrganizationMessageNamed(teammate().name)"
+      (click)="message.emit()"></button>
+  }
+  @if (editsIn(); as department) {
+    <button type="button" nol-icon-button class="remove" [icon]="resources.organizationRemoveIcon" [label]="resources.formatOrganizationRemoveNamed(teammate().name)"
+      (click)="confirmRemove(department)"></button>
+  }
+  <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
+    [label]="resources.formatOrganizationCardMenu(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
+</div>
+@if (editing()) {
+  <div class="move">
+    <span class="move-label" aria-hidden="true">{{ resources.organizationDetailsReportsTo }}</span>
+    <nol-select class="move-choice" [label]="resources.formatOrganizationMoveLabel(teammate().name)" [options]="placeOptions()" [value]="placeKey()"
+      (valueChange)="move($event)" />
+  </div>
+}
+@if (fields().has(fieldNames.Status)) {
+  <nol-teamrun-teammate-status class="status" [teammateId]="teammate().id" />
+}
+@if (fields().has(fieldNames.Now) && shape() === shapes.Fluid && activities().length > 0) {
+  <ul class="acts" [attr.aria-label]="resources.formatOrganizationNowOf(teammate().name)">
+    @for (activity of activities(); track activity.chatId) {
+      <li class="act">
+        <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationNowRunningIcon }}</span>
+        <span class="now-body">
+          <span class="now-text">{{ activity.text }}</span>
+          <span class="now-for">{{ activity.lasted }}</span>
+        </span>
+      </li>
+    }
+  </ul>
+} @else if (fields().has(fieldNames.Now)) {
+  @let shown = now();
+  <div class="now">
+    <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ shown.icon }}</span>
+    <span class="now-body">
+      <span class="now-text">{{ shown.text }}</span>
+      @if (shown.lasted; as lasted) {
+        <span class="now-for">{{ lasted }}</span>
+      }
+    </span>
+  </div>
+}
+@if (fields().has(fieldNames.Usage)) {
+  @if (usage(); as shown) {
+    <nol-meter class="usage" [label]="shown.meter.label" [value]="shown.used" [warning]="shown.used >= resources.organizationUsageWarning">{{ resources.formatOrganizationUsage(shown.used) }}</nol-meter>
+  }
+}
+@if (fields().has(fieldNames.Last)) {
+  @if (last(); as reply) {
+    <p class="last">{{ reply.text }}</p>
+  }
+}
+@if (fields().has(fieldNames.Model)) {
+  @if (model(); as text) {
+    <span class="model">{{ text }}</span>
+  }
+}
+@if (showsWork()) {
+  <nol-teamrun-teammate-work [teammateId]="teammate().id" [fields]="fields()" />
+}
+<ng-template #fieldsMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.formatOrganizationCardShows(teammate().name)">
+      @for (field of resources.organizationOfferedFields; track field) {
+        <button nol-menu-item [label]="resources.organizationFieldLabels[field]" [checkbox]="true" [checked]="fields().has(field)"
+          (triggered)="layout.showOnCard(teammate().id, field, !fields().has(field))"></button>
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item class="use-every-card" [label]="resources.organizationUseEveryCard" [icon]="resources.organizationResetIcon"
+      [disabled]="!layout.layout().hasOwnFields(teammate().id)" (triggered)="layout.clearCard(teammate().id)"></button>
+    <nol-menu-separator />
+    <nol-menu-group class="works-in" [label]="worksIn()">
+      <button nol-menu-item [icon]="resources.moveToProjectIcon" [label]="inProject() ? resources.moveToAnotherProjectLabel : resources.moveToProjectLabel"
+        [nolMenuTriggerFor]="moveMenu"></button>
+      @if (!inProject()) {
+        <button nol-menu-item [icon]="resources.attachFolderIcon" [label]="attachedChat() ? resources.replaceFolderLabel : resources.attachFolderLabel"
+          (triggered)="attachFolder()"></button>
+        @if (attachedChat(); as attachedChat) {
+          <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachFolder(attachedChat)"></button>
+        }
+      }
+    </nol-menu-group>
+  </nol-menu>
+</ng-template>
+<ng-template #moveMenu>
+  <nol-menu>
+    @for (project of otherProjects(); track project.id) {
+      <button nol-menu-item [label]="project.name" (triggered)="moveToProject(project)"></button>
+    }
+    @if (otherProjects().length > 0) {
+      <nol-menu-separator />
+    }
+    <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="moveToFolder()"></button>
+  </nol-menu>
+</ng-template>

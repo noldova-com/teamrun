@@ -11,8 +11,8 @@ import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { DatePattern } from "@noldova/desktop.protocol";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { DatePattern, FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import { ComputerUseGrant, ComputerUseGrantIdParams, MethodName } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -254,12 +254,113 @@ describe("ComputerUseGrantsViewComponent", () => {
     expect(element().querySelector(".nol-teamrun-error")).toBeNull();
   });
 
-  it("shows a failed list above the table and no apps", async () => {
+  it("shows a failed first list above the table, with no apps and no line saying it reads them or that there are none", async () => {
     await create(t => t.fail(MethodName.ComputerUseGrantList, "The method is not available."));
 
     expect(texts(".nol-teamrun-error-text")).toEqual(["The method is not available."]);
     expect(rows()).toHaveLength(0);
-    expect(texts(".nol-teamrun-no-grants")).toEqual([none]);
+    expect(element().querySelector(".nol-teamrun-no-grants")).toBeNull();
+  });
+
+  it("keeps the apps it last listed beside the error when a later list fails, and says none again once a list answers", async () => {
+    let failing = false;
+    await create(t => t.answer(MethodName.ComputerUseGrantList, () => {
+      if (failing)
+        return Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting."));
+      return grants.map(u => u.toJson());
+    }));
+    failing = true;
+
+    revokeButton(0).click();
+    await Wait.until(() => expect(texts(".nol-teamrun-error-text")).toEqual(["The runtime is restarting."]));
+
+    expect(rows().map(t => texts("td", t)[0])).toEqual(["com.example.mail", "com.example.notes", "paint.exe"]);
+    expect(element().querySelector(".nol-teamrun-no-grants")).toBeNull();
+    failing = false;
+    grants = [];
+    revokeButton(0).click();
+    await Wait.until(() => expect(texts(".nol-teamrun-no-grants")).toEqual([none]));
+    expect(rows()).toHaveLength(0);
+    expect(texts(".nol-teamrun-error-text")).toEqual([]);
+  });
+
+  it("reads the apps again on Retry beside a failed list, once for a second click while it reads, and drops the error once they answer", async () => {
+    let failing = true;
+    await create(t => t.answer(MethodName.ComputerUseGrantList, () => failing
+      ? Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting."))
+      : grants.map(u => u.toJson())));
+    const lists = (): number => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ComputerUseGrantList)).length;
+    await Wait.until(() => expect(texts(".nol-teamrun-error-text")).toEqual(["The runtime is restarting."]));
+    const alert = part(element(), ".nol-teamrun-read-failed");
+    const retry = part(alert, ".nol-teamrun-retry-read");
+    const message = part(alert, ".nol-teamrun-error-text").getBoundingClientRect();
+
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(retry.textContent?.trim()).toBe("Retry");
+    expect(Math.abs(retry.getBoundingClientRect().right - alert.getBoundingClientRect().right)).toBeLessThanOrEqual(0.5);
+    expect(message.right).toBeLessThanOrEqual(retry.getBoundingClientRect().left);
+    expect(rows()).toHaveLength(0);
+    const before = lists();
+    failing = false;
+    retry.click();
+    retry.click();
+
+    await Wait.until(() => expect(rows()).toHaveLength(4));
+    expect(lists()).toBe(before + 1);
+    expect(element().querySelector(".nol-teamrun-read-failed")).toBeNull();
+    expect(texts(".nol-teamrun-error-text")).toEqual([]);
+  });
+
+  describe("when two lists answer out of order", () => {
+    const answers: ((failed: boolean) => void)[] = [];
+    const answer = (index: number, failed: boolean): void => {
+      const found = answers[index];
+      if (Object.isUndefined(found))
+        throw new RangeError(`There is no list ${index}.`);
+      found(failed);
+    };
+    const revokeTwo = async (): Promise<void> => {
+      answers.length = 0;
+      let held = false;
+      await create(t => t.answer(MethodName.ComputerUseGrantList, () => {
+        const listed = grants.map(u => u.toJson());
+        return held
+          ? new Promise<JsonValue>((resolve, reject) => answers.push(failed => failed
+            ? reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting."))
+            : resolve(listed)))
+          : listed;
+      }));
+      held = true;
+      revokeButton(0).click();
+      await Wait.until(() => expect(answers).toHaveLength(1));
+      revokeButton(0).click();
+      await Wait.until(() => expect(answers).toHaveLength(2));
+    };
+
+    it("shows the latest list's apps and drops an older list's answer that lands after it", async () => {
+      await revokeTwo();
+
+      answer(1, false);
+      await settle();
+      answer(0, false);
+      await settle();
+
+      expect(revoked()).toEqual(["g4", "g3"]);
+      expect(rows().map(t => texts("td", t)[0])).toEqual(["com.example.notes", "paint.exe"]);
+      expect(texts(".nol-teamrun-error-text")).toEqual([]);
+    });
+
+    it("drops an older list's failure that lands after the latest list answers", async () => {
+      await revokeTwo();
+
+      answer(1, false);
+      await settle();
+      answer(0, true);
+      await settle();
+
+      expect(rows().map(t => texts("td", t)[0])).toEqual(["com.example.notes", "paint.exe"]);
+      expect(texts(".nol-teamrun-error-text")).toEqual([]);
+    });
   });
 
   it("shows a failed list that isn't an error by its text", async () => {

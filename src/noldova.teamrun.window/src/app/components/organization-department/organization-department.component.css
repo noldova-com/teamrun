@@ -1,0 +1,104 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.department {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--nol-space-1) + var(--nol-space-half));
+  box-sizing: border-box;
+  width: 15rem;
+  padding: var(--nol-space-3);
+  border: 1px solid var(--nol-card-border);
+  border-radius: var(--nol-radius-medium);
+  background: light-dark(var(--nol-panel), var(--nol-raised));
+}
+
+.department-row {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  min-width: 0;
+}
+
+.department-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: 1.25rem;
+  padding: 0 calc(var(--nol-space-1) + var(--nol-space-half));
+  border-radius: var(--nol-radius-small);
+  background: var(--nol-badge);
+  color: var(--nol-badge-text);
+  font-size: var(--nol-text-small);
+  font-weight: var(--nol-weight-emphasis);
+  white-space: nowrap;
+}
+
+.department-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.leader-choice {
+  width: 100%;
+}
+
+.department-summary,
+.hidden {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.message {
+  align-self: flex-start;
+}
+
+.hidden {
+  padding: var(--nol-space-2) 0 0 var(--nol-space-4);
+}
+
+.stem {
+  width: 1px;
+  height: var(--nol-space-3);
+  background: var(--nol-menu-border);
+}
+
+:host(.report) > .self {
+  width: 13.25rem;
+}
+
+nol-teamrun-organization-card:is(:focus-visible, [data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  nol-teamrun-organization-card:is(:focus-visible, [data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}

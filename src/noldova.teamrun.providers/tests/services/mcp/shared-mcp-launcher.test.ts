@@ -13,7 +13,7 @@ import { constants } from "node:os";
 import path from "node:path";
 import { Duplex, PassThrough, Writable } from "node:stream";
 
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { SharedMcpLauncher } from "@noldova/teamrun.providers";
 
@@ -27,7 +27,8 @@ export class SharedMcpLauncherTests {
   private static readonly INPUT_SCRIPT: string = "process.stdin.resume(); process.stdin.on(\"end\", () => process.exit(0))";
   private static readonly NO_SUCH_PROGRAM: string = "teamrun-no-such-program";
   private static readonly VERSION_OPTION: string = "--version";
-  private static readonly HANDED: string = "4321 1700000000000 1700000000005\n";
+  private static readonly HANDED: string = "4321\n";
+  private static readonly EXITED: string = "4321\nexited\n";
   private static readonly HOLD: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
     + "|| { echo missing >&3; exit 127; }; case $found in */*) [ -f \"$found\" ] && [ -x \"$found\" ] || { echo denied >&3; exit 126; };; esac; exec 3<&-; "
     + "exec /usr/bin/env";
@@ -88,19 +89,17 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
-  public async handsTheWatchTheServersIdAndTimesAsSoonAsTheServerStartsAndBeforeWaitingForAnything(): Promise<void> {
+  public async handsTheWatchTheServersIdAsSoonAsTheServerStartsAndSaysOnceTheServerExits(): Promise<void> {
     const host = new FakeLauncherHost();
     const input = new PassThrough();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.watching(input), SharedMcpLauncherTests.exiting(0));
-    const before = Date.now();
 
     const running = new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", "server"]);
     const handed = String(input.read());
     await running;
 
-    const [processId, started, startedBy] = handed.split(" ").map(t => Number(t));
-    Assert.areEqual(JSON.stringify([["--watch", "server"], recorder.children[1]?.pid, true, true]), JSON.stringify([[recorder.starts[0]?.args[1],
-      recorder.starts[1]?.args[2]], processId, handed.endsWith("\n"), before <= Number(started) && Number(started) < Number(startedBy)]));
+    Assert.areEqual(JSON.stringify([["--watch", "server"], `${String(recorder.children[1]?.pid)}\n`, "exited\n"]), JSON.stringify([[recorder.starts[0]?.args[1],
+      recorder.starts[1]?.args[2]], handed, String(input.read())]));
     Assert.isFalse(input.writableEnded);
   }
 
@@ -120,7 +119,7 @@ export class SharedMcpLauncherTests {
     await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", "server"]);
 
     const [[line, handed] = ["", ""]] = released;
-    Assert.areEqual(JSON.stringify(["go\n", true, 1, true, [0]]), JSON.stringify([line, handed.startsWith("4321 "), released.length, release.writableFinished, host.codes]));
+    Assert.areEqual(JSON.stringify(["go\n", true, 1, true, [0]]), JSON.stringify([line, handed === SharedMcpLauncherTests.HANDED, released.length, release.writableFinished, host.codes]));
   }
 
   @TestMethod
@@ -328,7 +327,7 @@ export class SharedMcpLauncherTests {
     await running;
 
     const script = Buffer.from(String(recorder.starts[0]?.args[3]), "base64").toString("utf16le");
-    Assert.areEqual(JSON.stringify([true, true, true, true, true, true]), JSON.stringify(["$_.ProcessId -eq 5555 })", "$_.ProcessId -eq 6666 })",
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ", "$_.ProcessId -eq 5555 })", "$_.ProcessId -eq 6666 })",
       "$_.ParentProcessId -eq 6666 -and $_.ProcessId -ne 5555 -and $_.Created -ge $self[0].Created", "-and $_.Created -lt $by", "$tree[$root.ProcessId] = $root.Created",
       "Stop-Process -Id $_.ProcessId -Force"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
@@ -380,6 +379,7 @@ export class SharedMcpLauncherTests {
     await running;
 
     Assert.areEqual(JSON.stringify([0]), JSON.stringify(host.codes));
+    Assert.areEqual(JSON.stringify(["pipe", "ignore", "inherit"]), JSON.stringify(recorder.starts[0]?.options.stdio));
     Assert.areEqual(JSON.stringify({ command: path.join("C:\\tools\\server.exe"), args: ["--stdio"], options: { env: { Path: "C:\\Windows", SystemRoot: "C:\\Windows",
       search_key: "s1" }, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: false, detached: false } }), JSON.stringify(recorder.starts[1]));
     Assert.areEqual(JSON.stringify([[recorder.children[1]?.pid, "SIGTERM"]]), JSON.stringify(host.signals));
@@ -480,10 +480,10 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
-  public async endsNothingWhenItsInputEndsWithoutAWholeLineOfTheServersIdAndTimes(): Promise<void> {
+  public async endsNothingWhenItsInputEndsWithoutAWholeLineOfTheServersId(): Promise<void> {
     const outcomes: unknown[] = [];
 
-    for (const text of ["", "4321 1700000000000 1700000000005", "4321 1700000000000\n", "0 1700000000000 1700000000005\n", "x 1 2\n"]) {
+    for (const text of ["", "4321", "4321 1700000000000 1700000000005\n", "0\n", "x\n"]) {
       for (const platform of ["linux", "win32"]) {
         const host = new FakeLauncherHost();
         const recorder = SharedMcpLauncherTests.recorder();
@@ -511,7 +511,7 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
-  public async endsEachProcessUnderTheServerThatStartedAfterItThroughPowerShellOnWindows(): Promise<void> {
+  public async endsTheServerAndEachProcessUnderItThatStartedAfterTheWatchByTheKernelsTimesOnWindows(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
     const environment = { SystemRoot: "C:\\Windows" };
@@ -524,10 +524,137 @@ export class SharedMcpLauncherTests {
     const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
     Assert.areEqual(JSON.stringify(["powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand"], { env: environment, stdio: "ignore", windowsHide: true }]),
       JSON.stringify([powershell?.command, powershell?.args.slice(0, 3), powershell?.options]));
-    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, false]), JSON.stringify(["FromUnixTimeMilliseconds(1700000000000).UtcDateTime",
-      "FromUnixTimeMilliseconds(1700000000005).UtcDateTime", "Created = $_.CreationDate.ToUniversalTime()", "$_.ProcessId -eq 4321",
-      "$tree[[uint32]4321] = $since", "Stop-Process -Id $_.ProcessId -Force", "LocalDateTime"].map(t => script.includes(t))));
+    Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true, true, false, false]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ",
+      "Created = $_.CreationDate.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
+      "$ours = $true -and $holder.Count -gt 0 -and $holder[0].Created -ge $self[0].Created -and $holder[0].ParentProcessId -eq $self[0].ParentProcessId; ",
+      "$_.ParentProcessId -eq 4321 -and $_.Created -ge $self[0].Created -and $_.Created -lt $before", "$_.Created -ge $tree[$_.ParentProcessId]",
+      "if ($ending.Count -eq 0) { exit 4 }; ", "Stop-Process -Id $_.ProcessId -Force", "FromUnixTimeMilliseconds", "LocalDateTime"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
+  }
+
+  @TestMethod
+  public async endsOnlyWhatTheServerStartedWhenAProcessTheLauncherDidNotStartHoldsItsIdOnWindows(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    const script = Buffer.from(String(recorder.starts[0]?.args[3]), "base64").toString("utf16le");
+    Assert.areEqual(JSON.stringify([true, true, true]), JSON.stringify(["-and $holder[0].ParentProcessId -eq $self[0].ParentProcessId; ",
+      "$before = if ($holder.Count -gt 0 -and -not $ours) { $holder[0].Created } else { [DateTime]::MaxValue }; ",
+      "$ending = @(if ($ours) { $holder } else { $all | Where-Object { $_.ParentProcessId -eq 4321 -and $_.Created -ge $self[0].Created -and $_.Created -lt $before } }); "]
+      .map(t => script.includes(t))));
+  }
+
+  @TestMethod
+  public async endsOnlyWhatTheServerStartedBeforeAnotherProcessTookItsIdOnceItExitedOnWindows(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.EXITED);
+    await running;
+
+    const script = Buffer.from(String(recorder.starts[0]?.args[3]), "base64").toString("utf16le");
+    Assert.areEqual(JSON.stringify([true, true, [0], ""]), JSON.stringify([...["$ours = $false -and $holder.Count -gt 0",
+      "$before = if ($holder.Count -gt 0 -and -not $ours) { $holder[0].Created } else { [DateTime]::MaxValue }; "].map(t => script.includes(t)), host.codes, host.errors]));
+  }
+
+  @TestMethod
+  @TestData("4321\n", 0, "")
+  @TestData("4321\n", 1, "TeamRun's MCP watch: PowerShell 1 of 2 exited with 1 after 5 ms.\n")
+  @TestData("4321\n", 3, "TeamRun's MCP watch: PowerShell 1 of 2 exited with 3 after 5 ms.\n")
+  @TestData("4321\n", 4, "TeamRun's MCP watch: its launcher ended before server 4321, and PowerShell found nothing of it to end.\n")
+  @TestData("4321\nexited\n", 4, "")
+  @TestData("4321\nexited\n", 1, "TeamRun's MCP watch: PowerShell 1 of 2 exited with 1 after 5 ms.\n")
+  public async writesALineOnWindowsWhenPowershellFailsOrALauncherKilledBeforeItsServerLeavesNothingToEnd(input: string, code: number, written: string): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(code));
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, undefined, SharedMcpLauncherTests.clock(0, 5))
+      .runAsync(true, ["--watch"]);
+    host.stdin.end(input);
+    await running;
+
+    Assert.areEqual(JSON.stringify([[0], 1, written]), JSON.stringify([host.codes, recorder.starts.length, host.errors]));
+  }
+
+  @TestMethod
+  public async endsAPowershellThatDoesntAnswerWithinItsLimitOnWindowsAndListsOnceMoreInANewOne(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.exiting(0));
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number, signal?: AbortSignal): Promise<void> => {
+      limits.push(milliseconds);
+      if (limits.length > 1)
+        await new Promise((_, reject) => signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync,
+      SharedMcpLauncherTests.clock(0, 10_000, 10_000, 10_400)).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+    const [stalled, second] = recorder.starts;
+
+    Assert.areEqual(JSON.stringify([2, "powershell.exe", true, [SharedMcpLauncher.powershellAnswerMilliseconds,
+      SharedMcpLauncher.windowsEndMilliseconds - SharedMcpLauncher.powershellAnswerMilliseconds], [true, false], [0],
+    "TeamRun's MCP watch: PowerShell 1 of 2 didn't end and was ended after 10000 ms.\n"]),
+    JSON.stringify([recorder.starts.length, second?.command, second?.args[3] === stalled?.args[3], limits, recorder.children.map(t => t.killed), host.codes,
+      host.errors]));
+  }
+
+  @TestMethod
+  public async endsTheRetrysPowershellTooWhenItDoesntAnswerWithinTheRestOfTheEndsTimeOnWindows(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.waiting());
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number): Promise<void> => {
+      limits.push(milliseconds);
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync,
+      SharedMcpLauncherTests.clock(0, 10_000, 10_000, 20_000)).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([2, SharedMcpLauncher.windowsEndMilliseconds, [true, true], [0],
+      "TeamRun's MCP watch: PowerShell 1 of 2 didn't end and was ended after 10000 ms.\nTeamRun's MCP watch: PowerShell 2 of 2 didn't end and was ended after 10000 ms.\n"]),
+    JSON.stringify([recorder.starts.length, limits.reduce((total, t) => total + t, 0), recorder.children.map(t => t.killed), host.codes, host.errors]));
+  }
+
+  @TestMethod
+  public async endsBothPowershellsWithinTheEndsTimeOnWindowsWhenItsErrorsCantBeWritten(): Promise<void> {
+    const host = new FakeLauncherHost();
+    Object.defineProperty(host, "stderr", { value: new Writable({ write: (_chunk, _encoding, done) => done(new Error("write EPIPE")) }) });
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.waiting(), SharedMcpLauncherTests.waiting());
+    const limits: number[] = [];
+    const delayAsync = async (milliseconds: number): Promise<void> => {
+      limits.push(milliseconds);
+    };
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, delayAsync).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([2, SharedMcpLauncher.windowsEndMilliseconds, [true, true], [0]]),
+      JSON.stringify([recorder.starts.length, limits.reduce((total, t) => total + t, 0), recorder.children.map(t => t.killed), host.codes]));
+  }
+
+  @TestMethod
+  @TestData(2000, "")
+  @TestData(2001, "TeamRun's MCP watch: PowerShell 1 of 2 ended after 2001 ms.\n")
+  public async writesAPowershellsTimeOnWindowsOnlyWhenItTakesOverTwoSeconds(elapsed: number, written: string): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, undefined, SharedMcpLauncherTests.clock(0, elapsed))
+      .runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    Assert.areEqual(JSON.stringify([[0], 1, written]), JSON.stringify([host.codes, recorder.starts.length, host.errors]));
   }
 
   @TestMethod
@@ -535,11 +662,13 @@ export class SharedMcpLauncherTests {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.failing());
 
-    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    const running = new SharedMcpLauncher("win32", {}, "node", "launch.js", host, recorder.start, undefined, undefined, SharedMcpLauncherTests.clock(0, 5))
+      .runAsync(true, ["--watch"]);
     host.stdin.end(SharedMcpLauncherTests.HANDED);
     await running;
 
-    Assert.areEqual(JSON.stringify([[0], 1]), JSON.stringify([host.codes, recorder.starts.length]));
+    Assert.areEqual(JSON.stringify([[0], 1, "TeamRun's MCP watch: PowerShell 1 of 2 failed to start after 5 ms.\n"]),
+      JSON.stringify([host.codes, recorder.starts.length, host.errors]));
   }
 
   @TestMethod
@@ -642,6 +771,10 @@ export class SharedMcpLauncherTests {
       child.stdin = input;
       return child;
     };
+  }
+
+  private static clock(...times: number[]): () => number {
+    return () => times.shift() ?? 0;
   }
 
   private static waiting(): () => ChildProcess {

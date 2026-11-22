@@ -10,10 +10,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import fsPromises from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
-import { JsonException, JsonReader } from "@noldova/context.json";
+import { mock } from "node:test";
+import { JsonException, type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as CoreResources, ForkRequest, McpEndpoint, SessionTokens, SharedMcpFailureKind, SharedMcpValues, type TurnDetail, TurnOutcome, TurnRequest,
-  TurnTools } from "@noldova/teamrun.core";
+  TurnSteer, TurnTools } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import { AuthStatus, DetailKind, MessageAttachment, Provider, ProviderAbility, ReplyAction, type ReplyUsage, RequestedSettings, SharedMcpServerDefinition,
   SharedMcpTransport } from "@noldova/teamrun.protocol";
@@ -54,6 +55,9 @@ class BlockingOnReplyListener extends RecordingTurnListener {
 
 @TestClass
 export class GrokAdapterTests {
+  private static readonly hooks: JsonObject = { "x.ai/hooks": { blockingEvents: ["PreToolUse", "Stop", "SubagentStop"], decisions: ["deny", "block"] } };
+  private static readonly editRefused: string = Resources.formatReadOnlyChatRefused(Resources.grokDisplayName, "Edit notes.md");
+
   @TestMethod
   public async passesAListedSlashCommandUnwrappedAndAnswersAnyOtherBeforeSendingIt(): Promise<void> {
     await using host = new GrokTestHost();
@@ -507,6 +511,100 @@ export class GrokAdapterTests {
   }
 
   @TestMethod
+  public async restartsAnApprovedPlanFirstTurnOfAReadOnlyChatInItsModeOnceGrokLeavesThePlanForDefaultRefusingAnEditMeanwhile(): Promise<void> {
+    await using host = new GrokTestHost();
+
+    const seen = [await GrokAdapterTests.leavePlanAsync(host, "ask", null), await GrokAdapterTests.leavePlanAsync(host, "default", null),
+      await GrokAdapterTests.leavePlanAsync(host, "ask", "fail-ask")];
+
+    const approved = "{\"result\":{\"outcome\":\"approved\"}";
+    Assert.areEqual([`${TurnOutcome.Completed} 1 null 1 ${approved},"edit":{"outcome":{"outcome":"selected","optionId":"reject-once"}},"sets":["mode=plan"],"cancelled":true}`
+      + `|{"restarted":["${CoreResources.planApprovedPrompt}"],"sets":["mode=plan","mode=ask"]}`,
+      `${TurnOutcome.Completed} 2 null 0 ${approved},"edit":{"outcome":{"outcome":"selected","optionId":"allow-once"}},"sets":["mode=plan"],"cancelled":false}`,
+      `${TurnOutcome.Failed} 1 Mode refused 1 ${approved},"edit":{"outcome":{"outcome":"selected","optionId":"reject-once"}},"sets":["mode=plan"],"cancelled":true}`].join("\n"),
+      seen.join("\n"));
+  }
+
+  @TestMethod
+  public async holdsASteerSentWhileAnApprovedPlanFirstTurnRestartsAndSendsItWithTheNewPromptOnceAskIsSet(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_PLAN_LEFT_HOLD: "1" });
+    const asked = host.request("plan-left-for-default", null, null, null, null, "ask");
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+    const offers: (((steer: TurnSteer) => Promise<boolean>) | null)[] = [];
+    listener.onSteerable = t => offers.push(t);
+
+    const running = adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, new AbortController().signal);
+    await Wait.until(() => listener.texts.some(t => t.startsWith(GrokAdapterTests.editRefused)), "The edit was not refused.");
+    const taken = offers.at(-1)?.(new TurnSteer("Check the tests too.", [])) ?? Promise.resolve(null);
+    writeFileSync(join(host.directory.resolve("person"), "plan-left-released.txt"), "");
+    const turn = await running;
+
+    Assert.areEqual(`${TurnOutcome.Completed} true {"restarted":["${CoreResources.planApprovedPrompt}","Check the tests too."],"sets":["mode=plan","mode=ask"]}`,
+      [turn.outcome, await taken, listener.texts.find(t => t.includes("\"restarted\""))].join(" "));
+  }
+
+  @TestMethod
+  public async refusesOnlyAHeldSteerWhoseImageCantBeReadAndRestartsAnApprovedPlanFirstTurnWithTheOthers(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_PLAN_LEFT_HOLD: "1" });
+    const asked = host.request("plan-left-for-default", null, null, null, null, "ask");
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+    const offers: (((steer: TurnSteer) => Promise<boolean>) | null)[] = [];
+    listener.onSteerable = t => offers.push(t);
+
+    const running = adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, new AbortController().signal);
+    await Wait.until(() => listener.texts.some(t => t.startsWith(GrokAdapterTests.editRefused)), "The edit was not refused.");
+    const offer = offers.at(-1) ?? null;
+    const unread = offer?.(new TurnSteer("See the screenshot.", [new MessageAttachment("missing.png", "image/png", 13, host.directory.resolve("missing.png"))]))
+      ?? Promise.resolve(null);
+    const taken = offer?.(new TurnSteer("Check the tests too.", [])) ?? Promise.resolve(null);
+    writeFileSync(join(host.directory.resolve("person"), "plan-left-released.txt"), "");
+    const turn = await running;
+
+    Assert.areEqual(`${TurnOutcome.Completed} false true {"restarted":["${CoreResources.planApprovedPrompt}","Check the tests too."],"sets":["mode=plan","mode=ask"]}`,
+      [turn.outcome, await unread, await taken, listener.texts.find(t => t.includes("\"restarted\""))].join(" "));
+  }
+
+  @TestMethod
+  public async sendsNoNewPromptWhenTheReplyIsStoppedWhileAnApprovedPlanFirstTurnRestarts(): Promise<void> {
+    await using host = new GrokTestHost();
+    const prompts = host.directory.resolve("prompts.txt");
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_PLAN_LEFT_HOLD: "1", TEAMRUN_FAKE_ACP_PROMPTS: prompts });
+    const asked = host.request("plan-left-for-default", null, null, null, null, "ask");
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+    const stop = new AbortController();
+
+    const running = adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, stop.signal);
+    await Wait.until(() => listener.texts.some(t => t.startsWith(GrokAdapterTests.editRefused)), "The edit was not refused.");
+    stop.abort();
+    writeFileSync(join(host.directory.resolve("person"), "plan-left-released.txt"), "");
+    const turn = await running;
+
+    Assert.areEqual(`${TurnOutcome.Interrupted} 1 false`, [turn.outcome, readFileSync(prompts, "utf8").trim().split("\n").length,
+      listener.texts.some(t => t.includes("\"restarted\""))].join(" "));
+  }
+
+  @TestMethod
+  public async switchesAnApprovedPlanFirstTurnThatEndedBeforeItsCancelToItsChatsModeForTheNextTurnWithoutANewPrompt(): Promise<void> {
+    await using host = new GrokTestHost();
+    const prompts = host.directory.resolve("prompts.txt");
+    const sets = host.directory.resolve("sets.txt");
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_PROMPTS: prompts, TEAMRUN_FAKE_ACP_SETS: sets });
+    const asked = host.request("plan-left-ends-first", null, null, null, null, "ask");
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+
+    const turn = await adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, new AbortController().signal);
+
+    Assert.areEqual(`${TurnOutcome.Completed} 1 mode=plan,mode=ask`, [turn.outcome, readFileSync(prompts, "utf8").trim().split("\n").length,
+      readFileSync(sets, "utf8").trim().split("\n").join(",")].join(" "));
+  }
+
+  @TestMethod
   public async setsEveryChosenModeOnALoadedSessionSoADefaultTurnLeavesThePlanModeGrokRestored(): Promise<void> {
     await using host = new GrokTestHost();
     const adapter = host.createAdapter();
@@ -824,7 +922,7 @@ export class GrokAdapterTests {
   @TestMethod
   public async reachesTeamRunsToolsAtTheEndpointWhenItsInitializeOffersHttpAndStillWaitsForTheirListing(): Promise<void> {
     await using host = new GrokTestHost();
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true } } };
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true }, _meta: GrokAdapterTests.hooks } };
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) });
     const tools = new TurnTools({ listToolsAsync: () => Promise.resolve([]), callToolAsync: () => Promise.resolve({}) },
       [], new McpEndpoint("http://127.0.0.1:4711/mcp", new SessionTokens(), "c1/t1"));
@@ -1306,7 +1404,7 @@ export class GrokAdapterTests {
   @TestMethod
   public async doesOnItsDoubleWhatItsAbilityRowSays(): Promise<void> {
     await using host = new GrokTestHost();
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, mcpCapabilities: { http: true } },
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, mcpCapabilities: { http: true }, _meta: GrokAdapterTests.hooks },
       _meta: { agentVersion: "1.0.30-fixture", modelState: JsonReader.fromValue(GrokModelStateRecording.initialized).readObject("_meta").readObject("modelState").toJson() } };
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) });
     const provider = new Provider("g", "grok", "Work", host.directory.resolve("profile"), AuthStatus.Unknown, null, null, null, null, "t");
@@ -1332,6 +1430,17 @@ export class GrokAdapterTests {
     await PlanToolRule.expectSentAsync(host.createAdapter(), host.request("role-payload"));
   }
 
+  private static async leavePlanAsync(host: GrokTestHost, mode: string, setMode: string | null): Promise<string> {
+    const adapter = host.createAdapter(Object.isNull(setMode) ? host.environment : { ...host.environment, TEAMRUN_FAKE_ACP_SET_MODE: setMode });
+    const asked = host.request("plan-left-for-default", null, null, null, null, mode);
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption, "allow-once");
+    const turn = await adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, new AbortController().signal);
+    const refused = listener.texts.filter(t => t.startsWith(GrokAdapterTests.editRefused)).length;
+    const answers = listener.texts.filter(t => t.includes("\"sets\"")).join("|");
+    return [turn.outcome, listener.asks.length, String(turn.error), refused, answers].join(" ");
+  }
+
   private static modesSet(listener: RecordingTurnListener): string {
     const echoed = listener.texts.find(t => t.startsWith("{\"methods\""));
     if (Object.isUndefined(echoed))
@@ -1340,12 +1449,61 @@ export class GrokAdapterTests {
   }
 
   private static offeringHttp(host: GrokTestHost): NodeJS.ProcessEnv {
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true } } };
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true }, _meta: GrokAdapterTests.hooks } };
     return { ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) };
   }
 
   private static endpoint(): McpEndpoint {
     return new McpEndpoint("http://127.0.0.1:4711/mcp", new SessionTokens(), "c1/t1");
+  }
+
+  @TestMethod
+  public async registersItsReadOnlyHookOnEachNewAndLoadedSessionOnlyWhenGrokOffersToRefuseACall(): Promise<void> {
+    await using host = new GrokTestHost();
+    await using plain = new GrokTestHost();
+    const first = await host.createAdapter().runTurn(host.request("Hello"), new RecordingTurnListener(), new AbortController().signal);
+    await host.createAdapter().runTurn(host.request("Again", first.nativeSessionId), new RecordingTurnListener(), new AbortController().signal);
+    await plain.createAdapter(GrokAdapterTests.withoutHooks(plain)).runTurn(plain.request("Hello"), new RecordingTurnListener(), new AbortController().signal);
+
+    const hooks = JSON.stringify({ "x.ai/hooks": { PreToolUse: [{ hookCallbackIds: ["teamrun-read-only-chat"] }] } });
+    Assert.areEqual(`session/new ${hooks}\nsession/load ${hooks}\nsession/new null`,
+      [host, plain].map(t => readFileSync(join(t.directory.resolve("person"), "session-meta.txt"), "utf8").trim()).join("\n"));
+  }
+
+  @TestMethod
+  public async refusesEachToolGrokDoesntMarkReadOnlyInAReadOnlyChatThroughItsHookAheadOfGrokRulesAndLetsOtherChatsGoOn(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter();
+
+    const answers = [await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "ask"), await GrokAdapterTests.gateAsync(host, adapter, "gated-read:read_file", "ask"),
+      await GrokAdapterTests.gateAsync(host, adapter, "gated-unknown", "ask"), await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "default")];
+
+    const refused = (tool: string): string =>
+      JSON.stringify({ gate: { decision: "deny", reason: Resources.formatReadOnlyToolRefused(Resources.grokDisplayName, tool) } });
+    Assert.areEqual([`${TurnOutcome.Completed} ${refused("Gated edit")}`, `${TurnOutcome.Completed} {"gate":{}}`, `${TurnOutcome.Completed} ${refused("Gated unknown")}`,
+      `${TurnOutcome.Completed} {"gate":{}}`].join("\n"), answers.join("\n"));
+  }
+
+  @TestMethod
+  public async refusesAReadOnlyChatOnAGrokThatOffersNoHookAndRunsOtherChatsThere(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter(GrokAdapterTests.withoutHooks(host));
+
+    const asked = await adapter.runTurn(host.request("gated-edit:write", null, null, null, null, "ask"), new RecordingTurnListener(), new AbortController().signal);
+    const chatted = await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "default");
+
+    Assert.areEqual(`${TurnOutcome.Failed}:${Resources.formatModeUnavailable(Resources.grokDisplayName, "Ask")}|${TurnOutcome.Completed} {"gate":{}}`,
+      `${asked.outcome}:${String(asked.error)}|${chatted}`);
+  }
+
+  private static async gateAsync(host: GrokTestHost, adapter: GrokAdapter, prompt: string, mode: string): Promise<string> {
+    const listener = new RecordingTurnListener();
+    const turn = await adapter.runTurn(host.request(prompt, null, null, null, null, mode), listener, new AbortController().signal);
+    return `${turn.outcome} ${listener.texts.find(t => t.startsWith("{\"gate\"")) ?? "no answer"}`;
+  }
+
+  private static withoutHooks(host: GrokTestHost): NodeJS.ProcessEnv {
+    return { ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify({ agentCapabilities: { loadSession: true, promptCapabilities: { image: false } } }) };
   }
 
   private static formatUsage(usage: ReplyUsage): string {
@@ -1359,17 +1517,17 @@ export class GrokAdapterTests {
 
   private static async abortingWhileReading<T>(path: string, controller: AbortController, action: () => Promise<T>): Promise<T> {
     const original = fsPromises.readFile;
-    fsPromises.readFile = new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
+    const read = mock.method(fsPromises, "readFile", (...args: Parameters<typeof original>): ReturnType<typeof original> => {
       if (args[0] === path)
         controller.abort();
-      return Reflect.apply(target, self, args);
-    } });
+      return original(...args);
+    });
     syncBuiltinESMExports();
     try {
       return await action();
     }
     finally {
-      fsPromises.readFile = original;
+      read.mock.restore();
       syncBuiltinESMExports();
     }
   }

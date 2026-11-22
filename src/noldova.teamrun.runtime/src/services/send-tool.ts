@@ -47,6 +47,18 @@ export class SendTool implements IToolHandler {
     const mentioned = MentionResolver.resolveTeammateText(text, (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name))).map(t => t.teammateId);
     const params = new MessageSendParams(call.arguments[Resources.chatIdArgument] as string, text, null, null, [], mentioned, null, token,
       call.arguments[Resources.wakeWhenDoneArgument] === true);
+    const sendId = this.sends.announceSend(params);
+    try {
+      return await this.sendAsync(call, params);
+    }
+    catch (error) {
+      if (!Object.isNull(sendId))
+        this.sends.abandonSend(sendId);
+      throw error;
+    }
+  }
+
+  private async sendAsync(call: ToolCall, params: MessageSendParams): Promise<ToolResult> {
     const ask = await this.sends.describeSendAsync(params);
     if (!Object.isNull(ask))
       await this.askAsync(call, ask, params);

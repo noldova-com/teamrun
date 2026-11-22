@@ -18,13 +18,18 @@ import {
   ApprovalOption,
   ApprovalOutcome,
   ApprovalScope,
+  ChatMemberModeParams,
   ChatPlanFirstParams,
+  CommandStartParams,
   ConversationIdParams,
   ConversationMemberParams,
   ConversationMoveParams,
+  ConversationResponder,
+  ConversationResponderParams,
   DetailKind,
+  EventName,
   Harness,
-  type Message,
+  Message,
   MessageAuthor,
   MessageIdParams,
   MessageListParams,
@@ -42,6 +47,7 @@ import {
 import { BoundingWork } from "../../fixtures/bounding-work.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
+import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
 export class WakeRepliesTests {
@@ -310,6 +316,24 @@ export class WakeRepliesTests {
   }
 
   @TestMethod
+  public async failsAWakeReplyAndClosesItsToolsWhenHandingThemToTheProviderFails(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await CoreHost.createAsync(false, false, undefined, undefined, undefined, tools);
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await wake?.onToolsAsync(() => Promise.reject(new RangeError("The provider refused its tools.")));
+    await host.engine.waitForIdle();
+    const woken = (await WakeRepliesTests.afterAsync(host, conversation.id, 0)).at(-1);
+
+    Assert.areEqual(2, tools.opened.length);
+    Assert.areEqual(1, tools.opened[1]?.ends);
+    Assert.areEqual(MessageStatus.Failed, (await host.messages.findAsync(woken?.id ?? String.empty))?.status);
+  }
+
+  @TestMethod
   public async startsNoReplyForAWakeUpAfterShutdown(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
@@ -339,6 +363,183 @@ export class WakeRepliesTests {
 
     Assert.isTrue(interrupts > 0);
     Assert.areEqual(MessageStatus.Cancelled, (await host.messages.findAsync(shown.id))?.status);
+  }
+
+  @TestMethod
+  public async wakesTheDefaultResponderInTheModeTheChatHoldsWhenTheWakeStarts(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    const choose = async (mode: string): Promise<void> => {
+      await host.engine.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+        new RequestedSettings("fake", null, null, null, mode), provider), true));
+    };
+    await choose("bypass");
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await choose("ask");
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const woken = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("ask", wake?.mode);
+    Assert.areEqual("ask", woken?.provenance?.requested.mode);
+  }
+
+  @TestMethod
+  public async wakesTheDefaultResponderAfterItsOwnCommandInTheModeTheChatHoldsWhenTheCommandEnds(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    host.adapter.turnTexts = [["Started."], ["Thanks."]];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    const choose = async (mode: string): Promise<void> => {
+      await host.engine.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+        new RequestedSettings("fake", null, null, null, mode), provider), true));
+    };
+    await choose("bypass");
+    let started = false;
+    host.adapter.holdTurn = async request => {
+      const token = SenderEnvironment.read(request.environment);
+      if (started || Object.isNull(token))
+        return;
+      started = true;
+      await host.engine.startCommandAsync(new CommandStartParams(token, "npm test", "Test"));
+    };
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Test it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await choose("ask");
+
+    host.commands.started[0]?.end(0);
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const [first, woken] = host.adapter.requests;
+    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("bypass,ask,ask", [first?.requested.mode, woken?.requested.mode, reply?.provenance?.requested.mode].join());
+  }
+
+  @TestMethod
+  public async wakesATeammateInTheModeTheChatHoldsForItWhenTheWakeStarts(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    host.adapter.unrestrictedModes = ["bypass"];
+    const conversation = await host.createConversationAsync();
+    const alice = await WakeRepliesTests.teammateAsync(host, "Alice");
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice start the server", null, null, [], [alice.id]));
+    await host.engine.waitForIdle();
+    await host.conversations.setMemberModeAsync(new ChatMemberModeParams(conversation.id, alice.id, "bypass"));
+    const unrestricted = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    unrestricted?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    await host.conversations.setMemberModeAsync(new ChatMemberModeParams(conversation.id, alice.id, "ask"));
+
+    const restricted = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-2", "npm test"));
+    restricted?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const woken = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual("bypass", unrestricted?.mode);
+    Assert.areEqual("ask", restricted?.mode);
+    Assert.areEqual("ask", woken?.provenance?.requested.mode);
+  }
+
+  @TestMethod
+  public async keepsTheReplysModeForADefaultWakeWhenTheChatsResponderIsAnotherKind(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    host.adapter.modeIds = ["bypass", "ask"];
+    const conversation = await host.createConversationAsync();
+    const provider = (await host.providerOfAsync()).id;
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null, null, "bypass"), provider));
+    await host.engine.waitForIdle();
+    await host.conversations.setResponderAsync(new ConversationResponderParams(conversation.id, new ConversationResponder(null,
+      new RequestedSettings("other", null, null, null, "ask"), null), true));
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual("bypass", wake?.mode);
+  }
+
+  @TestMethod
+  public async failsAWakeReplyWhoseStartFailsToWriteWithTheTurnsFailure(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const started: string[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && started.push(message.id) === 1)
+          throw new RangeError("The window is gone.");
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const woken = await host.messages.findAsync(started[0] ?? String.empty);
+    const last = woken?.details.at(-1);
+
+    Assert.areEqual(1, started.length);
+    Assert.areEqual(MessageStatus.Failed, woken?.status);
+    Assert.areEqual(`${DetailKind.Error} ${Resources.formatTurnFailed("The window is gone.")}`, `${last?.kind} ${last?.text}`);
+  }
+
+  @TestMethod
+  public async cancelsAStoppedWakeReplyWhoseStartFailsToWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const stops: Promise<Message>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Running && stops.length === 0) {
+          stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+          throw new RangeError("The window is gone.");
+        }
+      }
+    });
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    const stopped = await Promise.all(stops);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.areEqual(MessageStatus.Cancelled, stopped[0]?.status);
+    Assert.isFalse(stopped[0]?.details.some(t => t.kind === DetailKind.Error) ?? true);
+  }
+
+  @TestMethod
+  public async cancelsAWakeReplyStoppedAfterItsCompletedWrite(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const stops: Promise<Message>[] = [];
+    host.events.subscribe({
+      onEvent: event => {
+        const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
+        if (message?.status === MessageStatus.Completed && stops.length === 0)
+          stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+      }
+    });
+
+    const wake = await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    wake?.end(new TurnResult(TurnOutcome.Completed, null, new ObservedSettings("fake", null, null, null), null));
+    await host.engine.waitForIdle();
+    const stopped = await Promise.all(stops);
+
+    Assert.areEqual(1, stopped.length);
+    Assert.areEqual(MessageStatus.Cancelled, stopped[0]?.status);
   }
 
   @TestMethod

@@ -9,13 +9,16 @@
 import { signal } from "@angular/core";
 
 import "@noldova/context.core";
-import { FileSaveOutcome, LinkPlace, ViewBadge } from "@noldova/desktop.window";
+import type { JsonObject } from "@noldova/context.json";
+import { FileSaveOutcome, LinkPlace, RuntimeRequestException, ViewBadge } from "@noldova/desktop.window";
 import { Page, PageListRequest, PageRequest } from "@noldova/teamrun.protocol";
 
 import { ChatPages } from "../../../../src/app/services/pages/chat-pages";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { LinkRefusedException } from "../../../fixtures/link-refused-exception.fixture";
 import { SamplePages } from "../../../fixtures/sample-pages.fixture";
+import { UnhandledRejections } from "../../../fixtures/unhandled-rejections.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("ChatPages", () => {
@@ -23,6 +26,7 @@ describe("ChatPages", () => {
   const checklist = SamplePages.page("p2", "Launch checklist", 1, 0, SamplePages.sol);
   let context: FakeWindowPartContext;
   let store: ChatPages;
+  let rejections: UnhandledRejections | null = null;
 
   const titles = (): string[] => store.pagesOf(SamplePages.chatId).map(t => `${t.title} v${t.version}`);
   const create = (next: FakeWindowPartContext = SamplePages.context([options, checklist])): void => {
@@ -30,7 +34,11 @@ describe("ChatPages", () => {
     store = ChatPages.of(context);
   };
 
-  afterEach(() => ChatPages.release(context));
+  afterEach(() => {
+    rejections?.stop();
+    rejections = null;
+    ChatPages.release(context);
+  });
 
   it("lists a chat's pages once, newest change first, by the chat's id", async () => {
     create();
@@ -127,7 +135,7 @@ describe("ChatPages", () => {
     let fails = true;
     create(SamplePages.context(() => {
       if (fails)
-        throw new Error("down");
+        throw new RuntimeRequestException("failed", "down");
       return [options.toJson()];
     }));
 
@@ -203,7 +211,7 @@ describe("ChatPages", () => {
 
   it("says when the page can't open in the system browser, and clears it on the next action", async () => {
     create(SamplePages.context([options]).answerModule(SamplePages.open, () => {
-      throw new Error("The page server isn't listening.");
+      throw new RuntimeRequestException("failed", "The page server isn't listening.");
     }).answerModule(SamplePages.read, () => "<p>hi</p>"));
 
     await store.openInBrowser(options);
@@ -211,6 +219,63 @@ describe("ChatPages", () => {
     await store.save(options);
 
     expect([error, store.error(), context.links]).toEqual(["TeamRun couldn't open the page in the system browser.", null, []]);
+  });
+
+  it("says when no browser takes the page's address", async () => {
+    create(SamplePages.context([options]).answerModule(SamplePages.open, () => SamplePages.view(options).toJson()));
+    vi.spyOn(context, "openLinkAsync").mockRejectedValue(new LinkRefusedException("No browser took the page."));
+
+    await store.openInBrowser(options);
+
+    expect(store.error()).toBe("TeamRun couldn't open the page in the system browser.");
+  });
+
+  it("lets a fault that isn't a failed request or a bad reply through an action, and shows no error for it", async () => {
+    create(SamplePages.context([options]).answerModule(SamplePages.open, () => {
+      throw new TypeError("A fault in the action.");
+    }));
+
+    await expect(store.openInBrowser(options)).rejects.toThrow(TypeError);
+    expect(store.error()).toBeNull();
+  });
+
+  it("lets a fault that isn't a bad page through a page event", () => {
+    create();
+    const faulty = new Proxy<JsonObject>({}, {
+      ownKeys: () => {
+        throw new TypeError("A fault in the event.");
+      }
+    });
+
+    expect(() => context.emitModule(SamplePages.updated, faulty)).toThrow(TypeError);
+  });
+
+  it("lets a fault that isn't a failed request or a bad reply through a list of the chat's pages, and shows no error for it", async () => {
+    const failures = UnhandledRejections.catch();
+    rejections = failures;
+    create(SamplePages.context(() => {
+      throw new TypeError("A fault in the list.");
+    }));
+
+    store.watch(SamplePages.chatId);
+
+    await Wait.until(() => expect(failures.reasons.map(t => t instanceof TypeError)).toEqual([true]));
+    expect(store.loadErrorOf(SamplePages.chatId)).toBeNull();
+  });
+
+  it("lets a fault that isn't a failed request through a read of the open pages, and keeps the open pages it has", async () => {
+    const next = SamplePages.context([options]);
+    next.openInstances = ["p1"];
+    create(next);
+    await Wait.until(() => expect(store.isOpen("p1")).toBe(true));
+    const failures = UnhandledRejections.catch();
+    rejections = failures;
+    vi.spyOn(context, "listOpenDocumentsAsync").mockRejectedValue(new TypeError("A fault in the read."));
+
+    context.emitModule(SamplePages.updated, options.toJson());
+
+    await Wait.until(() => expect(failures.reasons.map(t => t instanceof TypeError)).toEqual([true]));
+    expect(store.isOpen("p1")).toBe(true);
   });
 
   it("saves a page's latest HTML under its file's name, and says when saving fails, though not when it's cancelled", async () => {
@@ -253,6 +318,48 @@ describe("ChatPages", () => {
     await store.copyPath(options, () => Promise.resolve(false));
 
     expect([copied, error, store.error()]).toEqual([["D:\\profile\\pages\\p1.html"], null, "TeamRun couldn't copy the file's path."]);
+  });
+
+  it("clears an action's error when another chat shows", async () => {
+    create(SamplePages.context([options]).answerModule(SamplePages.open, () => {
+      throw new RuntimeRequestException("failed", "The page server isn't listening.");
+    }));
+    const chat = signal<string | null>("c1");
+    let follower: (chatId: string | null) => void = () => undefined;
+    const release = ChatPages.provide(context, chat, t => {
+      follower = t;
+      return () => undefined;
+    }, signal(new Map()));
+
+    await store.openInBrowser(options);
+    const error = store.error();
+    chat.set("c2");
+    follower("c2");
+    const shown = store.error();
+    release();
+
+    expect([error, shown]).toEqual(["TeamRun couldn't open the page in the system browser.", null]);
+  });
+
+  it("keeps an action's error out of a chat shown while the action ran", async () => {
+    const opened = new DeferredResponse();
+    create(SamplePages.context([options]).answerModule(SamplePages.open, () => opened.promise));
+    const chat = signal<string | null>("c1");
+    let follower: (chatId: string | null) => void = () => undefined;
+    const release = ChatPages.provide(context, chat, t => {
+      follower = t;
+      return () => undefined;
+    }, signal(new Map()));
+
+    const opening = store.openInBrowser(options);
+    chat.set("c2");
+    follower("c2");
+    opened.reject(new RuntimeRequestException("failed", "The page server isn't listening."));
+    await opening;
+    const error = store.error();
+    release();
+
+    expect([error, context.links]).toEqual([null, []]);
   });
 
   it("takes the shown chat from its window, and lets the events go on release", () => {

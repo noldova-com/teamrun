@@ -10,5 +10,6 @@ export enum PageMethodName {
   PageOpen = "PageOpen",
   PageRead = "PageRead",
   PageRestore = "PageRestore",
-  PageList = "PageList"
+  PageList = "PageList",
+  PageEditedList = "PageEditedList"
 }

@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AttachmentStore, QuestionAsk, Resources, type TurnSteer } from "@noldova/teamrun.core";
+import { AttachmentStore, QuestionAsk, RequestDispatcher, Resources, type TurnSteer } from "@noldova/teamrun.core";
 import {
   ApprovalDecideParams,
   ApprovalQuestion,
@@ -777,8 +777,8 @@ export class WaitingSendsTests {
     Assert.isFalse(existsSync(folder(chat.id, sent.id)));
 
     const kept = prepare();
-    await addAsync(new MessageSendParams(other.id, "To nobody", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id,
-      [new AttachmentInput(kept.name, kept.mediaType, null, kept.path)], ["teammate-gone"]));
+    await addAsync(new MessageSendParams(other.id, "To nobody", new RequestedSettings("fake", null, null), "provider-gone",
+      [new AttachmentInput(kept.name, kept.mediaType, null, kept.path)], []));
     await host.until("the failed message kept", async () => (await host.engine.listWaitingAsync(new ChatIdParams(other.id))).messages.some(t => !Object.isNull(t.failure)));
     const before = existsSync(folder(other.id));
     await host.conversations.deleteAsync(new ChatIdParams(other.id));
@@ -927,6 +927,76 @@ export class WaitingSendsTests {
   }
 
   @TestMethod
+  public async refusesAWaitingMessageWhoseMentionsArentThoseOfItsTextAndAddsNothing(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+
+    const refused = await Assert.throwsAsync(() => host.engine.addWaitingAsync(new WaitingMessageAddParams(
+      new MessageSendParams(chat.id, "Check X", null, null, [], [bob.id]), MessageDelivery.Queue)), ServiceException);
+    const listed = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length;
+    release();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.waitingMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
+    Assert.areEqual(0, listed);
+    Assert.areEqual("First", await WaitingSendsTests.sentAsync(host, chat.id));
+  }
+
+  @TestMethod
+  public async refusesAWaitingMessageWithASenderTokenAsInvalidBeforeItsMentions(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+
+    let refused: unknown = null;
+    await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "Check X", null, null, [], [bob.id], null, "sender-token"),
+      MessageDelivery.Queue)).catch((error: unknown) => refused = error);
+    const listed = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length;
+    release();
+    await host.engine.waitForIdle();
+    const described = RequestDispatcher.describe(refused);
+
+    Assert.areEqual(`${ErrorCode.InvalidParams}:${ProtocolResources.waitingFromPersonOnly} (Parameter '${ProtocolResources.messageField}'):0`,
+      `${described.name}:${described.message}:${listed}`);
+  }
+
+  @TestMethod
+  public async refusesAnEditWhoseMentionsArentThoseOfItsNewTextAndKeepsTheMessageAsItWas(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const provider = await host.createProviderAsync();
+    const alice = await host.teammates.createAsync(new TeammateCreateParams("Alice", null, provider.id, Harness.Provider, null, null));
+    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
+    const release = WaitingSendsTests.holdFirst(host);
+    await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
+    await host.adapter.requested(1);
+    const send = (text: string, mentioned: readonly string[]): MessageSendParams => new MessageSendParams(chat.id, text, null, null, [], mentioned);
+    const waiting = await host.engine.addWaitingAsync(new WaitingMessageAddParams(send("@Bob check X", [bob.id]), MessageDelivery.Queue));
+
+    const refused = await Assert.throwsAsync(() => host.engine.editWaitingAsync(new WaitingMessageEditParams(waiting.id, send("@Alice check X", [bob.id]))),
+      ServiceException);
+    const kept = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.map(t => `${t.message.text}:${t.message.mentionedTeammateIds.join(",")}`);
+    await host.engine.editWaitingAsync(new WaitingMessageEditParams(waiting.id, send("@Alice check X", [alice.id])));
+    release();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(`${ErrorCode.Conflict}:${Resources.waitingMentionsMismatch}`, `${refused.info.name}:${refused.message}`);
+    Assert.areEqual(`@Bob check X:${bob.id}`, kept.join("|"));
+    Assert.areEqual("First,@Alice check X", await WaitingSendsTests.sentAsync(host, chat.id));
+    Assert.areEqual(0, (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages.length);
+  }
+
+  @TestMethod
   public async editsAWaitingMessageInItsPlaceRemovesOneAndRefusesUnknownOnesAndAnotherChat(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.createConversationAsync();
@@ -972,7 +1042,7 @@ export class WaitingSendsTests {
     const release = WaitingSendsTests.holdFirst(host);
     await host.engine.sendAsync(await WaitingSendsTests.paramsAsync(host, chat.id, "First"));
     await host.adapter.requested(1);
-    const unknown = new MessageSendParams(chat.id, "To nobody", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id, [], ["teammate-gone"]);
+    const unknown = new MessageSendParams(chat.id, "To nobody", new RequestedSettings("fake", null, null), "provider-gone", [], []);
     const failing = await host.engine.addWaitingAsync(new WaitingMessageAddParams(unknown, MessageDelivery.Queue));
     await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Next"), MessageDelivery.Queue));
 
@@ -985,7 +1055,7 @@ export class WaitingSendsTests {
     await host.engine.waitForIdle();
 
     Assert.areEqual(failing.id, kept[0]?.id);
-    Assert.isTrue(kept.length === 1 && (kept[0]?.failure?.includes("teammate-gone") ?? false), kept[0]?.failure ?? "no failure");
+    Assert.isTrue(kept.length === 1 && (kept[0]?.failure?.includes("provider-gone") ?? false), kept[0]?.failure ?? "no failure");
     Assert.areEqual("First,Next,To the chat", await WaitingSendsTests.sentAsync(host, chat.id));
     Assert.areEqual(1, host.log.lines.filter(t => t.startsWith(`A waiting message in the chat ${chat.id} wasn't sent: `)).length,
       host.log.lines.join("\n"));

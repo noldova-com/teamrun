@@ -19,5 +19,6 @@ export enum ChangeEntity {
   AcpAgent = "AcpAgent",
   Department = "Department",
   DepartmentMember = "DepartmentMember",
-  OrganizationMessage = "OrganizationMessage"
+  TeammatePlacement = "TeammatePlacement",
+  Organization = "Organization"
 }

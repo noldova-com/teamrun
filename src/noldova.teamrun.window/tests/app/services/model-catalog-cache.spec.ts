@@ -12,6 +12,7 @@ import { ProviderMode, ProviderModel, ProviderModelList } from "@noldova/teamrun
 
 import { ModelCatalogCache } from "../../../src/app/services/model-catalog-cache";
 import { Resources } from "../../../src/resources";
+import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 
 describe("ModelCatalogCache", () => {
   const clock = (): number => 0;
@@ -37,6 +38,42 @@ describe("ModelCatalogCache", () => {
     now = Resources.modelCatalogLifetime;
     expect((await cache.load("codex", "a")).fetchedAt).toBe(Resources.modelCatalogLifetime);
     expect(fetchModels).toHaveBeenCalledTimes(5);
+  });
+
+  it("asks again for each list it holds once they expire, still giving the one it holds until then, and keeps a list read afterwards", async () => {
+    let calls = 0;
+    const fetchModels = vi.fn(async (kind: string) => {
+      calls += 1;
+      return new ProviderModelList([new ProviderModel(`${kind}-${String(calls)}`, "One", "", [], true, null, null)], null);
+    });
+    const cache = new ModelCatalogCache(fetchModels, clock);
+    await cache.load("codex", "a");
+    await cache.load("claude", "a");
+
+    cache.expire();
+    const held = cache.loadedOf("codex", "a")?.models[0]?.id;
+    const read = await Promise.all([cache.load("codex", "a"), cache.load("claude", "a")]);
+    const again = await cache.load("codex", "a");
+
+    expect([held, read.map(t => t.models[0]?.id), again.models[0]?.id, fetchModels.mock.calls.length]).toEqual(["codex-1", ["codex-3", "claude-4"], "codex-3", 4]);
+  });
+
+  it("asks again rather than joining a read that was out when the lists expired, and keeps the new answer when the old one comes after it", async () => {
+    const answers: ((list: ProviderModelList) => void)[] = [];
+    const fetchModels = vi.fn(() => new Promise<ProviderModelList>(resolve => answers.push(resolve)));
+    const list = (id: string): ProviderModelList => new ProviderModelList([new ProviderModel(id, id, "", [], true, null, null)], null);
+    const cache = new ModelCatalogCache(fetchModels, clock);
+    const old = cache.load("codex", "a");
+
+    cache.expire();
+    const fresh = cache.load("codex", "a");
+    answers[1]?.(list("new"));
+    const shown = (await fresh).models[0]?.id;
+    answers[0]?.(list("old"));
+    const late = (await old).models[0]?.id;
+
+    expect([fetchModels.mock.calls.length, shown, late, cache.loadedOf("codex", "a")?.models[0]?.id, (await cache.load("codex", "a")).models[0]?.id])
+      .toEqual([2, "new", "old", "new", "new"]);
   });
 
   it("keeps a list for each folder apart, and asks for it with its folder", async () => {
@@ -138,10 +175,29 @@ describe("ModelCatalogCache", () => {
     expect([other.models, other.modes, other.defaultMode, other.defaultTakesListedEfforts]).toEqual([[], [], null, false]);
   });
 
+  it("reads a list again at the next load after a read failed, instead of keeping the failure as fresh, and keeps the list a later read gives", async () => {
+    const fetchModels = vi.fn(async (_kind: string, _provider: string | null, _refresh: boolean): Promise<ProviderModelList> => {
+      throw new Error("offline");
+    });
+    const cache = new ModelCatalogCache(fetchModels, clock);
+
+    const failed = await cache.load("codex", "a");
+    fetchModels.mockResolvedValue(new ProviderModelList([new ProviderModel("gpt-5", "GPT-5", "", [], true, null, true)], true));
+    const read = await cache.load("codex", "a");
+    const kept = await cache.load("codex", "a");
+
+    expect([failed.failed, read.failed, kept.failed]).toEqual([true, false, false]);
+    expect(kept.models.map(t => t.id)).toEqual(["gpt-5"]);
+    expect(fetchModels).toHaveBeenCalledTimes(2);
+    expect(fetchModels.mock.calls.map(t => t[2])).toEqual([false, false]);
+  });
+
   it("coalesces requests and bounds pending requests and kept catalogs", async () => {
-    let complete!: (list: ProviderModelList) => void;
-    const pending = new Promise<ProviderModelList>(resolve => complete = resolve);
-    const fetchModels = vi.fn((): Promise<ProviderModelList> => pending);
+    const held = new DeferredResponse();
+    const fetchModels = vi.fn(async (): Promise<ProviderModelList> => {
+      await held.promise;
+      return new ProviderModelList([], null);
+    });
     const cache = new ModelCatalogCache(fetchModels, clock);
     const first = cache.load("codex", "0");
     expect(cache.load("codex", "0", true)).toBe(first);
@@ -151,7 +207,7 @@ describe("ModelCatalogCache", () => {
 
     expect((await cache.load("codex", "overflow")).failed).toBe(true);
     expect(fetchModels).toHaveBeenCalledTimes(Resources.maximumModelCatalogs);
-    complete(new ProviderModelList([], null));
+    held.resolve(null);
     await Promise.all(requests);
     await cache.load("codex", "overflow");
     await cache.load("codex", "0");

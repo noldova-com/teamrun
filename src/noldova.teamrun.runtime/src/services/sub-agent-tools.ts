@@ -8,8 +8,9 @@
 
 import { type IToolDescriptor, ToolRisk } from "@noldova/desktop.runtime";
 import { type JsonObject, JsonReader } from "@noldova/context.json";
-import { SubAgentStartParams, SubAgentStopParams, SubAgentWaitParams } from "@noldova/teamrun.protocol";
+import { MethodName, SubAgentStartParams, SubAgentStopParams, SubAgentWaitParams } from "@noldova/teamrun.protocol";
 
+import { SubAgentMethod } from "../models/sub-agent-method.js";
 import { Resources } from "../resources.js";
 
 export class SubAgentTools {
@@ -45,6 +46,11 @@ export class SubAgentTools {
   };
 
   public static readonly all: readonly IToolDescriptor[] = [SubAgentTools.start, SubAgentTools.wait, SubAgentTools.stop];
+  public static readonly methods: readonly SubAgentMethod[] = [
+    new SubAgentMethod(SubAgentTools.start, MethodName.SubAgentStart, (input, token) => SubAgentTools.startParamsOf(input, token)),
+    new SubAgentMethod(SubAgentTools.wait, MethodName.SubAgentWait, (input, token) => SubAgentTools.waitParamsOf(input, token)),
+    new SubAgentMethod(SubAgentTools.stop, MethodName.SubAgentStop, (input, token) => SubAgentTools.stopParamsOf(input, token))
+  ];
 
   public static startParamsOf(input: JsonObject, token: string): JsonObject {
     const reader = JsonReader.fromValue(input);

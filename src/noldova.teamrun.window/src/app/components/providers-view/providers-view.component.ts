@@ -38,6 +38,7 @@ import {
 } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { FocusAfterDelete } from "../../models/focus-after-delete";
 import type { ProviderFoundRow } from "../../models/provider-found-row";
 import type { ProviderGroup } from "../../models/provider-group";
 import { ProviderInstallLine } from "../../models/provider-install-line";
@@ -61,7 +62,7 @@ import { ProviderTerminalComponent } from "../provider-terminal/provider-termina
     ProviderListComponent, ProviderMenuComponent, ProviderStepComponent, ProviderTerminalComponent, SpinnerComponent],
   providers: [ChatStoreService.provider],
   templateUrl: "./providers-view.component.html",
-  styleUrls: ["../settings-view.css", "./providers-view.component.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css", "./providers-view.component.css"]
 })
 export class ProvidersViewComponent {
   protected readonly resources: typeof Resources = Resources;
@@ -283,6 +284,7 @@ export class ProvidersViewComponent {
   }
 
   protected async remove(provider: Provider): Promise<void> {
+    const control = document.activeElement;
     this.asking.set(null);
     this.error.set(null);
     const ids = [...this.host.nativeElement.querySelectorAll<HTMLElement>(".nol-teamrun-item[data-provider]")].map(t => t.dataset["provider"]);
@@ -290,18 +292,16 @@ export class ProvidersViewComponent {
     const neighbour = ids[at + 1] ?? ids[at - 1];
     await this.store.removeProvider(provider.id, this.report);
     const target = this.store.providers().some(t => t.id === provider.id) ? provider.id : neighbour;
-    afterNextRender(() => this.focusAfterRemove(target), { injector: this.injector });
+    FocusAfterDelete.later(this.injector, control, () => Object.isUndefined(target) ? null : this.rowPart(target, ".nol-teamrun-row-menu"),
+      () => this.host.nativeElement.querySelector<HTMLElement>(".nol-teamrun-add"));
   }
 
   private focusIn(providerId: string, selector: string): void {
-    this.host.nativeElement.querySelector<HTMLElement>(`.nol-teamrun-item[data-provider="${CSS.escape(providerId)}"] ${selector}`)?.focus();
+    this.rowPart(providerId, selector)?.focus();
   }
 
-  private focusAfterRemove(providerId: string | undefined): void {
-    if (Object.isUndefined(providerId))
-      this.host.nativeElement.querySelector<HTMLElement>(".nol-teamrun-add")?.focus();
-    else
-      this.focusIn(providerId, ".nol-teamrun-row-menu");
+  private rowPart(providerId: string, selector: string): HTMLElement | null {
+    return this.host.nativeElement.querySelector<HTMLElement>(`.nol-teamrun-item[data-provider="${CSS.escape(providerId)}"] ${selector}`);
   }
 
   private async searchKind(kind: string): Promise<void> {

@@ -1,0 +1,107 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  max-height: 40%;
+  min-height: 0;
+  border-bottom: var(--nol-border-width) solid var(--nol-border);
+}
+
+.nol-teamrun-organization-inbox-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  padding: var(--nol-space-3);
+}
+
+.nol-teamrun-organization-inbox-title {
+  flex: 1;
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+}
+
+.nol-teamrun-organization-unread,
+.nol-teamrun-organization-conversation-time,
+.nol-teamrun-organization-conversation-line,
+.nol-teamrun-organization-empty {
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+}
+
+.nol-teamrun-organization-conversations {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--nol-space-1) var(--nol-space-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.nol-teamrun-organization-conversation {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0.375rem var(--nol-space-2);
+  border: none;
+  border-radius: var(--nol-radius-medium);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.nol-teamrun-organization-conversation:hover {
+  background: var(--nol-hover);
+}
+
+.nol-teamrun-organization-conversation-selected {
+  background: var(--nol-selected);
+}
+
+.nol-teamrun-organization-conversation:focus-visible {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+.nol-teamrun-organization-conversation-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nol-teamrun-organization-conversation-top {
+  display: flex;
+  gap: var(--nol-space-2);
+  justify-content: space-between;
+}
+
+.nol-teamrun-organization-conversation-title,
+.nol-teamrun-organization-conversation-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nol-teamrun-organization-conversation-time {
+  flex: none;
+}
+
+.nol-teamrun-organization-empty {
+  margin: 0;
+  padding: var(--nol-space-2);
+}

@@ -1,0 +1,133 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header class="top">
+  <div class="heading">
+    <h1 class="title">{{ resources.organizationTitle }}</h1>
+    <span class="headcount">{{ headcount() }}</span>
+  </div>
+  <span class="spacer"></span>
+  <div class="tools">
+    <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
+    <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
+      @for (status of resources.organizationStatusKey; track status) {
+        <nol-teamrun-teammate-status [status]="status" />
+      }
+    </div>
+    <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
+    <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" [attr.aria-pressed]="editing()" (click)="toggleEditing()"><span
+      nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationEditIcon }}</span>{{ editing() ? resources.organizationDoneEditing
+      : resources.organizationEditStructure }}</button>
+  </div>
+</header>
+<ng-template #cardsShowMenu>
+  <nol-menu>
+    <nol-menu-group [label]="resources.organizationEveryCardShows">
+      @for (field of resources.organizationOfferedFields; track field) {
+        <button nol-menu-item [label]="resources.organizationFieldLabels[field]" [checkbox]="true" [checked]="layout.layout().cardsShow.has(field)"
+          (triggered)="layout.showOnEveryCard(field, !layout.layout().cardsShow.has(field))"></button>
+      }
+    </nol-menu-group>
+    <nol-menu-separator />
+    <button nol-menu-item class="clear-every-card" [label]="resources.organizationClearEveryCard" [icon]="resources.organizationResetIcon"
+      [disabled]="layout.layout().cards.size === 0" (triggered)="layout.clearEveryCard()"></button>
+  </nol-menu>
+</ng-template>
+@if (organization.loadError(); as error) {
+  <div class="failure">
+    <p class="error" role="alert">{{ error }}</p>
+    <button type="button" nol-button [variant]="text" (click)="organization.reload()">{{ resources.replyHistoryRetry }}</button>
+  </div>
+}
+@if (organization.actionError(); as error) {
+  <div class="failure">
+    <p class="error action-error" role="alert">{{ error }}</p>
+    <button type="button" nol-button class="dismiss" [variant]="text" (click)="organization.clearActionError()">{{ resources.dismissLabel }}</button>
+  </div>
+}
+<div class="body">
+  <main class="chart" [class.focused]="mode() === modes.Focus">
+    @if (mode() === modes.Focus) {
+      <nol-teamrun-organization-focus class="focus" [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" />
+    } @else {
+      <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+        @if (mode() === modes.Board) {
+          <nol-teamrun-organization-board [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
+        } @else {
+          <div class="tree" #flowArea>
+            <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
+            <div class="owner" nolCanvasItem [attr.data-flow-node]="resources.organizationFlowPersonKey" [attr.data-flow-shape]="lines.Root"
+              [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
+              <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+              <div class="who">
+                <span class="name">{{ resources.organizationOwnerName }}</span>
+                <span class="role">{{ ownerRole() }}</span>
+              </div>
+            </div>
+            @if (root().reports.length > 0) {
+              <div class="reports" [style.--nol-teamrun-organization-columns]="root().columns">
+                @for (node of root().reports; track node.id) {
+                  <nol-teamrun-organization-department class="report" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+                }
+              </div>
+            }
+            @if (root().departments.length > 0 || editing()) {
+              <div class="kids">
+                @for (node of root().departments; track node.id) {
+                  <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+                }
+                @if (editing()) {
+                  <div class="kid adds">
+                    <button #search="nolPopoverTrigger" type="button" nol-button class="add-member" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
+                      [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+                      aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
+                    <ng-template #teammateSearch>
+                      <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
+                    </ng-template>
+                    <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+                      class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+                  </div>
+                }
+              </div>
+            } @else if (root().reports.length === 0) {
+              <p class="empty">{{ resources.organizationEmpty }}</p>
+            }
+          </div>
+        }
+      </nol-canvas>
+    }
+  </main>
+  @if (mode() !== modes.Focus) {
+    <aside class="messages" [class.inbox]="mode() === modes.Board" [attr.aria-label]="resources.organizationMessagesLabel">
+      @if (mode() === modes.Board) {
+        <nol-teamrun-organization-chats class="chats" [selectedTeammateId]="selectedTeammateId()" (chosen)="chooseTeammate($event)" />
+      }
+      @if (target(); as current) {
+        <nol-teamrun-organization-chat class="thread" [target]="current" (targetChange)="chosen.set($event)">
+          @if (mode() === modes.Tree) {
+            <div class="to" nolTeamrunOrganizationTo>
+              <ng-container *ngTemplateOutlet="to" />
+            </div>
+          }
+        </nol-teamrun-organization-chat>
+      } @else {
+        @if (mode() === modes.Tree) {
+          <div class="to">
+            <ng-container *ngTemplateOutlet="to" />
+          </div>
+        }
+        <p class="nol-teamrun-organization-empty">{{ resources.organizationChooseTarget }}</p>
+      }
+      <ng-template #to>
+        <span class="to-label" aria-hidden="true">{{ resources.organizationToLabel }}</span>
+        <nol-select class="to-choice" [label]="resources.organizationToLabel" [options]="options()" [value]="targetKey()" (valueChange)="pick($event)" />
+      </ng-template>
+    </aside>
+  }
+</div>

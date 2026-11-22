@@ -11,6 +11,8 @@
 const { appendFileSync, existsSync } = require("node:fs");
 const path = require("node:path");
 
+const preloadRuntime = require("./runtime-preload.cjs");
+
 const code = process.env["TEAMRUN_GITHUB_DOUBLE_CODE"];
 const log = process.env["TEAMRUN_GITHUB_DOUBLE_LOG"];
 const gitHubHosts = new Set(["github.com", "api.github.com"]);
@@ -27,19 +29,22 @@ const answer = (status, body, headers = {}) => new Response(JSON.stringify(body)
 
 const isApproved = () => existsSync(`${log}.approved`);
 
-const urlOf = input => typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+const urlOf = input => Object.isString(input) ? input : input instanceof URL ? input.href : input.url;
 
-const methodOf = (input, init) => init?.method ?? (typeof input === "object" && !(input instanceof URL) ? input.method : "GET");
+const methodOf = (input, init) => init?.method ?? (Object.isObject(input) && !(input instanceof URL) ? input.method : "GET");
 
 const processName = () => process.type ?? (process.env["ELECTRON_RUN_AS_NODE"] === "1" ? "runtime" : "node");
 
 const preload = `--require "${__filename.split(path.sep).join("/")}"`;
 const inherited = process.env["NODE_OPTIONS"] ?? "";
 
-if (code !== undefined && log !== undefined && !inherited.includes(preload))
+if (!Object.isUndefined(code) && !Object.isUndefined(log) && !inherited.includes(preload))
   process.env["NODE_OPTIONS"] = inherited === "" ? preload : `${inherited} ${preload}`;
 
-if (code !== undefined && log !== undefined) {
+if (!Object.isUndefined(code) && !Object.isUndefined(log))
+  preloadRuntime(__filename);
+
+if (!Object.isUndefined(code) && !Object.isUndefined(log)) {
   globalThis.fetch = async (input, init) => {
     const url = new URL(urlOf(input));
     const request = `${methodOf(input, init)} ${url.href}`;

@@ -32,16 +32,19 @@ import { TimeFormatService } from "../../services/time-format.service";
     ConfigurationTableShareDirective, IconButtonComponent, TooltipDirective],
   providers: [ChatStoreService.provider],
   templateUrl: "./computer-use-grants-view.component.html",
-  styleUrls: ["../settings-view.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css"]
 })
 export class ComputerUseGrantsViewComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly grants: WritableSignal<readonly ComputerUseGrant[] | null> = signal(null);
   protected readonly error: WritableSignal<string | null> = signal(null);
+  protected readonly readError: WritableSignal<string | null> = signal(null);
+  protected readonly reading: WritableSignal<boolean> = signal(false);
   protected readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly brokenIcons: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly times: TimeFormatService = inject(TimeFormatService);
+  private reads: number = 0;
 
   public constructor() {
     void this.list();
@@ -80,13 +83,24 @@ export class ComputerUseGrantsViewComponent {
     await this.list();
   }
 
+  protected async retry(): Promise<void> {
+    if (!this.reading())
+      await this.list();
+  }
+
   private async list(): Promise<void> {
-    try {
-      this.grants.set((await this.store.listComputerUseGrants()).toSorted((a, b) => a.grantedAt.localeCompare(b.grantedAt)));
-    }
-    catch (error) {
-      this.grants.set([]);
-      this.error.set(error instanceof Error ? error.message : String(error));
-    }
+    this.reads++;
+    const read = this.reads;
+    this.reading.set(true);
+    const answer = await this.store.listComputerUseGrants().then(
+      t => (): void => {
+        this.grants.set(t.toSorted((a, b) => a.grantedAt.localeCompare(b.grantedAt)));
+        this.readError.set(null);
+      },
+      (error: unknown) => (): void => this.readError.set(error instanceof Error ? error.message : String(error)));
+    if (read !== this.reads)
+      return;
+    this.reading.set(false);
+    answer();
   }
 }

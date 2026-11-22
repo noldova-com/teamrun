@@ -77,26 +77,36 @@ import {
 import { Resources } from "../../../resources";
 import { ImageOpenMode } from "../../enums/image-open-mode";
 import { SendKey } from "../../enums/send-key";
+import { DraftUnreadableException } from "../../exceptions/draft-unreadable.exception";
+import type { IComposerDrafts } from "../../interfaces/i-composer-drafts";
 import { AbilityRefusal } from "../../models/ability-refusal";
-import { ChatThread } from "../../models/chat-thread";
-import { ProviderChoice } from "../../models/provider-choice";
+import { AccessWidths } from "../../models/access-widths";
+import { CatalogReads } from "../../models/catalog-reads";
+import { CatalogSource } from "../../models/catalog-source";
 import type { ChatContext } from "../../models/chat-context";
+import { ChatThread } from "../../models/chat-thread";
 import { ComposerAttachment } from "../../models/composer-attachment";
 import { ComposerBar } from "../../models/composer-bar";
 import { ComposerDraft } from "../../models/composer-draft";
+import type { ComposerFanOut } from "../../models/composer-fan-out";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FoldWidths } from "../../models/fold-widths";
 import { ImageViewerData } from "../../models/image-viewer-data";
 import { ModelCatalog } from "../../models/model-catalog";
+import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
 import type { RewoundDraft } from "../../models/rewound-draft";
+import { TeammateModelSettings } from "../../models/teammate-model-settings";
 import { ViewedImage } from "../../models/viewed-image";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ComposerDraftService } from "../../services/composer-draft.service";
+import { EngineResync } from "../../services/engine-resync";
 import { ImageViewerService } from "../../services/image-viewer.service";
+import { KeptComposerDraftService } from "../../services/kept-composer-draft.service";
 import { PlanUsageStatus } from "../../services/plan-usage-status";
 import { ProviderSignOut } from "../../services/provider-sign-out";
 import { TeammateCandidates } from "../../services/teammate-candidates";
@@ -130,9 +140,12 @@ import { WaitingMessagesComponent } from "../waiting-messages/waiting-messages.c
     TooltipDirective,
     WaitingMessagesComponent
   ],
-  providers: [ChatStoreService.provider, ComposerDefaultService.provider, ComposerDraftService, ImageViewerService.provider],
+  providers: [ChatStoreService.provider, ComposerDefaultService.provider, ComposerDraftService, KeptComposerDraftService, ImageViewerService.provider],
   templateUrl: "./composer.component.html",
-  styleUrl: "./composer.component.css"
+  styleUrl: "./composer.component.css",
+  host: {
+    "[class.nol-teamrun-composer-fan-out]": "isFanOut()"
+  }
 })
 export class ComposerComponent {
   private readonly box: Signal<ElementRef<HTMLTextAreaElement>> = viewChild.required<ElementRef<HTMLTextAreaElement>>("box");
@@ -158,9 +171,10 @@ export class ComposerComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
   private readonly fitObserver: ResizeObserver = new ResizeObserver(() => this.refold());
-  private readonly insets: [number, number | null] = [0, null];
+  private wideInset: number = 0;
+  private tightInset: number = 0;
   private accessMinimum: number = 0;
-  private accessNeeds: readonly [number, number, number] = [0, 0, 0];
+  private accessNeeds: AccessWidths = new AccessWidths(0, 0, 0);
   private readonly frameTooltips: Signal<readonly TooltipDirective[]> = viewChildren("frame", { read: TooltipDirective });
   private readonly teammateMentions: Signal<readonly TeammateMention[]>;
   private readonly choices: ComposerChoicesService = inject(ComposerChoicesService);
@@ -169,13 +183,17 @@ export class ComposerComponent {
   private readonly shown: Signal<boolean> = inject(WindowPartTokens.shown, { optional: true }) ?? signal(true);
   private readonly usage: UsageFormatterService = inject(UsageFormatterService);
   private readonly focusOnShow: WritableSignal<boolean> = signal(false);
-  private readonly drafts: ComposerDraftService = inject(ComposerDraftService);
+  private readonly chatDrafts: ComposerDraftService = inject(ComposerDraftService);
+  private readonly keptDrafts: KeptComposerDraftService = inject(KeptComposerDraftService);
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly viewer: ImageViewerService = inject(ImageViewerService);
   private readonly tasks: PendingTasks = inject(PendingTasks);
   private readonly ownChoice: Signal<ComposerSettings | null>;
   private readonly keptChoice: Signal<ConversationResponder | null | undefined>;
   private catalogGeneration: number = 0;
+  private readonly resynced: WritableSignal<number> = signal(0);
+  private readonly catalogReads: CatalogReads = new CatalogReads();
+  private catalogsResynced: number = 0;
   private reconcileProvider: string | null = null;
   private keptConversationId: string | null = null;
   private lastKept: ConversationResponder | null | undefined = undefined;
@@ -285,10 +303,14 @@ export class ComposerComponent {
   private readonly defaultLabel: Signal<string>;
 
   public readonly conversationId: InputSignal<string> = input.required<string>();
+  public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
+  public readonly fanOut: InputSignal<ComposerFanOut | null> = input<ComposerFanOut | null>(null);
+
+  protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
 
   public constructor() {
     const store = this.store;
-    this.teammateMentions = computed(() => store.teammates().map(t => new TeammateMention(t.id, t.name)));
+    this.teammateMentions = computed(() => Object.isNull(this.teammateId()) && !this.isFanOut() ? store.teammates().map(t => new TeammateMention(t.id, t.name)) : []);
     this.ownChoice = computed(() => this.choices.choiceOf(this.conversationId()), { equal: (a, b) => a === b || (!Object.isNull(a) && a.equals(b)) });
     this.keptChoice = computed(() => store.conversation(this.conversationId())?.responder, { equal: ComposerComponent.sameResponder });
     this.runningReply = computed(() => store.runningReplyOf(this.conversationId()));
@@ -305,6 +327,8 @@ export class ComposerComponent {
     this.memberTeammates = computed(() => NameOrder.sort(store.membersOf(this.conversationId())
       .map(t => store.teammate(t.teammateId)).filter((t): t is Teammate => !Object.isNull(t)), t => t.name));
     this.candidates = computed(() => {
+      if (!Object.isNull(this.teammateId()) || this.isFanOut())
+        return [];
       const members = this.memberTeammates();
       const candidates = new TeammateCandidates();
       const options = (section: string) => (teammate: Teammate): IMentionCandidateOptions =>
@@ -381,14 +405,20 @@ export class ComposerComponent {
       return named.filter(t => takesImages(t) === false).map(t => t.name);
     });
     effect(() => {
-      const teammates = [...this.memberTeammates(), ...hasImages() ? parties() : []].filter(t => !store.isTeammateUnavailable(t.id))
-        .map((t): [string, string | null] => [store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
-      const wanted: readonly [string, string | null][] = Object.isNull(this.responder()) ? teammates : [...teammates, [this.kind()!, this.ownProvider()]];
+      const teammates = [...this.memberTeammates(), ...hasImages() ? parties() : []].flatMap(t => {
+        const provider = store.providers().find(u => u.id === t.providerId);
+        return Object.isUndefined(provider) || store.isTeammateUnavailable(t.id) ? [] : [new CatalogSource(provider.kind, t.providerId)];
+      });
+      const kind = this.kind();
+      const wanted: readonly CatalogSource[] = Object.isNull(this.responder()) || Object.isNull(kind) ? teammates : [...teammates, new CatalogSource(kind, this.ownProvider())];
       const loaded = untracked(() => this.catalogs());
-      for (const [kind, provider] of wanted) {
-        const key = ComposerComponent.catalogKey(kind, provider);
-        if (!loaded.has(key))
-          void store.modelCatalogs.load(kind, provider).then(t => this.catalogs.update(u => new Map(u).set(key, t)));
+      const resynced = this.resynced();
+      const fresh = resynced !== this.catalogsResynced;
+      this.catalogsResynced = resynced;
+      for (const source of wanted) {
+        const key = ComposerComponent.catalogKey(source.kind, source.providerId);
+        if (fresh || !loaded.has(key))
+          this.catalogReads.follow(key, store.modelCatalogs.load(source.kind, source.providerId), t => this.catalogs.update(u => new Map(u).set(key, t)));
       }
     });
     this.canCompose = computed(() => !this.preparing() && !this.restoring());
@@ -531,7 +561,8 @@ export class ComposerComponent {
         const found = own ?? fresh ?? carried?.withMode(null) ?? null;
         const opens = Object.isNull(own) && Object.isNullOrUndefined(kept) && (!Object.isNull(found) || Object.isNull(this.kind()));
         const local = opens ? this.store.startingChoiceOf(this.store.membersOf(conversationId).map(t => t.teammateId), found) : found;
-        const base = local ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
+        const listed = Object.isNull(local) || !kinds.some(t => t.id === local.kind) ? null : local;
+        const base = listed ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
         const remembered = follows ? base.following(kept!) : local;
         const applies = !Object.isNull(remembered) && kinds.some(t => t.id === remembered.kind);
         if (applies) {
@@ -573,6 +604,10 @@ export class ComposerComponent {
     const unwatchReplies = store.onReplyEnded(t => {
       if ((this.catalog().awaitsTurn || this.chosenDescriptor()?.followsOwnConfig === true) && t.provenance?.requested.kind === this.chosenKind() && t.provenance.providerId === this.chosenProvider())
         this.loadModels(true, true);
+    });
+    const unwatchResync = EngineResync.on(this.context, () => {
+      this.loadModels(true, true);
+      this.resynced.update(t => t + 1);
     });
     const status = PlanUsageStatus.of(this.context);
     effect(() => {
@@ -617,14 +652,20 @@ export class ComposerComponent {
       unwatchDeletions();
       unwatchStale();
       unwatchReplies();
+      unwatchResync();
       void this.drafts.flush();
       for (const attachment of this.attachments())
         attachment.dispose();
     });
     effect(() => {
       const id = this.responderId();
-      if (!Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
+      if (Object.isNull(this.teammateId()) && !Object.isNull(id) && store.screenConversationId() === this.conversationId() && !this.memberTeammates().some(t => t.id === id))
         untracked(() => this.selectResponder(null, false));
+    });
+    effect(() => {
+      const fixed = this.teammateId();
+      if (!Object.isNull(fixed) && this.responderId() !== fixed)
+        untracked(() => this.responderId.set(fixed));
     });
     effect(onCleanup => {
       const conversationId = this.conversationId();
@@ -651,15 +692,16 @@ export class ComposerComponent {
   }
 
   public stopOnEscape(event: KeyboardEvent): void {
-    if (event.key === Resources.escapeKey && !event.defaultPrevented && !event.isComposing && !Object.isNull(this.editing()) && event.target instanceof Element
-      && this.card().nativeElement.contains(event.target) && !this.ownsEscape(event.target)) {
+    const target = event.target;
+    if (event.key !== Resources.escapeKey || event.defaultPrevented || event.isComposing || !(target instanceof Element) || this.ownsEscape(target))
+      return;
+    if (!Object.isNull(this.editing()) && this.card().nativeElement.contains(target)) {
       event.preventDefault();
       this.cancelEditing();
       return;
     }
     const reply = this.runningReply();
-    if (event.key !== Resources.escapeKey || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
-      || Object.isNull(reply) || this.stopping() || this.ownsEscape(event.target as Element))
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || Object.isNull(reply) || this.stopping())
       return;
     event.preventDefault();
     void this.stop();
@@ -809,7 +851,7 @@ export class ComposerComponent {
     if (!this.canCompose() || !Array.from(event.dataTransfer?.types ?? []).includes(Resources.filesTransferType))
       return;
     event.preventDefault();
-    this.dropping.set(this.editingSignal() === null);
+    this.dropping.set(Object.isNull(this.editingSignal()));
   }
 
   protected dragLeave(): void {
@@ -947,7 +989,7 @@ export class ComposerComponent {
   protected async makeDefault(teammate: Teammate): Promise<void> {
     const settings = this.memberSettings();
     const conversationId = this.conversationId();
-    if (!Object.isNull(settings) && await this.store.editTeammate(teammate.id, teammate.providerId, () => [settings.model, settings.effort, settings.speed]))
+    if (!Object.isNull(settings) && await this.store.editTeammate(teammate.id, teammate.providerId, () => new TeammateModelSettings(settings.model, settings.effort, settings.speed)))
       await this.store.setMemberSettings(conversationId, teammate.id, null);
   }
 
@@ -1063,7 +1105,10 @@ export class ComposerComponent {
     const picker = this.pickerButton().nativeElement;
     const style = getComputedStyle(form);
     const inset = (Number.parseFloat(style.paddingInlineStart) || 0) + (Number.parseFloat(style.paddingInlineEnd) || 0);
-    this.insets[this.fold() >= ComposerBar.tight ? 1 : 0] = inset;
+    if (this.fold() >= ComposerBar.tight)
+      this.tightInset = inset;
+    else
+      this.wideInset = inset;
     const width = (element: Element): number => element.getBoundingClientRect().width;
     const natural = (element: Element): number => {
       const text = document.createRange();
@@ -1081,14 +1126,14 @@ export class ComposerComponent {
     if (this.fold() < ComposerBar.accessIcon)
       this.accessMinimum = length(access, t => t.minWidth);
     if (this.fold() < ComposerBar.accessInMenu)
-      this.accessNeeds = [this.accessMinimum + natural(this.accessLabel().nativeElement), this.accessMinimum,
+      this.accessNeeds = new AccessWidths(this.accessMinimum + natural(this.accessLabel().nativeElement), this.accessMinimum,
         length(access, t => t.paddingInlineStart) + length(access, t => t.paddingInlineEnd) + length(access, t => t.borderInlineStartWidth)
-        + length(access, t => t.borderInlineEndWidth) + width(this.accessMark().nativeElement)];
+        + length(access, t => t.borderInlineEndWidth) + width(this.accessMark().nativeElement));
     const line = this.line()?.nativeElement;
-    const fold = new ComposerBar(width(this.host), [this.insets[0], this.insets[1] ?? 0], length(card, t => t.maxWidth, Infinity), width(card) - width(bar),
+    const fold = new ComposerBar(width(this.host), new FoldWidths(this.wideInset, this.tightInset), length(card, t => t.maxWidth, Infinity), width(card) - width(bar),
       length(bar, t => t.columnGap), width(this.addButton().nativeElement) + width(this.barEnd().nativeElement), this.accessNeeds,
-      Object.isUndefined(gauge) ? null : [gauge.fullWidth(), gauge.trackWidth()],
-      [chrome + natural(this.pickerLabel().nativeElement), chrome + natural(this.pickerShort().nativeElement)],
+      Object.isUndefined(gauge) ? null : new FoldWidths(gauge.fullWidth(), gauge.trackWidth()),
+      new FoldWidths(chrome + natural(this.pickerLabel().nativeElement), chrome + natural(this.pickerShort().nativeElement)),
       Object.isUndefined(line) ? null : width(line)).fold();
     if (fold >= ComposerBar.accessInMenu && this.accessMenu().isOpen())
       this.accessMenu().close();
@@ -1122,7 +1167,9 @@ export class ComposerComponent {
         draft = await this.drafts.restore(conversationId);
       }
       catch (error) {
-        failure = Resources.formatDraftUnreadable(error instanceof Error ? error.message : String(error));
+        if (!(error instanceof DraftUnreadableException))
+          throw error;
+        failure = error.message;
       }
       if (restoration !== this.restorations)
         return;
@@ -1154,7 +1201,7 @@ export class ComposerComponent {
       return;
     }
 
-    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
+    const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel", this.box().nativeElement);
     dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.replaceDraftTitle, Resources.replaceDraftText, Resources.replaceDraftLabel, null, true));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
@@ -1181,6 +1228,10 @@ export class ComposerComponent {
       void attachment.loadPreview(path => this.store.shareAttachment(conversationId, path));
   }
 
+  private get drafts(): IComposerDrafts {
+    return this.isFanOut() ? this.keptDrafts : this.chatDrafts;
+  }
+
   private currentSettings(): ComposerSettings | null {
     const kind = this.kind();
     return Object.isNull(kind) ? null : new ComposerSettings(kind, this.model(), this.effort(), this.ownProvider(), this.responderId(), this.speed(), this.mode());
@@ -1192,7 +1243,7 @@ export class ComposerComponent {
       return;
     const responder = settings.toResponder();
     if (!ComposerComponent.sameResponder(responder, conversation.responder))
-      void this.store.setResponder(conversationId, responder, chosen);
+      void this.store.setResponder(conversationId, responder, chosen, !chosen && Object.isNull(responder.teammateId) && Object.isNull(conversation.responder));
   }
 
   private static sameResponder(a: ConversationResponder | null | undefined, b: ConversationResponder | null | undefined): boolean {
@@ -1240,10 +1291,12 @@ export class ComposerComponent {
         prepared.push(saved);
         attachments.push(new AttachmentInput(saved.name, saved.mediaType, null, saved.path));
       }
-      if (await this.deliver(text, settings, conversationId, attachments, mentions.map(t => t.teammateId), delivery)) {
-        this.context.keepDocument(Resources.conversationDocumentName, conversationId);
-        this.choices.remember(conversationId, settings);
-        this.defaults.remember(settings);
+      if (await this.deliver(text, settings, conversationId, attachments, drafted.map(t => t.key), mentions.map(t => t.teammateId), delivery)) {
+        if (!this.isFanOut()) {
+          this.context.keepDocument(Resources.conversationDocumentName, conversationId);
+          this.choices.remember(conversationId, settings);
+          this.defaults.remember(settings);
+        }
         const last = mentions.at(-1);
         if (!Object.isUndefined(last)) {
           this.choices.remember(conversationId, settings.withResponder(last.teammateId));
@@ -1270,18 +1323,21 @@ export class ComposerComponent {
     }
   }
 
-  private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[],
+  private deliver(text: string, settings: ComposerSettings, conversationId: string, attachments: readonly AttachmentInput[], sources: readonly string[],
     mentioned: readonly string[], delivery: MessageDelivery | null): Promise<boolean> {
+    const fanOut = this.fanOut();
+    if (!Object.isNull(fanOut))
+      return fanOut.send(text, settings, attachments, sources);
     const editing = this.editing();
     if (!Object.isNull(editing))
-      return this.saveEdit(editing, text, conversationId);
+      return this.saveEdit(editing, text, conversationId, mentioned);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
     return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
   }
 
-  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string): Promise<boolean> {
-    const saved = await this.store.editWaiting(editing, text, editing.message.attachments);
+  private async saveEdit(editing: WaitingMessage, text: string, conversationId: string, mentioned: readonly string[]): Promise<boolean> {
+    const saved = await this.store.editWaiting(editing, text, editing.message.attachments, mentioned);
     if (saved && this.editingSignal() === editing)
       this.editingSignal.set(null);
     if (!saved && conversationId !== this.conversationId())
@@ -1317,11 +1373,12 @@ export class ComposerComponent {
       this.signOutFailure.set(Resources.logoutUnavailable);
       return;
     }
-    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider))
+    const report = (message: string): void => this.signOutFailure.set(message);
+    if (!await ProviderSignOut.confirmAsync(this.dialogs, this.store, provider, report))
       return;
     this.value.set(String.empty);
     void this.drafts.discard(conversationId);
-    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, t => this.signOutFailure.set(t));
+    const isSignedOut = await ProviderSignOut.signOutAsync(this.store, provider, report);
     if (Object.isNull(isSignedOut))
       this.signOutNote.set(Resources.formatSignOutUnknown(provider.label));
     else

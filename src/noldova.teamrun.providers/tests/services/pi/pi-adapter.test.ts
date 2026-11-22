@@ -471,7 +471,7 @@ export class PiAdapterTests {
     Assert.areEqual(JSON.stringify([[realpathSync(host.directory.path), provider.profileDir, "ask", "from the request", false],
       [realpathSync(host.directory.path), provider.profileDir, "allow-all", "from the request", true]]),
     JSON.stringify(launches.map(t => [realpathSync(String(t["cwd"])), t["agentDir"], t["mode"], t["extra"], (t["argv"] as string[]).includes("--session")])));
-    Assert.areEqual(JSON.stringify([{ provider: "anthropic", modelId: "sonnet-9" }]), JSON.stringify(host.commands("set_model").map(t => ({ provider: t["provider"],
+    Assert.areEqual(JSON.stringify([{ provider: "anthropic", modelId: "sonnet-9" }, { provider: "anthropic", modelId: "sonnet-9" }]), JSON.stringify(host.commands("set_model").map(t => ({ provider: t["provider"],
       modelId: t["modelId"] }))));
     Assert.areEqual(JSON.stringify([Resources.formatRolePrompt("Be brief", "Hi"), Resources.formatRolePrompt(null, "Again")]),
       JSON.stringify(host.commands("prompt").map(t => t["message"])));
@@ -481,6 +481,89 @@ export class PiAdapterTests {
       listener.usages[0]!.costUsd, listener.usages[0]!.cacheReadTokens, listener.usages[0]!.cacheWriteTokens, listener.usages[0]!.context?.usedTokens,
       listener.usages[0]!.context?.windowTokens]));
     Assert.areEqual(0, listener.taskStarts.length);
+  }
+
+  @TestMethod
+  @TestData(false, 0)
+  @TestData(true, 1)
+  public async setsPisDefaultModelAndThinkingLevelWhenAKeptOrResumedChatOnAnExplicitOneTurnsBackToDefault(restarts: boolean, lookups: number): Promise<void> {
+    await using host = new PiTestHost();
+    const provider = host.createProvider();
+    const listener = new RecordingTurnListener();
+    let adapter = host.createAdapter();
+    const turn = (prompt: string, resume: string | null, model: string | null = null, effort: string | null = null): Promise<TurnResult> =>
+      adapter.runTurn(host.createRequest(prompt, provider, resume, model, effort), listener, new AbortController().signal);
+
+    const first = await turn("Hi", null, "openai/gpt-10", "high");
+    if (restarts) {
+      await adapter.shutdown();
+      adapter = host.createAdapter();
+    }
+    const back = await turn("Again", first.nativeSessionId);
+    const again = await turn("Once more", first.nativeSessionId);
+    const explicit = await turn("Last", first.nativeSessionId, "openai/gpt-9", "low");
+
+    const looked = host.records.map(t => t["argv"]).filter(t => Array.isArray(t) && t.every(Object.isString) && t.includes("--no-session")).length;
+    Assert.areEqual(JSON.stringify([["openai/gpt-10", "high"], ["anthropic/sonnet-9", "medium"], ["anthropic/sonnet-9", "medium"], ["openai/gpt-9", "low"]]),
+      JSON.stringify([first, back, again, explicit].map(t => [t.observed.model, t.observed.effort])));
+    Assert.areEqual(JSON.stringify(["openai/gpt-10", "anthropic/sonnet-9", "anthropic/sonnet-9", "openai/gpt-9"]),
+      JSON.stringify(host.commands("set_model").map(t => `${String(t["provider"])}/${String(t["modelId"])}`)));
+    Assert.areEqual(JSON.stringify(["high", "medium", "medium", "low"]), JSON.stringify(host.commands("set_thinking_level").map(t => t["level"])));
+    Assert.areEqual(lookups, looked);
+  }
+
+  @TestMethod
+  public async readsAResumedChatsDefaultFromAPiWithTheProfilesExtensionsWhenOnlyAnIsolatedPiRanBefore(): Promise<void> {
+    await using host = new PiTestHost();
+    const provider = host.createProvider({ defaultProvider: "from-an-extension", defaultModel: "model-1", defaultThinkingLevel: "high" });
+    const listener = new RecordingTurnListener();
+    const first = await host.createAdapter().runTurn(host.createRequest("Hi", provider, null, "openai/gpt-9", "low"), listener, new AbortController().signal);
+    const adapter = host.createAdapter();
+    const isolated = new TurnRequest(provider, host.directory.path, "Name this chat", new RequestedSettings("pi", null, null, null, null), null, [],
+      null, null, {}, false, null, [], null, undefined, SharedMcpValues.none, null, true);
+
+    await adapter.askIsolated(isolated, listener, new AbortController().signal);
+    const back = await adapter.runTurn(host.createRequest("Again", provider, first.nativeSessionId), listener, new AbortController().signal);
+
+    Assert.areEqual(JSON.stringify(["from-an-extension/model-1", "high"]), JSON.stringify([back.observed.model, back.observed.effort]));
+    Assert.areEqual(JSON.stringify(["openai/gpt-9", "from-an-extension/model-1"]),
+      JSON.stringify(host.commands("set_model").map(t => `${String(t["provider"])}/${String(t["modelId"])}`)));
+  }
+
+  @TestMethod
+  public async readsTheDefaultAgainForAKeptChatOnceTheProfilesSettingsChange(): Promise<void> {
+    await using host = new PiTestHost();
+    const provider = host.createProvider();
+    const listener = new RecordingTurnListener();
+    const adapter = host.createAdapter();
+    const turn = (prompt: string, resume: string | null, model: string | null = null, effort: string | null = null): Promise<TurnResult> =>
+      adapter.runTurn(host.createRequest(prompt, provider, resume, model, effort), listener, new AbortController().signal);
+    const settings = join(provider.profileDir, "settings.json");
+
+    const first = await turn("Hi", null, "openai/gpt-9", "low");
+    const back = await turn("Again", first.nativeSessionId);
+    writeFileSync(settings, JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-10", defaultThinkingLevel: "high" }));
+    const later = statSync(settings).mtimeMs / 1000 + 60;
+    utimesSync(settings, later, later);
+    const changed = await turn("Once more", first.nativeSessionId);
+
+    Assert.areEqual(JSON.stringify([["anthropic/sonnet-9", "medium"], ["openai/gpt-10", "high"]]),
+      JSON.stringify([back, changed].map(t => [t.observed.model, t.observed.effort])));
+  }
+
+  @TestMethod
+  @TestData("anthropic/sonnet-9", "[\"low\",\"medium\"]")
+  @TestData("openai/gpt-10", "[\"low\"]")
+  public async setsTheDefaultThinkingLevelOnAResumedChatWithAnExplicitModelOnlyWhenThatModelIsTheDefault(model: string, levels: string): Promise<void> {
+    await using host = new PiTestHost();
+    const provider = host.createProvider();
+    const listener = new RecordingTurnListener();
+    const adapter = host.createAdapter();
+
+    const first = await adapter.runTurn(host.createRequest("Hi", provider, null, "openai/gpt-9", "low"), listener, new AbortController().signal);
+    await adapter.runTurn(host.createRequest("Again", provider, first.nativeSessionId, model), listener, new AbortController().signal);
+
+    Assert.areEqual(levels, JSON.stringify(host.commands("set_thinking_level").map(t => t["level"])));
   }
 
   @TestMethod

@@ -59,7 +59,7 @@ export class InlineTerminals {
 
   public async answerBusyAsync(owner: string, stop: boolean): Promise<void> {
     const waiting = this.busy().get(owner);
-    if (waiting === undefined)
+    if (Object.isUndefined(waiting))
       return;
     await this.startAsync(owner, waiting.command, waiting.folder, waiting.shellKinds, waiting.place, stop ? TerminalRunBusy.Interrupt : null);
   }
@@ -100,7 +100,7 @@ export class InlineTerminals {
 
   public attach(owner: string, place: IRunPlace, host: HTMLElement, injector: EnvironmentInjector): void {
     const current = this.terminals.get(owner);
-    if (current === undefined || !this.isLiveAt(owner, place))
+    if (Object.isUndefined(current) || !this.isLiveAt(owner, place))
       return;
     current.terminal ??= this.open(current.sessionId, injector, current.rows);
     host.append(current.terminal.element);
@@ -114,7 +114,7 @@ export class InlineTerminals {
   public detach(owner: string, host: HTMLElement): void {
     const current = this.terminals.get(owner);
     const terminal = current?.terminal ?? null;
-    if (current === undefined || Object.isNull(terminal) || terminal.element.parentElement !== host)
+    if (Object.isUndefined(current) || Object.isNull(terminal) || terminal.element.parentElement !== host)
       return;
     current.focuses ||= terminal.element.contains(document.activeElement);
     terminal.setShown(false);
@@ -123,7 +123,7 @@ export class InlineTerminals {
 
   public fit(owner: string, historyHeight: number): void {
     const current = this.terminals.get(owner);
-    if (current === undefined || Object.isNull(current.terminal))
+    if (Object.isUndefined(current) || Object.isNull(current.terminal))
       return;
     const terminal = current.terminal;
     const rowHeight = terminal.rowHeight();
@@ -190,7 +190,7 @@ export class InlineTerminals {
   private async moveAsync(owner: string, command: string, folder: string | null, shellKinds: readonly TerminalShellKind[], place: IRunPlace | null,
     whenBusy: TerminalRunBusy | null, left: ILeftPlace[]): Promise<void> {
     const current = this.terminals.get(owner);
-    const target = current === undefined || Object.isNull(whenBusy) ? null : new TerminalRunTarget(current.sessionId, whenBusy);
+    const target = Object.isUndefined(current) || Object.isNull(whenBusy) ? null : new TerminalRunTarget(current.sessionId, whenBusy);
     const before = this.placed().get(owner) ?? null;
     const opened = this.closings;
     this.unbusy(owner);
@@ -205,7 +205,7 @@ export class InlineTerminals {
         throw error;
       if (error.reason === TerminalRunOutcome.Busy) {
         const entry = this.terminals.get(owner);
-        if (entry === undefined)
+        if (Object.isUndefined(entry))
           return;
         entry.focuses = false;
         this.place(owner, before);
@@ -221,7 +221,7 @@ export class InlineTerminals {
       this.track(owner, place, run);
     const earlier = this.latest.get(owner);
     this.latest.set(owner, { run, place });
-    if (earlier !== undefined && !Object.isNull(earlier.place) && !InlineTerminals.isSame(earlier.place, place))
+    if (!Object.isUndefined(earlier) && !Object.isNull(earlier.place) && !InlineTerminals.isSame(earlier.place, place))
       await this.storeAsync(owner, earlier.place, earlier.run);
   }
 
@@ -241,7 +241,7 @@ export class InlineTerminals {
       this.terminals.set(owner, { sessionId, terminal: null, focuses: true, rows: current?.rows ?? Resources.inlineTerminalRows });
     }
     const before = this.placed().get(owner);
-    if (before !== undefined && !InlineTerminals.isSame(before, place)) {
+    if (!Object.isUndefined(before) && !InlineTerminals.isSame(before, place)) {
       const leaving: ILeftPlace = { place: before };
       left.push(leaving);
       this.leaving.set(new Map([...this.leaving(), [owner, [...this.leaving().get(owner) ?? [], leaving]]]));
@@ -261,9 +261,11 @@ export class InlineTerminals {
     }
     if (output.lines.length === 0 || !this.terminals.has(owner) || this.isLiveAt(owner, place))
       return;
+    await this.kept?.save(owner, { place, output });
+    if (!this.terminals.has(owner) || this.isLiveAt(owner, place))
+      return;
     const kept = (this.stored().get(owner) ?? []).filter(t => !InlineTerminals.isSame(t.place, place));
     this.stored.set(new Map([...this.stored(), [owner, [...kept, { place, output }]]]));
-    this.kept?.save(owner, { place, output });
   }
 
   private async loadAsync(owner: string): Promise<void> {

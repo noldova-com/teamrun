@@ -26,8 +26,10 @@ import { CommandTargetsService } from "../../../../src/app/services/command-targ
 import { ComposerChoicesService } from "../../../../src/app/services/composer-choices.service";
 import { ComposerDefaultService } from "../../../../src/app/services/composer-default.service";
 import { ConversationActions } from "../../../../src/app/services/conversation-actions";
+import { EngineResync } from "../../../../src/app/services/engine-resync";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { PointerEventsFixture } from "../../../fixtures/pointer-events.fixture";
@@ -271,6 +273,38 @@ describe("TeammatesViewComponent", () => {
     expect(document.activeElement).toBe(button(".nol-teamrun-clear-default"));
   });
 
+  it("names the default teammate's model and effort from its provider's catalog when no listed teammate chooses either there", async () => {
+    await create(t => {
+      t.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([
+        new ProviderModel("gpt-5", "GPT-5", "Fixture", ["high", "xhigh"], true, null, true, "high", { xhigh: "Extra high" })]));
+      t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", "gpt-5", "xhigh"), "a1").toJson());
+      data.teammates = [new Teammate("erin", "Erin", null, "a1", Harness.Provider, null, null, "t", "t")];
+    });
+
+    await Wait.until(() => expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["GPT-5"], ["Extra high"]]));
+  });
+
+  it("names the default teammate's model and effort after a resync when its provider's catalog couldn't be read before", async () => {
+    let reachable = false;
+    await create(t => {
+      t.answer(MethodName.ProviderModelCatalog, () => {
+        if (!reachable)
+          throw new Error("offline");
+        return SampleData.catalog([new ProviderModel("gpt-5", "GPT-5", "Fixture", ["high", "xhigh"], true, null, true, "high", { xhigh: "Extra high" })]);
+      });
+      t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", "gpt-5", "xhigh"), "a1").toJson());
+      data.teammates = [new Teammate("erin", "Erin", null, "a1", Harness.Provider, null, null, "t", "t")];
+    });
+    await Wait.until(() => expect(context.count(MethodName.ProviderModelCatalog)).toBe(1));
+    await settle();
+    expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["gpt-5"], ["Xhigh"]]);
+    reachable = true;
+
+    context.emit(EventName.StateResyncRequested, null);
+
+    await Wait.until(() => expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["GPT-5"], ["Extra high"]]));
+  });
+
   it("says a default teammate saved without a provider has no provider chosen", async () => {
     await create(t => t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", null, null)).toJson()));
 
@@ -355,6 +389,46 @@ describe("TeammatesViewComponent", () => {
     expect(texts(".nol-teamrun-model-name")).toEqual(["gpt-5", Resources.providerDefaultModel, Resources.providerDefaultModel]);
     expect(texts(".nol-teamrun-model-note")).toEqual(shown === "gpt-5" ? [] : [Resources.notInCatalogNote]);
     expect(row("Alice").querySelector("nol-avatar")?.getAttribute("aria-label")).toBe(`Alice · Codex · Work · ${shown} · High`);
+  });
+
+  it.each([
+    { cause: "the runtime asks for a resync", resync: (): void => context.emit(EventName.StateResyncRequested, null) },
+    { cause: "the window reconnects", resync: (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    } }
+  ])("asks a teammate's provider for its models again after $cause, while the providers are still being read, and drops the note once the new list has its model", async ({ resync }) => {
+    let models = [new ProviderModel("gpt-5-mini", "gpt-5-mini", "Fixture", ["high"], true, null, true)];
+    await create(t => t.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog(models)));
+    await Wait.until(() => expect(texts(".nol-teamrun-model-note")).toEqual([Resources.notInCatalogNote]));
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    models = [...models, new ProviderModel("gpt-5", "gpt-5", "Fixture", ["high"], false, null, true)];
+    const providers = new DeferredResponse();
+    context.answer(MethodName.ProviderList, () => providers.promise);
+
+    resync();
+
+    await Wait.until(() => expect(texts(".nol-teamrun-model-note")).toEqual([]));
+    expect(context.count(MethodName.ProviderModelCatalog)).toBeGreaterThan(asked);
+    providers.resolve([SampleData.provider.toJson()]);
+    await settle();
+  });
+
+  it("keeps the list read after a resync when the one asked before it answers last", async () => {
+    const before = new DeferredResponse();
+    const after = new DeferredResponse();
+    let asked = 0;
+    await create(t => t.answer(MethodName.ProviderModelCatalog, () => ++asked === 1 ? before.promise : after.promise));
+    await Wait.until(() => expect(asked).toBe(1));
+
+    context.emit(EventName.StateResyncRequested, null);
+    await Wait.until(() => expect(asked).toBe(2));
+    after.resolve(SampleData.catalog([new ProviderModel("gpt-5", "gpt-5", "Fixture", ["high"], true, null, true, "high", { high: "Deep" })]));
+    await Wait.until(() => expect(row("Alice").querySelector("nol-avatar")?.getAttribute("aria-label")).toBe("Alice · Codex · Work · gpt-5 · Deep"));
+    before.resolve(SampleData.catalog([new ProviderModel("gpt-5-mini", "gpt-5-mini", "Fixture", ["high"], true, null, true)]));
+    await settle();
+
+    expect([texts(".nol-teamrun-model-note"), row("Alice").querySelector("nol-avatar")?.getAttribute("aria-label")]).toEqual([[], "Alice · Codex · Work · gpt-5 · Deep"]);
   });
 
   it("shows a teammate saved with a level's id at that level, not as a model the catalog doesn't list", async () => {
@@ -451,6 +525,46 @@ describe("TeammatesViewComponent", () => {
 
     expect(TeammateIdParams.fromJson(context.parametersOf(MethodName.TeammateDelete)).teammateId).toBe("bob");
     expect(texts(".nol-teamrun-item-name")).toEqual(["Alice", "Offline"]);
+  });
+
+  it("moves the focus to the next teammate's Delete once one is deleted, to the one before for the last, and to Add once none is left", async () => {
+    await create();
+    const confirmDelete = async (name: string): Promise<void> => {
+      const remove = button(".nol-teamrun-delete", row(name));
+      remove.focus();
+      remove.click();
+      await settle();
+      button(".nol-teamrun-confirm", document).click();
+      await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).toBeNull());
+    };
+
+    await confirmDelete("Bob");
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-delete", row("Offline"))));
+    await confirmDelete("Offline");
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-delete", row("Alice"))));
+    await confirmDelete("Alice");
+
+    await Wait.until(() => expect(document.activeElement).toBe(button(".nol-teamrun-add")));
+    expect(texts(".nol-teamrun-item-name")).toEqual([]);
+  });
+
+  it("leaves a focus the person moved while a teammate's delete runs", async () => {
+    const deleting = new DeferredResponse();
+    await create(t => t.answer(MethodName.TeammateDelete, () => deleting.promise));
+    const remove = button(".nol-teamrun-delete", row("Bob"));
+    remove.focus();
+    remove.click();
+    await settle();
+    button(".nol-teamrun-confirm", document).click();
+    await Wait.until(() => expect(context.count(MethodName.TeammateDelete)).toBe(1));
+    const add = button(".nol-teamrun-add");
+
+    add.focus();
+    deleting.resolve(null);
+    await Wait.until(() => expect(texts(".nol-teamrun-item-name")).not.toContain("Bob"));
+    await settle();
+
+    expect(document.activeElement).toBe(add);
   });
 
   describe("New chat", () => {

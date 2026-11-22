@@ -9,12 +9,14 @@
 import { computed, type FactoryProvider, inject, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
-import type { JsonValue } from "@noldova/context.json";
-import { FileSaveOutcome, type IWindowPartContext, LinkPlace, ViewBadge, WindowPartTokens } from "@noldova/desktop.window";
+import { ArgumentException } from "@noldova/context.exceptions";
+import { JsonException, type JsonValue } from "@noldova/context.json";
+import { FileSaveOutcome, type IWindowPartContext, LinkPlace, RuntimeRequestException, ViewBadge, WindowException, WindowPartTokens } from "@noldova/desktop.window";
 import { Page, PageKind, PageListRequest, PageRequest, PageView } from "@noldova/teamrun.protocol";
 
 import { PagePathCopyException } from "../../exceptions/pages/page-path-copy.exception";
 import { PageSaveException } from "../../exceptions/pages/page-save.exception";
+import { PagesException } from "../../exceptions/pages/pages.exception";
 import { ChatPagesResources } from "./chat-pages-resources";
 import { PageDocumentResources } from "./page-document-resources";
 import { PageDocuments } from "./page-documents";
@@ -92,6 +94,12 @@ export class ChatPages {
     void this.load(chatId);
   }
 
+  public resync(): void {
+    void this.readOpen();
+    for (const chatId of [...this.loads])
+      void this.load(chatId);
+  }
+
   public pagesOf(chatId: string): readonly Page[] {
     return this.pagesSignal().get(chatId) ?? [];
   }
@@ -153,12 +161,16 @@ export class ChatPages {
   }
 
   private async attempt(action: () => Promise<void>, failure: string): Promise<void> {
+    const chatId = this.chatId();
     this.errorSignal.set(null);
     try {
       await action();
     }
-    catch {
-      this.errorSignal.set(failure);
+    catch (error) {
+      if (!ChatPages.isActionFailure(error))
+        throw error;
+      if (this.chatId() === chatId)
+        this.errorSignal.set(failure);
     }
   }
 
@@ -171,7 +183,9 @@ export class ChatPages {
       this.pagesSignal.update(t => new Map(t).set(chatId, ChatPages.sorted(ChatPages.merged(listed, t.get(chatId) ?? []))));
       this.showBadge();
     }
-    catch {
+    catch (error) {
+      if (!(error instanceof RuntimeRequestException) && !ChatPages.isReadFailure(error))
+        throw error;
       this.loads.delete(chatId);
       this.loadErrorsSignal.update(t => new Map(t).set(chatId, ChatPagesResources.loadFailed));
     }
@@ -182,7 +196,9 @@ export class ChatPages {
     try {
       page = Page.fromJson(value);
     }
-    catch {
+    catch (error) {
+      if (!ChatPages.isReadFailure(error))
+        throw error;
       return null;
     }
     if (page.kind !== PageKind.Page)
@@ -206,12 +222,14 @@ export class ChatPages {
       if (read === this.openRead && !Object.isNull(open))
         this.openSignal.set(new Set(open));
     }
-    catch {
-      return;
+    catch (error) {
+      if (!(error instanceof RuntimeRequestException))
+        throw error;
     }
   }
 
   private show(chatId: string | null): void {
+    this.errorSignal.set(null);
     if (!Object.isNull(chatId))
       this.watch(chatId);
     this.showBadge();
@@ -226,6 +244,14 @@ export class ChatPages {
   private dispose(): void {
     for (const unsubscribe of this.subscriptions)
       unsubscribe();
+  }
+
+  private static isActionFailure(error: unknown): error is WindowException | JsonException | ArgumentException | PagesException {
+    return error instanceof WindowException || error instanceof PagesException || ChatPages.isReadFailure(error);
+  }
+
+  private static isReadFailure(error: unknown): error is JsonException | ArgumentException {
+    return error instanceof JsonException || error instanceof ArgumentException;
   }
 
   private static merged(next: readonly Page[], known: readonly Page[]): readonly Page[] {

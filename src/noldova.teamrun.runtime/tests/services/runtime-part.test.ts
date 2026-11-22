@@ -541,6 +541,17 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  public findsAToolsHandlerByItsNameAndRefusesOneThatIsMissingNamingIt(): void {
+    const handlers = new Map([["teamrun.projectOpen", "open"]]);
+
+    const found = RuntimePart.handlerAt(handlers, "teamrun.projectOpen");
+    const failure = Assert.throws(() => RuntimePart.handlerAt(handlers, "teamrun.missing"), RuntimePartException);
+
+    Assert.areEqual("open", found);
+    Assert.areEqual(RuntimeResources.formatHandlerMissing("teamrun.missing"), failure.message);
+  }
+
+  @TestMethod
   public async registersExactlyTheMethodsAndEventsItsModuleDeclares(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -1533,8 +1544,7 @@ export class RuntimePartTests {
     await part.activateAsync(context);
     const project = await RuntimePartTests.callAsync(context, "teamrun.projectOpen", { rootPath: directory.path }) as { id: string };
     const chat = await RuntimePartTests.callAsync(context, "teamrun.conversationCreate", { projectId: project.id, title: null }) as { id: string };
-    const providerId = await RuntimePartTests.providerIdAsync(context, CommandModeAdapter.id, directory.path);
-    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), providerId, [], ["teammate-gone"]);
+    const send = new MessageSendParams(chat.id, "To nobody", new RequestedSettings(CommandModeAdapter.id, null, null), "provider-gone", [], []);
 
     let failed = RuntimePartTests.waitingFailed(context);
     const added = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",
@@ -1542,7 +1552,7 @@ export class RuntimePartTests {
     await failed;
     failed = RuntimePartTests.waitingFailed(context);
     const theirs = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageEdit",
-      new WaitingMessageEditParams(added.id, send).toJson(), ShellClients.commandLine));
+      new WaitingMessageEditParams(added.id, new MessageSendParams(chat.id, "To nobody", send.requested, "provider-gone", [], [])).toJson(), ShellClients.commandLine));
     await failed;
     failed = RuntimePartTests.waitingFailed(context);
     const outside = WaitingMessage.fromJson(await RuntimePartTests.callAsync(context, "teamrun.waitingMessageAdd",

@@ -45,4 +45,15 @@ describe("PackageManifest", () => {
     await assert.rejects(readAsync({ private: true, publishConfig: { access: "restricted" } }),
       { message: `${FILE} must have no publishConfig; TeamRun publishes no package to a registry.` });
   });
+
+  it("reads the tests a package runs in a process of their own, sorted, and none when it lists none", async () => {
+    assert.deepEqual((await readAsync({ private: true, noldova: { isolatedTests: ["b.test.ts", "a/c.test.ts"] } })).isolatedTests, ["a/c.test.ts", "b.test.ts"]);
+    assert.deepEqual((await readAsync({ private: true })).isolatedTests, []);
+  });
+
+  it("refuses isolated tests that aren't an array of paths", async () => {
+    for (const isolatedTests of ["a.test.ts", [1]])
+      await assert.rejects(readAsync({ private: true, noldova: { isolatedTests } }),
+        { message: `${FILE} must list its isolated tests as an array of paths under its tests folder.` });
+  });
 });

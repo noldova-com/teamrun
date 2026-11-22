@@ -9,10 +9,14 @@
 import fs, { appendFileSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
+import { mock } from "node:test";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ProjectImageReader, SharedImages } from "@noldova/teamrun.core";
 import { AttachmentContent, ErrorCode, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { FileSystemHook } from "../../fixtures/file-system-hook.fixture.js";
+import { LinkSwapCase } from "../../fixtures/link-swap-case.fixture.js";
+import { SystemCallError } from "../../fixtures/system-call-error.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 
 @TestClass
@@ -98,13 +102,13 @@ export class ProjectImageReaderTests {
     const changes: (() => void)[] = [
       () => appendFileSync(path, "x"),
       () => {
-        throw Object.assign(new Error("Simulated read failure"), { code: "EIO", syscall: "read" });
+        throw new SystemCallError("Simulated read failure", "EIO", "read");
       }
     ];
 
     for (const [index, change] of changes.entries()) {
       writeFileSync(path, ProjectImageReaderTests.png());
-      Assert.areEqual(ErrorCode.NotFound, ProjectImageReaderTests.refusalWhile([{ name: "readSync", call: 1, before: change }],
+      Assert.areEqual(ErrorCode.NotFound, ProjectImageReaderTests.refusalWhile([new FileSystemHook("readSync", 1, change, null)],
         () => ProjectImageReader.read(project, path)), String(index));
     }
     writeFileSync(path, ProjectImageReaderTests.png());
@@ -117,13 +121,12 @@ export class ProjectImageReaderTests {
     const project = ProjectImageReaderTests.project(directory);
     const path = join(project, "chart.png");
     writeFileSync(path, ProjectImageReaderTests.png());
-    const errors: unknown[] = [new TypeError("Not the file system's."), "Not an error.", Object.assign(new Error("No call named."), { syscall: 1 })];
+    const errors: unknown[] = [new TypeError("Not the file system's."), "Not an error.", new SystemCallError("No call named.", "EIO", 1)];
     const thrown: unknown[] = [];
-    const original = fs.readSync;
     for (const error of errors) {
-      fs.readSync = () => {
+      const read = mock.method(fs, "readSync", (): number => {
         throw error;
-      };
+      });
       syncBuiltinESMExports();
       try {
         ProjectImageReader.read(project, path);
@@ -132,7 +135,7 @@ export class ProjectImageReaderTests {
         thrown.push(caught);
       }
       finally {
-        fs.readSync = original;
+        read.mock.restore();
         syncBuiltinESMExports();
       }
     }
@@ -161,15 +164,16 @@ export class ProjectImageReaderTests {
       renameSync(kept, folder);
     };
 
-    const cases: [name: string, hooks: Parameters<typeof ProjectImageReaderTests.refusalWhile>[0], restore: () => void][] = [
-      ["swapped around the open", [{ name: "openSync", call: 1, before: swap, after: back }], () => undefined],
-      ["swapped after the real path check and back after the open", [{ name: "realpathSync", call: 2, after: swap }, { name: "openSync", call: 1, after: back }], () => undefined],
-      ["swapped before the open and left", [{ name: "openSync", call: 1, before: swap }], back]
+    const cases: readonly LinkSwapCase[] = [
+      new LinkSwapCase("swapped around the open", [new FileSystemHook("openSync", 1, swap, back)], () => undefined),
+      new LinkSwapCase("swapped after the real path check and back after the open",
+        [new FileSystemHook("realpathSync", 2, null, swap), new FileSystemHook("openSync", 1, null, back)], () => undefined),
+      new LinkSwapCase("swapped before the open and left", [new FileSystemHook("openSync", 1, swap, null)], back)
     ];
 
-    for (const [name, hooks, restore] of cases) {
-      Assert.areEqual(ErrorCode.NotFound, ProjectImageReaderTests.refusalWhile(hooks, () => ProjectImageReader.read(project, join(folder, "chart.png"))), name);
-      restore();
+    for (const each of cases) {
+      Assert.areEqual(ErrorCode.NotFound, ProjectImageReaderTests.refusalWhile(each.hooks, () => ProjectImageReader.read(project, join(folder, "chart.png"))), each.name);
+      each.restore();
     }
     Assert.areEqual("image/png", ProjectImageReader.read(project, join(folder, "chart.png")).mediaType);
   }
@@ -191,29 +195,35 @@ export class ProjectImageReaderTests {
     return Assert.throws(action, ServiceException).info.name;
   }
 
-  private static refusalWhile(hooks: readonly { name: "readSync" | "openSync" | "realpathSync"; call: number; before?: () => void; after?: () => void }[], action: () => unknown): string {
-    const originals = hooks.map(t => [t.name, fs[t.name]] as const);
+  private static refusalWhile(hooks: readonly FileSystemHook[], action: () => unknown): string {
     const calls = new Map<string, number>();
-    for (const [name, original] of new Map(originals))
-      Object.assign(fs, { [name]: new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
-        const call = (calls.get(name) ?? 0) + 1;
-        calls.set(name, call);
-        const hook = hooks.find(t => t.name === name && t.call === call);
-        hook?.before?.();
-        try {
-          return Reflect.apply(target, self, args);
-        }
-        finally {
-          hook?.after?.();
-        }
-      } }) });
+    const around = <T>(name: string, run: () => T): T => {
+      const call = (calls.get(name) ?? 0) + 1;
+      calls.set(name, call);
+      const hook = hooks.find(t => t.name === name && t.call === call);
+      hook?.before?.();
+      try {
+        return run();
+      }
+      finally {
+        hook?.after?.();
+      }
+    };
+    const read = fs.readSync;
+    const open = fs.openSync;
+    const resolve = fs.realpathSync;
+    const mocks = [
+      mock.method(fs, "readSync", (...args: Parameters<typeof read>): number => around("readSync", () => read(...args))),
+      mock.method(fs, "openSync", (...args: Parameters<typeof open>): number => around("openSync", () => open(...args))),
+      mock.method(fs, "realpathSync", (...args: Parameters<typeof resolve>): ReturnType<typeof resolve> => around("realpathSync", () => resolve(...args)))
+    ];
     syncBuiltinESMExports();
     try {
       return ProjectImageReaderTests.refusal(action);
     }
     finally {
-      for (const [name, original] of originals)
-        Object.assign(fs, { [name]: original });
+      for (const restored of mocks)
+        restored.mock.restore();
       syncBuiltinESMExports();
     }
   }

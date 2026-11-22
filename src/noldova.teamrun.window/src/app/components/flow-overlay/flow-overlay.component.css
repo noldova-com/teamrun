@@ -1,0 +1,93 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.lines {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.route {
+  fill: none;
+  stroke: var(--nol-accent);
+  stroke-width: 2;
+}
+.writing {
+  opacity: 0.75;
+  stroke-dasharray: 0 8;
+  stroke-linecap: round;
+  stroke-width: 3;
+  animation: nol-teamrun-flow-march linear infinite;
+}
+.abandoned {
+  animation: nol-teamrun-flow-fade ease-out forwards;
+}
+.pulse {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: var(--nol-space-2);
+  height: var(--nol-space-2);
+  border-radius: 50%;
+  background: var(--nol-accent);
+  offset-rotate: 0deg;
+  animation: nol-teamrun-flow-pulse ease-in-out forwards;
+}
+.glow {
+  position: absolute;
+  z-index: -1;
+  box-sizing: border-box;
+  border-radius: var(--nol-radius-medium);
+  box-shadow: 0 0 0 var(--nol-space-1) var(--nol-accent);
+  opacity: 0;
+  animation: nol-teamrun-flow-glow ease-out forwards;
+}
+@keyframes nol-teamrun-flow-march {
+  to {
+    stroke-dashoffset: -8;
+  }
+}
+@keyframes nol-teamrun-flow-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes nol-teamrun-flow-pulse {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+@keyframes nol-teamrun-flow-glow {
+  30% {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (forced-colors: active) {
+  .route {
+    stroke: Highlight;
+  }
+  .pulse {
+    background: Highlight;
+  }
+  .glow {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}

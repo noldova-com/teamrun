@@ -62,7 +62,9 @@ export class RewindDialogComponent {
     const store = this.store();
     const result = await store.rewind(this.message(), this.restoreFiles(), t => this.error.set(t));
     this.rewinding.set(false);
-    if (!Object.isNull(result))
-      this.closed.emit();
+    if (Object.isNull(result))
+      return;
+    this.closed.emit();
+    store.offerRewoundDraft(this.message());
   }
 }

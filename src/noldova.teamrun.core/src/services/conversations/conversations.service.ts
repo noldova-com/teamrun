@@ -38,6 +38,7 @@ import {
   ErrorCode,
   ForkedSession,
   Message,
+  type OrganizationChat,
   MessageSearchHit,
   MessageSearchResult,
   Project,
@@ -98,16 +99,23 @@ export class ConversationsService implements IConversationsService {
     return this.read(record);
   }
 
-  public async createAsync(params: ConversationCreateParams, transaction?: SqlTransaction): Promise<Conversation> {
+  public async findOrganizationChatAsync(chat: OrganizationChat, transaction: SqlTransaction): Promise<Conversation | null> {
+    const [record] = await transaction.queryAsync(new SqlQuery(Resources.selectOrganizationChat,
+      [chat.organizationId, chat.teammateId]));
+    return Object.isUndefined(record) ? null : this.read(record);
+  }
+
+  public async createAsync(params: ConversationCreateParams, transaction?: SqlTransaction, organizationChat: OrganizationChat | null = null): Promise<Conversation> {
     if (Object.isUndefined(transaction))
-      return this.context.database.connection.runInTransactionAsync(t => this.createAsync(params, t));
+      return this.context.database.connection.runInTransactionAsync(t => this.createAsync(params, t, organizationChat));
     if (!Object.isNull(params.projectId))
       await this.requireProjectAsync(params.projectId, transaction);
     const now = new Date().toISOString();
     const title = Object.isNull(params.title) ? Resources.defaultConversationTitle : params.title;
     const id = Guid.createVersion7().toString();
     const folder = Object.isNull(params.projectId) ? this.context.chatFolders.prepare(id) : null;
-    const conversation = new Conversation(id, params.projectId, title, now, now).withFolder(folder);
+    const conversation = new Conversation(id, params.projectId, title, now, now, false, null, null, false, folder, false, [], false, false, null,
+      organizationChat);
     const json = JSON.stringify(conversation.toJson());
     await transaction.executeAsync(new SqlQuery(Resources.insertConversation, [conversation.id, conversation.projectId, json, now, now]));
     await this.context.database.changeFeed.appendAsync(ChangeEntity.Chat, conversation.id, ChangeOperation.Insert, json, transaction);
@@ -156,6 +164,12 @@ export class ConversationsService implements IConversationsService {
     if (Object.isUndefined(transaction))
       return this.context.database.connection.runInTransactionAsync(t => this.setResponderAsync(params, t));
     const conversation = await this.requireAsync(params.conversationId, transaction);
+    if (params.start && !Object.isNull(conversation.responder))
+      return conversation;
+    const held = conversation.responder?.teammateId ?? null;
+    if (!params.chosen && Object.isNull(params.responder?.teammateId ?? null) && !Object.isNull(held) &&
+      (await transaction.queryAsync(new SqlQuery(Resources.selectMember, [conversation.id, held]))).length > 0)
+      return conversation;
     const teammateId = params.responder?.teammateId ?? null;
     const providerId = params.responder?.providerId ?? null;
     if (!Object.isNull(teammateId)) {

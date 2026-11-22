@@ -1,0 +1,114 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<section class="section needs-section" aria-labelledby="organization-board-needs">
+  <div class="section-head">
+    <span class="material-symbols-rounded icon" aria-hidden="true">{{ resources.organizationBoardNeedsIcon }}</span>
+    <span id="organization-board-needs" class="title">{{ resources.organizationBoardNeedsTitle }}</span>
+    <nol-chip class="needs-count">{{ asks().length }}</nol-chip>
+  </div>
+  <div class="queue">
+    @for (ask of asks(); track ask.teammate.id) {
+      <div class="ask" [class.selected]="isOpen(teammateTarget(ask.teammate))">
+        <nol-teamrun-teammate-avatar [teammate]="ask.teammate" [decorative]="true" />
+        <div class="ask-body">
+          <div class="name-line">
+            <span class="name">{{ ask.teammate.name }}</span>
+            <span class="note department">{{ ask.department }}</span>
+          </div>
+          <div class="ask-state">
+            <nol-teamrun-teammate-status class="status" [teammateId]="ask.teammate.id" />
+            @if (askAgo(ask); as ago) {
+              <span class="note ask-ago">{{ ago }}</span>
+            }
+          </div>
+          @if (askText(ask); as text) {
+            <p class="ask-text">{{ text }}</p>
+          }
+        </div>
+        <button type="button" nol-button class="answer" [variant]="primary" [attr.aria-label]="resources.formatOrganizationBoardAnswer(ask.action, ask.teammate.name)"
+          (click)="chosen.emit(teammateTarget(ask.teammate))">{{ ask.action }}</button>
+      </div>
+    } @empty {
+      <span class="note needs-empty">{{ resources.organizationBoardNobodyWaiting }}</span>
+    }
+  </div>
+</section>
+<section class="section leaders-section" aria-labelledby="organization-board-leaders">
+  <div class="section-head">
+    <span id="organization-board-leaders" class="title">{{ resources.organizationBoardLeadersTitle }}</span>
+    <span class="note">{{ resources.organizationBoardLeadersNote }}</span>
+    <span class="spacer"></span>
+    <button type="button" nol-button class="message-leaders" [variant]="secondary" (click)="chosen.emit(leadersTarget)"><span nolButtonIcon
+      class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationBoardMessageLeadersIcon }}</span>{{ resources.organizationBoardMessageLeaders }}</button>
+  </div>
+  <div class="leaders">
+    @for (leader of leaders(); track leader.id) {
+      <nol-teamrun-organization-card class="leader" nolCanvasItem [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row"
+        [editing]="editing()" (message)="chosen.emit(teammateTarget(leader))" />
+    }
+    @for (report of directReports(); track report.id) {
+      <nol-teamrun-organization-card class="leader report" nolCanvasItem [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row"
+        [editing]="editing()" (message)="chosen.emit(teammateTarget(report))" />
+    }
+  </div>
+</section>
+<section class="section departments-section" aria-labelledby="organization-board-departments">
+  <div class="section-head">
+    <span id="organization-board-departments" class="title">{{ resources.organizationBoardDepartmentsTitle }}</span>
+    <span class="note">{{ resources.organizationBoardDepartmentsNote }}</span>
+  </div>
+  <div class="lanes">
+    @for (node of departments(); track node.id) {
+      <div class="lane" [class.selected]="isOpen(departmentTarget(node))">
+        <div class="lane-head">
+          @if (editing() && node.department; as department) {
+            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="department.name"
+              (change)="rename(department, $event)" />
+            <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
+              [label]="resources.formatOrganizationDeleteNamed(department.name)" (click)="deleteDepartment(department)"></button>
+          } @else {
+            <span class="title lane-name">{{ node.name }}</span>
+            <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
+            <span class="spacer"></span>
+            <button type="button" nol-icon-button class="message-department" [icon]="resources.organizationBoardMessageIcon"
+              [label]="resources.formatOrganizationBoardMessage(node.name)" (click)="chosen.emit(departmentTarget(node))"></button>
+          }
+        </div>
+        @if (summaryOf(node); as summary) {
+          <span class="note lane-summary">{{ summary }}</span>
+        }
+        @if (node.members.length > 0) {
+          <nol-choice-pills class="lane-sort" [options]="sortOptions" [value]="sortOf(node)" [label]="resources.formatOrganizationBoardSort(node.name)"
+            (valueChange)="sort(node, $event)" />
+        }
+        @for (member of membersOf(node); track member.id) {
+          <nol-teamrun-organization-card nolCanvasItem [class.selected]="isOpen(teammateTarget(member))" [teammate]="member" [shape]="row" [editing]="editing()"
+            [department]="node.department" (message)="chosen.emit(teammateTarget(member))" />
+        } @empty {
+          <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
+        }
+        @if (editing()) {
+          <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="addable(node).length === 0" [nolMenuTriggerFor]="addMenu"><span nolButtonIcon
+            class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddMember }}</button>
+          <ng-template #addMenu>
+            <nol-menu>
+              @for (teammate of addable(node); track teammate.id) {
+                <button nol-menu-item [label]="teammate.name" (triggered)="addMember(node, teammate)"></button>
+              }
+            </nol-menu>
+          </ng-template>
+        }
+      </div>
+    }
+  </div>
+  @if (editing()) {
+    <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+  }
+</section>

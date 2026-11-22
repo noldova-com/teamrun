@@ -52,6 +52,12 @@ export class ConversationActions {
     return Object.isUndefined(project) ? [] : [project.name];
   }
 
+  public static placeOf(store: ChatStoreService, conversation: Conversation | null): string | null {
+    if (Object.isNull(conversation) || (Object.isNull(conversation.projectId) && Object.isNull(conversation.attachedFolder)))
+      return null;
+    return ConversationActions.breadcrumbOf(store, conversation.projectId, conversation.attachedFolder).at(-1) ?? null;
+  }
+
   public static folderNameOf(folder: string): string {
     const name = folder.slice(Math.max(folder.lastIndexOf(Resources.slash), folder.lastIndexOf(Resources.backslash)) + 1);
     return String.isNullOrWhitespace(name) ? folder : name;

@@ -37,11 +37,25 @@
   },
   "peerDependencies": {
     "@noldova/checkpoints.protocol": "0.0.3",
-    "@noldova/context.core": ">=0.0.8 <0.1.0",
-    "@noldova/context.data": ">=0.0.8 <0.1.0",
-    "@noldova/context.data.sql": ">=0.0.8 <0.1.0",
-    "@noldova/context.data.sql.sqlite": ">=0.0.8 <0.1.0",
-    "@noldova/context.exceptions": ">=0.0.8 <0.1.0",
-    "@noldova/context.json": ">=0.0.8 <0.1.0"
+    "@noldova/context.core": ">=0.0.12 <0.1.0",
+    "@noldova/context.data": ">=0.0.12 <0.1.0",
+    "@noldova/context.data.sql": ">=0.0.12 <0.1.0",
+    "@noldova/context.data.sql.sqlite": ">=0.0.12 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.12 <0.1.0",
+    "@noldova/context.json": ">=0.0.12 <0.1.0"
+  },
+  "noldova": {
+    "isolatedTests": [
+      "services/conversations/chat-folders.test.ts",
+      "services/drafts/drafts.service.test.ts",
+      "services/drafts/sent-files.test.ts",
+      "services/engine/attachment-store.test.ts",
+      "services/engine/file-system-errors.test.ts",
+      "services/engine/image-size.reader.test.ts",
+      "services/engine/project-image.reader.test.ts",
+      "services/engine/projectless-chats.test.ts",
+      "services/engine/shared-images.test.ts",
+      "services/providers/providers.service.test.ts"
+    ]
   }
 }

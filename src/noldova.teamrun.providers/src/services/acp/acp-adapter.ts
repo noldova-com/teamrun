@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import "@noldova/context.core";
 import { JsonReader, type JsonValue } from "@noldova/context.json";
 import { Resources as CoreResources, type ForkRequest, type ILog, type IProviderAdapter, type ITimer, type ITurnListener, NodeTimer, PlanReading, type ProfileSearch, SharedMcpFailure,
-  SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type McpEndpoint, type TurnRequest, TurnOutcome, TurnResult, type TurnSteer, type TurnTools }
+  SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type McpEndpoint, type TurnRequest, TurnOutcome, TurnResult, type TurnSteer, type TurnTools, type WakeTurn }
   from "@noldova/teamrun.core";
 import { RoleApplication, AuthStatus, DetailKind, ForkedSession, type MessageAttachment, ObservedSettings, type OwnMcpServer, type PlanWindow, ReplyAction, ReplyUsage, type Provider,
   ProviderIdentity, type ProviderKind, type ProviderMode, ProviderModel, ProviderModelList, RequestedSettings, Resources as ProtocolResources,
@@ -37,9 +37,12 @@ import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { ISavedImageReader } from "../../interfaces/i-saved-image.reader.js";
 import { AcpConfigOption } from "../../models/acp-config-option.js";
+import { AcpHeldSteer } from "../../models/acp-held-steer.js";
 import { AcpModelChoices } from "../../models/acp-model-choices.js";
+import { AcpServedEndpoint } from "../../models/acp-served-endpoint.js";
 import { AcpSession } from "../../models/acp-session.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
+import { LaunchedAcpClient } from "../../models/launched-acp-client.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
 import { Resources } from "../../resources.js";
@@ -83,6 +86,7 @@ export class AcpAdapter implements IProviderAdapter {
   private readonly kept: Map<AcpClient, AcpKeptSession> = new Map();
   private readonly runningSessions: Set<string> = new Set();
   private readonly closingSessions: Set<string> = new Set();
+  private readonly sessionModes: Map<AcpClient | null, string | null> = new Map();
   private shutdowns: number = 0;
 
   public readonly descriptor: ProviderKind;
@@ -93,7 +97,7 @@ export class AcpAdapter implements IProviderAdapter {
   public constructor(agent: IAcpAgent, clientInfo: AppServerClientInfo, starter: IProcessStarter, timings: ProviderTimings,
     timer: ITimer = new NodeTimer(), savedImages: ISavedImageReader | null = null, log: ILog | null = null,
     processTree: IProcessTree = new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace,
-      undefined, PowershellSession.shared), idleTimer: ITimer = new NodeTimer()) {
+      undefined, PowershellSession.shared, undefined, log), idleTimer: ITimer = new NodeTimer()) {
     this.agent = agent;
     const isolatedMode = agent.isolatedMode;
     if (!Object.isUndefined(isolatedMode))
@@ -312,6 +316,8 @@ export class AcpAdapter implements IProviderAdapter {
     let confirming: Promise<boolean> | null = null;
     const interruptWait = new AbortController();
     const toolsWait = new AbortController();
+    const stopReport = new AbortController();
+    let step = Resources.turnStepStart;
     const steers: Promise<boolean>[] = [];
     let revoke: () => void = () => undefined;
     let adopt: (tools: TurnTools) => void = () => undefined;
@@ -321,13 +327,28 @@ export class AcpAdapter implements IProviderAdapter {
     let keeping: AcpKeptSession | null = null;
     let unreported = false;
     const approvedTools = request.tools?.approvedTools ?? [];
+    const readOnlyMode = this.agent.modes.find(t => t.id === asked.requested.mode && t.readOnly && t.id !== this.planMode);
+    const readOnlyChat = !Object.isUndefined(readOnlyMode);
+    const restartsPlan = readOnlyChat && asked !== request && this.agent.plans?.leavesPlan === true;
+    const restarts = new Set<string>();
+    const held: AcpHeldSteer[] = [];
+    const leave = (t: string): Promise<void> => {
+      if (!restartsPlan)
+        return this.leavePlan(client, t, asked, request);
+      this.sessionModes.set(client, this.agent.defaultMode);
+      restarts.add(t);
+      turn.restartAfterCancel();
+      client?.notify(Resources.acpSessionCancel, { sessionId: t });
+      return Promise.resolve();
+    };
     const createTurn = (target: ITurnListener, turnSignal: AbortSignal): AcpTurn => new AcpTurn(kindId, this.descriptor.displayName, this.agent.toolTitle,
       target, turnSignal, this.timings.streamInterval, (tool, session) => this.savedImages?.read(tool, session, request.provider, request.workingDirectory) ?? null,
       this.agent.routedMcpTool, async t => (await request.tools?.host.listToolsAsync(t) ?? []).map(u => String(u[Resources.nameField])),
       (tool, session) => this.agent.toDos?.read(tool, session, request.provider) ?? null, tool => this.savedImages?.failureOf(tool) ?? null, this.agent.questions,
-      this.agent.plans ?? null, t => this.leavePlan(client, t, asked, request), approvedTools, tool => this.agent.mcpToolOf?.(tool) ?? null,
+      this.agent.plans ?? null, leave, approvedTools, tool => this.agent.mcpToolOf?.(tool) ?? null,
       async t => Object.isNull(request.tools) ? [] : ReadOnlyMcpTools.listAsync(request.tools, t),
-      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null);
+      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null, readOnlyChat,
+      this.agent.toolGate ?? null);
     const turn = createTurn(listener, signal);
     const sender = SenderEnvironment.read(request.environment);
     const commands = new AcpCommands();
@@ -340,7 +361,10 @@ export class AcpAdapter implements IProviderAdapter {
       });
       if (!Object.isNull(sender))
         t.adoptSender(sender);
-      return createTurn(t, u);
+      await this.noteWakeModeAsync(client, request.requested.mode, t);
+      const woken = createTurn(t, u);
+      woken.switchingMode(this.switchWakeMode(client, sessionId, t));
+      return woken;
     },
       t => client?.notify(Resources.acpSessionCancel, { sessionId: t }), (reason, session, seen) => this.wakeResult(reason, session, seen), this.descriptor.displayName,
       (t, u) => this.endTaskTree(client!, t, u), t => this.cancelSubAgent(client!, t), commands, terminals);
@@ -348,6 +372,9 @@ export class AcpAdapter implements IProviderAdapter {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
       void this.timer.delayAsync(this.timings.interruptGrace, interruptWait.signal).then(() => client?.stop()).catch(() => undefined);
+      const subAgents = turn.subAgentStates;
+      void this.timer.delayAsync(this.timings.stopReportWait, stopReport.signal)
+        .then(() => this.sessionLog?.write(Resources.formatTurnStopStuck(this.descriptor.id, step, subAgents)), () => undefined);
     };
     signal.addEventListener(Resources.abortEvent, cancel, { once: true });
     try {
@@ -376,6 +403,8 @@ export class AcpAdapter implements IProviderAdapter {
           : new ModelListException(Resources.formatModelsNotLoaded(this.descriptor.displayName, request.requested.model));
       if (!Object.isNull(request.requested.effort) && !Object.isNullOrUndefined(selected?.effortLevels) && !selected.effortLevels.includes(request.requested.effort))
         throw new SettingUnavailableException(Resources.formatUnknownEffort(request.requested.effort, selected.displayName));
+      if (!Object.isUndefined(readOnlyMode) && !Object.isUndefined(this.agent.toolGate) && Object.isNull(this.agent.toolGate.metaOf(initialized)))
+        throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, readOnlyMode.name));
       if (this.agent.authenticates && !this.canAuthenticate(initialized))
         throw new SignInException(this.agent.formatSignIn(request.provider));
       if (Object.isNull(taken))
@@ -385,12 +414,12 @@ export class AcpAdapter implements IProviderAdapter {
       client.setListener(channel);
       this.channels.set(client, channel);
       const endpoint = this.endpointOf(request.tools, initialized);
-      let served: { url: string; token: string } | null = null;
+      let served: AcpServedEndpoint | null = null;
       if (!Object.isNull(endpoint)) {
         const token = taken?.token ?? endpoint.issueKept();
         revoke = () => endpoint.revoke(token);
         adopt = tools => tools.adopt(token);
-        served = { url: endpoint.url, token };
+        served = new AcpServedEndpoint(endpoint.url, token);
       }
       const params = await this.paramsOf(request, initialized, served);
       const reopen = async (failure: unknown): Promise<AcpClient> => {
@@ -482,11 +511,35 @@ export class AcpAdapter implements IProviderAdapter {
       const steering = this.agent.steering;
       if (!Object.isUndefined(steering))
         listener.onSteerable?.(t => {
+          if (restarts.has(steered)) {
+            const sent = Promise.withResolvers<boolean>();
+            held.push(new AcpHeldSteer(t, sent));
+            steers.push(sent.promise);
+            return sent.promise;
+          }
           const taken = this.steer(current, steering, steered, t);
           steers.push(taken);
           return taken;
         });
-      const result = JsonReader.fromValue(await client.request(Resources.acpSessionPrompt, { sessionId, prompt }, null));
+      step = Resources.turnStepPrompt;
+      let result = JsonReader.fromValue(await client.request(Resources.acpSessionPrompt, { sessionId, prompt }, null));
+      if (restarts.has(sessionId))
+        try {
+          await this.leavePlan(client, sessionId, asked, request);
+          if (!signal.aborted && result.readNonBlankString(Resources.acpStopReasonField) === Resources.acpCancelled) {
+            turn.noteSent(CoreResources.planApprovedPrompt);
+            const sending = [...held];
+            const answer = client.request(Resources.acpSessionPrompt, { sessionId, prompt: await this.restartBlocksOf(sending) }, null);
+            restarts.delete(sessionId);
+            sending.forEach(t => t.sent.resolve(true));
+            result = JsonReader.fromValue(await answer);
+          }
+        }
+        finally {
+          restarts.delete(sessionId);
+          held.forEach(t => t.sent.resolve(false));
+        }
+      step = Resources.turnStepAnswer;
       const reason = result.readNonBlankString(Resources.acpStopReasonField);
       if (signal.aborted || reason === Resources.acpCancelled)
         return new TurnResult(TurnOutcome.Interrupted, sessionId, this.unconfirmed(observed, request.requested), null, turn.nativeTurnId);
@@ -507,6 +560,7 @@ export class AcpAdapter implements IProviderAdapter {
       return new TurnResult(TurnOutcome.Completed, sessionId, confirmed ? observed : this.unconfirmed(observed, request.requested), null, turn.nativeTurnId);
     }
     catch (error) {
+      step = Resources.turnStepHandled;
       if (!Object.isNull(client))
         await client.whenHandledAsync();
       if (!Object.isNull(client) && !signal.aborted)
@@ -519,21 +573,33 @@ export class AcpAdapter implements IProviderAdapter {
     }
     finally {
       listener.onSteerable?.(null);
+      held.forEach(t => t.sent.resolve(false));
       signal.removeEventListener(Resources.abortEvent, cancel);
       interruptWait.abort();
       toolsWait.abort();
-      if (!Object.isNull(client))
-        await client.whenHandledAsync();
-      if (!Object.isNull(blocked))
-        await this.reportBlockedServersAsync(request, listener, startedAt, blocked);
-      await turn.finishAsync();
-      if (unreported)
-        await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatCompactionUnreported(this.descriptor.displayName), null, null));
-      if (turn.compacted && !Object.isNull(sessionId))
-        this.sessionsWithoutHome.add(sessionId);
-      await this.settle(steers);
-      if (!Object.isNull(client))
-        await this.release(client, channel, shutdowns, revoke, keeping, sessionId);
+      try {
+        step = Resources.turnStepHandled;
+        if (!Object.isNull(client))
+          await client.whenHandledAsync();
+        step = Resources.turnStepBlockedServers;
+        if (!Object.isNull(blocked))
+          await this.reportBlockedServersAsync(request, listener, startedAt, blocked);
+        step = Resources.turnStepFinish;
+        await turn.finishAsync();
+        step = Resources.turnStepCompaction;
+        if (unreported)
+          await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatCompactionUnreported(this.descriptor.displayName), null, null));
+        if (turn.compacted && !Object.isNull(sessionId))
+          this.sessionsWithoutHome.add(sessionId);
+        step = Resources.turnStepSteers;
+        await this.settle(steers);
+        step = Resources.turnStepRelease;
+        if (!Object.isNull(client))
+          await this.release(client, channel, shutdowns, revoke, keeping, sessionId);
+      }
+      finally {
+        stopReport.abort();
+      }
     }
   }
 
@@ -665,6 +731,19 @@ export class AcpAdapter implements IProviderAdapter {
     catch {
       return false;
     }
+  }
+
+  private async restartBlocksOf(steers: readonly AcpHeldSteer[]): Promise<JsonValue[]> {
+    const blocks = await this.blocksOf(CoreResources.planApprovedPrompt, []);
+    for (const held of steers) {
+      try {
+        blocks.push(...await this.blocksOf(held.steer.text, held.steer.attachments));
+      }
+      catch {
+        held.sent.resolve(false);
+      }
+    }
+    return blocks;
   }
 
   private async blocksOf(text: string, attachments: readonly MessageAttachment[]): Promise<JsonValue[]> {
@@ -867,12 +946,42 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async leavePlan(client: AcpClient | null, sessionId: string, asked: TurnRequest, request: TurnRequest): Promise<void> {
+    const leaves = this.agent.plans?.leavesPlan === true;
+    if (leaves)
+      this.sessionModes.set(client, this.agent.defaultMode);
     if (asked === request || Object.isNull(client))
       return;
     const wanted = this.agent.modes.find(t => t.id === asked.requested.mode && t.id !== this.planMode);
     const mode = Object.isUndefined(wanted) || this.runsInDefault(wanted.id) ? this.agent.defaultMode : wanted.id;
-    if (!Object.isNull(mode))
-      await client.request(Resources.acpSessionSetMode, { sessionId, modeId: mode });
+    if (Object.isNull(mode) || (leaves && mode === this.agent.defaultMode))
+      return;
+    await client.request(Resources.acpSessionSetMode, { sessionId, modeId: mode });
+    if (leaves)
+      this.sessionModes.set(client, mode);
+  }
+
+  private async noteWakeModeAsync(client: AcpClient | null, launched: string | null, wake: WakeTurn): Promise<void> {
+    const mode = wake.mode ?? this.agent.defaultMode;
+    if (!Object.isNull(launched) && launched === this.agent.launchMode && mode !== launched)
+      await wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeStillApproves(this.descriptor.displayName), null, null));
+    if (this.sessionModeOf(wake.mode) !== this.sessionModes.get(client))
+      await wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeBeganInEarlierMode(this.descriptor.displayName), null, null));
+  }
+
+  private switchWakeMode(client: AcpClient | null, sessionId: string | null, wake: WakeTurn): Promise<void> {
+    const modeId = this.sessionModeOf(wake.mode);
+    let switched = Promise.resolve();
+    if (!Object.isNull(client) && !Object.isNull(sessionId) && !Object.isNull(modeId))
+      switched = client.request(Resources.acpSessionSetMode, { sessionId, modeId }).then(() => {
+        this.sessionModes.set(client, modeId);
+      }, (error: unknown) =>
+        wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeModeKept(this.descriptor.displayName, FailureDescriber.describe(error)), null, null)))
+        .catch((error: unknown) => this.sessionLog?.write(Resources.formatWakeModeNoteLost(this.descriptor.id, FailureDescriber.describe(error))));
+    return switched;
+  }
+
+  private sessionModeOf(mode: string | null): string | null {
+    return Object.isNull(mode) || this.runsInDefault(mode) ? this.agent.defaultMode : mode;
   }
 
   private plannedOf(request: TurnRequest): TurnRequest {
@@ -905,6 +1014,7 @@ export class AcpAdapter implements IProviderAdapter {
       else if (Object.isUndefined(option) && session.id !== mode)
         await client.request(Resources.acpSessionSetMode, { sessionId, modeId: session.id });
       mode = current.find(t => t.category === Resources.acpModeCategory)?.currentValue ?? session.id;
+      this.sessionModes.set(client, session.id);
     }
     else if (!Object.isUndefined(session) && session.id !== this.agent.defaultMode)
       throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, session.name));
@@ -942,7 +1052,7 @@ export class AcpAdapter implements IProviderAdapter {
   private async createClient(provider: Provider | null, requested: RequestedSettings | null, signingIn: boolean = false,
     environment: Readonly<Record<string, string>> = {}, workingDirectory: string | null = null, approvedTools: readonly string[] | null = null,
     shutdowns: number = this.shutdowns, extraArguments: readonly string[] = [], chatTurn: boolean = false,
-    titleSession: boolean = false): Promise<{ client: AcpClient; environment: NodeJS.ProcessEnv }> {
+    titleSession: boolean = false): Promise<LaunchedAcpClient> {
     const base = await this.starter.readEnvironmentAsync(this.agent.baseEnvironment);
     if (shutdowns !== this.shutdowns)
       throw new ProviderStoppedException(Resources.formatStoppedForShutdown(this.descriptor.displayName));
@@ -953,17 +1063,17 @@ export class AcpAdapter implements IProviderAdapter {
 
   private launchClient(provider: Provider | null, requested: RequestedSettings | null, base: NodeJS.ProcessEnv, signingIn: boolean = false,
     environment: Readonly<Record<string, string>> = {}, workingDirectory: string | null = null, approvedTools: readonly string[] | null = null,
-    extraArguments: readonly string[] = [], chatTurn: boolean = false, titleSession: boolean = false): { client: AcpClient; environment: NodeJS.ProcessEnv } {
+    extraArguments: readonly string[] = [], chatTurn: boolean = false, titleSession: boolean = false): LaunchedAcpClient {
     const launch = this.agent.launch(provider, requested, workingDirectory, approvedTools, base, chatTurn, titleSession);
     if (!signingIn && this.agent.isSignedIn(provider) === false)
       throw new SignInException(this.agent.formatSignIn(provider));
     const command = launch.command.withArguments(...extraArguments).withOrigin(this.originOf(provider)).inOwnGroup();
     const launched = signingIn ? AcpEnvironment.forSignIn(launch.environment, base) : launch.environment;
     const client = new AcpClient(command, { ...launched, ...environment }, launch.directory, this.starter, this.timings, this.timer, MessageFraming.Lines,
-      this.processTree);
+      this.processTree, this.agent.toolGate ?? null);
     this.clients.set(client, provider?.id ?? null);
     client.start();
-    return { client, environment: base };
+    return new LaunchedAcpClient(client, base);
   }
 
   private async initializeSignedIn(client: AcpClient): Promise<JsonReader | null> {
@@ -996,7 +1106,7 @@ export class AcpAdapter implements IProviderAdapter {
     }));
   }
 
-  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: { url: string; token: string } | null,
+  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: AcpServedEndpoint | null,
     environment: NodeJS.ProcessEnv): JsonValue[] {
     const shared = request.sharedServers.map(t => this.sharedServerOf(t, initialized,
       (variable: string) => request.sharedValues.valueOf(t.name, variable) ?? environment[variable] ?? String.empty));
@@ -1227,7 +1337,7 @@ export class AcpAdapter implements IProviderAdapter {
     this.kept.delete(kept.client);
     kept.end();
     const endpoint = Object.isNull(kept.token) ? null : this.endpointOf(request.tools, kept.initialized);
-    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : { url: endpoint.url, token: kept.token };
+    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new AcpServedEndpoint(endpoint.url, kept.token);
     if (kept.key === key && kept.client.isConnected && Object.isNull(request.tools) === Object.isNull(kept.token) && Object.isNull(sender) === Object.isNull(kept.sender)
       && (Object.isNull(kept.sender) || request.adoptSender(kept.sender)) && (Object.isNull(kept.token) || request.tools?.adopt(kept.token) === true)
       && JSON.stringify(await this.paramsOf(request, kept.initialized, served)) === kept.params)
@@ -1237,11 +1347,11 @@ export class AcpAdapter implements IProviderAdapter {
     return null;
   }
 
-  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: { url: string; token: string } | null): Promise<Record<string, JsonValue>> {
+  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: AcpServedEndpoint | null): Promise<Record<string, JsonValue>> {
     const params: Record<string, JsonValue> = { cwd: request.workingDirectory, mcpServers: this.serversOf(request, initialized, served,
       await this.starter.readEnvironmentAsync(this.agent.baseEnvironment)) };
-    const meta = this.agent.sessionMeta(request.requested);
-    if (!Object.isNull(meta))
+    const meta = { ...this.agent.sessionMeta(request.requested) ?? {}, ...this.agent.toolGate?.metaOf(initialized) ?? {} };
+    if (Object.keys(meta).length > 0)
       params[Resources.acpMetaField] = meta;
     return params;
   }
@@ -1274,6 +1384,7 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async close(client: AcpClient): Promise<void> {
+    this.sessionModes.delete(client);
     const kept = this.kept.get(client);
     if (!Object.isUndefined(kept)) {
       this.kept.delete(client);

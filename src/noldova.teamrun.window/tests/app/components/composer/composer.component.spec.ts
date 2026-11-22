@@ -13,7 +13,8 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { FileSaveOutcome, type StatusBarItem, WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { FileSaveOutcome, RuntimeRequestException, type StatusBarItem, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AbilityCell,
   AttachmentInput,
@@ -73,8 +74,9 @@ import {
   WaitingMessageEditParams,
   WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
-import { ClipboardWriter, DefaultTheme, MentionValue, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
+import { ClipboardWriter, DefaultTheme, DialogService, MentionValue, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, ClipboardWriterFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import type { MockInstance } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
@@ -90,27 +92,51 @@ import { CommandTargetsService } from "../../../../src/app/services/command-targ
 import { ComposerChoicesService } from "../../../../src/app/services/composer-choices.service";
 import { ComposerDefaultService } from "../../../../src/app/services/composer-default.service";
 import { ComposerDraftService } from "../../../../src/app/services/composer-draft.service";
+import { EngineResync } from "../../../../src/app/services/engine-resync";
 import { ImageViewerService } from "../../../../src/app/services/image-viewer.service";
 import { PlanUsageStatus } from "../../../../src/app/services/plan-usage-status";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { UsageFormatterService } from "../../../../src/app/services/usage-formatter.service";
 import { Resources } from "../../../../src/resources";
+import { RewindDialogComponent } from "../../../../src/app/components/rewind-dialog/rewind-dialog.component";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { CodedError } from "../../../fixtures/coded-error.fixture";
+import { ColorCount } from "../../../fixtures/color-count.fixture";
+import { ConfirmCase } from "../../../fixtures/confirm-case.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeTerminalLauncher } from "../../../fixtures/fake-terminal-launcher.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { FoldCase } from "../../../fixtures/fold-case.fixture";
+import { GeometryCase } from "../../../fixtures/geometry-case.fixture";
+import { HintCase } from "../../../fixtures/hint-case.fixture";
+import { PaintedSelection } from "../../../fixtures/painted-selection.fixture";
+import { PartReadError } from "../../../fixtures/part-read-error.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
+import { PermissionsCase } from "../../../fixtures/permissions-case.fixture";
+import { Pixel } from "../../../fixtures/pixel.fixture";
+import { PixelSpan } from "../../../fixtures/pixel-span.fixture";
+import { PlanModeCase } from "../../../fixtures/plan-mode-case.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
+import { Required } from "../../../fixtures/required.fixture";
+import { ResizeStep } from "../../../fixtures/resize-step.fixture";
+import { ResyncCase } from "../../../fixtures/resync-case.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
+import { SelectionLooks } from "../../../fixtures/selection-looks.fixture";
+import { SendKeyCase } from "../../../fixtures/send-key-case.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
+import { ThemeCase } from "../../../fixtures/theme-case.fixture";
+import { ThemeLook } from "../../../fixtures/theme-look.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
+import { WidthBand } from "../../../fixtures/width-band.fixture";
 
 describe("ComposerComponent", () => {
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<ComposerComponent>;
-  const required = <T>(value: T | null | undefined): T => {
-    if (Object.isNullOrUndefined(value))
-      throw new Error("The part the spec reads isn't there.");
-    return value;
+  const attachmentOf = (found: unknown): ComposerAttachment => {
+    if (!(found instanceof ComposerAttachment))
+      throw new PartReadError("A dispose ran on something other than an attachment.");
+    return found;
   };
   const providerOf =(kind: string, id: string = `${kind}-1`): Provider =>
     new Provider(id, kind, "Work", `D:\\profiles\\${kind}`, AuthStatus.LoggedIn, null, null, null, null, SampleData.timestamp);
@@ -133,10 +159,16 @@ describe("ComposerComponent", () => {
   };
   const remember = (settings: ComposerSettings, conversationId: string = "c1"): void => TestBed.inject(ComposerChoicesService).remember(conversationId, settings);
   const choice = (conversationId: string = "c1"): ComposerSettings | null => TestBed.inject(ComposerChoicesService).choiceOf(conversationId);
-  const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
-  const box = (): HTMLTextAreaElement => root().querySelector("textarea")!;
-  const picker = (): HTMLButtonElement => required(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-picker"));
-  const loading = (): HTMLElement => root().querySelector<HTMLElement>(".nol-teamrun-composer-loading")!;
+  const root = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
+  const box = (): HTMLTextAreaElement => Required.of(root().querySelector("textarea"));
+  const expectSameRect = (after: DOMRect, before: DOMRect): void => {
+    AppearanceFixture.expectPixels(after.left, before.left);
+    AppearanceFixture.expectPixels(after.top, before.top);
+    AppearanceFixture.expectPixels(after.width, before.width);
+    AppearanceFixture.expectPixels(after.height, before.height);
+  };
+  const picker = (): HTMLButtonElement => Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-picker"));
+  const loading = (): HTMLElement => Required.of(root().querySelector<HTMLElement>(".nol-teamrun-composer-loading"));
   const summary = (): string | null => picker().getAttribute("aria-label");
   const reason = (): string | undefined => root().querySelector(".nol-teamrun-composer-unavailable nol-field-message")?.textContent?.trim();
   const sendButton = (): HTMLButtonElement | null => root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send");
@@ -151,7 +183,12 @@ describe("ComposerComponent", () => {
     const url = canvas.toDataURL("image/png");
     return url.slice(url.indexOf(",") + 1);
   };
-  const clipboard = (): ClipboardWriterFixture => TestBed.inject(ClipboardWriter) as ClipboardWriterFixture;
+  const clipboard = (): ClipboardWriterFixture => {
+    const writer = TestBed.inject(ClipboardWriter);
+    if (!(writer instanceof ClipboardWriterFixture))
+      throw new PartReadError("The spec's clipboard isn't the fixture's.");
+    return writer;
+  };
   const nextWrite = (answer: () => Promise<boolean> = () => Promise.resolve(true)): Promise<void> =>
     new Promise<void>(resolve => clipboard().answer = () => (resolve(), answer()));
   const openImageMenu = async (preview: HTMLElement): Promise<void> => {
@@ -161,12 +198,12 @@ describe("ComposerComponent", () => {
   };
   const imageFile = (name: string, width: number = 3): File => new File([Uint8Array.from(atob(pixels(width)), t => t.charCodeAt(0))], name, { type: "image/png" });
   const alert = (): string | undefined => root().querySelector('[role="alert"]')?.textContent?.trim();
-  const menuLabels = (): string[] => [...[...document.querySelectorAll("nol-menu")].at(-1)!.querySelectorAll(".nol-menu-item-label")].map(t => t.textContent!.trim());
+  const menuLabels = (): string[] => [...Required.of([...document.querySelectorAll("nol-menu")].at(-1)).querySelectorAll(".nol-menu-item-label")].map(t => Required.of(t.textContent).trim());
   const note = (): string | undefined => root().querySelector('.nol-teamrun-composer-note[role="status"]')?.textContent?.trim();
   const items = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-  const labels = (): string[] => items().map(t => t.querySelector(".nol-menu-item-label")!.textContent!.trim());
-  const item = (label: string): HTMLButtonElement => items().find(t => t.querySelector(".nol-menu-item-label")!.textContent!.trim() === label)!;
-  const names = (): string[] => [...document.querySelectorAll(".nol-mention-name")].map(t => t.textContent!.trim());
+  const labels = (): string[] => items().map(t => Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim());
+  const item = (label: string): HTMLButtonElement => Required.of(items().find(t => Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim() === label));
+  const names = (): string[] => [...document.querySelectorAll(".nol-mention-name")].map(t => Required.of(t.textContent).trim());
   const sent = (): MessageSendParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.MessageSend))
     .map(t => MessageSendParams.fromJson(t.parameters));
   const click = async (element: HTMLElement): Promise<void> => {
@@ -188,12 +225,12 @@ describe("ComposerComponent", () => {
   };
   const chooseKind = async (...path: string[]): Promise<void> => {
     await chooseProvider();
-    await click(required(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
+    await click(Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
     for (const label of path)
       await click(item(label));
   };
   const rowsOf = (column: string): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>(`.nol-teamrun-composer-${column} button[nol-menu-item]`)];
-  const labelOf = (row: HTMLElement): string => required(required(row.querySelector(".nol-menu-item-label")).textContent).trim();
+  const labelOf = (row: HTMLElement): string => Required.of(Required.of(row.querySelector(".nol-menu-item-label")).textContent).trim();
   const buttonLabel = (): string | undefined => picker().querySelector(".nol-teamrun-composer-label")?.textContent?.trim();
   const providerLine = (): string | undefined => root().querySelector(".nol-teamrun-composer-provider")?.textContent?.trim();
   const answerAs = async (name: string): Promise<void> => {
@@ -202,14 +239,14 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(buttonLabel()?.startsWith(`@${name} `)).toBe(true));
     await ready();
   };
-  const providerRow = (): HTMLButtonElement => required(document.querySelector<HTMLButtonElement>(".nol-teamrun-provider-row"));
+  const providerRow = (): HTMLButtonElement => Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-provider-row"));
   const providerRowLabel = (): string | undefined => providerRow().querySelector(".nol-menu-item-label")?.textContent?.trim();
   const close = (): Promise<void> => click(picker());
-  const access = (): HTMLButtonElement => root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-access")!;
+  const access = (): HTMLButtonElement => Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-access"));
   const modeLabel = (): string | undefined => access().querySelector(".nol-teamrun-composer-label")?.textContent?.trim();
   const risky = (): HTMLElement | null => access().querySelector<HTMLElement>(".nol-teamrun-composer-risky");
-  const modeRows = (): string[][] => [...[...document.querySelectorAll("nol-menu")].at(-1)!.querySelectorAll<HTMLElement>("button[nol-menu-item]")]
-    .map(t => [t.querySelector(".nol-menu-item-label")!.textContent!.trim(), t.querySelector(".nol-menu-item-description")?.textContent?.trim() ?? "",
+  const modeRows = (): string[][] => [...Required.of([...document.querySelectorAll("nol-menu")].at(-1)).querySelectorAll<HTMLElement>("button[nol-menu-item]")]
+    .map(t => [Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim(), t.querySelector(".nol-menu-item-description")?.textContent?.trim() ?? "",
       t.querySelector(".nol-menu-item-tag")?.textContent?.trim() ?? "", t.querySelector(".nol-menu-item-icon")?.textContent?.trim() ?? "", String(t.getAttribute("aria-checked"))]);
   const chatSettings = (): unknown[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationSetMemberSettings))
     .map(t => t.parameters);
@@ -218,10 +255,10 @@ describe("ComposerComponent", () => {
   const chooseMode = async (name: string): Promise<void> => {
     await ready();
     await click(access());
-    await click([...[...document.querySelectorAll("nol-menu")].at(-1)!.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")]
-      .find(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim() === name)!);
+    await click(Required.of([...Required.of([...document.querySelectorAll("nol-menu")].at(-1)).querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")]
+      .find(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim() === name)));
   };
-  const refresh = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>(".nol-teamrun-refresh-models")!;
+  const refresh = (): HTMLButtonElement => Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-refresh-models"));
   const refreshes = (): number => document.querySelectorAll(".nol-teamrun-refresh-models").length;
   const refreshModels = async (): Promise<void> => {
     await choose();
@@ -246,17 +283,25 @@ describe("ComposerComponent", () => {
   };
   const send = async (): Promise<void> => {
     await Wait.until(() => expect(sendButton()?.disabled).toBe(false));
-    await click(sendButton()!);
+    await click(Required.of(sendButton()));
   };
+  const transferOf = (files: readonly File[]): DataTransfer => {
+    const transfer = new DataTransfer();
+    for (const file of files)
+      transfer.items.add(file);
+    return transfer;
+  };
+  const pasteOf = (files: readonly File[]): ClipboardEvent =>
+    new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: transferOf(files) });
   const pick = async (files: readonly File[]): Promise<void> => {
-    const input = root().querySelector<HTMLInputElement>('input[type="file"]')!;
-    Object.defineProperty(input, "files", { value: files, configurable: true });
+    const input = Required.of(root().querySelector<HTMLInputElement>('input[type="file"]'));
+    input.files = transferOf(files).files;
     input.dispatchEvent(new Event("change"));
     await fixture.whenStable();
   };
   const sized = (name: string, size: number, mediaType: string = ""): File => {
     const file = new File(["a"], name, { type: mediaType });
-    Object.defineProperty(file, "size", { value: size });
+    vi.spyOn(file, "size", "get").mockReturnValue(size);
     return file;
   };
   const answered = (): JsonValue => new MessageSendResult(SampleData.userMessage, []).toJson();
@@ -267,7 +312,7 @@ describe("ComposerComponent", () => {
   const shownTooltip = (): HTMLElement => {
     const found = tooltip();
     if (Object.isNull(found))
-      throw new Error("No tooltip shows.");
+      throw new PartReadError("No tooltip shows.");
     return found;
   };
   const modes = [new ProviderMode("auto", "Default", "Edits files in the workspace, and asks before anything else."),
@@ -285,7 +330,7 @@ describe("ComposerComponent", () => {
   const shownPlanFirstRow = (): HTMLButtonElement => {
     const row = planFirstRow();
     if (Object.isNull(row))
-      throw new Error("The permissions menu shows no Plan first row.");
+      throw new PartReadError("The permissions menu shows no Plan first row.");
     return row;
   };
   const plansFirst = (): (string | boolean)[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationSetPlanFirst))
@@ -299,13 +344,13 @@ describe("ComposerComponent", () => {
   };
   const confirmTitle = (): string | undefined => document.querySelector("nol-teamrun-confirm-dialog .nol-dialog-title")?.textContent?.trim();
   const answerConfirm = async (button: string): Promise<void> => {
-    document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`)!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(`nol-teamrun-confirm-dialog ${button}`)).click();
     await fixture.whenStable();
   };
   const keptChoices = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationResponderSet))
     .map(t => JSON.stringify(ConversationResponderParams.fromJson(t.parameters).toJson()));
-  const choiceParams = (responder: ConversationResponder, conversationId: string = "c1", chosen: boolean = false): string =>
-    JSON.stringify(new ConversationResponderParams(conversationId, responder, chosen).toJson());
+  const choiceParams = (responder: ConversationResponder, conversationId: string = "c1", chosen: boolean = false, start: boolean = false): string =>
+    JSON.stringify(new ConversationResponderParams(conversationId, responder, chosen, start).toJson());
 
   beforeEach(() => {
     localStorage.removeItem(Resources.composerChoicesStorageKey);
@@ -331,9 +376,9 @@ describe("ComposerComponent", () => {
     await choose();
 
     const groups = [...document.querySelectorAll<HTMLElement>('nol-menu-group[role="group"]')];
-    expect(groups.map(t => required(required(t.querySelector(".nol-menu-label")).textContent).trim())).toEqual([Resources.modelLabel, Resources.effortLabel]);
-    expect(required(groups[0]).getBoundingClientRect().right).toBeLessThanOrEqual(required(groups[1]).getBoundingClientRect().left + 0.5);
-    expect(required(groups[0]).getBoundingClientRect().top).toBeCloseTo(required(groups[1]).getBoundingClientRect().top, 1);
+    expect(groups.map(t => Required.of(Required.of(t.querySelector(".nol-menu-label")).textContent).trim())).toEqual([Resources.modelLabel, Resources.effortLabel]);
+    expect(Required.of(groups[0]).getBoundingClientRect().right).toBeLessThanOrEqual(Required.of(groups[1]).getBoundingClientRect().left + 0.5);
+    expect(Required.of(groups[0]).getBoundingClientRect().top).toBeCloseTo(Required.of(groups[1]).getBoundingClientRect().top, 1);
     expect(labels()).toEqual([Resources.formatProviderDefault("Codex", "gpt-5"), "gpt-5", "gpt-5-mini", "Medium", "High", "Work · Codex"]);
     expect(items().map(t => t.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false", "true", null]);
     expect(items().map(t => t.getAttribute("aria-haspopup"))).toEqual([null, null, null, null, null, "menu"]);
@@ -357,7 +402,7 @@ describe("ComposerComponent", () => {
 
     await click(item(Resources.formatEditTeammate("@Alice")));
     await Wait.until(() => expect(document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")?.value).toBe("Alice"));
-    document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")).click();
     await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
   });
 
@@ -373,8 +418,8 @@ describe("ComposerComponent", () => {
     await render();
 
     await chooseProvider();
-    const offered = [...document.querySelectorAll("nol-menu")[1]!.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
-    expect(offered.map(t => [t.querySelector(".nol-menu-item-label")!.textContent!.trim(), t.getAttribute("aria-checked")]))
+    const offered = [...Required.of(document.querySelectorAll("nol-menu")[1]).querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+    expect(offered.map(t => [Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim(), t.getAttribute("aria-checked")]))
       .toEqual([["Personal · This computer", "false"], ["Work · This computer", "true"]]);
     await click(item("Personal · This computer"));
 
@@ -463,7 +508,7 @@ describe("ComposerComponent", () => {
     await chooseProvider("Personal · This computer");
     await Wait.until(() => expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ProviderModelCatalog))
       .map(t => ProviderListModelsParams.fromJson(t.parameters).providerId)).toContain("a3"));
-    expect(await store.deleteTeammate(store.teammate("alice")!)).toBe(true);
+    expect(await store.deleteTeammate(Required.of(store.teammate("alice")))).toBe(true);
     release();
     await store.modelCatalogs.load("codex", "a3");
     await fixture.whenStable();
@@ -493,8 +538,8 @@ describe("ComposerComponent", () => {
       await choose();
       expect([providerRowLabel(), store.teammate("alice")?.providerId]).toEqual(["Personal · Codex", "a1"]);
       await click(providerRow());
-      expect([...document.querySelectorAll("nol-menu")[1]!.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")]
-        .filter(t => t.getAttribute("aria-checked") === "true").map(t => t.querySelector(".nol-menu-item-label")!.textContent!.trim())).toEqual(["Personal · This computer"]);
+      expect([...Required.of(document.querySelectorAll("nol-menu")[1]).querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")]
+        .filter(t => t.getAttribute("aria-checked") === "true").map(t => Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim())).toEqual(["Personal · This computer"]);
       await close();
     };
 
@@ -551,7 +596,7 @@ describe("ComposerComponent", () => {
           ? new Promise<JsonValue>(resolve => releaseCatalog = () => resolve(catalog)) : catalog)
         .answer(MethodName.TeammateUpdate, t => {
           const params = TeammateUpdateParams.fromJson(t);
-          const teammate = params.applyTo(data.teammates.find(u => u.id === params.teammateId)!, "t");
+          const teammate = params.applyTo(Required.of(data.teammates.find(u => u.id === params.teammateId)), "t");
           data.teammates = data.teammates.map(u => u.id === teammate.id ? teammate : u);
           saves += 1;
           return saves === 1 ? new Promise<JsonValue>(resolve => releaseSave = () => resolve(teammate.toJson())) : teammate.toJson();
@@ -623,7 +668,7 @@ describe("ComposerComponent", () => {
       .answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([new ProviderModel("gpt-5", "GPT-5", "", ["high"], true, null, true)]))
       .answer(MethodName.TeammateUpdate, t => {
         const params = TeammateUpdateParams.fromJson(t);
-        const teammate = params.applyTo(data.teammates.find(u => u.id === params.teammateId)!, "t");
+        const teammate = params.applyTo(Required.of(data.teammates.find(u => u.id === params.teammateId)), "t");
         data.teammates = data.teammates.map(u => u.id === teammate.id ? teammate : u);
         saves += 1;
         return saves === 1 ? new Promise<JsonValue>(resolve => release = () => resolve(teammate.toJson())) : teammate.toJson();
@@ -776,6 +821,69 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini · High"));
   });
 
+  const resyncs = [
+    new ResyncCase("the runtime asks for a resync", (): void => context.emit(EventName.StateResyncRequested, null)),
+    new ResyncCase("the window reconnects", (): void => {
+      EngineResync.request(context);
+      void ChatStoreService.resync(context);
+    })
+  ];
+
+  it.each(resyncs)("asks the provider for its models again after $cause, and names the model as the new list does", async ({ resync }) => {
+    let name = "GPT-5 Mini";
+    context.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([new ProviderModel("gpt-5-mini", name, "", ["high"], true, null, true)]));
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5-mini", "high", "a1"));
+    await render();
+    await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini · High"));
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    name = "GPT-5 Mini Next";
+
+    resync();
+
+    await Wait.until(() => expect(buttonLabel()).toBe("Codex · GPT-5 Mini Next · High"));
+    expect(context.count(MethodName.ProviderModelCatalog)).toBeGreaterThan(asked);
+  });
+
+  it.each(resyncs)("asks a member teammate's provider for its models again after $cause, while the providers are still being read", async ({ resync }) => {
+    const teammates = new TeammateFixture(context);
+    const personal = new Provider("a3", "codex", "Personal", "D:/personal", AuthStatus.LoggedIn, null, null, null, null, "t");
+    teammates.teammates.push(new Teammate("erin", "Erin", null, "a3", Harness.Provider, null, null, "t", "t"));
+    teammates.members.push(new ConversationMember("c1", "erin", "t", null, false));
+    context.answer(MethodName.ProviderList, () => [SampleData.provider.toJson(), personal.toJson()]);
+    const personalReads = (): number => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ProviderModelCatalog)
+      && ProviderListModelsParams.fromJson(t.parameters).providerId === "a3").length;
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await Wait.until(() => expect(personalReads()).toBe(1));
+    const providers = new DeferredResponse();
+    context.answer(MethodName.ProviderList, () => providers.promise);
+
+    resync();
+
+    await Wait.until(() => expect(personalReads()).toBe(2));
+    providers.resolve([SampleData.provider.toJson(), personal.toJson()]);
+    await fixture.whenStable();
+  });
+
+  it("asks no provider for its models at a resync once the composer is gone", async () => {
+    await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await ready();
+    const asked = context.count(MethodName.ProviderModelCatalog);
+    const providers = new DeferredResponse();
+    context.answer(MethodName.ProviderList, () => providers.promise);
+    fixture.destroy();
+
+    context.emit(EventName.StateResyncRequested, null);
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+    expect(context.count(MethodName.ProviderModelCatalog)).toBe(asked);
+    providers.resolve([SampleData.provider.toJson()]);
+  });
+
   it("sorts each section of the mention completions and the kind's providers by name, ignoring case with an accented name beside its letter", async () => {
     const teammates = new TeammateFixture(context);
     teammates.teammates = ["zoe", "edgar", "Émile", "bob", "Élise", "Alice", "dora"].map(t => new Teammate(t, t, null, "a1", Harness.Provider, null, null, "t", "t"));
@@ -817,10 +925,11 @@ describe("ComposerComponent", () => {
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve)));
       const settled = menu();
 
-      expect([first, settled].map(t => t !== undefined)).toEqual([true, true]);
+      expect([first, settled].map(t => !Object.isUndefined(t))).toEqual([true, true]);
       AppearanceFixture.expectPixels(settled?.bottom ?? Number.NaN, picker().getBoundingClientRect().top);
-      for (const [shown, place] of [[first?.top ?? 0, settled?.top ?? Number.NaN], [first?.height ?? 0, settled?.height ?? Number.NaN], [first?.left ?? 0, settled?.left ?? Number.NaN]] as const)
-        AppearanceFixture.expectPixels(shown, place);
+      AppearanceFixture.expectPixels(first?.top ?? 0, settled?.top ?? Number.NaN);
+      AppearanceFixture.expectPixels(first?.height ?? 0, settled?.height ?? Number.NaN);
+      AppearanceFixture.expectPixels(first?.left ?? 0, settled?.left ?? Number.NaN);
       await userEvent.keyboard("{Escape}");
     });
 
@@ -883,20 +992,20 @@ describe("ComposerComponent", () => {
     await render();
     const effortMenu = (): HTMLElement[] => rowsOf("efforts");
     const tags = (): (string | null)[] => effortMenu().map(t => t.querySelector(".nol-menu-item-tag")?.textContent?.trim() ?? null);
-    const checked = (): string[] => effortMenu().filter(t => t.getAttribute("aria-checked") === "true").map(t => t.querySelector(".nol-menu-item-label")!.textContent!.trim());
+    const checked = (): string[] => effortMenu().filter(t => t.getAttribute("aria-checked") === "true").map(t => Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim());
 
     await choose("GPT-5");
     await ready();
     expect(choice()?.effort).toBeNull();
     await choose();
     expect(buttonLabel()).toBe("Codex · GPT-5 · Deep");
-    expect(effortMenu().map(t => t.querySelector(".nol-menu-item-label")!.textContent!.trim())).toEqual(["Low", "Deep"]);
+    expect(effortMenu().map(t => Required.of(Required.of(t.querySelector(".nol-menu-item-label")).textContent).trim())).toEqual(["Low", "Deep"]);
     expect(checked()).toEqual(["Deep"]);
     expect(tags()).toEqual([null, Resources.recommendedEffortTag]);
     await close();
 
     await type("hello");
-    root().querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(sent()[0]?.requested?.effort).toBeNull();
     await choose("Low");
@@ -923,7 +1032,7 @@ describe("ComposerComponent", () => {
     await ready();
 
     await type("hello");
-    root().querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(sent()[0]?.requested?.speed).toBe("priority");
     await choose("GPT-5 Mini");
@@ -944,7 +1053,8 @@ describe("ComposerComponent", () => {
 
     await choose();
     expect(rows()).toEqual([["Standard", "true"], ["Fast", "false"]]);
-    const [effort, speed] = [document.querySelector(".nol-teamrun-composer-efforts"), document.querySelector(".nol-teamrun-composer-speeds")];
+    const effort = document.querySelector(".nol-teamrun-composer-efforts");
+    const speed = document.querySelector(".nol-teamrun-composer-speeds");
     expect([effort, speed?.parentElement?.classList.contains("nol-teamrun-composer-column")]).toEqual([null, true]);
     await click(item("Fast"));
     await ready();
@@ -1031,7 +1141,7 @@ describe("ComposerComponent", () => {
     expect(summary()).not.toContain("Other model");
 
     await type("hello");
-    root().querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
 
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(sent()[0]?.providerId).toBe("a5");
@@ -1405,10 +1515,10 @@ describe("ComposerComponent", () => {
     expect([modeLabel(), access().querySelector(".nol-teamrun-composer-glyph")?.textContent?.trim(), access().getAttribute("aria-label"), access().disabled])
       .toEqual(["Default", Resources.permissionsGlyph, Resources.formatChatPermissions("Default"), false]);
     await click(access());
-    const menu = document.querySelector("nol-menu")!;
+    const menu = Required.of(document.querySelector("nol-menu"));
     expect([menu.getAttribute("aria-label"), menu.querySelector(".nol-menu-label")?.textContent?.trim()]).toEqual([Resources.chatPermissionsLabel, Resources.formatChatPermissionsOf("Codex")]);
-    expect(modeRows()).toEqual([["Default", modes[0]!.description, Resources.defaultModeTag, "", "true"], ["Read Only", modes[1]!.description, "", "", "false"],
-      ["Full Access", modes[2]!.description, "", Resources.unrestrictedModeGlyph, "false"], [Resources.toolsFollowMode, "", "", "", "null"]]);
+    expect(modeRows()).toEqual([["Default", Required.of(modes[0]).description, Resources.defaultModeTag, "", "true"], ["Read Only", Required.of(modes[1]).description, "", "", "false"],
+      ["Full Access", Required.of(modes[2]).description, "", Resources.unrestrictedModeGlyph, "false"], [Resources.toolsFollowMode, "", "", "", "null"]]);
     expect(item(Resources.toolsFollowMode).getAttribute("aria-disabled")).toBe("true");
     await click(access());
 
@@ -1676,8 +1786,8 @@ describe("ComposerComponent", () => {
   });
 
   it.each([
-    { kind: "names no plan mode", settings: new ComposerSettings("codex", "gpt-5", null, "a1"), planMode: null, mode: "Default" },
-    { kind: "runs in a read-only mode", settings: new ComposerSettings("codex", "gpt-5", null, "a1", null, null, "plan"), planMode: "plan", mode: "Plan" }
+    new PlanModeCase("names no plan mode", new ComposerSettings("codex", "gpt-5", null, "a1"), null, "Default"),
+    new PlanModeCase("runs in a read-only mode", new ComposerSettings("codex", "gpt-5", null, "a1", null, null, "plan"), "plan", "Plan")
   ])("offers no Plan first and names the chat's mode while its provider $kind, even with the chat's Plan first on", async ({ settings, planMode, mode }) => {
     withPlanMode(planMode);
     listPlanFirst(() => true);
@@ -1717,11 +1827,12 @@ describe("ComposerComponent", () => {
     it("says why in the Effort and Speed columns with a row each that chooses nothing", async () => {
       await start();
       await choose();
-      const [effort, speed] = [rowsOf("efforts"), rowsOf("speeds")];
+      const effort = rowsOf("efforts");
+      const speed = rowsOf("speeds");
 
       expect([effort.map(labelOf), speed.map(labelOf), effort[0]?.getAttribute("aria-disabled"), speed[0]?.getAttribute("aria-disabled")])
         .toEqual([["Codex can't change effort: its models each have one fixed setting."], ["Codex can't change speed: TeamRun doesn't support this for it yet."], "true", "true"]);
-      await click(required(effort[0]));
+      await click(Required.of(effort[0]));
       expect([document.querySelectorAll("nol-menu").length, choice()?.effort]).toEqual([1, null]);
       await close();
     });
@@ -1730,9 +1841,9 @@ describe("ComposerComponent", () => {
       await start();
       picker().focus();
       await userEvent.keyboard("{Enter}");
-      await reach(() => required(rowsOf("efforts")[0]));
+      await reach(() => Required.of(rowsOf("efforts")[0]));
 
-      expect(labelOf(document.activeElement as HTMLElement)).toBe("Codex can't change effort: its models each have one fixed setting.");
+      expect(labelOf(PartReads.elementOf(document.activeElement))).toBe("Codex can't change effort: its models each have one fixed setting.");
       await userEvent.keyboard("{Escape}");
       await Wait.until(() => expect(document.querySelector("nol-menu")).toBeNull());
     });
@@ -1791,7 +1902,7 @@ describe("ComposerComponent", () => {
       expect(modeRows().slice(0, 3)).toEqual([["Default", "Edits files in the workspace, and asks before anything else.", Resources.defaultModeTag, "", "true"],
         ["Read-only", "", "", "", "null"], ["Unrestricted", "", "", Resources.unrestrictedModeGlyph, "null"]]);
       expect(refusedRows().map(t => t.getAttribute("aria-disabled"))).toEqual(["true", "true"]);
-      await click(required(refusedRows()[1]));
+      await click(Required.of(refusedRows()[1]));
       expect(modeLabel()).toBe("Default");
     });
 
@@ -1800,7 +1911,7 @@ describe("ComposerComponent", () => {
         access().focus();
         await userEvent.keyboard("{Enter}");
       });
-      const row = required(refusedRows()[0]);
+      const row = Required.of(refusedRows()[0]);
       const described = (): string => (row.getAttribute("aria-describedby") ?? "").split(" ").filter(t => t.length > 0)
         .map(t => document.getElementById(t)?.textContent?.trim() ?? "").join(" ");
       const reason = "Codex can't use a read-only mode: its guide lists read-only mode as missing.";
@@ -1824,9 +1935,11 @@ describe("ComposerComponent", () => {
     it("says each refused mode's row reason on hover", async () => {
       await start();
 
-      for (const [index, reason] of ["Codex can't use a read-only mode: its guide lists read-only mode as missing.",
-        "Codex can't use an unrestricted mode: TeamRun doesn't support this for it yet."].entries()) {
-        const row = required(refusedRows()[index]);
+      const reasons = ["Codex can't use a read-only mode: its guide lists read-only mode as missing.",
+        "Codex can't use an unrestricted mode: TeamRun doesn't support this for it yet."];
+      for (let index = 0; index < reasons.length; index++) {
+        const row = Required.of(refusedRows()[index]);
+        const reason = Required.of(reasons[index]);
         await userEvent.hover(row);
         await Wait.until(() => expect(tooltip()?.textContent?.trim()).toBe(reason));
         await userEvent.unhover(row);
@@ -1837,14 +1950,18 @@ describe("ComposerComponent", () => {
     it("gives a refused mode the offered mode's start, end and name start, and the plain row's height and name top, in rem", async () => {
       await start();
       const rem = (pixels: number): number => pixels / AppearanceFixture.toPixels(1);
-      const offered = required(document.querySelector<HTMLElement>(".nol-teamrun-composer-permissions button[nol-menu-item]"));
+      const offered = Required.of(document.querySelector<HTMLElement>(".nol-teamrun-composer-permissions button[nol-menu-item]"));
       const plain = item(Resources.toolsFollowMode);
-      const label = (row: HTMLElement): DOMRect => required(row.querySelector(".nol-menu-item-label")).getBoundingClientRect();
-      const [offeredBox, offeredLabel, plainBox, plainLabel] = [offered.getBoundingClientRect(), label(offered), plain.getBoundingClientRect(), label(plain)];
+      const label = (row: HTMLElement): DOMRect => Required.of(row.querySelector(".nol-menu-item-label")).getBoundingClientRect();
+      const offeredBox = offered.getBoundingClientRect();
+      const offeredLabel = label(offered);
+      const plainBox = plain.getBoundingClientRect();
+      const plainLabel = label(plain);
 
       expect(rem(plainBox.height)).toBeGreaterThan(0);
       expect(refusedRows().map(t => {
-        const [box, name] = [t.getBoundingClientRect(), label(t)];
+        const box = t.getBoundingClientRect();
+        const name = label(t);
         return [rem(box.left - offeredBox.left), rem(box.right - offeredBox.right), rem(name.left - offeredLabel.left), rem(box.height - plainBox.height),
           rem(name.top - box.top - (plainLabel.top - plainBox.top))].map(u => Math.round(u * 1000) / 1000 + 0);
       })).toEqual([[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]);
@@ -1903,7 +2020,7 @@ describe("ComposerComponent", () => {
     expect([confirmTitle(), choice()?.mode, risky()]).toEqual([undefined, "read-only", null]);
     await Wait.until(() => expect(store.conversation("c1")?.responder?.requested?.mode).toBe("read-only"));
     await type("hello");
-    root().querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(sent()[0]?.requested?.mode).toBe("read-only");
     await chooseMode("Default");
@@ -1965,8 +2082,8 @@ describe("ComposerComponent", () => {
   });
 
   it.each([
-    { answer: "Close", button: ".nol-teamrun-cancel", kept: null },
-    { answer: "Use Full Access", button: ".nol-teamrun-confirm", kept: "full-access" }
+    new ConfirmCase("Close", ".nol-teamrun-cancel", null),
+    new ConfirmCase("Use Full Access", ".nol-teamrun-confirm", "full-access")
   ])("asks before the chat takes an unrestricted mode, and $answer keeps $kept", async ({ button, kept }) => {
     withModes();
     await prepare();
@@ -1976,7 +2093,7 @@ describe("ComposerComponent", () => {
     await chooseMode("Full Access");
 
     expect(confirmTitle()).toBe(Resources.formatUnrestrictedModeTitle("Full Access"));
-    expect(document.querySelector("nol-teamrun-confirm-dialog p")?.textContent?.trim()).toBe(Resources.formatUnrestrictedModeText("Codex", modes[2]!.description));
+    expect(document.querySelector("nol-teamrun-confirm-dialog p")?.textContent?.trim()).toBe(Resources.formatUnrestrictedModeText("Codex", Required.of(modes[2]).description));
     expect(choice()?.mode ?? null).toBeNull();
     await answerConfirm(button);
 
@@ -2033,12 +2150,12 @@ describe("ComposerComponent", () => {
 
     expect(modeLabel()).toBe("Read Only");
     await click(access());
-    expect(modeRows()).toEqual([["Default", modes[0]!.description, "", "", "false"], ["Read Only", modes[1]!.description, Resources.formatOwnDefaultMode("Alice"), "", "true"],
-      ["Full Access", modes[2]!.description, "", Resources.unrestrictedModeGlyph, "false"], [Resources.formatChangeDefaultMode("Alice"), Resources.toolsFollowMode, "", "", "null"]]);
+    expect(modeRows()).toEqual([["Default", Required.of(modes[0]).description, "", "", "false"], ["Read Only", Required.of(modes[1]).description, Resources.formatOwnDefaultMode("Alice"), "", "true"],
+      ["Full Access", Required.of(modes[2]).description, "", Resources.unrestrictedModeGlyph, "false"], [Resources.formatChangeDefaultMode("Alice"), Resources.toolsFollowMode, "", "", "null"]]);
     await click(item(Resources.formatChangeDefaultMode("Alice")));
 
     await Wait.until(() => expect(document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")?.value).toBe("Alice"));
-    document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")).click();
     await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
     expect(memberModes()).toEqual([]);
   });
@@ -2077,7 +2194,7 @@ describe("ComposerComponent", () => {
     expect(modeLabel()).toBe(Resources.formatUnlisted("gone"));
     await click(access());
 
-    const first = [...document.querySelector("nol-menu")!.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")][0]!;
+    const first = Required.of([...Required.of(document.querySelector("nol-menu")).querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")][0]);
     expect([first.querySelector(".nol-menu-item-label")?.textContent?.trim(), first.getAttribute("aria-checked"), first.getAttribute("aria-disabled")])
       .toEqual([Resources.formatUnlisted("gone"), "true", "true"]);
     expect(risky()).toBeNull();
@@ -2113,7 +2230,7 @@ describe("ComposerComponent", () => {
 
     await type("@");
     await Wait.until(() => expect(names()).toEqual(["Alice", "Bob", "Offline"]));
-    expect([...document.querySelectorAll(".nol-mention-section")].map(t => t.textContent!.trim())).toEqual(["Chat members", "Other teammates"]);
+    expect([...document.querySelectorAll(".nol-mention-section")].map(t => Required.of(t.textContent).trim())).toEqual(["Chat members", "Other teammates"]);
     expect(document.querySelector(".nol-mention-option-unavailable")?.textContent).toContain("Offline");
     await key("ArrowDown");
     await key("Enter");
@@ -2131,6 +2248,29 @@ describe("ComposerComponent", () => {
     fixture.destroy();
     await render();
     expect(summary()).toContain("Bob");
+  });
+
+  it("answers with its fixed teammate, whatever the chat chose, with no mentions and no way to answer without it", async () => {
+    new TeammateFixture(context);
+    await prepare();
+    remember(new ComposerSettings("codex", null, null, null, null));
+    fixture = TestBed.createComponent(ComposerComponent);
+    fixture.componentRef.setInput("conversationId", "c1");
+    fixture.componentRef.setInput("teammateId", "alice");
+    await fixture.whenStable();
+
+    expect(summary()).toContain("Alice");
+    await type("@");
+    await fixture.whenStable();
+    expect([names(), document.querySelectorAll("nol-mention-list").length]).toEqual([[], 0]);
+
+    await type("@Bob, look");
+    await send();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+    expect([sent()[0]?.text, sent()[0]?.mentionedTeammateIds, sent()[0]?.responderTeammateId]).toEqual(["@Bob, look", [], "alice"]);
+
+    await choose();
+    expect([labels().includes(Resources.formatEditTeammate("@Alice")), labels().includes(Resources.answerWithoutTeammateLabel)]).toEqual([true, false]);
   });
 
   it("resolves a written name with spaces to its teammate, shows its initials, and offers it in completion", async () => {
@@ -2182,9 +2322,9 @@ describe("ComposerComponent", () => {
     await type("@");
     await Wait.until(() => expect(names()).toContain("Alice"));
     const field = box().getBoundingClientRect();
-    const list = document.querySelector("nol-mention-list")!.getBoundingClientRect();
+    const list = Required.of(document.querySelector("nol-mention-list")).getBoundingClientRect();
 
-    expect(getComputedStyle(root().querySelector(".nol-teamrun-composer-card")!).position).toBe("relative");
+    expect(getComputedStyle(Required.of(root().querySelector(".nol-teamrun-composer-card"))).position).toBe("relative");
     expect([list.left - field.left, list.width - field.width, list.bottom - field.top].map(t => Math.abs(t) < 0.5)).toEqual([true, true, true]);
   });
 
@@ -2196,7 +2336,7 @@ describe("ComposerComponent", () => {
     const empty = box().getBoundingClientRect().height;
     const line = Number.parseFloat(getComputedStyle(box()).lineHeight);
     const words = "thank you for looking at the build and the tests, ".repeat(12);
-    const copy = root().querySelector<HTMLElement>(".nol-mention-backdrop")!;
+    const copy = Required.of(root().querySelector<HTMLElement>(".nol-mention-backdrop"));
     const drawnWidth = (): number => {
       const drawn = document.createRange();
       drawn.selectNodeContents(copy);
@@ -2347,23 +2487,23 @@ describe("ComposerComponent", () => {
     const store = await prepare();
     remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
     await render();
-    const fallback = (model: string, chosen: boolean = false): string =>
-      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen);
+    const fallback = (model: string, chosen: boolean = false, start: boolean = false): string =>
+      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen, start);
     const alice = (chosen: boolean): string => choiceParams(new ConversationResponder("alice"), "c1", chosen);
 
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5")]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true)]));
     await choose("gpt-5-mini");
-    expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true)]);
+    expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true)]);
     await type("Any news?");
     await send();
     await Wait.until(() => expect(sent()).toHaveLength(1));
     expect(keptChoices()).toHaveLength(2);
     await type("@Alice, have a look");
     await send();
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true), alice(false)]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true), alice(false)]));
     expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
     await choose(Resources.answerWithoutTeammateLabel);
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true), alice(false), fallback("gpt-5-mini", true)]));
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true), alice(false), fallback("gpt-5-mini", true)]));
     expect(store.conversation("c1")?.responder?.teammateId ?? null).toBeNull();
   });
 
@@ -2373,9 +2513,9 @@ describe("ComposerComponent", () => {
     const store = await prepare();
     remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
     await render();
-    const fallback = (model: string, chosen: boolean = false): string =>
-      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen);
-    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5")]));
+    const fallback = (model: string, chosen: boolean = false, start: boolean = false): string =>
+      choiceParams(new ConversationResponder(null, new RequestedSettings("codex", model, model === "gpt-5" ? "high" : null), "a1"), "c1", chosen, start);
+    await Wait.until(() => expect(keptChoices()).toEqual([fallback("gpt-5", false, true)]));
 
     await type("Any news?");
     await send();
@@ -2386,7 +2526,7 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(box().value).toBe(""));
     await fixture.whenStable();
 
-    expect(keptChoices()).toEqual([fallback("gpt-5"), fallback("gpt-5-mini", true)]);
+    expect(keptChoices()).toEqual([fallback("gpt-5", false, true), fallback("gpt-5-mini", true)]);
     expect(summary()).toContain("gpt-5-mini");
     expect([choice()?.model, store.conversation("c1")?.responder?.requested?.model]).toEqual(["gpt-5-mini", "gpt-5-mini"]);
   });
@@ -2462,6 +2602,156 @@ describe("ComposerComponent", () => {
     expect(context.count(MethodName.ConversationResponderSet)).toBe(0);
   });
 
+  it("writes its starting choice only if the chat holds no responder in the runtime, and shows the teammate the runtime holds when one does", async () => {
+    new TeammateFixture(context);
+    context.answer(MethodName.ConversationResponderSet, () => SampleData.conversation.withResponder(new ConversationResponder("alice")).toJson());
+    const store = await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+
+    await Wait.until(() => expect(store.conversation("c1")?.responder?.teammateId).toBe("alice"));
+    await ready();
+    expect(summary()).toContain("Alice");
+    expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, new RequestedSettings("codex", "gpt-5", "high"), "a1"), "c1", false, true)]);
+  });
+
+  it("opens a chat answered by its teammate while the chat's members still load, writing nothing over the teammate", async () => {
+    const data = new TeammateFixture(context);
+    const members = new DeferredResponse();
+    context.answer(MethodName.ConversationListMembers, t => ConversationIdParams.fromJson(t).conversationId === "c1" ? members.promise : [])
+      .answer(MethodName.ConversationList, () => [SampleData.conversation.withResponder(new ConversationResponder("alice")).toJson()]);
+    configure();
+    const store = ChatStoreService.of(context);
+    await Wait.until(() => expect(store.loaded()).toBe(true));
+    const selected = store.selectConversation("c1");
+    remember(new ComposerSettings("gone", null, null, null));
+    await render();
+    await ready();
+
+    expect(summary()).toContain("Alice");
+    expect(store.membersOf("c1")).toEqual([]);
+    expect(context.count(MethodName.ConversationResponderSet)).toBe(0);
+    members.resolve(data.members.map(t => t.toJson()));
+    await selected;
+    await fixture.whenStable();
+    expect([store.conversation("c1")?.responder?.teammateId, context.count(MethodName.ConversationResponderSet)]).toEqual(["alice", 0]);
+  });
+
+  describe("when the window's copy of a chat and its kept choice lack the teammate a mention made it answered by", () => {
+    const second = new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp);
+    let held: ConversationResponder | null = null;
+    const runtime = (): void => {
+      held = null;
+      context.answer(MethodName.ConversationResponderSet, t => {
+        const params = ConversationResponderParams.fromJson(t);
+        if (params.conversationId !== "c1")
+          return second.withResponder(params.responder).toJson();
+        const keeps = params.start ? !Object.isNull(held) : !params.chosen && Object.isNull(params.responder?.teammateId ?? null) && !Object.isNull(held?.teammateId ?? null);
+        if (!keeps)
+          held = params.responder;
+        return SampleData.conversation.withResponder(held).toJson();
+      }).answer(MethodName.MessageSend, answered);
+    };
+    const mention = async (): Promise<ChatStoreService> => {
+      new TeammateFixture(context);
+      runtime();
+      context.answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(), second.toJson()]);
+      const store = await prepare();
+      remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+      await render();
+      await ready();
+      await type("@Alice, have a look");
+      await send();
+      await Wait.until(() => expect(held?.teammateId).toBe("alice"));
+      localStorage.setItem(Resources.composerChoicesStorageKey, JSON.stringify(new ComposerChoices().toJson()));
+      window.dispatchEvent(new StorageEvent("storage", { key: Resources.composerChoicesStorageKey }));
+      context.answer(MethodName.ProjectOpen, () => SampleData.project.toJson());
+      await store.openProject(SampleData.project.rootPath);
+      expect([store.conversation("c1")?.responder ?? null, choice()]).toEqual([null, null]);
+      return store;
+    };
+    const unmentioned = async (): Promise<void> => {
+      await ready();
+      await Wait.until(() => expect(summary()).toContain("Alice"));
+      await type("Any news?");
+      await send();
+      await Wait.until(() => expect(sent()).toHaveLength(2));
+      expect([sent()[1]?.mentionedTeammateIds.length, sent()[1]?.responderTeammateId, held?.teammateId]).toEqual([0, "alice", "alice"]);
+    };
+
+    it("answers the next message without a mention by that teammate after switching to another chat and back", async () => {
+      const store = await mention();
+      fixture.componentRef.setInput("conversationId", "c2");
+      await fixture.whenStable();
+      fixture.componentRef.setInput("conversationId", "c1");
+      await fixture.whenStable();
+
+      await unmentioned();
+      expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    });
+
+    it("answers the next message without a mention by that teammate after a reload", async () => {
+      const store = await mention();
+      fixture.destroy();
+      await render();
+
+      await unmentioned();
+      expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+    });
+  });
+
+  it("sets the teammate a mention names after the chat's opening write failed in the window while the runtime kept it", async () => {
+    new TeammateFixture(context);
+    const opening = new DeferredResponse();
+    const reply = new DeferredResponse();
+    let held: ConversationResponder | null = null;
+    context.answer(MethodName.ConversationResponderSet, t => {
+      const params = ConversationResponderParams.fromJson(t);
+      if (params.conversationId !== "c1")
+        return new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp).withResponder(params.responder).toJson();
+      const first = Object.isNull(held);
+      if (!(params.start && !first))
+        held = params.responder;
+      return first ? opening.promise : SampleData.conversation.withResponder(held).toJson();
+    }).answer(MethodName.MessageSend, () => reply.promise)
+      .answer(MethodName.ConversationList, () => [SampleData.conversation.toJson(),
+        new Conversation("c2", "p1", "Second", SampleData.timestamp, SampleData.timestamp).toJson()]);
+    const store = await prepare();
+    remember(new ComposerSettings("codex", "gpt-5", "high", "a1"));
+    await render();
+    await ready();
+    await Wait.until(() => expect(held?.requested?.kind).toBe("codex"));
+    await type("@Alice, have a look");
+    await send();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+    fixture.componentRef.setInput("conversationId", "c2");
+    await fixture.whenStable();
+
+    opening.reject(new Error("The answer was lost."));
+    await Wait.until(() => expect(store.conversation("c1")?.responder ?? null).toBeNull());
+    reply.resolve(answered());
+
+    await Wait.until(() => expect(held?.teammateId).toBe("alice"));
+    await Wait.until(() => expect(store.conversation("c1")?.responder?.teammateId).toBe("alice"));
+    expect(keptChoices().filter(t => t.includes("alice"))).toEqual([choiceParams(new ConversationResponder("alice"))]);
+  });
+
+  it("never writes a choice the person didn't make over a teammate of the chat, and sets that teammate's mode when the person picks one", async () => {
+    new TeammateFixture(context);
+    withModes();
+    context.answer(MethodName.ConversationList, () => [SampleData.conversation.withResponder(new ConversationResponder("alice")).toJson()]);
+    const store = await prepare();
+    remember(new ComposerSettings("gone", null, null, null));
+    await render();
+    await ready();
+
+    expect(summary()).toContain("Alice");
+    await chooseMode("Read Only");
+    await Wait.until(() => expect(memberModes()).toEqual([["c1", "alice", "read-only"]]));
+    expect(context.count(MethodName.ConversationResponderSet)).toBe(0);
+    expect(store.conversation("c1")?.responder?.teammateId).toBe("alice");
+  });
+
   it("keeps the first provider's choice in place of a kept choice whose provider is gone", async () => {
     context.answer(MethodName.ConversationList, () => [
       SampleData.conversation.withResponder(new ConversationResponder(null, new RequestedSettings("gone", "m1", null))).toJson()
@@ -2473,7 +2763,7 @@ describe("ComposerComponent", () => {
     expect(summary()).toContain("Codex · Work · This computer");
     const kept = store.conversation("c1")?.responder;
     expect([kept?.teammateId, kept?.requested?.kind, kept?.providerId].join()).toBe(",codex,a1");
-    expect(ConversationResponderParams.fromJson(context.parametersOf(MethodName.ConversationResponderSet)!).responder?.requested?.kind).toBe("codex");
+    expect(ConversationResponderParams.fromJson(Required.of(context.parametersOf(MethodName.ConversationResponderSet))).responder?.requested?.kind).toBe("codex");
   });
 
   it("refuses images only while no one in the chat takes them, and uses each model's effort levels", async () => {
@@ -2562,7 +2852,7 @@ describe("ComposerComponent", () => {
     expect(rows()).toHaveLength(10);
 
     await ready();
-    root().querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
     await Wait.until(() => expect(uploads).toBe(1));
     first.resolve(new MessageAttachment("0.bin", "application/octet-stream", 1, "D:/data/attachments/drafts/first.bin").toJson());
 
@@ -2586,11 +2876,10 @@ describe("ComposerComponent", () => {
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
     await pick([file]);
     await ready();
-    required(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
+    Required.of(root().querySelector("form")).dispatchEvent(new Event("submit", { cancelable: true }));
     await Wait.until(() => expect(box().readOnly).toBe(true));
 
-    const paste = new Event("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "other.txt", { type: "text/plain" })] } });
+    const paste = pasteOf([new File(["a"], "other.txt", { type: "text/plain" })]);
     box().dispatchEvent(paste);
     await fixture.whenStable();
     const during = [paste.defaultPrevented, box().readOnly, rows().length, alert()];
@@ -2604,14 +2893,13 @@ describe("ComposerComponent", () => {
     context.fail(MethodName.MessageSend, "Disconnected");
     await prepare();
     await render();
-    const form = root().querySelector("form")!;
+    const form = Required.of(root().querySelector("form"));
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
     const transfer = new DataTransfer();
     transfer.items.add(file);
 
     await pick([file, file]);
-    const paste = new Event("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(paste, "clipboardData", { value: { files: [file] } });
+    const paste = pasteOf([file]);
     box().dispatchEvent(paste);
     const empty = new Event("paste", { bubbles: true, cancelable: true });
     box().dispatchEvent(empty);
@@ -2632,7 +2920,7 @@ describe("ComposerComponent", () => {
     expect([paste.defaultPrevented, empty.defaultPrevented, over.defaultPrevented, plain.defaultPrevented, drop.defaultPrevented])
       .toEqual([true, false, true, false, true]);
     expect(rows()).toHaveLength(4);
-    await click(root().querySelector<HTMLButtonElement>('button[aria-label="Remove attachment: notes.txt"]')!);
+    await click(Required.of(root().querySelector<HTMLButtonElement>('button[aria-label="Remove attachment: notes.txt"]')));
     expect(rows()).toHaveLength(3);
     await ready();
     form.dispatchEvent(new Event("submit", { cancelable: true }));
@@ -2733,12 +3021,12 @@ describe("ComposerComponent", () => {
     expect(sent()[0]?.requested?.kind).toBe("codex");
     await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
     expect(context.keptDocuments).toEqual([{ name: Resources.conversationDocumentName, instance: "c1" }]);
-    expect(getComputedStyle(root().querySelector(".nol-teamrun-composer-card")!).opacity).toBe("1");
+    expect(getComputedStyle(Required.of(root().querySelector(".nol-teamrun-composer-card"))).opacity).toBe("1");
     expect([box().readOnly, box().value]).toEqual([false, ""]);
     expect(sendButton()).toBeNull();
     await pick([new File(["a"], "late.txt")]);
     expect(rows()).toHaveLength(1);
-    await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop")!);
+    await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop")));
     await Wait.until(() => expect(sendButton()).not.toBeNull());
     expect(context.count(MethodName.ConversationCancel)).toBe(1);
   });
@@ -2748,13 +3036,13 @@ describe("ComposerComponent", () => {
     context.answer(MethodName.MessageSend, () => new MessageSendResult(SampleData.userMessage, [SampleData.reply]).toJson())
       .answer(MethodName.ConversationCancel, async () => {
         await cancel.promise;
-        throw Object.assign(new Error("The reply is not open."), { code: ErrorCode.Conflict });
+        throw new CodedError("The reply is not open.", ErrorCode.Conflict);
       });
     await prepare();
     await render();
     await type("ship it");
     await send();
-    const stop = (): HTMLButtonElement => root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop")!;
+    const stop = (): HTMLButtonElement => Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop"));
     await Wait.until(() => expect(stop()).not.toBeNull());
 
     await click(stop());
@@ -2766,7 +3054,7 @@ describe("ComposerComponent", () => {
     expect(context.noticeText()).toBeNull();
 
     context.emit(EventName.MessageUpdated, SampleData.withStatus(SampleData.reply, MessageStatus.Completed).toJson());
-    await Wait.until(() => expect(stop()).toBeNull());
+    await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).toBeNull());
     expect(context.noticeText()).toBeNull();
   });
 
@@ -2777,7 +3065,7 @@ describe("ComposerComponent", () => {
     await render();
     await type("ship it");
     await send();
-    const stop = (): HTMLButtonElement => root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop")!;
+    const stop = (): HTMLButtonElement => Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop"));
     await Wait.until(() => expect(stop()).not.toBeNull());
 
     await click(stop());
@@ -2789,8 +3077,8 @@ describe("ComposerComponent", () => {
 
   describe("while its reply runs", () => {
     const present = <T>(value: T | null | undefined): T => {
-      if (value === null || value === undefined)
-        throw new Error("Not found.");
+      if (Object.isNullOrUndefined(value))
+        throw new PartReadError("Not found.");
       return value;
     };
     const deliver = (): HTMLElement | null => root().querySelector<HTMLElement>(".nol-teamrun-composer-deliver");
@@ -2863,10 +3151,7 @@ describe("ComposerComponent", () => {
       expect(added()).toEqual(["Steer:c1:look again", "StopAndSend:c1:now", "Queue:c1:later"]);
     });
 
-    it.each([
-      { platform: "MacIntel", modifier: "Cmd" },
-      { platform: "Win32", modifier: "Ctrl" }
-    ])("offers each way to send beside Stop with its key on $platform, and sends by the one picked", async ({ platform, modifier }) => {
+    it.each([new SendKeyCase("MacIntel", "Cmd"), new SendKeyCase("Win32", "Ctrl")])("offers each way to send beside Stop with its key on $platform, and sends by the one picked", async ({ platform, modifier }) => {
       vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
       await running();
       expect([main().getAttribute("aria-label"), arrow().getAttribute("aria-label")]).toEqual([Resources.deliveryLabels[MessageDelivery.Steer], Resources.deliveryMenuLabel]);
@@ -2971,13 +3256,23 @@ describe("ComposerComponent", () => {
       expect([context.count(MethodName.ConversationCancel), document.activeElement === box()]).toEqual([1, true]);
     });
 
+    it("leaves the reply running on an Escape with no element as its target", async () => {
+      await running();
+      await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
+      const escape = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+
+      fixture.componentInstance.stopOnEscape(escape);
+      await fixture.whenStable();
+
+      expect([escape.defaultPrevented, context.count(MethodName.ConversationCancel)]).toEqual([false, 0]);
+    });
+
     it("refuses a file pasted during an edit with a note, keeps Add files off, and saves the edit with the message's own files", async () => {
       await running();
       await listed(waiting("w1", "first"));
       await key("ArrowUp");
       const add = present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-add"));
-      const paste = new Event("paste", { bubbles: true, cancelable: true });
-      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+      const paste = pasteOf([new File(["a"], "notes.txt", { type: "text/plain" })]);
 
       box().dispatchEvent(paste);
       await fixture.whenStable();
@@ -3001,10 +3296,10 @@ describe("ComposerComponent", () => {
     });
 
     describe.each([
-      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Light },
-      { look: "the fixture theme", theme: FixtureTheme.theme, mode: ThemeMode.Dark },
-      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Light },
-      { look: "the default theme", theme: DefaultTheme.theme, mode: ThemeMode.Dark }
+      new ThemeLook("the fixture theme", FixtureTheme.theme, ThemeMode.Light),
+      new ThemeLook("the fixture theme", FixtureTheme.theme, ThemeMode.Dark),
+      new ThemeLook("the default theme", DefaultTheme.theme, ThemeMode.Light),
+      new ThemeLook("the default theme", DefaultTheme.theme, ThemeMode.Dark)
     ])("in $look's $mode mode", ({ theme, mode }) => {
       beforeEach(() => AppearanceFixture.apply(theme, mode));
 
@@ -3014,8 +3309,7 @@ describe("ComposerComponent", () => {
         await running();
         await listed(waiting("w1", "first"));
         await key("ArrowUp");
-        const paste = new Event("paste", { bubbles: true, cancelable: true });
-        Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+        const paste = pasteOf([new File(["a"], "notes.txt", { type: "text/plain" })]);
 
         box().dispatchEvent(paste);
         await fixture.whenStable();
@@ -3035,11 +3329,10 @@ describe("ComposerComponent", () => {
       await running();
       await listed(waiting("w1", "first"));
       await key("ArrowUp");
-      const paste = new Event("paste", { bubbles: true, cancelable: true });
-      Object.defineProperty(paste, "clipboardData", { value: { files: [new File(["a"], "notes.txt", { type: "text/plain" })] } });
+      const paste = pasteOf([new File(["a"], "notes.txt", { type: "text/plain" })]);
       box().dispatchEvent(paste);
       await fixture.whenStable();
-      const refused = root().querySelector(".nol-teamrun-composer-files-refused") !== null;
+      const refused = !Object.isNull(root().querySelector(".nol-teamrun-composer-files-refused"));
 
       await click(present(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-cancel-edit")));
       await key("ArrowUp");
@@ -3110,6 +3403,20 @@ describe("ComposerComponent", () => {
       expect([edited(), editingNote()]).toEqual([["w1:first, changed:0"], undefined]);
     });
 
+    it("saves an edit with the teammates its new text mentions, not the ones the message first named", async () => {
+      new TeammateFixture(context);
+      await running();
+      await listed(new WaitingMessage("w1", MessageDelivery.Queue,
+        new MessageSendParams("c1", "@Bob check X", SampleData.provenance.requested, "a1", [], ["bob"]), SampleData.timestamp));
+      await key("ArrowUp");
+
+      await write("@Alice check X");
+
+      await Wait.until(() => expect(edited()).toEqual(["w1:@Alice check X:0"]));
+      const params = WaitingMessageEditParams.fromJson(context.parametersOf(MethodName.WaitingMessageEdit));
+      expect(params.message.mentionedTeammateIds).toEqual(["alice"]);
+    });
+
     it("keeps an edit open when its save fails, so the next Enter tries the edit again and sends no new message", async () => {
       await running();
       await listed(waiting("w1", "first"));
@@ -3162,7 +3469,7 @@ describe("ComposerComponent", () => {
       await running();
       await listed(waiting("w1", "first"));
       context.answer(MethodName.DraftSave, () => held.promise.then(() => {
-        throw Object.assign(new Error("The draft changed."), { code: ErrorCode.Conflict, details: { error: ErrorCode.Conflict, arguments: ["c1"] } });
+        throw new RefusedError("The draft changed.", ErrorCode.Conflict, "c1");
       })).answer(MethodName.DraftRead, () => new Draft("c1", "from the other window", [], [], 4, SampleData.timestamp).toJson());
       await type("an aside");
       const saving = [...context.saves].at(-1)?.();
@@ -3189,6 +3496,7 @@ describe("ComposerComponent", () => {
       await type("first, changed");
 
       await ChatStoreService.of(context).rewind(SampleData.userMessage, false);
+      ChatStoreService.of(context).offerRewoundDraft(SampleData.userMessage);
       await Wait.until(() => expect(document.querySelector(".nol-teamrun-confirm")).not.toBeNull());
       document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
       await fixture.whenStable();
@@ -3415,7 +3723,7 @@ describe("ComposerComponent", () => {
       await userEvent.keyboard("{ArrowDown}");
       await fixture.whenStable();
 
-      expect([first, document.activeElement === refresh(), refresh().closest("nol-menu")!.contains(document.activeElement)]).toEqual([[refresh()], false, true]);
+      expect([first, document.activeElement === refresh(), Required.of(refresh().closest("nol-menu")).contains(document.activeElement)]).toEqual([[refresh()], false, true]);
     }
     finally {
       document.removeEventListener("focusin", track);
@@ -3444,7 +3752,7 @@ describe("ComposerComponent", () => {
     await type("");
     await pick([sized("notes.txt", 4, "text/plain")]);
     states.push(targets.isFresh("c1"));
-    await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")!);
+    await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")));
     states.push(targets.isFresh("c1"));
     await type("Ask");
     await send();
@@ -3555,7 +3863,7 @@ describe("ComposerComponent", () => {
 
     await click(picker());
     await click(providerRow());
-    await click(required(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
+    await click(Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
     await click(item("Claude Code"));
     codexModels.resolve(SampleData.catalog([new ProviderModel("gpt-5", "GPT-5", "", [], true, null, true)]));
 
@@ -3574,7 +3882,7 @@ describe("ComposerComponent", () => {
     await choose();
     const others = [...document.querySelectorAll<HTMLElement>(".nol-teamrun-other-provider")];
     const offered = others.map(t => labelOf(t));
-    await click(required(others[0]));
+    await click(Required.of(others[0]));
     await choose();
     const after = [labels(), providerRowLabel(), document.querySelectorAll(".nol-teamrun-other-provider").length];
     await close();
@@ -3606,12 +3914,12 @@ describe("ComposerComponent", () => {
 
     await AccessibilityFixture.zoomedAsync(async () => {
       await choose();
-      const menu = required(document.querySelector<HTMLElement>(".cdk-overlay-container nol-menu")).getBoundingClientRect();
+      const menu = Required.of(document.querySelector<HTMLElement>(".cdk-overlay-container nol-menu")).getBoundingClientRect();
       const row = providerRow().getBoundingClientRect();
-      const other = required(document.querySelector<HTMLElement>(".nol-teamrun-other-provider"));
+      const other = Required.of(document.querySelector<HTMLElement>(".nol-teamrun-other-provider"));
       const box = other.getBoundingClientRect();
-      const label = required(other.querySelector<HTMLElement>(".nol-menu-item-label"));
-      const rowLabel = required(providerRow().querySelector<HTMLElement>(".nol-menu-item-label")).getBoundingClientRect();
+      const label = Required.of(other.querySelector<HTMLElement>(".nol-menu-item-label"));
+      const rowLabel = Required.of(providerRow().querySelector<HTMLElement>(".nol-menu-item-label")).getBoundingClientRect();
       const found = { below: box.top >= row.bottom - 0.5, next: box.top - row.bottom < row.height, inside: box.left >= menu.left - 0.5 && box.right <= menu.right + 0.5,
         onScreen: menu.left >= -0.5 && menu.right <= window.innerWidth + 0.5, uncut: label.scrollWidth <= label.clientWidth + 0.5,
         sameLeft: Math.abs(box.left - row.left) < 0.5, sameLabelStart: Math.abs(label.getBoundingClientRect().left - rowLabel.left) < 0.5, sameHeight: Math.abs(box.height - row.height) < 0.5 };
@@ -3698,14 +4006,14 @@ describe("ComposerComponent", () => {
 
     const empty = `${Resources.formatModelsCameBackEmpty("GitHub Copilot")} ${Resources.formatCopilotPlanChange("D:\\profiles\\copilot")}`;
     await choose();
-    const menu = required(document.querySelector(".nol-teamrun-composer-models"));
+    const menu = Required.of(document.querySelector(".nol-teamrun-composer-models"));
     const reason = item(empty).getBoundingClientRect();
-    const label = menu.querySelector(".nol-menu-label")!.getBoundingClientRect();
+    const label = Required.of(menu.querySelector(".nol-menu-label")).getBoundingClientRect();
     const action = refresh().getBoundingClientRect();
     expect(empty).toContain("copilot login in a terminal with COPILOT_HOME set to D:\\profiles\\copilot, then");
     expect(item(empty).getAttribute("aria-disabled")).toBe("true");
     expect([refreshes(), labels().includes(Resources.refreshModelsLabel)]).toEqual([1, false]);
-    expect([menu.querySelector(".nol-menu-label")!.textContent!.trim(), menu.querySelector("button[nol-menu-item]")]).toEqual([Resources.modelLabel, item(empty)]);
+    expect([Required.of(Required.of(menu.querySelector(".nol-menu-label")).textContent).trim(), menu.querySelector("button[nol-menu-item]")]).toEqual([Resources.modelLabel, item(empty)]);
     expect(action.top + action.height / 2).toBeGreaterThan(label.top);
     expect(action.top + action.height / 2).toBeLessThan(Math.min(label.bottom, reason.top));
     expect(action.left).toBeGreaterThan(label.left);
@@ -3979,13 +4287,13 @@ describe("ComposerComponent", () => {
     await send();
     await Wait.until(() => expect(sent()).toHaveLength(1));
     const sentChoice = new ComposerSettings("claude", "gpt-5", null, "claude-1");
-    expect(JSON.parse(localStorage.getItem(key)!)).toEqual(new ComposerChoices(
+    expect(JSON.parse(Required.of(localStorage.getItem(key)))).toEqual(new ComposerChoices(
       new Map([["c1", new ComposerSettings("codex", null, null, null)], ["c2", sentChoice]])).toJson());
     await Wait.until(() => expect(ComposerDefaultSaveParams.fromJson(context.parametersOf(MethodName.ComposerDefaultSave)).toJson())
       .toEqual(new ComposerDefaultSaveParams(sentChoice.toJson()).toJson()));
 
     await choose("gpt-5-mini");
-    storeElsewhere(JSON.parse(localStorage.getItem(key)!));
+    storeElsewhere(JSON.parse(Required.of(localStorage.getItem(key))));
     await fixture.whenStable();
     expect(summary()).toContain("gpt-5-mini");
     storeElsewhere(new ComposerChoices(new Map([["c2", new ComposerSettings("codex", null, null, null)]])).toJson());
@@ -4007,7 +4315,7 @@ describe("ComposerComponent", () => {
     await render();
     await ready();
     expect(summary()).toContain("Codex · Work · This computer · gpt-5 · High");
-    await Wait.until(() => expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, work.requested, "a1"))]));
+    await Wait.until(() => expect(keptChoices()).toEqual([choiceParams(new ConversationResponder(null, work.requested, "a1"), "c1", false, true)]));
 
     expect(await store.setDefaultTeammate(new DefaultTeammate(new RequestedSettings("claude", null, null)))).toBe(true);
     await fixture.whenStable();
@@ -4029,7 +4337,7 @@ describe("ComposerComponent", () => {
     await ready();
     expect(summary()).toContain("Codex · Work · This computer · gpt-5-mini");
     expect(ComposerDefaultSaveParams.fromJson(context.parametersOf(MethodName.ComposerDefaultSave)).toJson()).toEqual(new ComposerDefaultSaveParams(moved.toJson(), true).toJson());
-    expect(JSON.parse(localStorage.getItem(key)!)).not.toHaveProperty(Resources.defaultChoiceField);
+    expect(JSON.parse(Required.of(localStorage.getItem(key)))).not.toHaveProperty(Resources.defaultChoiceField);
   });
 
   it("offers a new tab, Copy Image and Download in an attached image's context menu, puts the image's bytes on the clipboard, and says so when it can't", async () => {
@@ -4039,18 +4347,18 @@ describe("ComposerComponent", () => {
     await pick([imageFile("shot.png"), new File(["a"], "notes.txt")]);
     await Wait.until(() => expect(previews()).toHaveLength(1));
 
-    expect([frames().length, frames()[0]!.tabIndex, frames()[0]!.getAttribute("aria-label")]).toEqual([1, 0, "shot.png"]);
-    await openImageMenu(frames()[0]!);
+    expect([frames().length, Required.of(frames()[0]).tabIndex, Required.of(frames()[0]).getAttribute("aria-label")]).toEqual([1, 0, "shot.png"]);
+    await openImageMenu(Required.of(frames()[0]));
     expect(labels()).toEqual(["Open in a new tab", "Copy Image", "Download Image"]);
     let written = nextWrite();
     await click(item("Copy Image"));
     await Wait.settled(written, "the copy's write to the clipboard");
     expect(writer.images).toHaveLength(1);
-    expect([...writer.images[0]!]).toEqual([...Uint8Array.from(atob(pixels()), t => t.charCodeAt(0))]);
+    expect([...Required.of(writer.images[0])]).toEqual([...Uint8Array.from(atob(pixels()), t => t.charCodeAt(0))]);
     expect(alert()).toBeUndefined();
 
     written = nextWrite(() => Promise.resolve(false));
-    await openImageMenu(frames()[0]!);
+    await openImageMenu(Required.of(frames()[0]));
     await click(item("Copy Image"));
     await Wait.settled(written, "the copy's write to the clipboard");
     await Wait.until(() => expect(alert()).toBe(Resources.imageCopyFailed));
@@ -4064,8 +4372,8 @@ describe("ComposerComponent", () => {
     await pick([imageFile("shot.png")]);
     await Wait.until(() => expect(previews()).toHaveLength(1));
 
-    expect(frames()[0]!.tabIndex).toBe(0);
-    await openImageMenu(frames()[0]!);
+    expect(Required.of(frames()[0]).tabIndex).toBe(0);
+    await openImageMenu(Required.of(frames()[0]));
     expect(labels()).toEqual(["Open in a new tab", "Download Image"]);
   });
 
@@ -4077,14 +4385,14 @@ describe("ComposerComponent", () => {
     const viewer = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-teamrun-image-viewer");
     const shownName = (): string | undefined => viewer()?.querySelector(".nol-teamrun-image-viewer-name")?.textContent?.trim();
 
-    await click(frames()[0]!);
+    await click(Required.of(frames()[0]));
     await Wait.until(() => expect(shownName()).toBe("first.png"));
     expect(context.openedDocuments).toEqual([]);
-    await click(viewer()!.querySelector<HTMLButtonElement>(".nol-teamrun-image-next")!);
+    await click(Required.of(Required.of(viewer()).querySelector<HTMLButtonElement>(".nol-teamrun-image-next")));
     await Wait.until(() => expect(shownName()).toBe("second.png"));
-    expect(viewer()!.querySelector<HTMLButtonElement>(".nol-teamrun-image-next")!.disabled).toBe(true);
+    expect(Required.of(Required.of(viewer()).querySelector<HTMLButtonElement>(".nol-teamrun-image-next")).disabled).toBe(true);
 
-    await click(viewer()!.querySelector<HTMLButtonElement>(".nol-teamrun-image-close")!);
+    await click(Required.of(Required.of(viewer()).querySelector<HTMLButtonElement>(".nol-teamrun-image-close")));
     await Wait.until(() => expect(viewer()).toBeNull());
     expect(document.activeElement).toBe(frames()[0]);
   });
@@ -4097,15 +4405,15 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(previews()).toHaveLength(1));
     const viewer = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-teamrun-image-viewer");
 
-    await click(frames()[0]!);
+    await click(Required.of(frames()[0]));
     expect(context.openedDocuments.map(t => [t.name, t.title])).toEqual([[Resources.imageDocumentName, "shot.png"]]);
     expect(viewer()).toBeNull();
 
-    await openImageMenu(frames()[0]!);
+    await openImageMenu(Required.of(frames()[0]));
     expect(labels()).toEqual(["Open modal", "Copy Image", "Download Image"]);
     await click(item("Open modal"));
     await Wait.until(() => expect(viewer()?.querySelector(".nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("shot.png"));
-    await click(viewer()!.querySelector<HTMLButtonElement>(".nol-teamrun-image-close")!);
+    await click(Required.of(Required.of(viewer()).querySelector<HTMLButtonElement>(".nol-teamrun-image-close")));
     await Wait.until(() => expect(viewer()).toBeNull());
     expect([context.openedDocuments.length, document.activeElement]).toEqual([1, frames()[0]]);
   });
@@ -4118,7 +4426,7 @@ describe("ComposerComponent", () => {
     await Wait.until(() => expect(previews()).toHaveLength(1));
     const viewer = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-teamrun-image-viewer");
 
-    const frame = frames()[0]!;
+    const frame = Required.of(frames()[0]);
     try {
       await userEvent.hover(frame);
       await Wait.until(() => expect(document.querySelector("nol-tooltip")?.textContent?.trim()).toBe("shot.png"));
@@ -4126,7 +4434,7 @@ describe("ComposerComponent", () => {
       await click(item("Open modal"));
       await Wait.until(() => expect(viewer()?.querySelector(".nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("shot.png"));
       expect(document.querySelector("nol-tooltip")).toBeNull();
-      document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      Required.of(document.activeElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
       await Wait.until(() => expect(viewer()).toBeNull());
       expect(document.activeElement).toBe(frame);
     }
@@ -4160,7 +4468,7 @@ describe("ComposerComponent", () => {
     await pick([imageFile("shot.png")]);
     await Wait.until(() => expect(previews()).toHaveLength(1));
     const run = async (label: string): Promise<void> => {
-      await openImageMenu(frames()[0]!);
+      await openImageMenu(Required.of(frames()[0]));
       await click(item(label));
     };
 
@@ -4201,18 +4509,18 @@ describe("ComposerComponent", () => {
     await pick([imageFile("first.png"), imageFile("second.png")]);
     await Wait.until(() => expect(previews()).toHaveLength(2));
 
-    await openImageMenu(frames()[0]!);
+    await openImageMenu(Required.of(frames()[0]));
     await click(item("Copy Image"));
     await Wait.settled(written, "the copy's write to the clipboard");
     expect(answers).toHaveLength(1);
-    await openImageMenu(frames()[1]!);
+    await openImageMenu(Required.of(frames()[1]));
     expect(item("Copy Image").getAttribute("aria-disabled") === "true").toBe(true);
     await click(item("Copy Image"));
     expect([writer.images.length, alert()]).toEqual([1, undefined]);
 
-    answers[0]!(true);
+    Required.of(answers[0])(true);
     await Wait.until(() => expect(ImageViewerService.of(context).copying()).toBe(false));
-    await openImageMenu(frames()[1]!);
+    await openImageMenu(Required.of(frames()[1]));
     expect(item("Copy Image").getAttribute("aria-disabled") === "true").toBe(false);
   });
 
@@ -4222,14 +4530,14 @@ describe("ComposerComponent", () => {
     const saves = (): DraftSaveParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DraftSave))
       .map(t => DraftSaveParams.fromJson(t.parameters));
     const notes = new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/notes.txt");
-    const saveStep = (): (() => Promise<void>) => [...context.saves].at(-1)!;
+    const saveStep = (): (() => Promise<void>) => Required.of([...context.saves].at(-1));
     const picture = new MessageAttachment("picture.png", "image/png", 5, "D:/data/attachments/drafts/c1/picture.png");
     const photo = new MessageAttachment("photo.png", "image/png", 5, "D:/data/attachments/drafts/c1/photo.png");
     const shareBack = (attachment: MessageAttachment, data: string = pixels()): JsonValue => context.share(Resources.formatDataUrl(attachment.mediaType, data));
     const reads = (): AttachmentReadParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.AttachmentShare))
       .map(t => AttachmentReadParams.fromJson(t.parameters));
-    const released = (dispose: { readonly mock: { readonly contexts: readonly unknown[] } }): (string | null)[][] =>
-      dispose.mock.contexts.map(t => t as ComposerAttachment).map(t => [t.name, t.previewUrl()]);
+    const released = (dispose: MockInstance<() => void>): (string | null)[][] =>
+      dispose.mock.contexts.map(t => attachmentOf(t)).map(t => [t.name, t.previewUrl()]);
 
     beforeEach(() => context.answer(MethodName.MessageSend, answered));
 
@@ -4267,7 +4575,7 @@ describe("ComposerComponent", () => {
     it("ends a save under way when its chat is deleted with no error, and doesn't save it again", async () => {
       const held = new DeferredResponse();
       context.answer(MethodName.DraftSave, () => held.promise.then(() => {
-        throw Object.assign(new Error("Conversation c1 was not found."), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: ["c1"] } });
+        throw new RefusedError("Conversation c1 was not found.", ErrorCode.NotFound, "c1");
       }));
       await prepare();
       await render();
@@ -4293,7 +4601,7 @@ describe("ComposerComponent", () => {
       expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt")]);
       await send();
 
-      expect(AttachmentInput.fromJson(context.parametersOf(MethodName.AttachmentPrepare)!).path).toBe(notes.path);
+      expect(AttachmentInput.fromJson(Required.of(context.parametersOf(MethodName.AttachmentPrepare))).path).toBe(notes.path);
       expect(sent()[0]?.text).toBe("where were we");
       await Wait.until(() => expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 2 }));
       expect(box().value).toBe("");
@@ -4320,7 +4628,7 @@ describe("ComposerComponent", () => {
     });
 
     describe("sent while it saves", () => {
-      const prepares = (): [boolean, string | null][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.AttachmentPrepare))
+      const prepares = (): (boolean | string | null)[][] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.AttachmentPrepare))
         .map(t => AttachmentInput.fromJson(t.parameters)).map(t => [!Object.isNull(t.grant), t.path]);
 
       it("waits for the save under way and sends a new file once, by the path that save stored", async () => {
@@ -4388,9 +4696,9 @@ describe("ComposerComponent", () => {
       await Wait.until(() => expect(names()).toContain("Alice"));
       await key("Enter");
       await saveStep()();
-      const saved = MentionValue.parse(saves()[0]!.text);
+      const saved = MentionValue.parse(Required.of(saves()[0]).text);
       fixture.destroy();
-      context.answer(MethodName.DraftRead, () => drafted("c1", saves()[0]!.text));
+      context.answer(MethodName.DraftRead, () => drafted("c1", Required.of(saves()[0]).text));
       await render();
 
       expect([saved.text.trimEnd(), saved.chips.map(t => [t.id, t.text])]).toEqual(["Ask @Alice", [["alice", "@Alice"]]]);
@@ -4415,6 +4723,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(box().value).toBe(rewound);
@@ -4436,6 +4745,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(mentioned, false);
+        store.offerRewoundDraft(mentioned);
         await fixture.whenStable();
 
         expect([box().value, document.querySelectorAll(".nol-mention-chip").length]).toEqual(["Ask @Alice", 0]);
@@ -4443,15 +4753,13 @@ describe("ComposerComponent", () => {
         expect(saves().map(t => t.text)).toEqual(["Ask @Alice"]);
       });
 
-      it.each([
-        { answer: "Close", button: ".nol-teamrun-cancel", kept: "mine" },
-        { answer: "Replace", button: ".nol-teamrun-confirm", kept: rewound }
-      ])("asks before it puts the rewound message over a typed one, and $answer leaves $kept", async ({ button, kept }) => {
+      it.each([new ConfirmCase("Close", ".nol-teamrun-cancel", "mine"), new ConfirmCase("Replace", ".nol-teamrun-confirm", rewound)])("asks before it puts the rewound message over a typed one, and $answer leaves $kept", async ({ button, kept }) => {
         const store = await prepare();
         await render();
         await type("mine");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBe(Resources.replaceDraftTitle);
@@ -4474,6 +4782,7 @@ describe("ComposerComponent", () => {
         const dispose = vi.spyOn(ComposerAttachment.prototype, "dispose");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBe(Resources.replaceDraftTitle);
@@ -4497,6 +4806,7 @@ describe("ComposerComponent", () => {
         await render();
 
         await store.rewind(pictured, false);
+        store.offerRewoundDraft(pictured);
 
         await Wait.until(() => expect(previews()[0]?.getAttribute("src")).toBe(`data:image/png;base64,${pixels()}`));
         expect(reads()).toEqual([new AttachmentReadParams("c1", "D:/data/attachments/drafts/c1/shot.png")]);
@@ -4513,6 +4823,7 @@ describe("ComposerComponent", () => {
         await Wait.until(() => expect(context.count(MethodName.AttachmentPrepare)).toBe(1));
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(title()).toBeUndefined();
@@ -4523,11 +4834,53 @@ describe("ComposerComponent", () => {
         expect([...rows()].map(t => t.textContent)).toEqual([expect.stringContaining("notes.txt")]);
       });
 
+      it("takes a rewind confirmed with the keyboard once its dialog has closed, into an empty box with the focus, or asks to replace a draft only then, the focus back in the box either way", async () => {
+        const store = await prepare();
+        await render();
+        const dialogs = (): number => document.querySelectorAll("nol-dialog").length;
+        const rewindByKeyboard = async (): Promise<void> => {
+          const opener = document.body.appendChild(document.createElement("button"));
+          opener.focus();
+          const dialog = TestBed.inject(DialogService).open(RewindDialogComponent, ".nol-teamrun-confirm");
+          dialog.componentRef?.setInput("store", store);
+          dialog.componentRef?.setInput("message", asked);
+          dialog.componentInstance?.closed.subscribe(() => {
+            opener.remove();
+            dialog.close();
+          });
+          await Wait.until(() => expect(document.activeElement?.classList.contains("nol-teamrun-confirm")).toBe(true));
+          await userEvent.keyboard("{Enter}");
+        };
+
+        await rewindByKeyboard();
+        await Wait.until(() => expect(box().value).toBe(rewound));
+        await fixture.whenStable();
+        expect([document.activeElement === box(), dialogs(), store.rewoundDraft()]).toEqual([true, 0, null]);
+
+        await type("mine");
+        await rewindByKeyboard();
+        await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
+        document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")?.click();
+        await Wait.until(() => expect(dialogs()).toBe(0));
+        await fixture.whenStable();
+        const kept = [box().value, document.activeElement === box(), store.rewoundDraft()];
+
+        await rewindByKeyboard();
+        await Wait.until(() => expect(title()?.trim()).toBe(Resources.replaceDraftTitle));
+        const asking = [dialogs(), box().value];
+        document.querySelector<HTMLButtonElement>(".nol-teamrun-confirm")?.click();
+        await Wait.until(() => expect(box().value).toBe(rewound));
+        await fixture.whenStable();
+
+        expect([kept, asking, document.activeElement === box(), dialogs()]).toEqual([["mine", true, null], [1, "mine"], true, 0]);
+      });
+
       it("keeps the rewound message for its own conversation until the composer shows it", async () => {
         const store = await prepare();
         await render("c2");
 
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         expect(box().value).toBe("");
@@ -4543,6 +4896,7 @@ describe("ComposerComponent", () => {
         await render();
         await type("mine");
         await store.rewind(asked, false);
+        store.offerRewoundDraft(asked);
         await fixture.whenStable();
 
         fixture.componentRef.setInput("conversationId", "c2");
@@ -4558,8 +4912,9 @@ describe("ComposerComponent", () => {
       const gone = new MessageAttachment("gone.png", "image/png", 5, "D:/data/attachments/drafts/c1/gone.png");
       const refused = new MessageAttachment("refused.webp", "image/webp", 5, "D:/data/attachments/drafts/c1/refused.webp");
       const broken = new MessageAttachment("broken.jpg", "image/jpeg", 5, "D:/data/attachments/drafts/c1/broken.jpg");
-      const failures = new Map([[gone.path, { code: ErrorCode.NotFound, message: "The attachment is gone." }],
-        [refused.path, { code: ErrorCode.InvalidParams, message: "The attachment isn't one of the conversation's." }]]);
+      const failures = new Map<string, CodedError>();
+      failures.set(gone.path, new CodedError("The attachment is gone.", ErrorCode.NotFound));
+      failures.set(refused.path, new CodedError("The attachment isn't one of the conversation's.", ErrorCode.InvalidParams));
       const data = pixels();
       context.answer(MethodName.DraftRead, () => drafted("c1", "look", [picture, gone, notes, refused, broken]))
         .answer(MethodName.AttachmentShare, t => {
@@ -4567,7 +4922,7 @@ describe("ComposerComponent", () => {
           const failure = failures.get(path);
           if (path === broken.path)
             return shareBack(broken, "AAAA");
-          return Object.isUndefined(failure) ? shareBack(picture, data) : Promise.reject(Object.assign(new Error(failure.message), { code: failure.code }));
+          return Object.isUndefined(failure) ? shareBack(picture, data) : Promise.reject(failure);
         });
       const failed = new Promise<void>(resolve => {
         const listen = (event: Event): void => {
@@ -4615,12 +4970,12 @@ describe("ComposerComponent", () => {
       await Wait.until(() => expect(previews()).toHaveLength(1));
       const viewer = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-teamrun-image-viewer");
 
-      await click(frames()[0]!);
+      await click(Required.of(frames()[0]));
 
       await Wait.until(() => expect(viewer()?.querySelector(".nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("picture.png"));
       expect(reads()).toEqual([picture, picture].map(t => new AttachmentReadParams("c1", t.path)));
       expect(context.methods).not.toContain(FakeWindowPartContext.qualify(MethodName.AttachmentRead));
-      await click(viewer()!.querySelector<HTMLButtonElement>(".nol-teamrun-image-close")!);
+      await click(Required.of(Required.of(viewer()).querySelector<HTMLButtonElement>(".nol-teamrun-image-close")));
       await Wait.until(() => expect(viewer()).toBeNull());
     });
 
@@ -4632,7 +4987,7 @@ describe("ComposerComponent", () => {
       await render();
       await Wait.until(() => expect(previews()).toHaveLength(2));
 
-      await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")!);
+      await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")));
       expect(released(dispose)).toEqual([["picture.png", null]]);
       expect(previews().map(t => t.alt)).toEqual(["photo.png"]);
       await send();
@@ -4675,7 +5030,7 @@ describe("ComposerComponent", () => {
       frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="img-src 'self' data: desktop-file:">`;
       await opened;
       const decode = async (src: string): Promise<number[]> => {
-        const image = frame.contentDocument!.createElement("img");
+        const image = Required.of(frame.contentDocument).createElement("img");
         image.src = src;
         await image.decode();
         return [image.naturalWidth, image.naturalHeight];
@@ -4702,21 +5057,58 @@ describe("ComposerComponent", () => {
       expect(box().value).toBe("hello");
     });
 
-    it("says when the unsent message could not be read, and keeps nothing written there over it", async () => {
+    it("says when the unsent message could not be read, saves nothing written there over it while it still can't be read, and saves it once it can", async () => {
+      let readable = false;
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1"
-        ? Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
+        ? readable ? null : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "unreadable"))
+        : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "offline")));
       await prepare();
       await render();
 
       expect(alert()).toBe(Resources.formatDraftUnreadable("unreadable"));
       expect(box().readOnly).toBe(false);
       await type("hello");
-      await saveStep()();
+      await expect(saveStep()()).rejects.toThrow(Resources.draftNotSaved);
       expect(context.count(MethodName.DraftSave)).toBe(0);
+      readable = true;
+      await saveStep()();
+      expect(saves().map(t => t.text)).toEqual(["hello"]);
 
       fixture.componentRef.setInput("conversationId", "c2");
       await fixture.whenStable();
       expect(alert()).toBe(Resources.formatDraftUnreadable("offline"));
+    });
+
+    it("lets a restore failure other than an unreadable message propagate", async () => {
+      const broken = new Error("broken");
+      vi.spyOn(ComposerDraftService.prototype, "restore").mockRejectedValue(broken);
+      const failures: unknown[] = [];
+      const record = (event: PromiseRejectionEvent): void => {
+        failures.push(event.reason);
+        event.preventDefault();
+      };
+      window.addEventListener("unhandledrejection", record);
+      onTestFinished(() => window.removeEventListener("unhandledrejection", record));
+      await prepare();
+      await render();
+      await Wait.until(() => expect(failures).toEqual([broken]));
+
+      expect(alert()).toBeUndefined();
+    });
+
+    it("shows the unsent message a save's read finds after a failed read, in place of what was written, and saves nothing over it", async () => {
+      let readable = false;
+      context.answer(MethodName.DraftRead, () => readable
+        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "unreadable")));
+      await prepare();
+      await render();
+      await type("ok");
+      readable = true;
+
+      await saveStep()();
+
+      await Wait.until(() => expect(box().value).toBe("a long unsent message"));
+      expect(context.count(MethodName.DraftSave)).toBe(0);
     });
 
     it("keeps the field closed and takes no files until the unsent message is read", async () => {
@@ -4730,8 +5122,8 @@ describe("ComposerComponent", () => {
       expect(box().readOnly).toBe(true);
       const input = root().querySelector<HTMLInputElement>('input[type="file"]');
       expect(input).not.toBeNull();
-      if (input !== null) {
-        Object.defineProperty(input, "files", { value: [new File(["a"], "early.txt")], configurable: true });
+      if (!Object.isNull(input)) {
+        input.files = transferOf([new File(["a"], "early.txt")]).files;
         input.dispatchEvent(new Event("change"));
       }
       fixture.detectChanges();
@@ -4777,7 +5169,7 @@ describe("ComposerComponent", () => {
       await prepare();
       await render();
 
-      await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")!);
+      await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")));
 
       await Wait.until(() => expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 3 }));
     });
@@ -4909,9 +5301,9 @@ describe("ComposerComponent", () => {
       }
       await Wait.until(() => expect(reads).toHaveLength(3));
 
-      reads[2]!.resolve(drafted("c1", "latest"));
-      reads[0]!.resolve(drafted("c1", "first"));
-      reads[1]!.resolve(drafted("c2", "other"));
+      Required.of(reads[2]).resolve(drafted("c1", "latest"));
+      Required.of(reads[0]).resolve(drafted("c1", "first"));
+      Required.of(reads[1]).resolve(drafted("c2", "other"));
       await fixture.whenStable();
 
       expect(box().value).toBe("latest");
@@ -4932,7 +5324,7 @@ describe("ComposerComponent", () => {
       fixture.destroy();
       read.resolve(drafted("c1", "look", [picture]));
 
-      await expect(restore.mock.results[0]!.value).resolves.toBeInstanceOf(Draft);
+      await expect(Required.of(restore.mock.results[0]).value).resolves.toBeInstanceOf(Draft);
       expect(preview).not.toHaveBeenCalled();
       expect(reads()).toEqual([]);
     });
@@ -4950,10 +5342,10 @@ describe("ComposerComponent", () => {
 
       fixture.componentRef.setInput("conversationId", "c2");
       fixture.detectChanges();
-      const remove = root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove")!;
+      const remove = Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-remove"));
       expect(remove.disabled).toBe(true);
       remove.click();
-      held.resolve(SampleData.savedDraft(saves()[0]!, 1).toJson());
+      held.resolve(SampleData.savedDraft(Required.of(saves()[0]), 1).toJson());
       await saving;
       await fixture.whenStable();
       await saveStep()();
@@ -4975,7 +5367,7 @@ describe("ComposerComponent", () => {
       await key("Enter");
 
       await Wait.until(() => expect(sent().map(t => t.text)).toEqual(["hello"]));
-      held.resolve(SampleData.savedDraft(saves()[0]!, 1).toJson());
+      held.resolve(SampleData.savedDraft(Required.of(saves()[0]), 1).toJson());
       await saving;
       await Wait.until(() => expect(context.parametersOf(MethodName.DraftDiscard)).toEqual({ chatId: "c1", revision: 1 }));
     });
@@ -5087,7 +5479,7 @@ describe("ComposerComponent", () => {
       await choose();
 
       expect(items().some(t => String(t.textContent).includes("Other"))).toBe(true);
-      expect(item(Resources.modelCatalogUnavailable)).toBeUndefined();
+      expect(labels()).not.toContain(Resources.modelCatalogUnavailable);
     });
   });
 
@@ -5107,7 +5499,7 @@ describe("ComposerComponent", () => {
 
       expect(hint()).toBe("Codex isn't signed in. Choose Providers to connect one.");
       expect(root().querySelector(".nol-teamrun-composer-manage")?.textContent?.trim()).toBe("Providers");
-      await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-manage")!);
+      await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-manage")));
       expect(context.openedDocuments.map(t => [t.name, t.instance, t.title])).toEqual([["teamrun.providers", "providers", "Providers"]]);
       expect(context.dialogs).toEqual([]);
 
@@ -5144,9 +5536,9 @@ describe("ComposerComponent", () => {
       await click(item(Resources.addProviderLabel));
       await Wait.until(() => expect(document.querySelector(".nol-teamrun-provider-name")).not.toBeNull());
       expect(document.querySelector(".nol-dialog-title")?.textContent).toBe(Resources.addProviderLabel);
-      document.querySelector<HTMLInputElement>(".nol-teamrun-existing-folder input[type=radio]")!.click();
+      Required.of(document.querySelector<HTMLInputElement>(".nol-teamrun-existing-folder input[type=radio]")).click();
       await fixture.whenStable();
-      document.querySelector<HTMLButtonElement>(".nol-teamrun-choose-folder")!.click();
+      Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-choose-folder")).click();
       await Wait.until(() => expect(context.folderChoices).toBe(1));
       document.querySelector<HTMLButtonElement>(".nol-teamrun-cancel")?.click();
       await fixture.whenStable();
@@ -5190,7 +5582,7 @@ describe("ComposerComponent", () => {
 
       expect(root().querySelector(".nol-teamrun-composer-manage")).toBeNull();
       expect(root().querySelector(".nol-teamrun-composer-add-provider")?.textContent?.trim()).toBe(Resources.addAProviderLabel);
-      await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-add-provider")!);
+      await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-add-provider")));
 
       expect(context.openedDocuments.map(t => [t.name, t.instance, t.title])).toEqual([["teamrun.providers", "providers", "Providers"]]);
       expect(document.querySelector(".nol-dialog-title")).toBeNull();
@@ -5261,7 +5653,7 @@ describe("ComposerComponent", () => {
       expect(hint()).toBe(Resources.kindsUnavailable);
 
       context.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson()]);
-      await click(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!);
+      await click(Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")));
       await Wait.until(() => expect(store.loaded()).toBe(true));
       await fixture.whenStable();
       expect(store.kindsFailed()).toBe(false);
@@ -5275,7 +5667,7 @@ describe("ComposerComponent", () => {
       const store = ChatStoreService.of(context);
       await render();
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
-      const retry = (): HTMLButtonElement => root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!;
+      const retry = (): HTMLButtonElement => Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
       const kinds = new DeferredResponse();
       context.answer(MethodName.ProviderKindList, () => kinds.promise.then(() => {
         throw new Error("still offline");
@@ -5302,7 +5694,7 @@ describe("ComposerComponent", () => {
       await render();
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
       context.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson()]);
-      const retry = root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!;
+      const retry = Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
 
       retry.focus();
       await click(retry);
@@ -5321,7 +5713,7 @@ describe("ComposerComponent", () => {
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
       const kinds = new DeferredResponse();
       context.answer(MethodName.ProviderKindList, () => kinds.promise.then(() => [SampleData.codex.toJson()]));
-      const retry = root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!;
+      const retry = Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
       const elsewhere = document.body.appendChild(document.createElement("button"));
       onTestFinished(() => elsewhere.remove());
 
@@ -5343,7 +5735,7 @@ describe("ComposerComponent", () => {
       await render();
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
       context.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson()]);
-      const retry = root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!;
+      const retry = Required.of(root().querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
 
       retry.focus();
       await store.initialize();
@@ -5363,7 +5755,7 @@ describe("ComposerComponent", () => {
       await other.whenStable();
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
       const retryOf = (target: ComponentFixture<ComposerComponent>): HTMLButtonElement =>
-        (target.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry")!;
+        Required.of(PartReads.elementOf(target.nativeElement).querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
       const kinds = new DeferredResponse();
       context.answer(MethodName.ProviderKindList, () => kinds.promise.then(() => {
         throw new Error("still offline");
@@ -5384,20 +5776,16 @@ describe("ComposerComponent", () => {
     });
   });
 
-  describe.each([
-    { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
-    { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
-    { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
-  ])("in $look", ({ mode, forcedColors }) => {
+  describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     const space = (step: number): number => AppearanceFixture.measureLook(`space-${step}`);
     const usage = (id: string, teammateId: string | null, teammateName: string | null, used: number): Message => new Message(id, "c1", Number(id.slice(1)), MessageAuthor.Provider,
       "m1", MessageStatus.Completed, [], new Provenance("a1", SampleData.provenance.requested, SampleData.provenance.observed, "s1", false, null, null,
         new ReplyUsage(1, 2, null, new ContextUsage(used, 100, null))), SampleData.timestamp, SampleData.timestamp, SampleData.timestamp, [], teammateId, teammateName);
     const border = (): number => AppearanceFixture.measureLook("border-width");
     const box = (target: Element): DOMRect => target.getBoundingClientRect();
-    const part = (selector: string, within: ParentNode = root()): HTMLElement => within.querySelector<HTMLElement>(selector)!;
+    const part = (selector: string, within: ParentNode = root()): HTMLElement => Required.of(within.querySelector<HTMLElement>(selector));
     const card = (): HTMLElement => part(".nol-teamrun-composer-card");
-    const field = (): HTMLTextAreaElement => root().querySelector<HTMLTextAreaElement>(".nol-teamrun-composer-text")!;
+    const field = (): HTMLTextAreaElement => Required.of(root().querySelector<HTMLTextAreaElement>(".nol-teamrun-composer-text"));
     const lineHeight = (): number => Number.parseFloat(getComputedStyle(field()).lineHeight);
     const lines = (count: number): string => Array.from({ length: count }, (_, index) => `line ${index}`).join("\n");
     const colorOf = (token: string): string => {
@@ -5412,35 +5800,36 @@ describe("ComposerComponent", () => {
       await render();
       await ready();
     };
-    const paintedSelection = async (): Promise<[string, string]> => {
+    const paintedSelection = async (): Promise<PaintedSelection> => {
       const image = new Image();
       image.src = `data:image/png;base64,${await page.screenshot({ element: field(), save: false })}`;
       await image.decode();
       const canvas = document.createElement("canvas");
-      [canvas.width, canvas.height] = [image.width, image.height];
-      const drawing = canvas.getContext("2d")!;
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const drawing = Required.of(canvas.getContext("2d"));
       drawing.drawImage(image, 0, 0);
       const { data } = drawing.getImageData(0, 0, image.width, image.height);
       const inset = Math.ceil(2 * image.width / box(field()).width);
-      const pixels: [number, number, string][] = [];
+      const pixels: Pixel[] = [];
       for (let y = inset; y < image.height - inset; y++)
         for (let x = inset; x < image.width - inset; x++) {
           const index = (y * image.width + x) * 4;
-          pixels.push([x, y, `rgb(${data[index]}, ${data[index + 1]}, ${data[index + 2]})`]);
+          pixels.push(new Pixel(x, y, `rgb(${data[index]}, ${data[index + 1]}, ${data[index + 2]})`));
         }
-      const counts = (within: readonly [number, number, string][]): [string, number][] => {
+      const counts = (within: readonly Pixel[]): ColorCount[] => {
         const found = new Map<string, number>();
-        for (const [, , color] of within)
-          found.set(color, (found.get(color) ?? 0) + 1);
-        return [...found].sort((t, u) => u[1] - t[1]);
+        for (const pixel of within)
+          found.set(pixel.color, (found.get(pixel.color) ?? 0) + 1);
+        return [...found.keys()].map(t => new ColorCount(t, found.get(t) ?? 0)).sort((t, u) => u.count - t.count);
       };
-      const band = counts(pixels)[1]?.[0] ?? String.empty;
-      const rows = new Map<number, [number, number]>();
-      for (const [x, y] of pixels.filter(t => t[2] === band))
-        rows.set(y, [Math.min(rows.get(y)?.[0] ?? x, x), Math.max(rows.get(y)?.[1] ?? x, x)]);
-      const text = counts(pixels.filter(([x, y]) => x >= (rows.get(y)?.[0] ?? Infinity) && x <= (rows.get(y)?.[1] ?? -Infinity))).filter(t => t[1] >= 5)
-        .map(t => t[0]).sort((t, u) => AppearanceFixture.contrast(u, band) - AppearanceFixture.contrast(t, band))[0] ?? String.empty;
-      return [band, text];
+      const band = counts(pixels)[1]?.color ?? String.empty;
+      const rows = new Map<number, PixelSpan>();
+      for (const pixel of pixels.filter(t => t.color === band))
+        rows.set(pixel.y, new PixelSpan(Math.min(rows.get(pixel.y)?.start ?? pixel.x, pixel.x), Math.max(rows.get(pixel.y)?.end ?? pixel.x, pixel.x)));
+      const text = counts(pixels.filter(t => t.x >= (rows.get(t.y)?.start ?? Infinity) && t.x <= (rows.get(t.y)?.end ?? -Infinity))).filter(t => t.count >= 5)
+        .map(t => t.color).sort((t, u) => AppearanceFixture.contrast(u, band) - AppearanceFixture.contrast(t, band))[0] ?? String.empty;
+      return new PaintedSelection(band, text);
     };
 
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
@@ -5464,12 +5853,13 @@ describe("ComposerComponent", () => {
       const stop = (): HTMLButtonElement => {
         const found = root().querySelector(".nol-teamrun-composer-stop");
         if (!(found instanceof HTMLButtonElement))
-          throw new Error("Stop is not shown.");
+          throw new PartReadError("Stop is not shown.");
         return found;
       };
       await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
       const tooltip = (): string => fixture.debugElement.query(By.css(".nol-teamrun-composer-stop")).injector.get(TooltipDirective).text();
-      const before = [box(stop()), box(card())] as const;
+      const stopBefore = box(stop());
+      const cardBefore = box(card());
       const idle = [stop().getAttribute("aria-label"), tooltip()];
 
       await click(stop());
@@ -5477,17 +5867,16 @@ describe("ComposerComponent", () => {
 
       expect([idle, [stop().getAttribute("aria-label"), tooltip(), stop().disabled]])
         .toEqual([[Resources.stopLabel, Resources.stopLabel], [Resources.stoppingLabel, Resources.stoppingLabel, true]]);
-      for (const [earlier, after] of [[before[0], box(stop())], [before[1], box(card())]] as const)
-        for (const edge of ["left", "top", "width", "height"] as const)
-          AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+      expectSameRect(box(stop()), stopBefore);
+      expectSameRect(box(card()), cardBefore);
       cancel.resolve(null);
       await Wait.until(() => expect(stop().disabled).toBe(false));
       expect(stop().getAttribute("aria-label")).toBe(Resources.stopLabel);
     });
 
     it.each([
-      { hint: "Providers", action: ".nol-teamrun-composer-manage", method: MethodName.ProviderModelCatalog },
-      { hint: "Retry", action: ".nol-teamrun-composer-retry", method: MethodName.ProviderKindList }
+      new HintCase("Providers", ".nol-teamrun-composer-manage", MethodName.ProviderModelCatalog),
+      new HintCase("Retry", ".nol-teamrun-composer-retry", MethodName.ProviderKindList)
     ])("puts the hint with $hint above the field, its text at the field's text start, level with its action at the field's end", async ({ action: selector, method }) => {
       context.fail(method, "not signed in");
       if (method === MethodName.ProviderKindList) {
@@ -5500,12 +5889,14 @@ describe("ComposerComponent", () => {
       await Wait.until(() => expect(root().querySelector(`.nol-teamrun-composer-unavailable ${selector}`)).not.toBeNull());
       await fixture.whenStable();
       const message = part(".nol-teamrun-composer-unavailable nol-field-message");
-      const [shown, action, text] = [box(message), box(part(selector)), box(field())];
+      const shown = box(message);
+      const action = box(part(selector));
+      const text = box(field());
       const padding = Number.parseFloat(getComputedStyle(field()).paddingInlineStart);
       const baselineOf = (element: Element): number => {
-        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, t => t.textContent!.trim() === "" ? NodeFilter.FILTER_SKIP : NodeFilter.FILTER_ACCEPT);
-        const text = walker.nextNode()!;
-        const probe = text.parentNode!.insertBefore(document.createElement("span"), text);
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, t => Required.of(t.textContent).trim() === "" ? NodeFilter.FILTER_SKIP : NodeFilter.FILTER_ACCEPT);
+        const text = Required.of(walker.nextNode());
+        const probe = Required.of(text.parentNode).insertBefore(document.createElement("span"), text);
         probe.style.display = "inline-block";
         const baseline = probe.getBoundingClientRect().bottom;
         probe.remove();
@@ -5542,7 +5933,8 @@ describe("ComposerComponent", () => {
     it("shows a refused column's reason whole as its row, at the Model rows' text start and height", async () => {
       await startRefused();
       await click(picker());
-      const [effort, model] = [required(rowsOf("efforts")[0]), required(rowsOf("models")[0])];
+      const effort = Required.of(rowsOf("efforts")[0]);
+      const model = Required.of(rowsOf("models")[0]);
       const label = (row: HTMLElement): DOMRect => box(part(".nol-menu-item-label", row));
 
       expect(labelOf(effort)).toBe("Codex can't change effort: its models each have one fixed setting.");
@@ -5560,7 +5952,8 @@ describe("ComposerComponent", () => {
       await render();
       await ready();
       await click(picker());
-      const [unlisted, listed] = [required(rowsOf("efforts")[0]), required(rowsOf("efforts")[1])];
+      const unlisted = Required.of(rowsOf("efforts")[0]);
+      const listed = Required.of(rowsOf("efforts")[1]);
       const check = (row: HTMLElement): HTMLElement => part(".nol-menu-item-check", row);
       const color = getComputedStyle(check(unlisted)).color;
 
@@ -5595,7 +5988,7 @@ describe("ComposerComponent", () => {
       field().setSelectionRange(field().value.indexOf("lice"), field().value.length);
       await fixture.whenStable();
 
-      const [band, text] = await paintedSelection();
+      const { band, text } = await paintedSelection();
 
       expect(root().querySelectorAll(".nol-mention-chip")).toHaveLength(1);
       if (forcedColors !== "active")
@@ -5649,7 +6042,8 @@ describe("ComposerComponent", () => {
       const frame = box(card());
       const text = box(field());
       const style = getComputedStyle(field());
-      const [start, end] = direction === "rtl" ? [frame.right - text.right, text.left - frame.left] : [text.left - frame.left, frame.right - text.right];
+      const start = direction === "rtl" ? frame.right - text.right : text.left - frame.left;
+      const end = direction === "rtl" ? text.left - frame.left : frame.right - text.right;
 
       expect(field().scrollHeight).toBeGreaterThan(field().clientHeight);
       AppearanceFixture.expectPixels(text.top - frame.top, border());
@@ -5671,7 +6065,7 @@ describe("ComposerComponent", () => {
       const style = getComputedStyle(field());
       const attachments = part(".nol-teamrun-composer-attachments");
       const above = box(attachments);
-      const preview = box(previews()[0]!);
+      const preview = box(Required.of(previews()[0]));
 
       AppearanceFixture.expectPixels(text.top + Number.parseFloat(style.paddingTop) - above.bottom, space(2));
       AppearanceFixture.expectPixels(above.bottom - text.top, space(3) - space(2));
@@ -5769,10 +6163,9 @@ describe("ComposerComponent", () => {
       await whole("default again", "Context 5%");
     });
 
-    describe.each([
-      { geometry: "the fixture theme's", theme: FixtureTheme.theme },
-      { geometry: "the default theme's", theme: DefaultTheme.theme }
-    ])("the picker with $geometry geometry", ({ theme }) => {
+    const geometries = [new GeometryCase("the fixture theme's", FixtureTheme.theme), new GeometryCase("the default theme's", DefaultTheme.theme)];
+
+    describe.each(geometries)("the picker with $geometry geometry", ({ theme }) => {
       const look = (name: string): number => AppearanceFixture.measureLook(name);
       const open = async (teammates: TeammateFixture, teammateId: string | null = null): Promise<void> => {
         teammates.members = teammates.teammates.map(t => new ConversationMember("c1", t.id, "t", null, false));
@@ -5787,8 +6180,10 @@ describe("ComposerComponent", () => {
 
       it("sets the Effort column beside the Model column, their labels and first rows level, each row's text a menu inset and padding inside it", async () => {
         await open(new TeammateFixture(context));
-        const [models, efforts] = [part(".nol-teamrun-composer-models", document), part(".nol-teamrun-composer-efforts", document)];
-        const [model, effort] = [required(rowsOf("models")[0]), required(rowsOf("efforts")[0])];
+        const models = part(".nol-teamrun-composer-models", document);
+        const efforts = part(".nol-teamrun-composer-efforts", document);
+        const model = Required.of(rowsOf("models")[0]);
+        const effort = Required.of(rowsOf("efforts")[0]);
 
         expect(box(efforts).left).toBeGreaterThanOrEqual(box(models).right - 0.5);
         AppearanceFixture.expectPixels(box(part(".nol-menu-label", efforts)).top, box(part(".nol-menu-label", models)).top);
@@ -5812,13 +6207,16 @@ describe("ComposerComponent", () => {
           SampleData.timestamp, SampleData.timestamp, null);
         context.emit(EventName.MessageUpdated, SampleData.withStatus(reply, MessageStatus.Completed).toJson());
         await reopen();
-        const [efforts, speeds] = [part(".nol-teamrun-composer-efforts", document), part(".nol-teamrun-composer-speeds", document)];
-        const [effort, speed, note] = [required(rowsOf("efforts").at(-1)), required(rowsOf("speeds")[0]), part(".nol-teamrun-speed-note", document)];
+        const efforts = part(".nol-teamrun-composer-efforts", document);
+        const speeds = part(".nol-teamrun-composer-speeds", document);
+        const effort = Required.of(rowsOf("efforts").at(-1));
+        const speed = Required.of(rowsOf("speeds")[0]);
+        const note = part(".nol-teamrun-speed-note", document);
 
         expect(box(speeds).top).toBeGreaterThanOrEqual(box(efforts).bottom - 0.5);
         AppearanceFixture.expectPixels(box(speeds).left, box(efforts).left);
         AppearanceFixture.expectPixels(box(part(".nol-menu-item-label", speed)).left, box(part(".nol-menu-item-label", effort)).left);
-        expect(box(note).top).toBeGreaterThanOrEqual(box(required(rowsOf("speeds").at(-2))).bottom - 0.5);
+        expect(box(note).top).toBeGreaterThanOrEqual(box(Required.of(rowsOf("speeds").at(-2))).bottom - 0.5);
         AppearanceFixture.expectPixels(box(part(".nol-menu-item-label", note)).left, box(part(".nol-menu-item-label", speed)).left);
         expect(box(part(".nol-menu-item-label", note)).right).toBeLessThanOrEqual(box(part("nol-menu", document)).right + 0.5);
       });
@@ -5827,7 +6225,8 @@ describe("ComposerComponent", () => {
         context.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([new ProviderModel("gpt-5", "GPT-6 Sol", "", ["medium"], true, null, true),
           new ProviderModel("terra", "GPT-6 Terra", "", ["medium"], false, null, true, null, {}, [], null, null, "needs Codex 0.167")]));
         await open(new TeammateFixture(context));
-        const [sol, terra] = [item("GPT-6 Sol"), item(Resources.formatModelUnavailable("GPT-6 Terra", "needs Codex 0.167"))];
+        const sol = item("GPT-6 Sol");
+        const terra = item(Resources.formatModelUnavailable("GPT-6 Terra", "needs Codex 0.167"));
 
         expect([terra.getAttribute("aria-disabled"), terra.getAttribute("aria-checked"), terra.classList.contains("nol-teamrun-unavailable-model")]).toEqual(["true", "false", true]);
         AppearanceFixture.expectPixels(textStart(terra), textStart(sol));
@@ -5838,16 +6237,19 @@ describe("ComposerComponent", () => {
 
       it("puts a named teammate's scope line under the columns at their text start, then Make it its default, then the provider, Edit and Answer without a teammate rows", async () => {
         await open(new TeammateFixture(context), "alice");
-        const model = required(rowsOf("models").at(-1));
+        const model = Required.of(rowsOf("models").at(-1));
         const scope = part(".nol-teamrun-composer-scope", document);
-        const [make, provider, edit, without] = [item(Resources.formatMakeDefault("Alice")), providerRow(), item(Resources.formatEditTeammate("@Alice")),
-          item(Resources.answerWithoutTeammateLabel)];
+        const make = item(Resources.formatMakeDefault("Alice"));
+        const provider = providerRow();
+        const edit = item(Resources.formatEditTeammate("@Alice"));
+        const without = item(Resources.answerWithoutTeammateLabel);
 
-        expect(box(scope).top).toBeGreaterThanOrEqual(Math.max(box(model).bottom, box(required(rowsOf("efforts").at(-1))).bottom) - 0.5);
+        expect(box(scope).top).toBeGreaterThanOrEqual(Math.max(box(model).bottom, box(Required.of(rowsOf("efforts").at(-1))).bottom) - 0.5);
         AppearanceFixture.expectPixels(box(scope).left + Number.parseFloat(getComputedStyle(scope).paddingInlineStart), box(part(".nol-menu-item-label", model)).left);
         expect(getComputedStyle(scope).color).toBe(colorOf("text-muted"));
-        for (const [above, below] of [[scope, make], [make, provider], [provider, edit], [edit, without]] as const)
-          expect(box(below).top).toBeGreaterThanOrEqual(box(above).bottom - 0.5);
+        const column = [scope, make, provider, edit, without];
+        for (let index = 1; index < column.length; index++)
+          expect(box(Required.of(column[index])).top).toBeGreaterThanOrEqual(box(Required.of(column[index - 1])).bottom - 0.5);
         for (const row of [make, provider, edit, without])
           AppearanceFixture.expectPixels(box(part(".nol-menu-item-label", row)).left, box(part(".nol-menu-item-label", model)).left);
         expect(part(".nol-menu-item-chevron", provider)).not.toBeNull();
@@ -5895,10 +6297,10 @@ describe("ComposerComponent", () => {
         await ready();
         return store;
       };
-      const unfoldedNeeds = (): [number, number, number, number, number, number] => {
+      const unfoldedNeeds = (): number[] => {
         const bar = part(".nol-teamrun-composer-bar");
         const gauge = part(".nol-teamrun-composer-context");
-        const ends = box(part("button", bar)).width + box(sendButton()!).width;
+        const ends = box(part("button", bar)).width + box(Required.of(sendButton())).width;
         const accessMinimum = Number.parseFloat(getComputedStyle(access()).minWidth);
         const pickerShort = box(picker()).width - box(part(".nol-teamrun-composer-label", picker())).width + box(part(".nol-teamrun-composer-short", picker())).width;
         const chrome = box(card()).width - box(bar).width;
@@ -5910,21 +6312,18 @@ describe("ComposerComponent", () => {
           rem(short - accessMinimum + AppearanceFixture.measureLook("icon") + edges(access()) + space(1) * 2 + space(6))];
       };
 
-      describe.each([
-        { geometry: "the fixture theme's", theme: FixtureTheme.theme },
-        { geometry: "the default theme's", theme: DefaultTheme.theme }
-      ])("with $geometry geometry", ({ theme }) => {
+      describe.each(geometries)("with $geometry geometry", ({ theme }) => {
         beforeEach(() => AppearanceFixture.apply(theme, mode));
 
         describe.each([
-          { permissions: "a restricted mode", mode: null, planFirst: false, warned: false },
-          { permissions: "Full Access, whose mark the permission button keeps at every width", mode: "full-access", planFirst: false, warned: true },
-          { permissions: "Full Access with Plan first on, where nothing warns", mode: "full-access", planFirst: true, warned: false }
+          new PermissionsCase("a restricted mode", null, false, false),
+          new PermissionsCase("Full Access, whose mark the permission button keeps at every width", "full-access", false, true),
+          new PermissionsCase("Full Access with Plan first on, where nothing warns", "full-access", true, false)
         ])("in $permissions", ({ mode, planFirst, warned }) => {
           describe.each([
-            { widths: "the widest third of the widths", band: 0 },
-            { widths: "the middle third of the widths", band: 1 },
-            { widths: "the narrowest third of the widths", band: 2 }
+            new WidthBand("the widest third of the widths", 0),
+            new WidthBand("the middle third of the widths", 1),
+            new WidthBand("the narrowest third of the widths", 2)
           ])("over $widths", ({ band }) => {
             it("hides the provider line, then folds the inset, then the picker to who answers, then the gauge's label, then the permissions to their glyph, then into the picker's menu, so at every width nothing in the bar overflows or overlaps and Send ends it", async ({ signal }) => {
               const bands = 3;
@@ -5932,9 +6331,10 @@ describe("ComposerComponent", () => {
               await resize(64, signal);
               const points = unfoldedNeeds();
               const folds = points.filter(t => t > 13.75).length;
-              const widest = Math.ceil(points[0] * 4) / 4 + 0.25;
+              const widest = Math.ceil(Required.of(points[0]) * 4) / 4 + 0.25;
               const count = (widest - 13.75) / 0.25 + 1;
-              const [first, end] = [Math.floor(count * band / bands), Math.floor(count * (band + 1) / bands)];
+              const first = Math.floor(count * band / bands);
+              const end = Math.floor(count * (band + 1) / bands);
               const before = widest - (first - 1) * 0.25;
               for (const point of points.filter(t => t - 1 / 16 > before))
                 await resize(point - 1 / 16, signal);
@@ -5947,7 +6347,7 @@ describe("ComposerComponent", () => {
                 const bar = part(".nol-teamrun-composer-bar");
                 const shown = [...bar.children].filter(t => !t.classList.contains("nol-teamrun-composer-space") && getComputedStyle(t).display !== "none"
                   && getComputedStyle(t).visibility === "visible");
-                const gaps = shown.slice(1).map((t, index) => box(t).left - box(shown[index]!).right);
+                const gaps = shown.slice(1).map((t, index) => box(t).left - box(Required.of(shown[index])).right);
                 const gauge = part(".nol-teamrun-composer-context");
                 const text = part(".nol-teamrun-context-text", gauge);
                 const glyphs = [...access().querySelectorAll(".nol-teamrun-composer-glyph")].filter(t => getComputedStyle(t).visibility === "visible");
@@ -5957,11 +6357,11 @@ describe("ComposerComponent", () => {
                   level >= ComposerBar.accessInMenu || glyphs.length === (level >= ComposerBar.accessIcon ? 1 : 2) && glyphs.every(t => inside(t, access())),
                   inside(part(".nol-teamrun-composer-glyph", picker()), picker()),
                   Object.isNull(risky()) !== warned]).toEqual([width, true, true, true, true, true, true, true, true, true]);
-                AppearanceFixture.expectPixels(box(sendButton()!).right, box(bar).right);
+                AppearanceFixture.expectPixels(box(Required.of(sendButton())).right, box(bar).right);
                 AppearanceFixture.expectPixels(box(card()).left - box(part("form")).left,
                   level >= ComposerBar.tight ? space(2) : Math.max(space(4) * 2, (box(part("form")).width - AppearanceFixture.toPixels(55)) / 2));
               }
-              const steps = levels.slice(1).map((t, index) => t - required(levels[index]));
+              const steps = levels.slice(1).map((t, index) => t - Required.of(levels[index]));
               expect([levels, steps.every(t => t === 0 || t === 1)]).toEqual([levels, true]);
               expect([band === 0 ? levels[1] : ComposerBar.unfolded, band === bands - 1 ? levels.at(-1) : folds]).toEqual([ComposerBar.unfolded, folds]);
             });
@@ -5977,12 +6377,13 @@ describe("ComposerComponent", () => {
               watcher.observe(target, { attributes: true, attributeFilter: ["class"] });
             const step = 1 / 16;
 
-            for (const [index, point] of points.entries()) {
+            for (let index = 0; index < points.length; index++) {
+              const point = Required.of(points[index]);
               await resize(point + step, signal);
               expect([point, levelOf()]).toEqual([point, index]);
-              for (const [width, level] of [[point - step, index + 1], [point + step, index], [point - step, index + 1]]) {
+              for (const { width, level } of [new ResizeStep(point - step, index + 1), new ResizeStep(point + step, index), new ResizeStep(point - step, index + 1)]) {
                 changes.splice(0);
-                await resize(width!, signal);
+                await resize(width, signal);
                 expect([width, levelOf(), changes.length]).toEqual([width, level, 1]);
               }
             }
@@ -6012,7 +6413,7 @@ describe("ComposerComponent", () => {
         it("shows the picker as who answers alone, in the same button with the same name and menu, and its full label again once it fits", async () => {
           await open();
           await resize(40);
-          const point = required(unfoldedNeeds()[ComposerBar.buttonShort - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.buttonShort - 1]);
           await resize(point + 1 / 16);
           const button = picker();
           const name = button.getAttribute("aria-label");
@@ -6038,18 +6439,18 @@ describe("ComposerComponent", () => {
         it("shows the permissions as their glyph alone just above the width where they fold into the picker's menu, centred, keeping the unrestricted mark, the same name and menu, and the focus", async () => {
           await open(100, "full-access");
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           await resize(40);
           access().focus();
           const name = access().getAttribute("aria-label");
           await resize(point + 1 / 16);
-          const glyph = required(risky());
+          const glyph = Required.of(risky());
 
           expect([levelOf(), document.activeElement === access(), access().getAttribute("aria-label"), getComputedStyle(part(".nol-teamrun-composer-summary", access())).visibility,
             getComputedStyle(glyph).visibility, glyph.textContent?.trim()]).toEqual([ComposerBar.accessIcon, true, name, "hidden", "visible", Resources.unrestrictedModeGlyph]);
           AppearanceFixture.expectPixels(box(access()).width, AppearanceFixture.measureLook("icon") + edges(access()));
           AppearanceFixture.expectPixels(box(glyph).left - box(access()).left, box(access()).right - box(glyph).right);
-          AppearanceFixture.expectPixels(box(required(sendButton())).right, box(part(".nol-teamrun-composer-bar")).right);
+          AppearanceFixture.expectPixels(box(Required.of(sendButton())).right, box(part(".nol-teamrun-composer-bar")).right);
           await click(access());
           expect([document.querySelector("nol-menu")?.getAttribute("aria-label"), labels()[0]]).toEqual([Resources.chatPermissionsLabel, "Default"]);
         });
@@ -6057,27 +6458,31 @@ describe("ComposerComponent", () => {
         it("folds the permissions into the picker's menu just below the width where the bar's parts fit, keeping every part inside the bar, the picker's expand glyph inside it and Send at its end there and at 13.75rem", async ({ signal }) => {
           await open(100, "full-access");
           await resize(64, signal);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           const bar = part(".nol-teamrun-composer-bar");
-          for (const [width, level] of [[point + 1 / 16, ComposerBar.accessIcon], [point - 1 / 16, ComposerBar.accessInMenu], [13.75, null]] as const) {
+          const checkAt = async (width: number, level: number | null): Promise<void> => {
             await resize(width, signal);
             const shown = [...bar.children].filter(t => !t.classList.contains("nol-teamrun-composer-space") && getComputedStyle(t).display !== "none"
               && getComputedStyle(t).visibility === "visible");
-            const gaps = shown.slice(1).map((t, index) => box(t).left - box(required(shown[index])).right);
+            const gaps = shown.slice(1).map((t, index) => box(t).left - box(Required.of(shown[index])).right);
 
             expect([width, Object.isNull(level) || levelOf() === level, shown.every(t => inside(t, bar)), gaps.every(t => t >= space(1) - 0.5),
               inside(part(".nol-teamrun-composer-glyph", picker()), picker())]).toEqual([width, true, true, true, true]);
-            AppearanceFixture.expectPixels(box(required(sendButton())).right, box(bar).right);
-          }
+            AppearanceFixture.expectPixels(box(Required.of(sendButton())).right, box(bar).right);
+          };
+
+          await checkAt(point + 1 / 16, ComposerBar.accessIcon);
+          await checkAt(point - 1 / 16, ComposerBar.accessInMenu);
+          await checkAt(13.75, null);
         });
 
-        for (const [where, level, narrowest] of [["just above where the permissions fold into the picker's menu", ComposerBar.accessIcon, false],
-          ["at 13.75rem, with the permissions in the picker's menu", ComposerBar.accessInMenu, true]] as const)
+        for (const { where, level, narrowest } of [new FoldCase("just above where the permissions fold into the picker's menu", ComposerBar.accessIcon, false),
+          new FoldCase("at 13.75rem, with the permissions in the picker's menu", ComposerBar.accessInMenu, true)])
           it.runIf(mode === ThemeMode.Light && forcedColors === "none")(
             `keeps every control and state visible under forced colours and whole at 200% zoom ${where}, in Full Access, with the picker's menu open`, async () => {
               await open(100, "full-access");
               await resize(64);
-              const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+              const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
               await resize(narrowest ? 13.75 : point + 1 / 16);
               expect(levelOf()).toBe(level);
               const folded = async (): Promise<boolean[]> => {
@@ -6091,7 +6496,7 @@ describe("ComposerComponent", () => {
               await AccessibilityFixture.expectVisibleForcedAsync(root());
               await AccessibilityFixture.expectFitsZoomedAsync(root(), () => fixture.whenStable(), [".nol-teamrun-context-track-only"]);
               await click(picker());
-              const menu = required(document.querySelector<HTMLElement>("nol-menu"));
+              const menu = Required.of(document.querySelector<HTMLElement>("nol-menu"));
               await AccessibilityFixture.expectVisibleForcedAsync(menu);
               await AccessibilityFixture.expectFitsZoomedAsync(menu, () => fixture.whenStable());
             });
@@ -6099,8 +6504,8 @@ describe("ComposerComponent", () => {
         it("moves the chat's permissions to the top of the picker's menu once the button folds, opening the same modes, and back to the bar once it fits again", async () => {
           await open();
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
-          const unfolded = required(summary());
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const unfolded = Required.of(summary());
           const chosen = unfolded.slice(Resources.formatPicker(String.empty).length);
           await resize(point - 1 / 16);
 
@@ -6123,7 +6528,7 @@ describe("ComposerComponent", () => {
         it("hands the focus from the permission button to the picker when the button folds into its menu", async () => {
           await open();
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           access().focus();
           expect(document.activeElement).toBe(access());
 
@@ -6135,7 +6540,7 @@ describe("ComposerComponent", () => {
         it("closes the permissions menu open while its button folds into the picker's menu, and hands the focus to the picker", async () => {
           await open();
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           await click(access());
           expect([document.querySelector("nol-menu")?.getAttribute("aria-label"), labels()[0]]).toEqual([Resources.chatPermissionsLabel, "Default"]);
 
@@ -6147,7 +6552,7 @@ describe("ComposerComponent", () => {
         it("hands the focus from the folded permissions row to a row of the picker's menu once the button goes back to the bar, and the arrow keys go on from it", async () => {
           await open();
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           await resize(point - 1 / 16);
           picker().focus();
           await userEvent.keyboard("{Enter}");
@@ -6166,11 +6571,11 @@ describe("ComposerComponent", () => {
         it("keeps the picker's menu open with the focus on a row that stays, such as a model, when the chat widens", async () => {
           await open();
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           await resize(point - 1 / 16);
           picker().focus();
           await userEvent.keyboard("{Enter}");
-          const model = required(rowsOf("models").at(-1));
+          const model = Required.of(rowsOf("models").at(-1));
           model.focus();
           expect(document.activeElement).toBe(model);
 
@@ -6182,7 +6587,7 @@ describe("ComposerComponent", () => {
         it("puts the unrestricted mode's mark on the picker's expand glyph's end corner as a badge once the permissions fold into its menu, adding no width, with Send ending the bar", async () => {
           await open(100, "full-access");
           await resize(64);
-          const point = required(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
+          const point = Required.of(unfoldedNeeds()[ComposerBar.accessInMenu - 1]);
           const badge = (): HTMLElement => part(".nol-teamrun-composer-badge", picker());
           await resize(point + 1 / 16);
           expect([levelOf(), getComputedStyle(badge()).display]).toEqual([ComposerBar.accessIcon, "none"]);
@@ -6197,7 +6602,7 @@ describe("ComposerComponent", () => {
           AppearanceFixture.expectPixels(mark.bottom, glyph.bottom);
           AppearanceFixture.expectPixels(mark.width, AppearanceFixture.measureLook("icon") / 2);
           AppearanceFixture.expectPixels(mark.height, AppearanceFixture.measureLook("icon") / 2);
-          AppearanceFixture.expectPixels(box(required(sendButton())).right, box(part(".nol-teamrun-composer-bar")).right);
+          AppearanceFixture.expectPixels(box(Required.of(sendButton())).right, box(part(".nol-teamrun-composer-bar")).right);
         });
       });
     });
@@ -6206,11 +6611,11 @@ describe("ComposerComponent", () => {
       await show();
       const bar = box(part(".nol-teamrun-composer-bar"));
       const buttons = [...part(".nol-teamrun-composer-bar").children].filter(t => t.tagName === "BUTTON").map(t => box(t));
-      const send = box(sendButton()!);
+      const send = box(Required.of(sendButton()));
 
-      AppearanceFixture.expectPixels(buttons[0]!.left, bar.left);
+      AppearanceFixture.expectPixels(Required.of(buttons[0]).left, bar.left);
       AppearanceFixture.expectPixels(send.right, bar.right);
-      AppearanceFixture.expectPixels(buttons[1]!.left - buttons[0]!.right, space(1));
+      AppearanceFixture.expectPixels(Required.of(buttons[1]).left - Required.of(buttons[0]).right, space(1));
       AppearanceFixture.expectPixels(send.left - box(picker()).right, space(1));
       for (const button of buttons)
         AppearanceFixture.expectPixels(button.top + button.height / 2, bar.top + bar.height / 2);
@@ -6218,7 +6623,7 @@ describe("ComposerComponent", () => {
 
     it("fills Send as a circle the button height across in the button color, and in the border color with a muted glyph while there is nothing to send", async () => {
       await show();
-      const send = sendButton()!;
+      const send = Required.of(sendButton());
       const system = (name: string): string => {
         const probe = document.body.appendChild(document.createElement("div"));
         probe.style.color = name;
@@ -6249,7 +6654,7 @@ describe("ComposerComponent", () => {
       await render();
       await ready();
       const width = Math.round(AppearanceFixture.toPixels(Resources.settingsMenuWidth));
-      const last = (): number => box(required([...document.querySelectorAll("nol-menu")].at(-1))).width;
+      const last = (): number => box(Required.of([...document.querySelectorAll("nol-menu")].at(-1))).width;
 
       await click(access());
       const permissions = last();
@@ -6257,7 +6662,7 @@ describe("ComposerComponent", () => {
       await choose();
       await click(providerRow());
       const provider = Math.round(last());
-      await click(required(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
+      await click(Required.of(document.querySelector<HTMLButtonElement>(".nol-teamrun-kind")));
       const kind = Math.round(last());
       await close();
 
@@ -6269,16 +6674,18 @@ describe("ComposerComponent", () => {
       withModes();
       await show();
       const access = part(".nol-teamrun-composer-access");
-      const [lead, chevron] = [...access.querySelectorAll<HTMLElement>(".nol-teamrun-composer-glyph")].map(t => box(t));
+      const glyphs = [...access.querySelectorAll<HTMLElement>(".nol-teamrun-composer-glyph")].map(t => box(t));
+      const lead = Required.of(glyphs[0]);
+      const chevron = Required.of(glyphs[1]);
       const label = box(part(".nol-teamrun-composer-label", access));
       const middle = (rect: DOMRect): number => rect.top + rect.height / 2;
       const tooltip = fixture.debugElement.query(By.css(".nol-teamrun-composer-access")).injector.get(TooltipDirective).text();
 
       expect([label.width > 0, box(part(".nol-teamrun-composer-summary", access)).right <= box(access).right + 0.5, tooltip]).toEqual([true, true, Resources.chatPermissionsLabel]);
-      AppearanceFixture.expectPixels(label.left - lead!.right, space(1));
-      AppearanceFixture.expectPixels(chevron!.left - label.right, space(1));
-      AppearanceFixture.expectPixels(box(access).right - chevron!.right, border() + AppearanceFixture.measureLook("button-padding"));
-      for (const glyph of [lead!, chevron!])
+      AppearanceFixture.expectPixels(label.left - lead.right, space(1));
+      AppearanceFixture.expectPixels(chevron.left - label.right, space(1));
+      AppearanceFixture.expectPixels(box(access).right - chevron.right, border() + AppearanceFixture.measureLook("button-padding"));
+      for (const glyph of [lead, chevron])
         AppearanceFixture.expectPixels(middle(glyph), middle(label));
     });
 
@@ -6294,13 +6701,12 @@ describe("ComposerComponent", () => {
       await chooseMode("Full Access");
       await answerConfirm(".nol-teamrun-confirm");
       await Wait.until(() => expect(risky()).not.toBeNull());
-      const after = [box(risky()!), box(part(".nol-teamrun-composer-label", access))];
+      const after = [box(Required.of(risky())), box(part(".nol-teamrun-composer-label", access))];
 
-      expect(risky()!.textContent?.trim()).toBe(Resources.unrestrictedModeGlyph);
-      for (const [index, rect] of after.entries())
-        AppearanceFixture.expectPixels(rect.left, before[index]!.left);
+      expect(Required.of(risky()).textContent?.trim()).toBe(Resources.unrestrictedModeGlyph);
+      after.forEach((rect, index) => AppearanceFixture.expectPixels(rect.left, Required.of(before[index]).left));
       if (forcedColors !== "active")
-        expect(getComputedStyle(risky()!).color).toBe(colorOf("error"));
+        expect(getComputedStyle(Required.of(risky())).color).toBe(colorOf("error"));
     });
 
     it("shows Plan first's glyph on the permission button where its shield was, muted like it, and its name where the mode's was, inside the button", async () => {
@@ -6313,18 +6719,20 @@ describe("ComposerComponent", () => {
       const access = part(".nol-teamrun-composer-access");
       const glyph = (): HTMLElement => part(".nol-teamrun-composer-glyph", access);
       const label = (): HTMLElement => part(".nol-teamrun-composer-label", access);
-      const before = [box(glyph()), box(label()), getComputedStyle(glyph()).color] as const;
+      const glyphBefore = box(glyph());
+      const labelBefore = box(label());
+      const colorBefore = getComputedStyle(glyph()).color;
 
       await click(access);
       await click(shownPlanFirstRow());
       await Wait.until(() => expect(label().textContent?.trim()).toBe(Resources.planFirstLabel));
 
       expect([glyph().textContent?.trim(), box(part(".nol-teamrun-composer-summary", access)).right <= box(access).right + 0.5]).toEqual([Resources.planFirstGlyph, true]);
-      AppearanceFixture.expectPixels(box(glyph()).left, before[0].left);
-      AppearanceFixture.expectPixels(box(label()).left, before[1].left);
-      AppearanceFixture.expectPixels(box(glyph()).top, before[0].top);
+      AppearanceFixture.expectPixels(box(glyph()).left, glyphBefore.left);
+      AppearanceFixture.expectPixels(box(label()).left, labelBefore.left);
+      AppearanceFixture.expectPixels(box(glyph()).top, glyphBefore.top);
       if (forcedColors !== "active")
-        expect(getComputedStyle(glyph()).color).toBe(before[2]);
+        expect(getComputedStyle(glyph()).color).toBe(colorBefore);
     });
 
     it("outlines the permission button in the border color, with its glyph and label muted, a quarter step by half a step inside", async () => {
@@ -6358,10 +6766,10 @@ describe("ComposerComponent", () => {
       const inset = AppearanceFixture.measureLook("button-padding");
       const middle = (rect: DOMRect): number => rect.top + rect.height / 2;
 
-      expect([required(label.textContent).trim().startsWith("@Alice · GPT-5"), picker().querySelector("nol-avatar")]).toEqual([true, null]);
+      expect([Required.of(label.textContent).trim().startsWith("@Alice · GPT-5"), picker().querySelector("nol-avatar")]).toEqual([true, null]);
       AppearanceFixture.expectPixels(Number.parseFloat(style.borderTopWidth), 0);
       AppearanceFixture.expectPixels(button.height, AppearanceFixture.measureLook("button-height"));
-      AppearanceFixture.expectPixels(button.height, box(sendButton()!).height);
+      AppearanceFixture.expectPixels(button.height, box(Required.of(sendButton())).height);
       AppearanceFixture.expectPixels(middle(button), middle(box(access())));
       AppearanceFixture.expectPixels(box(label).left - button.left, inset);
       AppearanceFixture.expectPixels(glyph.left - box(label).right, space(1));
@@ -6431,8 +6839,8 @@ describe("ComposerComponent", () => {
       if (way === "Enter")
         await key("Enter");
       else {
-        sendButton()!.focus();
-        await click(sendButton()!);
+        Required.of(sendButton()).focus();
+        await click(Required.of(sendButton()));
       }
       await Wait.until(() => expect(sent()).toHaveLength(1));
       await fixture.whenStable();
@@ -6458,7 +6866,7 @@ describe("ComposerComponent", () => {
       await show();
       await pick([imageFile("shot.png")]);
       await Wait.until(() => expect(previews()).toHaveLength(1));
-      const preview = frames()[0]!;
+      const preview = Required.of(frames()[0]);
       const remove = part(".nol-teamrun-composer-remove");
 
       preview.focus();
@@ -6478,7 +6886,7 @@ describe("ComposerComponent", () => {
       preview.dispatchEvent(new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true }));
       await fixture.whenStable();
       await Wait.until(() => expect(labels()).toEqual(["Open in a new tab", "Copy Image", "Download Image"]));
-      const menu = document.querySelector<HTMLElement>("nol-menu")!.getBoundingClientRect();
+      const menu = Required.of(document.querySelector<HTMLElement>("nol-menu")).getBoundingClientRect();
       AppearanceFixture.expectPixels(menu.left, box(preview).left);
     });
 
@@ -6495,35 +6903,34 @@ describe("ComposerComponent", () => {
       await pick([imageFile("new.png")]);
       await Wait.until(() => expect(previews().map(t => t.alt)).toEqual(["new.png"]));
 
-      AppearanceFixture.expectPixels(before[0]!.width, AppearanceFixture.toPixels(7));
-      AppearanceFixture.expectPixels(before[0]!.height, AppearanceFixture.toPixels(7));
-      AppearanceFixture.expectPixels(before[1]!.left - before[0]!.left, border());
-      AppearanceFixture.expectPixels(before[0]!.left, box(field()).left);
-      for (const [index, after] of shown().entries())
-        for (const edge of ["left", "top", "width", "height"] as const)
-          AppearanceFixture.expectPixels(after[edge], before[index]![edge]);
+      AppearanceFixture.expectPixels(Required.of(before[0]).width, AppearanceFixture.toPixels(7));
+      AppearanceFixture.expectPixels(Required.of(before[0]).height, AppearanceFixture.toPixels(7));
+      AppearanceFixture.expectPixels(Required.of(before[1]).left - Required.of(before[0]).left, border());
+      AppearanceFixture.expectPixels(Required.of(before[0]).left, box(field()).left);
+      shown().forEach((after, index) => expectSameRect(after, Required.of(before[index])));
     });
 
     it("lays out an attached file's type mark, an icon-sized box on the name's line, and its name half a step apart inside its row, and truncates the name at 12rem", async () => {
       await show();
       await pick([new File(["a"], `${"long-name-".repeat(10)}.txt`), new File(["a"], "notes.txt")]);
-      const [first, second] = [...rows()];
+      const first = Required.of(rows()[0]);
+      const second = Required.of(rows()[1]);
       const badge = part("nol-file-badge", first);
       const glyph = box(badge);
       const name = part(".nol-teamrun-composer-attachment-name", first);
 
-      expect([badge.getAttribute("aria-hidden"), badge.textContent?.trim(), [...first!.querySelectorAll(".material-symbols-rounded")].filter(t => !t.closest("nol-file-badge, .nol-teamrun-composer-remove")).length])
+      expect([badge.getAttribute("aria-hidden"), badge.textContent?.trim(), [...first.querySelectorAll(".material-symbols-rounded")].filter(t => !t.closest("nol-file-badge, .nol-teamrun-composer-remove")).length])
         .toEqual(["true", "description", 0]);
       AppearanceFixture.expectPixels(glyph.width, AppearanceFixture.measureLook("icon"));
       AppearanceFixture.expectPixels(glyph.height, AppearanceFixture.measureLook("icon"));
       AppearanceFixture.expectPixels(glyph.top + glyph.height / 2, box(name).top + box(name).height / 2);
       expect(getComputedStyle(name).whiteSpace).toBe("nowrap");
-      AppearanceFixture.expectPixels(glyph.left - box(first!).left, space(2) + border());
+      AppearanceFixture.expectPixels(glyph.left - box(first).left, space(2) + border());
       AppearanceFixture.expectPixels(box(name).left - glyph.right, space(2));
       AppearanceFixture.expectPixels(box(name).width, AppearanceFixture.toPixels(12));
       expect(name.scrollWidth).toBeGreaterThan(name.clientWidth);
-      AppearanceFixture.expectPixels(box(second!).left - box(first!).right, space(2));
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(first!).borderTopLeftRadius), AppearanceFixture.measureLook("radius-medium"));
+      AppearanceFixture.expectPixels(box(second).left - box(first).right, space(2));
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(first).borderTopLeftRadius), AppearanceFixture.measureLook("radius-medium"));
     });
 
     it("outlines the card with a dashed line inside its edge while files are dragged over it", async () => {
@@ -6549,7 +6956,7 @@ describe("ComposerComponent", () => {
     const plan = (percent: number, readAt: string = "2026-10-22T09:00:00.000Z", providerId: string | null = "a1"): PlanUsage =>
       new PlanUsage("codex", providerId, [new PlanWindow(PlanWindowName.FiveHour, percent, null), new PlanWindow(PlanWindowName.Weekly, 20, null)], readAt);
     const gauge = (): HTMLElement | null => root().querySelector<HTMLElement>(".nol-teamrun-composer-context [role='meter']");
-    const statusItem = (): StatusBarItem => context.statusBarItems.find(t => t.name === Resources.planUsageStatusItem)!;
+    const statusItem = (): StatusBarItem => Required.of(context.statusBarItems.find(t => t.name === Resources.planUsageStatusItem));
 
     it("shows how full the replying session is from the chat's latest reply, and follows each new reply", async () => {
       context.answer(MethodName.MessagePage, () => SampleData.page([SampleData.userMessage, withContext("m2", "2026-10-22T08:00:00.000Z", 172_000)], false, false).toJson());
@@ -6605,7 +7012,7 @@ describe("ComposerComponent", () => {
         const notes = (): string[] => [...root().querySelectorAll(".nol-teamrun-composer-note")].map(t => (t.textContent ?? String.empty).trim());
         const tags = (menu: Element | null | undefined): string[] => {
           if (Object.isNull(menu) || Object.isUndefined(menu))
-            throw new Error("The composer shows no such menu.");
+            throw new PartReadError("The composer shows no such menu.");
           return [...menu.querySelectorAll(".nol-menu-item-tag")].map(t => (t.textContent ?? String.empty).trim());
         };
         const windows = [new PlanWindow(PlanWindowName.FiveHour, 100, null)];
@@ -6729,7 +7136,7 @@ describe("ComposerComponent", () => {
       await ready();
       const opened = async (): Promise<HTMLElement> => {
         await click(access());
-        return required(document.querySelector<HTMLElement>("nol-menu"));
+        return Required.of(document.querySelector<HTMLElement>("nol-menu"));
       };
 
       await AccessibilityFixture.expectVisibleForcedAsync(await opened());
@@ -6752,7 +7159,7 @@ describe("ComposerComponent", () => {
       const open = async (): Promise<HTMLElement> => {
         await type("@");
         await Wait.until(() => expect(names().length).toBeGreaterThan(1));
-        return required(document.querySelector<HTMLElement>("nol-mention-list"));
+        return Required.of(document.querySelector<HTMLElement>("nol-mention-list"));
       };
       const zoomed = await AccessibilityFixture.zoomedAsync(async () => {
         const shown = await open();
@@ -6767,9 +7174,9 @@ describe("ComposerComponent", () => {
         .map(t => getComputedStyle(option).getPropertyValue(t)).join("|");
       const options = (selected: string): string[] => [...list.querySelectorAll(`[role='option'][aria-selected='${selected}']`)].map(look);
 
-      const [active, others] = await AccessibilityFixture.forcedAsync(async (): Promise<readonly [string[], string[]]> => {
+      const { active, others } = await AccessibilityFixture.forcedAsync(async (): Promise<SelectionLooks> => {
         await fixture.whenStable();
-        return [options("true"), options("false")];
+        return new SelectionLooks(options("true"), options("false"));
       });
       expect([active.length, others.length > 0, others.filter(t => active.includes(t))]).toEqual([1, true, []]);
       expect(zoomed, JSON.stringify(zoomed)).toEqual({ clipped: [], overlapping: [], outside: [] });

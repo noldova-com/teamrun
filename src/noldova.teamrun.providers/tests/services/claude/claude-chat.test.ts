@@ -19,6 +19,7 @@ import { ClaudeTestHost } from "../../fixtures/claude-test-host.fixture.js";
 import { FailureStep } from "../../fixtures/failure-step.fixture.js";
 import { FakeClaudeQuery } from "../../fixtures/fake-claude-query.fixture.js";
 import { GateStep } from "../../fixtures/gate-step.fixture.js";
+import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { LimitWaits } from "../../fixtures/limit-waits.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
@@ -178,10 +179,8 @@ export class ClaudeChatTests {
       Assert.areEqual(1, adapter.activeRunCount);
 
       gate.open();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
 
       Assert.areEqual(0, adapter.activeRunCount);
       Assert.areEqual(0, query.stoppedTasks.length);
@@ -1271,10 +1270,8 @@ export class ClaudeChatTests {
 
       gate.open();
       await woken;
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
 
       Assert.areEqual("The tests passed", reply.texts.join("|"));
       Assert.areEqual(0, adapter.activeRunCount);
@@ -2007,10 +2004,8 @@ export class ClaudeChatTests {
       const before = [query.closeCount, first.wakes.length, query.inputs.length].join();
       host.idleTimer.advance(Resources.idleCompactionDelay);
       const compacted = await woken;
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the compaction.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the compaction.");
 
       Assert.areEqual(TurnOutcome.Completed, result.outcome);
       Assert.areEqual("0,0,1", before);
@@ -2044,10 +2039,8 @@ export class ClaudeChatTests {
 
     try {
       await adapter.runTurn(ClaudeChatTests.idleRequest(host, allowed), first, new AbortController().signal);
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
 
       Assert.areEqual(0, first.wakes.length);
       Assert.areEqual(1, query.inputs.length);
@@ -2106,10 +2099,8 @@ export class ClaudeChatTests {
       await adapter.runTurn(ClaudeChatTests.idleRequest(host, true), first, new AbortController().signal);
       await ClaudeChatTests.waitingToCompact(host);
       await adapter.runTurn(ClaudeChatTests.idleRequest(host, true, "s-4"), second, new AbortController().signal);
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
       host.idleTimer.advance(Resources.idleCompactionDelay);
 
       Assert.areEqual("0,0", [first.wakes.length, second.wakes.length].join());
@@ -2187,10 +2178,8 @@ export class ClaudeChatTests {
       await ClaudeChatTests.waitingToCompact(host);
       query.contextUsageResult = ClaudeChatTests.context(18_000);
       await adapter.runTurn(ClaudeChatTests.idleRequest(host, true, "s-8", "/clear"), cleared, new AbortController().signal);
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
       host.idleTimer.advance(Resources.idleCompactionDelay);
 
       Assert.areEqual("0,0", [first.wakes.length, cleared.wakes.length].join());
@@ -2223,10 +2212,8 @@ export class ClaudeChatTests {
       await adapter.runTurn(ClaudeChatTests.idleRequest(host, true), first, new AbortController().signal);
       host.idleTimer.jump(Resources.idleCompactionDelay);
       gate.open();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
 
       Assert.areEqual(0, first.wakes.length);
       Assert.areEqual(1, query.inputs.length);

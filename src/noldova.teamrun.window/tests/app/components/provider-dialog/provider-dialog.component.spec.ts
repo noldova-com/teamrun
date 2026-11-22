@@ -32,6 +32,7 @@ import { DialogService, DialogTokens, LinkGesture, type SelectComponent, SelectO
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { ProviderDialogComponent } from "../../../../src/app/components/provider-dialog/provider-dialog.component";
+import { ChatAction } from "../../../../src/app/enums/chat-action";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
@@ -611,7 +612,7 @@ describe("ProviderDialogComponent", () => {
     await settle();
 
     expect(hint()).toBe(Resources.profileHintFor("cursor", false, platform === "Win32"));
-    expect(hint()).toContain(`in your ${file}, outside the profile.`);
+    expect(hint()).toContain(`in your ${file}, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.`);
   });
 
   it("says in fx's hint that fx in TeamRun is the person's own, one provider per computer, signed in with fx login", async () => {
@@ -763,6 +764,20 @@ describe("ProviderDialogComponent", () => {
 
       expect([terminals.launches[0]?.request.command, terminals.launches[0]?.request.opensTab, closes]).toEqual(["npm install -g claude-code", true, 1]);
     });
+
+  it("shows a tool install whose Terminals tab won't open in a notice, since Install closed the dialog", async () => {
+    await create(t => t.answer(MethodName.ProviderToolList, () => [new ProviderTool("claude", false, null, "npm install -g claude-code").toJson()]));
+    await store.refreshTools(() => undefined);
+    kind().valueChange.emit("claude");
+    await settle();
+    terminals.refuse(new Error("No shell can open the tab."));
+
+    field<HTMLButtonElement>(".nol-teamrun-install").click();
+
+    await Wait.until(() => expect([context.shownNotices(Resources.chatActionFailedNotice).at(-1)?.title, context.noticeText()])
+      .toEqual([Resources.formatProviderActionTitle(ChatAction.InstallTool, "Claude Code"), "No shell can open the tab."]));
+    expect(closes).toBe(1);
+  });
 
   it("installs a provider type TeamRun installs itself from Install, with Cancel while it runs, then offers Update to a newer version, keeping the dialog open",
     async () => {

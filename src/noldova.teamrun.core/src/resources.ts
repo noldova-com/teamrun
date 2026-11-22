@@ -44,6 +44,7 @@ export class Resources {
   public static readonly hexadecimalRadix: number = 16;
   public static readonly databaseVersionUnsupported: string = "This data belongs to a newer or incompatible TeamRun database version. Reopen it with that version; no migrations were applied.";
   public static readonly mentionsChanged: string = "Teammates changed while this message was sent, so its mentions no longer match. Send it again.";
+  public static readonly waitingMentionsMismatch: string = "The waiting message's mentions don't match its text, so it wasn't saved. Change its mentions or its text and try again.";
   public static readonly instructionsParameterName: string = "instructions";
   public static readonly freshPromptParameterName: string = "freshPrompt";
   public static readonly joinPreambleMaximumCharacters: number = 24_000;
@@ -387,8 +388,8 @@ export class Resources {
   public static readonly renameChatIdColumns: readonly string[] = ["ALTER TABLE messages RENAME COLUMN conversationId TO chatId",
     "ALTER TABLE drafts RENAME COLUMN conversationId TO chatId", "ALTER TABLE readingPositions RENAME COLUMN conversationId TO chatId",
     "ALTER TABLE chatTeammates RENAME COLUMN conversationId TO chatId"];
-  public static readonly dropLegacyChatIndexes: readonly string[] = ["DROP INDEX IX_conversations_projectId", "DROP INDEX IX_messages_conversationId_sequence",
-    "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
+  public static readonly dropLegacyChatIndexes: readonly string[] = ["DROP INDEX IX_conversations_projectId", "DROP INDEX IF EXISTS IX_messages_conversationId_sequence",
+    "DROP INDEX IF EXISTS UX_messages_conversationId_sequence", "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
   public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
@@ -475,22 +476,83 @@ export class Resources {
   public static readonly departmentsMigrationId: string = "20261120120000_Departments";
   public static readonly departmentsTable: string = "departments";
   public static readonly departmentMembersTable: string = "departmentMembers";
-  public static readonly departmentIdColumn: string = "departmentId";
-  public static readonly selectDepartments: string = "SELECT json FROM departments ORDER BY createdAt, rowid";
-  public static readonly selectDepartmentMembers: string = "SELECT teammateId, departmentId FROM departmentMembers ORDER BY rowid";
-  public static readonly insertDepartment: string = "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
+  public static readonly selectDepartments: string = "SELECT json FROM departments WHERE organizationId = ? ORDER BY createdAt, rowid";
+  public static readonly insertDepartment: string =
+    "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)";
   public static readonly updateDepartment: string = "UPDATE departments SET parentId = ?, json = ?, updatedAt = ? WHERE id = ?";
   public static readonly deleteDepartment: string = "DELETE FROM departments WHERE id = ?";
-  public static readonly insertDepartmentMember: string = "INSERT INTO departmentMembers (teammateId, departmentId) VALUES (?, ?)";
-  public static readonly deleteDepartmentMember: string = "DELETE FROM departmentMembers WHERE teammateId = ?";
+  public static readonly teammatePlacementsMigrationId: string = "20261123090000_TeammatePlacements";
+  public static readonly teammatePlacementsTable: string = "teammatePlacements";
+  public static readonly copyDepartmentMembersToPlacements: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT teammateId, "
+    + "json_object('teammateId', teammateId, 'parent', json_object('kind', 'Department', 'id', departmentId), "
+    + "'order', ROW_NUMBER() OVER (PARTITION BY departmentId ORDER BY rowid) - 1) FROM departmentMembers";
+  public static readonly placeUnplacedTeammatesUnderPerson: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT id, "
+    + "json_object('teammateId', id, 'parent', json_object('kind', 'Person', 'id', NULL), 'order', ROW_NUMBER() OVER (ORDER BY createdAt, rowid) - 1) "
+    + "FROM teammates WHERE id NOT IN (SELECT teammateId FROM departmentMembers)";
+  public static readonly dropDepartmentMembers: string = "DROP TABLE departmentMembers";
+  public static readonly moveDepartmentParentsIntoJson: string = "UPDATE departments SET json = json_remove(json_set(json, '$.parent', "
+    + "CASE WHEN parentId IS NULL THEN json_object('kind', 'Person', 'id', NULL) ELSE json_object('kind', 'Department', 'id', parentId) END), "
+    + "'$.parentId')";
+  public static readonly selectTeammatePlacements: string = "SELECT json FROM teammatePlacements WHERE organizationId = ? ORDER BY rowid";
+  public static readonly insertTeammatePlacement: string = "INSERT INTO teammatePlacements (organizationId, teammateId, json) VALUES (?, ?, ?)";
+  public static readonly updateTeammatePlacement: string = "UPDATE teammatePlacements SET json = ? WHERE organizationId = ? AND teammateId = ?";
+  public static readonly deleteTeammatePlacement: string = "DELETE FROM teammatePlacements WHERE organizationId = ? AND teammateId = ?";
+  public static readonly selectTeammateOrganizations: string = "SELECT organizationId FROM teammatePlacements WHERE teammateId = ? ORDER BY rowid";
+  public static readonly organizationIdColumn: string = "organizationId";
+  public static readonly organizationsMigrationId: string = "20261124090000_Organizations";
+  public static readonly organizationsTable: string = "organizations";
+  public static readonly defaultOrganizationName: string = "My organization";
+  public static readonly insertDefaultOrganization: string = "INSERT INTO organizations (id, json, createdAt, updatedAt) "
+    + "SELECT 'my-organization', json_object('id', 'my-organization', 'name', 'My organization', 'folder', NULL, 'order', 0, "
+    + "'createdAt', now, 'updatedAt', now, 'departments', json_array(), 'placements', json_array()), now, now "
+    + "FROM (SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS now)";
+  public static readonly copyDepartments: string = "CREATE TABLE departmentsCopy AS SELECT id, parentId, json, createdAt, updatedAt FROM departments";
+  public static readonly dropDepartments: string = "DROP TABLE departments";
+  public static readonly restoreDepartments: string = "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) "
+    + "SELECT id, 'my-organization', parentId, json, createdAt, updatedAt FROM departmentsCopy ORDER BY rowid";
+  public static readonly dropDepartmentsCopy: string = "DROP TABLE departmentsCopy";
+  public static readonly copyTeammatePlacements: string = "CREATE TABLE teammatePlacementsCopy AS SELECT teammateId, json FROM teammatePlacements";
+  public static readonly dropTeammatePlacements: string = "DROP TABLE teammatePlacements";
+  public static readonly restoreTeammatePlacements: string = "INSERT INTO teammatePlacements (organizationId, teammateId, json) "
+    + "SELECT 'my-organization', teammateId, json FROM teammatePlacementsCopy ORDER BY rowid";
+  public static readonly dropTeammatePlacementsCopy: string = "DROP TABLE teammatePlacementsCopy";
+  public static readonly moveOrganizationLayout: string =
+    "UPDATE preferences SET name = 'organizationLayout:my-organization' WHERE name = 'organizationLayout'";
+  public static readonly selectOrganizations: string = "SELECT json FROM organizations ORDER BY rowid";
+  public static readonly selectOrganization: string = "SELECT json FROM organizations WHERE id = ?";
+  public static readonly insertOrganization: string = "INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES (?, ?, ?, ?)";
+  public static readonly updateOrganization: string = "UPDATE organizations SET json = ?, updatedAt = ? WHERE id = ?";
+  public static readonly deleteOrganization: string = "DELETE FROM organizations WHERE id = ?";
+  public static readonly deleteOrganizationDepartments: string = "DELETE FROM departments WHERE organizationId = ?";
+  public static readonly deleteOrganizationPlacements: string = "DELETE FROM teammatePlacements WHERE organizationId = ?";
   public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
   public static readonly organizationMessagesTable: string = "organizationMessages";
-  public static readonly selectOrganizationMessages: string = "SELECT json FROM organizationMessages ORDER BY createdAt, rowid";
-  public static readonly selectOrganizationMessage: string = "SELECT json FROM organizationMessages WHERE id = ?";
-  public static readonly insertOrganizationMessage: string = "INSERT INTO organizationMessages (id, json, createdAt) VALUES (?, ?, ?)";
-  public static readonly updateOrganizationMessage: string = "UPDATE organizationMessages SET json = ? WHERE id = ?";
-  public static readonly organizationMessageLabel: string = "Organization";
-  public static readonly organizationSendInterrupted: string = "TeamRun stopped before it was sent.";
+  public static readonly organizationMessagesDropMigrationId: string = "20261124090000_OrganizationMessagesDrop";
+  public static readonly dropOrganizationMessages: string = "DROP TABLE organizationMessages";
+  public static readonly uniqueIndexNamesMigrationId: string = "20261125090000_UniqueIndexNames";
+  public static readonly nodeTypesMigrationId: string = "20261126090000_NodeTypes";
+  public static readonly addDefaultNodeTypes: readonly string[] = [
+    "UPDATE organizations SET json = json_set(json, '$.nodeTypes', json(CASE WHEN EXISTS (SELECT 1 FROM departments WHERE departments.organizationId = organizations.id) "
+      + "THEN json_array(json_object('id', 'department', 'name', 'Department', 'icon', NULL, 'color', NULL, 'createdAt', createdAt, 'updatedAt', createdAt)) "
+      + "ELSE json_array() END)) WHERE json_type(json, '$.nodeTypes') IS NULL",
+    "UPDATE departments SET json = json_set(json, '$.typeId', 'department') WHERE json_type(json, '$.typeId') IS NULL",
+    "UPDATE __changes SET payload = json_set(payload, '$.nodeTypes', json(CASE WHEN EXISTS (SELECT 1 FROM departments "
+      + "WHERE departments.organizationId = json_extract(payload, '$.id')) THEN json_array(json_object('id', 'department', 'name', 'Department', 'icon', NULL, 'color', NULL, "
+      + "'createdAt', json_extract(payload, '$.createdAt'), 'updatedAt', json_extract(payload, '$.createdAt'))) ELSE json_array() END)) "
+      + "WHERE entity = 'Organization' AND json_type(payload, '$.nodeTypes') IS NULL",
+    "UPDATE __changes SET payload = json_set(payload, '$.typeId', 'department') WHERE entity = 'Department' AND json_type(payload, '$.typeId') IS NULL"];
+  public static readonly renameUniqueIndexes: readonly string[] = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_projects_rootPath\" ON \"projects\" (\"rootPath\")", "DROP INDEX IF EXISTS IX_projects_rootPath",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")", "DROP INDEX IF EXISTS IX_messages_chatId_sequence",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_teammates_name\" ON \"teammates\" (\"name\")", "DROP INDEX IF EXISTS IX_teammates_name",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_sharedMcpServers_name\" ON \"sharedMcpServers\" (\"name\")", "DROP INDEX IF EXISTS IX_sharedMcpServers_name"];
+  public static readonly teammateLastRepliesMigrationId: string = "20261122090000_TeammateLastReplies";
+  public static readonly createTeammateLastReplyIndex: string =
+    "CREATE INDEX IX_messages_teammateId_endedAt ON messages (json_extract(json, '$.teammateId'), json_extract(json, '$.endedAt')) "
+    + `WHERE ${Resources.formatFinishedReply(null)}`;
+  public static readonly defaultOrganizationId: string = "my-organization";
+  public static readonly organizationReportsToPerson: string = "the person";
+  public static readonly organizationNoDepartment: string = "you are in no department";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -571,6 +633,7 @@ export class Resources {
 
   public static readonly conversationIdColumn: string = "chatId";
   public static readonly countColumn: string = "count";
+  public static readonly folderColumn: string = "folder";
   public static readonly endedAtColumn: string = "endedAt";
   public static readonly idColumn: string = "id";
   public static readonly jsonColumn: string = "json";
@@ -592,6 +655,9 @@ export class Resources {
   public static readonly deleteConversation: string = "DELETE FROM chats WHERE id = ?";
   public static readonly insertConversation: string = "INSERT INTO chats (id, projectId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
   public static readonly selectConversationById: string = "SELECT json FROM chats WHERE id = ?";
+  public static readonly selectOrganizationChats: string = "SELECT json FROM chats WHERE json_extract(json, '$.organizationChat.organizationId') = ?";
+  public static readonly selectOrganizationChat: string = "SELECT json FROM chats WHERE json_extract(json, '$.organizationChat.organizationId') = ? "
+    + "AND json_extract(json, '$.organizationChat.teammateId') = ? ORDER BY createdAt, rowid LIMIT 1";
   public static readonly selectConversationsByProject: string = "SELECT json FROM chats WHERE projectId IS ? ORDER BY createdAt, rowid";
   public static readonly selectRecentConversations: string = "SELECT chats.json FROM chats "
     + "JOIN (SELECT chatId, MAX(rowid) AS latest FROM messages GROUP BY chatId) AS last ON last.chatId = chats.id ORDER BY last.latest DESC LIMIT ?";
@@ -645,6 +711,13 @@ export class Resources {
     + "ORDER BY chatId, sequence";
   public static readonly selectOpenReplyByConversation: string =
     `SELECT json FROM messages WHERE chatId = ? AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') ORDER BY sequence LIMIT 1`;
+  public static readonly textBlanks: string = " \t\n\v\f\r\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+  public static readonly selectTeammateLastReplies: string =
+    "SELECT l.teammateId, m.chatId, m.id, t.text, json_extract(m.json, '$.endedAt') AS endedAt FROM (SELECT tm.id AS teammateId, "
+    + `(SELECT r.rowid FROM messages r CROSS JOIN messageText x ON x.rowid = r.rowid WHERE ${Resources.formatFinishedReply("r")} `
+    + "AND json_extract(r.json, '$.teammateId') = +tm.id AND json_extract(r.json, '$.endedAt') IS NOT NULL AND trim(x.text, ?) <> '' "
+    + "ORDER BY json_extract(r.json, '$.endedAt') DESC, r.rowid DESC LIMIT 1) AS lastRowid FROM teammates tm) l "
+    + "CROSS JOIN messages m ON m.rowid = l.lastRowid CROSS JOIN messageText t ON t.rowid = m.rowid ORDER BY l.teammateId";
   public static readonly selectTeammateUsage: string =
     "SELECT u.id, u.chatId, u.teammateId, u.startedAt, u.endedAt, u.usage FROM (SELECT id, chatId, sequence, "
     + "json_extract(json, '$.teammateId') AS teammateId, json_extract(json, '$.startedAt') AS startedAt, "
@@ -654,6 +727,20 @@ export class Resources {
     + "FROM messages WHERE json_extract(json, '$.teammateId') IS NOT NULL AND json_extract(json, '$.provenance.usage') IS NOT NULL) u "
     + "JOIN chatTeammates m ON m.chatId = u.chatId AND m.teammateId = u.teammateId "
     + "WHERE u.position = 1 AND u.nativeSessionId IS json_extract(m.json, '$.nativeSessionId') ORDER BY u.chatId, u.sequence";
+  public static readonly selectTeammateChatFolders: string =
+    "SELECT m.chatId, COALESCE(json_extract(c.json, '$.attachedFolder'), p.rootPath) AS folder "
+    + "FROM messages m CROSS JOIN chats c ON c.id = m.chatId LEFT JOIN projects p ON p.id = c.projectId "
+    + `WHERE ${Resources.formatFinishedReply("m")} AND json_extract(m.json, '$.teammateId') = ? AND json_extract(m.json, '$.endedAt') IS NOT NULL `
+    + "ORDER BY json_extract(m.json, '$.endedAt') DESC, m.rowid DESC";
+  public static readonly selectTeammateDocumentReplies: string =
+    "SELECT m.json, json_extract(m.json, '$.endedAt') AS endedAt, COALESCE(json_extract(c.json, '$.attachedFolder'), p.rootPath) AS folder "
+    + "FROM messages m CROSS JOIN chats c ON c.id = m.chatId LEFT JOIN projects p ON p.id = c.projectId "
+    + `WHERE ${Resources.formatFinishedReply("m")} AND json_extract(m.json, '$.teammateId') = ? AND json_extract(m.json, '$.endedAt') IS NOT NULL `
+    + "AND (instr(lower(m.json), '.md\"') > 0 OR instr(lower(m.json), '.markdown\"') > 0 OR instr(lower(m.json), '.txt\"') > 0) "
+    + "ORDER BY json_extract(m.json, '$.endedAt') DESC, m.rowid DESC";
+  public static readonly teammateDocumentPattern: RegExp = /\.(?:md|markdown|txt)$/i;
+  public static readonly teammateDocumentLimit: number = 20;
+  public static readonly deletedFileKind: string = "delete";
   public static readonly selectOpenReplyByProvider: string =
     "SELECT json FROM messages WHERE json_extract(json, '$.provenance.providerId') = ? "
     + `AND status IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}') LIMIT 1`;
@@ -797,6 +884,10 @@ export class Resources {
   public static readonly nativeTurnIdParameterName: string = "nativeTurnId";
   public static readonly lastTurnIdParameterName: string = "lastTurnId";
   public static readonly ellipsis: string = "…";
+  public static readonly runningReplyWork: string = "a teammate's background work";
+  public static readonly chatMoveChange: string = "move to a project";
+  public static readonly chatAttachChange: string = "attach a folder";
+  public static readonly chatDetachChange: string = "detach its folder";
   public static readonly existsErrorCode: string = "EEXIST";
   public static readonly maximumDiffLines: number = ProtocolResources.maximumDiffLines;
   public static readonly checkpointPathSeparator: string = "/";
@@ -869,6 +960,8 @@ export class Resources {
   public static readonly replyToField: string = "replyTo";
   public static readonly answerUnsentField: string = "answerUnsent";
   public static readonly promptField: string = "prompt";
+  public static readonly organizationRoleField: string = "organizationRole";
+  public static readonly organizationRoleTeammateIdField: string = "organizationRoleTeammateId";
   public static readonly steeredIntoField: string = "steeredInto";
   public static readonly mediaTypeField: string = "mediaType";
   public static readonly storedPathField: string = "storedPath";
@@ -906,8 +999,16 @@ export class Resources {
     + "AND json_type(d.value, '$.parentSequence') IS NULL AND (json_array_length(d.value, '$.payload.steps') > 0 "
     + "OR (json_type(d.value, '$.payload.text') = 'text' AND length(trim(json_extract(d.value, '$.payload.text'))) > 0)))";
 
+  public static formatRewindNotSavedAfterRestore(reason: string): string {
+    return `The files were restored to before that reply, but the chat still shows its messages. Rewind again to remove them. They couldn't be removed: ${reason}`;
+  }
+
   public static formatCompactRefused(provider: string, reason: string): string {
     return `${provider} can't compact its context here: ${reason}.`;
+  }
+
+  public static formatDescriptorNotRefreshed(kind: string, failure: string): string {
+    return `The ${kind} kind's descriptor couldn't be rebuilt from the environment its tooling is given, so it keeps the last one: ${failure}.`;
   }
 
   public static formatAcpAgentNotOpened(kind: string, reason: string): string {
@@ -1286,6 +1387,11 @@ export class Resources {
     return `${row}.status NOT IN ('${MessageStatus.Pending}', '${MessageStatus.Running}', '${MessageStatus.AwaitingApproval}')`;
   }
 
+  public static formatFinishedReply(row: string | null): string {
+    const prefix = Object.isNull(row) ? "" : `${row}.`;
+    return `${prefix}status = '${MessageStatus.Completed}' AND json_valid(${prefix}json) AND json_extract(${prefix}json, '$.author') = '${MessageAuthor.Provider}'`;
+  }
+
   public static formatMessageText(row: string): string {
     return `(SELECT group_concat(json_extract(d.value, '$.text'), ' ') FROM json_each(CASE WHEN json_valid(${row}.json) THEN ${row}.json END, '$.details') d `
       + `WHERE json_extract(d.value, '$.kind') = '${DetailKind.Text}')`;
@@ -1417,6 +1523,27 @@ export class Resources {
   public static formatOutsideCapEndsTasks(conversationId: string): string {
     return `The chat "${conversationId}" runs background tasks in a mode an outside message can't use; try again once they end.`;
   }
+
+  public static formatOrganizationChatTitle(name: string): string {
+    return `Organization · ${name}`;
+  }
+
+  public static formatOrganizationLeader(department: string): string {
+    return `you lead the ${department} department`;
+  }
+
+  public static formatOrganizationMember(department: string): string {
+    return `you are a member of the ${department} department`;
+  }
+
+  public static formatOrganizationRole(place: string, manager: string): string {
+    return `The person sent you this message from TeamRun's Organization view. In the organization, ${place}, and you report to ${manager}.`;
+  }
+
+  public static formatOrganizationRolePrompt(role: string, text: string): string {
+    return `${role}\n\n${text}`;
+  }
+
 
   public static formatOutsideChatTitle(name: string): string {
     return `From outside TeamRun · ${name}`;
@@ -1698,6 +1825,10 @@ export class Resources {
     return `The turn was stopped: ${reason}`;
   }
 
+  public static formatHandOffStopped(names: readonly string[]): string {
+    return `Stopped before handing off to ${names.join(", ")}.`;
+  }
+
   public static formatChainStopped(limit: number): string {
     if (limit === 0)
       return "Teammates' mentions start no one: the limit in Settings › TeamRun is 0 hand-offs. Mention a teammate to go on.";
@@ -1780,6 +1911,21 @@ export class Resources {
 
   public static formatFolderNotAbsolute(path: string): string {
     return `The folder "${path}" is not an absolute path.`;
+  }
+
+  public static formatChatWorkRunning(change: string, running: readonly string[]): string {
+    const names = running.length === 1 ? running.join("") : `${running.slice(0, -1).join(", ")} and ${running.slice(-1).join("")}`;
+    return running.length === 1
+      ? `This chat can't ${change} while ${names} is still running in its folder. Stop it or wait for it to end, then try again.`
+      : `This chat can't ${change} while ${names} are still running in its folder. Stop them or wait for them to end, then try again.`;
+  }
+
+  public static formatRunningCommand(command: string): string {
+    return `the background command "${command}"`;
+  }
+
+  public static formatRunningHelper(description: string): string {
+    return `the helper "${description}"`;
   }
 
   public static formatChatInProject(conversationId: string): string {
@@ -1901,25 +2047,53 @@ export class Resources {
     return `Teammate not found: ${id}.`;
   }
 
+  public static formatOrganizationLayoutPreference(organizationId: string): string {
+    return `organizationLayout:${organizationId}`;
+  }
+
+  public static formatOrganizationNotFound(id: string): string {
+    return `Organization ${id} doesn't exist.`;
+  }
+
+  public static formatLastOrganization(name: string): string {
+    return `${name} is the only organization; create another before deleting it.`;
+  }
+
+  public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string {
+    return `${organizationId}/${teammateId}`;
+  }
+
+  public static formatNodeTypeNotFound(id: string): string {
+    return `Node type not found: ${id}.`;
+  }
+
+  public static formatNodeTypeNameTaken(name: string): string {
+    return `This organization already has a node type named ${name}.`;
+  }
+
+  public static formatNodeTypeInUse(name: string, count: number): string {
+    return count === 1 ? `1 unit has the type ${name}; give it another type before deleting ${name}.`
+      : `${count} units have the type ${name}; give them another type before deleting ${name}.`;
+  }
+
   public static formatDepartmentNotFound(id: string): string {
     return `Department not found: ${id}.`;
   }
 
-  public static formatOrganizationMessageNotFound(id: string): string {
-    return `Organization message not found: ${id}.`;
-  }
-
-  public static formatAccountCannotReply(teammate: string, account: string | null): string {
-    return Object.isNull(account) ? `${teammate}'s account is deleted, so it can't reply.`
-      : `${teammate}'s account ${account} can't reply: it is turned off, signed out or of a kind TeamRun lacks.`;
-  }
-
-  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string {
-    return `${teammate} can't lead ${department} without being one of its members.`;
+  public static formatTeammateNotPlaced(id: string): string {
+    return `Teammate not in the organization: ${id}.`;
   }
 
   public static formatDepartmentUnderItself(department: string): string {
-    return `${department} can't move under itself or one of its own departments.`;
+    return `${department} can't move under itself or anything under it.`;
+  }
+
+  public static formatTeammateUnderItself(teammate: string): string {
+    return `${teammate} can't move under itself or anything under it.`;
+  }
+
+  public static formatDepartmentUnderLeader(teammate: string, department: string): string {
+    return `${teammate} can't lead ${department}, which sits under ${teammate}.`;
   }
 
   public static formatSharedMcpServerNotFound(id: string): string {

@@ -13,6 +13,7 @@ import { JsonReader, type JsonObject } from "@noldova/context.json";
 import { Resources } from "../resources.js";
 import { ChatResponder } from "./chat-responder.js";
 import { ForkedSession } from "./forked-session.js";
+import { OrganizationChat } from "./organization-chat.js";
 
 export class Chat {
   public readonly id: string;
@@ -30,6 +31,7 @@ export class Chat {
   public readonly approvedResponderPlan: boolean;
   public readonly titleChosen: boolean;
   public readonly attachedFolder: string | null;
+  public readonly organizationChat: OrganizationChat | null;
 
   public constructor(
     id: string,
@@ -46,7 +48,8 @@ export class Chat {
     approvedPlanTeammates: readonly string[] = [],
     approvedResponderPlan: boolean = false,
     titleChosen: boolean = false,
-    attachedFolder: string | null = null) {
+    attachedFolder: string | null = null,
+    organizationChat: OrganizationChat | null = null) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
     if (!Object.isNull(projectId))
       ArgumentException.throwIfNullOrWhitespace(projectId, Resources.projectIdField);
@@ -75,6 +78,7 @@ export class Chat {
     this.approvedResponderPlan = approvedResponderPlan;
     this.titleChosen = titleChosen;
     this.attachedFolder = attachedFolder;
+    this.organizationChat = organizationChat;
   }
 
   public static fromJson(value: unknown, path?: string): Chat {
@@ -96,7 +100,8 @@ export class Chat {
       reader.hasField(Resources.approvedResponderPlanField) && reader.readBoolean(Resources.approvedResponderPlanField),
       reader.hasField(Resources.titleChosenField) && reader.readBoolean(Resources.titleChosenField),
       reader.hasField(Resources.attachedFolderField) && !Object.isNull(reader.readNullableString(Resources.attachedFolderField))
-        ? reader.readNonBlankString(Resources.attachedFolderField) : null);
+        ? reader.readNonBlankString(Resources.attachedFolderField) : null,
+      Chat.readOrganizationChat(reader));
   }
 
   public toJson(): JsonObject {
@@ -115,53 +120,59 @@ export class Chat {
       ...this.approvedPlanTeammates.length > 0 ? { [Resources.approvedPlanTeammatesField]: [...this.approvedPlanTeammates] } : {},
       ...this.approvedResponderPlan ? { [Resources.approvedResponderPlanField]: true } : {},
       ...this.titleChosen ? { [Resources.titleChosenField]: true } : {},
-      ...Object.isNull(this.attachedFolder) ? {} : { [Resources.attachedFolderField]: this.attachedFolder }
+      ...Object.isNull(this.attachedFolder) ? {} : { [Resources.attachedFolderField]: this.attachedFolder },
+      ...Object.isNull(this.organizationChat) ? {} : { [Resources.organizationChatField]: this.organizationChat.toJson() }
     };
   }
 
   public withTitle(title: string, updatedAt: string): Chat {
     return new Chat(this.id, this.projectId, title, this.createdAt, updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withProjectId(projectId: string, updatedAt: string): Chat {
     return new Chat(this.id, projectId, this.title, this.createdAt, updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      null, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, null);
+      null, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, null, this.organizationChat);
   }
 
   public withFolder(folder: string | null): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+      folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withAttachedFolder(attachedFolder: string | null, updatedAt: string): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, attachedFolder, this.organizationChat);
   }
 
   public withSessionReset(sessionReset: boolean, updatedAt: string): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, updatedAt, sessionReset, null, this.responder, this.edited,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withForkedSession(forkedSession: ForkedSession | null, updatedAt: string): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, updatedAt, false, forkedSession, this.responder, this.edited,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withResponder(responder: ChatResponder | null): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, responder, this.edited,
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
+  }
+
+  public withoutOrganizationChat(): Chat {
+    return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
       this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
   }
 
   public asEdited(): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, true,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withChosenTitle(title: string, updatedAt: string): Chat {
     return new Chat(this.id, this.projectId, title, this.createdAt, updatedAt, this.sessionReset, this.forkedSession, this.responder, true,
-      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, true, this.attachedFolder);
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, true, this.attachedFolder, this.organizationChat);
   }
 
   public plansFirst(teammateId: string | null): boolean {
@@ -170,7 +181,7 @@ export class Chat {
 
   public withPlanFirst(planFirst: boolean): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      this.folder, planFirst, [], false, this.titleChosen, this.attachedFolder);
+      this.folder, planFirst, [], false, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withPlanApproved(teammateId: string | null): Chat {
@@ -179,7 +190,7 @@ export class Chat {
     const teammates = Object.isNull(teammateId) || this.approvedPlanTeammates.includes(teammateId) ? this.approvedPlanTeammates
       : [...this.approvedPlanTeammates, teammateId];
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
-      this.folder, this.planFirst, teammates, this.approvedResponderPlan || Object.isNull(teammateId), this.titleChosen, this.attachedFolder);
+      this.folder, this.planFirst, teammates, this.approvedResponderPlan || Object.isNull(teammateId), this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   public withPlanReopened(teammateId: string | null): Chat {
@@ -187,13 +198,19 @@ export class Chat {
       return this;
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
       this.folder, this.planFirst, Object.isNull(teammateId) ? this.approvedPlanTeammates : this.approvedPlanTeammates.filter(t => t !== teammateId),
-      this.approvedResponderPlan && !Object.isNull(teammateId), this.titleChosen, this.attachedFolder);
+      this.approvedResponderPlan && !Object.isNull(teammateId), this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
   private static readForkedSession(reader: JsonReader): ForkedSession | null {
     const fork = reader.hasField(Resources.forkedSessionField) ? reader.readNullableObject(Resources.forkedSessionField) : null;
 
     return Object.isNull(fork) ? null : ForkedSession.fromJson(fork.toJson(), fork.path);
+  }
+
+  private static readOrganizationChat(reader: JsonReader): OrganizationChat | null {
+    const chat = reader.hasField(Resources.organizationChatField) ? reader.readNullableObject(Resources.organizationChatField) : null;
+
+    return Object.isNull(chat) ? null : OrganizationChat.fromJson(chat.toJson(), chat.path);
   }
 
   private static readResponder(reader: JsonReader): ChatResponder | null {

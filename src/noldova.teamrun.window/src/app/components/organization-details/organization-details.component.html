@@ -1,0 +1,47 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<div nolPopover class="details" [label]="label()">
+  <div class="head">
+    <nol-teamrun-teammate-avatar [teammate]="teammate()" [decorative]="true" />
+    <div class="who">
+      <span class="name">{{ teammate().name }}</span>
+      @if (place()) {
+        <span class="place">{{ place() }}</span>
+      }
+    </div>
+  </div>
+  <dl class="facts">
+    <dt>{{ resources.organizationDetailsStatus }}</dt>
+    <dd><nol-teamrun-teammate-status [teammateId]="teammate().id" /></dd>
+    <dt>{{ resources.organizationDetailsReportsTo }}</dt>
+    <dd class="reports-to">{{ reportsTo() }}</dd>
+    <dt>{{ resources.organizationDetailsModel }}</dt>
+    <dd class="model">{{ model() }}</dd>
+    <dt>{{ resources.organizationDetailsUsage }}</dt>
+    <dd class="usage">{{ usage() }}</dd>
+    <dt>{{ resources.organizationDetailsWorksIn }}</dt>
+    <dd class="works-in">{{ worksIn() }}</dd>
+    <dt>{{ resources.organizationDetailsLastSaid }}</dt>
+    <dd class="last">
+      @if (last(); as said) {
+        <span class="said">{{ said.text }}</span> <span class="ago">{{ said.ago }}</span>
+      } @else {
+        {{ resources.organizationDetailsNothingSaid }}
+      }
+    </dd>
+  </dl>
+  <span class="now-label">{{ resources.organizationDetailsNow }}</span>
+  <ul class="running">
+    @for (item of running(); track item.chatId) {
+      <li class="act"><span class="act-text">{{ item.text }}</span><span class="act-for">{{ item.lasted }}</span></li>
+    } @empty {
+      <li class="act idle">{{ idle() }}</li>
+    }
+  </ul>
+</div>

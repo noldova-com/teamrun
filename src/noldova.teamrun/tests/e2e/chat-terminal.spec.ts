@@ -42,14 +42,12 @@ const topOf = async (locator: Locator): Promise<number> => (await locator.boundi
 interface IShellCommands {
   readonly run: (shellFile: string, programFile: string, beatFile: string) => string;
   readonly writePid: (file: string) => string;
-  readonly clearKey: string;
 }
 
 const SH: IShellCommands = {
   run: (shellFile, programFile, beatFile) =>
     `echo e2e-ran; echo $$ > ${shellFile}; sh -c 'echo $$ > ${programFile}; i=0; while :; do i=$((i+1)); echo $i > ${beatFile}.tmp && mv ${beatFile}.tmp ${beatFile}; sleep 0.2; done'`,
-  writePid: file => `echo $$ > ${file}`,
-  clearKey: "Control+U"
+  writePid: file => `echo $$ > ${file}`
 };
 
 const powerShellProgramOf = (programFile: string, beatFile: string): string => Buffer.from(`Set-Content -LiteralPath '${programFile}' -Value $PID; $i = 0; ` +
@@ -59,8 +57,7 @@ const powerShellProgramOf = (programFile: string, beatFile: string): string => B
 const POWERSHELL: IShellCommands = {
   run: (shellFile, programFile, beatFile) =>
     `echo e2e-ran; Set-Content -LiteralPath '${shellFile}' -Value $PID; powershell -NoProfile -EncodedCommand ${powerShellProgramOf(programFile, beatFile)}`,
-  writePid: file => `Set-Content -LiteralPath '${file}' -Value $PID`,
-  clearKey: "Escape"
+  writePid: file => `Set-Content -LiteralPath '${file}' -Value $PID`
 };
 
 const SHELL: IShellCommands = process.platform === "win32" ? POWERSHELL : SH;
@@ -73,6 +70,8 @@ const commandOf = (shellFile: string, programFile: string, beatFile: string): st
 
 const dockTabsOf = (page: Page): Locator =>
   page.getByRole("tablist").filter({ has: page.getByRole("tab", { name: "Activity" }) }).getByRole("tab");
+
+const terminalTabsOf = (page: Page): Locator => dockTabsOf(page).filter({ hasNotText: /Activity|Changes/ });
 
 const sendAsync = async (app: TeamRunApp, command: string, variables: Readonly<Record<string, string>> = {}): Promise<Page> => {
   const page = await app.openChatAsync(variables);
@@ -92,7 +91,7 @@ const runAsync = async (app: TeamRunApp): Promise<IRunningCommand> => {
   const beat = beatFileOf(app);
   const page = await sendAsync(app, commandOf(shellFile, programFile, beat));
   await expect.poll(() => TeamRunApp.readPid(programFile), TeamRunApp.pollOf(30_000)).not.toBeNull();
-  const tab = dockTabsOf(page).filter({ hasNotText: "Activity" }).first();
+  const tab = terminalTabsOf(page).first();
   await expect(tab).toBeVisible({ timeout: 30_000 });
   const name = await tab.getAttribute("aria-label") ?? "";
   expect(name).not.toBe("");
@@ -125,7 +124,7 @@ const expectBeatingAsync = async (file: string): Promise<void> => {
 
 const expectShellAnswersAsync = async (app: TeamRunApp, page: Page, shell: number): Promise<void> => {
   const file = app.pidFile("alive");
-  await TerminalScreen.enterAsync(page, page.locator("nol-terminal-pane .xterm-rows"), SHELL.writePid(file), SHELL.clearKey);
+  await TerminalScreen.enterAsync(page, page.locator("nol-terminal-pane .xterm-rows"), SHELL.writePid(file));
   try {
     await expect.poll(() => TeamRunApp.readPid(file), TeamRunApp.pollOf(30_000)).toBe(shell);
   }
@@ -167,8 +166,8 @@ test("an agent's command runs in a terminal tied to its chat, shows in the panel
 
   const activity = page.getByRole("tab", { name: "Activity" });
   const dockTabs = dockTabsOf(page);
-  await expect.soft(dockTabs).toHaveCount(2, { timeout: 30_000 });
-  const tab = dockTabs.filter({ hasNotText: "Activity" }).first();
+  await expect.soft(dockTabs).toHaveCount(3, { timeout: 30_000 });
+  const tab = terminalTabsOf(page).first();
   if (await tab.isVisible()) {
     const shellName = shellNameOf(/"shell":"([^"]+)"/.exec(readFileSync(app.codexLog, "utf8"))?.[1]) ?? "";
     expect.soft(shellName).not.toBe("");
@@ -216,7 +215,8 @@ test("the person closes an agent's terminal from the panel, and its tab goes and
   await closeTabAsync(tab, name);
 
   await expect(tab).toBeHidden();
-  await expect(dockTabsOf(page)).toHaveCount(1);
+  await expect(dockTabsOf(page)).toHaveCount(2);
+  await expect(terminalTabsOf(page)).toHaveCount(0);
   await expect.poll(() => [TeamRunApp.isRunning(shell), TeamRunApp.isRunning(program)], TeamRunApp.pollOf(30_000)).toEqual([false, false]);
   await quitAsync(app, []);
 });

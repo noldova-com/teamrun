@@ -554,26 +554,50 @@ export declare enum MethodName {
    */
   TeammateDelete = "TeammateDelete",
   /**
-   * Lists the organization: its departments and which teammate is in which. Parameters: `null`. Result: `Organization`.
+   * Lists every organization, each with its departments and where each teammate placed in it sits, by their order, the one every
+   * database starts with first. Parameters: `null`. Result: `Organization[]`.
+   * Each method below that names an organization fails with `NotFound` when it doesn't exist, and a department of another
+   * organization is `NotFound` too.
    */
   OrganizationList = "OrganizationList",
   /**
-   * Creates a department, last among its siblings, and publishes `OrganizationChanged`. Parameters: `DepartmentCreateParams`.
-   * Result: `Department`; a parent that isn't a department fails with `NotFound`.
+   * Creates an organization with no departments and no placed teammates, last in the list, and publishes `OrganizationChanged`.
+   * Parameters: `OrganizationCreateParams`. Result: `Organization`.
+   */
+  OrganizationCreate = "OrganizationCreate",
+  /**
+   * Renames an organization and sets its default folder, and publishes `OrganizationChanged`. A teammate's Organization chat
+   * with no folder of its own works in the new folder from its next turn. Parameters: `OrganizationUpdateParams`.
+   * Result: `Organization`.
+   */
+  OrganizationUpdate = "OrganizationUpdate",
+  /**
+   * Deletes an organization with its departments, placements and layout, and publishes `OrganizationRemoved`; its teammates
+   * and their chats stay. Deleting the last organization fails with `Conflict`. Parameters: `OrganizationIdParams`.
+   * Result: `null`.
+   */
+  OrganizationDelete = "OrganizationDelete",
+  /**
+   * Creates a department, last among the departments under its parent, and publishes `OrganizationChanged`; a leader given is
+   * placed in it first, from wherever it was, and leads it, in the same transaction. Parameters: `DepartmentCreateParams`.
+   * Result: `Department`; a parent, leader or node type that doesn't exist fails with `NotFound`, and a leader the department would
+   * sit under fails with `InvalidParams`.
    */
   DepartmentCreate = "DepartmentCreate",
   /**
-   * Renames a department or sets or clears its leader, and publishes `OrganizationChanged`. Parameters: `DepartmentUpdateParams`.
-   * Result: `Department`; a leader who isn't a member of the department fails with `InvalidParams`.
+   * Renames a department, changes its node type, or sets or clears its leader, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentUpdateParams`. Result: `Department`; a leader who isn't a member is placed in it first, last among its
+   * teammates, a leader the department sits under fails with `InvalidParams`, and a type the organization doesn't have fails with `NotFound`.
    */
   DepartmentUpdate = "DepartmentUpdate",
   /**
    * Moves a department under another parent, or to another place among its siblings, and publishes `OrganizationChanged`.
-   * Parameters: `DepartmentMoveParams`. Result: `Department`; a move under itself or one of its own departments fails with `InvalidParams`.
+   * Parameters: `DepartmentMoveParams`. Result: `Department`; a parent that doesn't exist fails with `NotFound`, and a move under
+   * itself or anything under it fails with `InvalidParams`.
    */
   DepartmentMove = "DepartmentMove",
   /**
-   * Deletes a department, moving its members and departments to its parent, and publishes `OrganizationChanged`.
+   * Deletes a department, moving its teammates and departments to its parent, and publishes `OrganizationChanged`.
    * Parameters: `DepartmentIdParams`. Result: `null`.
    */
   DepartmentDelete = "DepartmentDelete",
@@ -583,18 +607,43 @@ export declare enum MethodName {
    */
   DepartmentMemberSet = "DepartmentMemberSet",
   /**
-   * Sends a message to one teammate, a department's leader and members, every department's leader, or every teammate, starting
-   * each at once in its own chat, and publishes `OrganizationMessageUpdated` as each starts. Parameters:
-   * `OrganizationMessageSendParams`. Result: `OrganizationMessage`.
+   * Adds a node type to an organization, last among its types, and publishes `OrganizationChanged`.
+   * Parameters: `NodeTypeCreateParams`. Result: `NodeType`; a name another of its types has, ignoring case, fails with `Conflict`.
    */
-  OrganizationMessageSend = "OrganizationMessageSend",
+  NodeTypeCreate = "NodeTypeCreate",
   /**
-   * Stops an organization message: each recipient not yet started is Stopped, and a reply still pending is cancelled.
-   * Parameters: `MessageIdParams`, the organization message's id. Result: `OrganizationMessage`.
+   * Renames a node type or sets or clears its icon or color, and publishes `OrganizationChanged`.
+   * Parameters: `NodeTypeUpdateParams`. Result: `NodeType`; a type that doesn't exist fails with `NotFound`, and a name another of
+   * its organization's types has, ignoring case, fails with `Conflict`.
    */
-  OrganizationMessageStop = "OrganizationMessageStop",
-  /** Lists the organization messages, oldest first. Result: `OrganizationMessage[]`. */
-  OrganizationMessageList = "OrganizationMessageList",
+  NodeTypeUpdate = "NodeTypeUpdate",
+  /**
+   * Deletes a node type no department has, and publishes `OrganizationChanged`. Parameters: `NodeTypeIdParams`. Result: `null`;
+   * a type that doesn't exist fails with `NotFound`, and one a department has fails with `Conflict`.
+   */
+  NodeTypeDelete = "NodeTypeDelete",
+  /**
+   * Places a teammate under the person, a department or another teammate at an order among the teammates there, or takes it
+   * out of the organization, and publishes `OrganizationChanged`. A teammate that leaves a department stops leading it; what
+   * sits under a teammate that leaves the organization moves to its parent.
+   * Parameters: `TeammatePlaceParams`. Result: `null`.
+   */
+  TeammatePlace = "TeammatePlace",
+  /**
+   * Reads an Organization view's layout: its collapsed departments and what its cards show.
+   * Parameters: `OrganizationIdParams`. Result: the layout's JSON object, or `null` when none is kept.
+   */
+  OrganizationLayoutRead = "OrganizationLayoutRead",
+  /**
+   * Keeps the Organization view's layout, replacing the one kept, and publishes `OrganizationLayoutUpdated`. Parameters:
+   * `OrganizationLayoutSaveParams`. Result: the layout's JSON object.
+   */
+  OrganizationLayoutSave = "OrganizationLayoutSave",
+  /**
+   * Finds a teammate's Organization chat in one organization, or makes it when there is none yet, without sending anything.
+   * Parameters: `OrganizationChat`. Result: `Chat`.
+   */
+  OrganizationChatOpen = "OrganizationChatOpen",
   /**
    * Adds a teammate to a chat. Parameters: `ChatMemberParams`. Result: `ChatMember`.
    */
@@ -890,8 +939,9 @@ export declare enum MethodName {
   ConversationTouch = "ConversationTouch",
   /**
    * Sets or clears the responder chosen in a chat's composer, a teammate or the default teammate's settings and provider, to
-   * answer a teammate's message that mentions no one, keeping the chat's update time. Parameters: `ChatResponderParams`.
-   * Result: `Chat`.
+   * answer a teammate's message that mentions no one, keeping the chat's update time. With `start`, it sets the responder
+   * only when the chat holds none and otherwise changes nothing. Parameters: `ChatResponderParams`. Result: `Chat`, as stored
+   * after the request.
    */
   ConversationResponderSet = "ConversationResponderSet",
   /**
@@ -917,7 +967,8 @@ export declare enum MethodName {
   /**
    * Moves a chat into a project. A chat without a project first has its own folder's files copied into the project,
    * refused whole when the project already holds a file of one of their names, and its folder is then deleted. Refused while a reply
-   * runs in the chat. Parameters: `ChatMoveParams`. Result: the `Chat`.
+   * runs in the chat, and with `Conflict` naming what runs while a background command, a helper or a teammate's background work of the
+   * chat still runs. Parameters: `ChatMoveParams`. Result: the `Chat`.
    */
   ConversationMove = "ConversationMove",
   /**
@@ -933,13 +984,14 @@ export declare enum MethodName {
   /**
    * Attaches an existing folder to a chat without a project, or replaces the one attached: its teammates work in it, in place, from the
    * next turn, and nothing is copied; the chat's own folder stays for a detach. Refused with `Conflict` while a reply runs in the chat or
-   * for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
+   * its background commands, helpers or a teammate's background work still run, naming them, or for a chat in a project, `NotFound` for an unknown chat, and `InvalidParameters` when the folder isn't an absolute path to a folder
    * TeamRun can read. Parameters: `ChatFolderAttachParams`. Result: the `Chat`.
    */
   ChatFolderAttach = "ChatFolderAttach",
   /**
    * Detaches a chat's attached folder, leaving its files as they are, so that its teammates work in the chat's own folder again from
-   * the next turn. Refused with `Conflict` while a reply runs in the chat, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
+   * the next turn. Refused with `Conflict` while a reply runs in the chat or its background commands, helpers or a teammate's background
+   * work still run, naming them, `NotFound` for an unknown chat. Parameters: `ChatIdParams`.
    * Result: the `Chat`.
    */
   ChatFolderDetach = "ChatFolderDetach",
@@ -948,7 +1000,7 @@ export declare enum MethodName {
    * session fed with the kept transcript, and optionally restores the project's files to the snapshot taken before the
    * removed reply started (git projects). Parameters: `ChatRewindParams`. Result:
    * `ChatRewindResult`. Fails with `Conflict` while a reply is open, `NotFound` for an unknown chat
-   * or message.
+   * or message, and `Internal` when the messages can't be removed; after files were restored, that refusal says so, with the error's message.
    */
   ConversationRewind = "ConversationRewind",
   /**
@@ -1020,6 +1072,11 @@ export declare enum MethodName {
    * report none or whose latest such reply is from a session since reset, such as by a provider change.
    */
   TeammateUsageList = "TeammateUsageList",
+  /**
+   * Lists each teammate's latest completed reply that has text, in any chat. Parameters: none. Result: an array of `TeammateLastReply`,
+   * one per teammate that has one.
+   */
+  TeammateLastReplyList = "TeammateLastReplyList",
   /**
    * Lists a page of a chat's background tasks: every running one on the first page, then its
    * finished commands, newest first and at most `limit` a page, each with its output left out and
@@ -1151,7 +1208,8 @@ export declare enum MethodName {
    * publishes `WaitingMessagesChanged`. Stop and send stops the chat's running replies. The waiting messages go one at a time, each
    * as `MessageSend` sends it, once the chat has no running reply and no answer to a question waits; one added to an idle chat goes
    * at once. Steer waits like Queue until a provider can take it into its running turn. Parameters: `WaitingMessageAddParams`.
-   * Result: `WaitingMessage`; an unknown chat is `NotFound`.
+   * Result: `WaitingMessage`; an unknown chat is `NotFound`, and a send whose `mentionedTeammateIds` aren't the teammates its text
+   * mentions, as `MessageSend` resolves them for a person's text, is `Conflict`, as for `WaitingMessageEdit`.
    */
   WaitingMessageAdd = "WaitingMessageAdd",
   /**
@@ -1161,8 +1219,9 @@ export declare enum MethodName {
   WaitingMessageList = "WaitingMessageList",
   /**
    * Replaces a waiting message's send, keeping its place and clearing a failure, and publishes `WaitingMessagesChanged`. Parameters:
-   * `WaitingMessageEditParams`. Result: `WaitingMessage`; an unknown waiting message is `NotFound`, and a send to another chat is
-   * `InvalidParams`.
+   * `WaitingMessageEditParams`. Result: `WaitingMessage`; an unknown waiting message is `NotFound`, a send to another chat is
+   * `InvalidParams`, and a send whose `mentionedTeammateIds` aren't the teammates its new text mentions, as `MessageSend` resolves them, is
+   * `Conflict`: the engine resolves none, so the caller resolves them from the new text.
    */
   WaitingMessageEdit = "WaitingMessageEdit",
   /**
@@ -1184,7 +1243,12 @@ export declare enum MethodName {
    * Replaces the outside token, so that every outside session's next request is refused, ends their waits and forgets the message ids
    * they were given. Parameters: none. Result: `OutsideConnection`.
    */
-  OutsideTokenReset = "OutsideTokenReset"
+  OutsideTokenReset = "OutsideTokenReset",
+  /**
+   * Reads what a teammate worked on: the folder of the chat it last answered in, every folder of a chat it answered in, and the Markdown and
+   * text files its replies created or changed. Parameters: `TeammateIdParams`. Result: `TeammateWork`.
+   */
+  TeammateWorkRead = "TeammateWorkRead"
 }
 
 /**
@@ -1318,12 +1382,30 @@ export declare enum EventName {
    */
   WaitingMessagesChanged = "WaitingMessagesChanged",
   /**
-   * The organization changed: a department was created, renamed, moved or deleted, a leader was set or cleared, a teammate
-   * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
+   * An organization changed: it was created, renamed or given another folder, a department was created, renamed, moved or deleted,
+   * a leader was set or cleared, a teammate changed department, or a deleted teammate left its department. Payload: `Organization`,
+   * the whole organization after the change.
    */
   OrganizationChanged = "OrganizationChanged",
-  /** An organization message or one of its recipients changed. Payload: `OrganizationMessage`, the whole message. */
-  OrganizationMessageUpdated = "OrganizationMessageUpdated"
+  /**
+   * An organization was deleted. Payload: `OrganizationIdParams`.
+   */
+  OrganizationRemoved = "OrganizationRemoved",
+  /**
+   * An Organization view's layout was saved. Payload: `OrganizationLayoutSaveParams`, the organization's id and the layout.
+   */
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
+  /**
+   * A teammate started sending a message to another chat with its send tool, once the send is allowed and before the message
+   * exists. Payload: `MessageSendingPayload`. The message's `MessageCreated` follows, or `MessageSendAbandoned` when the send
+   * is refused, cancelled or fails.
+   */
+  MessageSending = "MessageSending",
+  /**
+   * A send that `MessageSending` announced ended without a message: it was refused, cancelled or failed.
+   * Payload: `MessageSendAbandonedPayload`.
+   */
+  MessageSendAbandoned = "MessageSendAbandoned"
 }
 
 /**
@@ -1397,7 +1479,7 @@ export declare class Resources {
   public static readonly defaultTeammateField: string;
 
   /**
-   * The layout field of `ProjectsLayoutSaveParams`.
+   * The layout field of `ProjectsLayoutSaveParams` and `OrganizationLayoutSaveParams`.
    */
   public static readonly layoutField: string;
   /**
@@ -1591,6 +1673,10 @@ export declare class Resources {
   public static readonly titleChosenField: string;
   /** Name of a chat's field for the existing folder a person attached to it: `attachedFolder`. */
   public static readonly attachedFolderField: string;
+  /** Name of a chat's field for the organization and teammate whose Organization chat it is: `organizationChat`. */
+  public static readonly organizationChatField: string;
+  /** Name of the field for an organization's id: `organizationId`. */
+  public static readonly organizationIdField: string;
   /** Name of a teammate update's field for the provider its sender read: `expectedProviderId`. */
   public static readonly expectedProviderIdField: string;
   /** Name of a provider mode's field saying it lifts the provider's restrictions: `unrestricted`. */
@@ -2158,8 +2244,6 @@ export declare class Resources {
    * Name of the last-update timestamp field of a model: `updatedAt`.
    */
   public static readonly updatedAtField: string;
-  /** Name of a department's parent field: `parentId`. */
-  public static readonly parentIdField: string;
   /** Name of a department's leader field: `leaderId`. */
   public static readonly leaderIdField: string;
   /** Name of a department's order field among its siblings: `order`. */
@@ -2168,8 +2252,36 @@ export declare class Resources {
   public static readonly departmentIdField: string;
   /** Name of an organization's departments field: `departments`. */
   public static readonly departmentsField: string;
-  /** Name of an organization's members field: `members`. */
-  public static readonly membersField: string;
+  /** Name of a department's or placement's parent field: `parent`. */
+  public static readonly parentField: string;
+  /** Name of a department's node type id field: `typeId`. */
+  public static readonly typeIdField: string;
+  /** Name of an organization's node types field: `nodeTypes`. */
+  public static readonly nodeTypesField: string;
+  /** Name of a node type's icon field: `icon`. */
+  public static readonly iconField: string;
+  /** Name of a node type's color field: `color`. */
+  public static readonly colorField: string;
+  /** Why a node type name is refused: it isn't 1 to 100 characters on one line, or is only spaces. */
+  public static readonly invalidNodeTypeName: string;
+  /** What a node type's icon may be: a Material Symbols name of 1 to 64 lowercase letters, digits or underscores. */
+  public static readonly nodeTypeIconPattern: RegExp;
+  /** Why a node type's icon is refused. */
+  public static readonly invalidNodeTypeIcon: string;
+  /** What a node type's color may be: a kit color's name, or a #rrggbb color in lowercase. */
+  public static readonly nodeTypeColorPattern: RegExp;
+  /** Why a node type's color is refused. */
+  public static readonly invalidNodeTypeColor: string;
+  /** Why an organization with two node types of one id or one name, ignoring case, is refused. */
+  public static readonly duplicateNodeType: string;
+  /** Why a department whose type isn't one of its organization's node types is refused. */
+  public static readonly unknownNodeType: string;
+  /** Why a node type update that changes nothing is refused. */
+  public static readonly emptyNodeTypeUpdate: string;
+  /** Why deleting a node type that a department has is refused. */
+  public static readonly nodeTypeInUse: string;
+  /** Name of an organization's placements field: `placements`. */
+  public static readonly placementsField: string;
   /** What a department name may be: 1 to 100 characters with no line break or other control character. */
   public static readonly departmentNamePattern: RegExp;
   /** Why a department name is refused: it is blank, longer than 100 characters, or holds a line break or other control character. */
@@ -2179,15 +2291,30 @@ export declare class Resources {
   /** Why a department naming itself as its parent is refused. */
   public static readonly departmentOwnParent: string;
   /** Why a department update that changes nothing is refused. */
+  public static readonly emptyOrganizationUpdate: string;
   public static readonly emptyDepartmentUpdate: string;
   /** Why an organization with two departments of one id is refused. */
   public static readonly duplicateDepartment: string;
-  /** Why an organization with a department whose parent isn't one of its departments is refused. */
-  public static readonly unknownParentDepartment: string;
-  /** Why an organization with a teammate in a department that isn't one of its departments is refused. */
-  public static readonly unknownMemberDepartment: string;
-  /** Why an organization with a teammate in two departments is refused. */
-  public static readonly teammateInTwoDepartments: string;
+  /** Why a parent that names no id for a teammate or department, or an id for the person, is refused. */
+  public static readonly organizationParentIdRequired: string;
+  /** Why a teammate or department under itself, directly or through others, is refused. */
+  public static readonly organizationNodeUnderItself: string;
+  /** Why a place's order that isn't a whole number from 0 is refused. */
+  public static readonly invalidOrganizationOrder: string;
+  /** Why a parent that is neither the person, a placed teammate nor one of the organization's departments is refused. */
+  public static readonly unknownOrganizationParent: string;
+  /** Why an organization that places a teammate twice is refused. */
+  public static readonly teammatePlacedTwice: string;
+  /** Why an organization name that isn't 1 to 100 characters on one line is refused. */
+  public static readonly invalidOrganizationName: string;
+  /** Why a blank default folder is refused. */
+  public static readonly blankOrganizationFolder: string;
+  /** Why an organization's order in the list that isn't a whole number from 0 is refused. */
+  public static readonly invalidOrganizationListOrder: string;
+  /** The id of the organization every database starts with, "My organization". */
+  public static readonly defaultOrganizationId: string;
+  /** Why moving the person is refused. */
+  public static readonly personCannotMove: string;
   /**
    * Name of a draft's revision field: `revision`.
    */
@@ -2309,6 +2436,14 @@ export declare class Resources {
    * Name of the field referencing a chat: `chatId`.
    */
   public static readonly chatIdField: string;
+  /**
+   * Name of the field naming the chat a message goes to: `toChatId`.
+   */
+  public static readonly toChatIdField: string;
+  /**
+   * Name of the field naming one send of a teammate's message: `sendId`.
+   */
+  public static readonly sendIdField: string;
   /**
    * The field referencing a chat, under its earlier constant name; its value is `chatId`.
    *
@@ -2657,6 +2792,10 @@ export declare class Resources {
    * Name of the field that says the person chose a chat's responder settings: `chosen`.
    */
   public static readonly chosenField: string;
+  /**
+   * Name of the field that asks to set a chat's responder only when the chat holds none: `start`.
+   */
+  public static readonly startField: string;
   /**
    * Name of a chat's forked session field: `forkedSession`.
    */
@@ -4460,6 +4599,10 @@ export declare class Chat {
    * folder; `null` when none is attached, and always in a project. Written only when set.
    */
   public readonly attachedFolder: string | null;
+  /**
+   * The organization and teammate whose Organization chat this is, or `null` for any other chat. Written only when set.
+   */
+  public readonly organizationChat: OrganizationChat | null;
 
   /**
    * Initializes the chat.
@@ -4479,6 +4622,7 @@ export declare class Chat {
    * @param approvedResponderPlan Whether the chat's own provider's plan was approved since Plan first turned on; `false` by default.
    * @param titleChosen Whether a person chose the title; `false` by default.
    * @param attachedFolder The folder a person attached, or `null` (the default).
+   * @param organizationChat The organization and teammate whose Organization chat this is, or `null` (the default).
    * @throws ArgumentException when the id, a given project id, the title, a timestamp, a given folder, a given attached folder or an
    * approved teammate is blank.
    */
@@ -4497,7 +4641,8 @@ export declare class Chat {
     approvedPlanTeammates?: readonly string[],
     approvedResponderPlan?: boolean,
     titleChosen?: boolean,
-    attachedFolder?: string | null);
+    attachedFolder?: string | null,
+    organizationChat?: OrganizationChat | null);
 
   /**
    * Reads a chat from untrusted JSON.
@@ -4602,6 +4747,12 @@ export declare class Chat {
    * @throws ArgumentException when the attached folder or the timestamp is blank.
    */
   public withAttachedFolder(attachedFolder: string | null, updatedAt: string): Chat;
+
+  /**
+   * A copy that is no longer an organization's chat, keeping everything else, for a chat whose organization is deleted.
+   * @returns The copy.
+   */
+  public withoutOrganizationChat(): Chat;
 
   /**
    * Returns a copy with the session-reset mark changed.
@@ -7474,6 +7625,39 @@ export declare class PageRequest {
 }
 
 /**
+ * The parameters of the edited page list method: the teammate whose pages and canvases to list.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire and storage shape.
+ */
+export declare class PageEditedListRequest {
+  /**
+   * The teammate's id.
+   */
+  public readonly teammateId: string;
+  /**
+   * Initializes the request.
+   * @throws ArgumentException when the id is blank.
+   */
+  public constructor(teammateId: string);
+
+  /**
+   * Decodes the request.
+   * @param value Object with teammateId.
+   * @param path Diagnostic field path; defaults to the JSON root.
+   * @returns The request.
+   * @throws JsonException for a missing or incorrectly typed field.
+   * @throws ArgumentException for a blank id.
+   */
+  public static fromJson(value: unknown, path?: string): PageEditedListRequest;
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with teammateId.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * The parameters of the page list method: the chat whose pages to list.
  * @remarks
  * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
@@ -7507,7 +7691,8 @@ export declare class PageListRequest {
 }
 
 /**
- * The methods Pages' runtime serves its window, each taking a `PageRequest` but `PageList`, which takes a `PageListRequest`; values
+ * The methods Pages' runtime serves its window, each taking a `PageRequest` but `PageList`, which takes a `PageListRequest`, and
+ * `PageEditedList`, which takes a `PageEditedListRequest`; values
  * match the member names, and the qualified name starts lowercase, as `teamrun.pageOpen`.
  */
 export declare enum PageMethodName {
@@ -7526,7 +7711,12 @@ export declare enum PageMethodName {
   /**
    * Answers the chat's pages, the most recently changed first, as an array of `Page`.
    */
-  PageList = "PageList"
+  PageList = "PageList",
+  /**
+   * Answers, across chats, the pages and canvases whose latest version the teammate wrote, the most recently changed first, at most 20, as an
+   * array of `Page`; a canvas's artboards are left out, as its own.
+   */
+  PageEditedList = "PageEditedList"
 }
 
 /**
@@ -8303,15 +8493,22 @@ export declare class ChatResponderParams {
    * `false`.
    */
   public readonly chosen: boolean;
+  /**
+   * Whether to set the responder only when the chat holds none, as the composer's starting choice does, so it never
+   * replaces a responder a mention or another window set; a chat that holds one is returned unchanged. Requests without it
+   * read as `false`.
+   */
+  public readonly start: boolean;
 
   /**
    * Initializes the parameters.
    * @param chatId The chat id.
    * @param responder The chosen responder, or `null` to clear the choice.
    * @param chosen Whether the person chose it; `false` by default.
+   * @param start Whether to set it only when the chat holds no responder; `false` by default.
    * @throws ArgumentException when the chat id is blank.
    */
-  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean);
+  public constructor(chatId: string, responder: ChatResponder | null, chosen?: boolean, start?: boolean);
 
   /**
    * The chat's id, by its earlier name.
@@ -8321,7 +8518,7 @@ export declare class ChatResponderParams {
 
   /**
    * Reads the parameters from untrusted JSON.
-   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen`.
+   * @param value The untrusted value, expected to carry `conversationId`, `responder` and the optional `chosen` and `start`.
    * @param path Path to report for the value; the root path `$` by default.
    * @returns The parameters.
    * @throws JsonException when a field is missing or invalid.
@@ -8330,7 +8527,7 @@ export declare class ChatResponderParams {
 
   /**
    * Renders the JSON object `fromJson` accepts.
-   * @returns The object with `conversationId`, `responder` and `chosen`.
+   * @returns The object with `conversationId`, `responder`, `chosen` and `start`.
    */
   public toJson(): JsonObject;
 }
@@ -9446,6 +9643,91 @@ export declare class BackgroundTaskOutputPayload {
   /**
    * Renders the JSON object `fromJson` accepts.
    * @returns The object with `conversationId`, `taskId`, `text`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `MessageSending`: a teammate's send to another chat, from the chat it works in.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class MessageSendingPayload {
+  /**
+   * The send's own id, which its `MessageSendAbandoned` names.
+   */
+  public readonly sendId: string;
+  /**
+   * The `Chat` id of the chat the sending teammate works in.
+   */
+  public readonly chatId: string;
+  /**
+   * The sending `Teammate`'s id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The `Chat` id of the chat the message goes to.
+   */
+  public readonly toChatId: string;
+
+  /**
+   * Initializes the payload.
+   * @param sendId The send's own id.
+   * @param chatId The chat the sending teammate works in.
+   * @param teammateId The sending teammate.
+   * @param toChatId The chat the message goes to.
+   * @throws ArgumentException when any of them is blank.
+   */
+  public constructor(sendId: string, chatId: string, teammateId: string, toChatId: string);
+
+  /**
+   * Reads the payload from untrusted JSON.
+   * @param value The untrusted value, expected to carry `sendId`, `chatId`, `teammateId`, `toChatId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The payload.
+   * @throws JsonException when a field is missing or blank; the exception names the field's path.
+   */
+  public static fromJson(value: unknown, path?: string): MessageSendingPayload;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `sendId`, `chatId`, `teammateId`, `toChatId`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `MessageSendAbandoned`: a send that ended without a message, by its id.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class MessageSendAbandonedPayload {
+  /**
+   * The id its `MessageSending` gave the send.
+   */
+  public readonly sendId: string;
+
+  /**
+   * Initializes the payload.
+   * @param sendId The send's id.
+   * @throws ArgumentException when it is blank.
+   */
+  public constructor(sendId: string);
+
+  /**
+   * Reads the payload from untrusted JSON.
+   * @param value The untrusted value, expected to carry `sendId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The payload.
+   * @throws JsonException when `sendId` is missing or blank; the exception names its path.
+   */
+  public static fromJson(value: unknown, path?: string): MessageSendAbandonedPayload;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `sendId`.
    */
   public toJson(): JsonObject;
 }
@@ -10594,12 +10876,17 @@ export declare class FileEdit {
    */
   public readonly lines: readonly DiffLine[];
   /**
+   * The path a move took the file to, or null for any other change.
+   */
+  public readonly movePath: string | null;
+  /**
    * Creates a file change.
    * @param path The recorded path.
    * @param kind The recorded change kind.
    * @param lines Immutable parsed lines retained by this instance.
+   * @param movePath The path a move took the file to, or null for any other change.
    */
-  public constructor(path: string, kind: string, lines: readonly DiffLine[]);
+  public constructor(path: string, kind: string, lines: readonly DiffLine[], movePath?: string | null);
   /**
    * The count of added lines.
    */
@@ -11758,14 +12045,71 @@ export declare class TeammateIdParams {
   public toJson(): JsonObject;
 }
 
-/** A department of the organization: it has a name, an optional leader, and sits under the person or another department. */
+/** A kind of organization node, such as Department or Team: a name, an optional icon and an optional color, kept per organization. */
+export declare class NodeType {
+  /** id. */
+  public readonly id: string;
+  /** The name, 1 to 100 characters on one line, unique in its organization ignoring case. */
+  public readonly name: string;
+  /** A Material Symbols name, or null for the default icon. */
+  public readonly icon: string | null;
+  /** A kit color's name or a #rrggbb color, or null for the default color. */
+  public readonly color: string | null;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id or a time is blank, or the name, icon or color is invalid.
+   */
+  public constructor(id: string, name: string, icon: string | null, color: string | null, createdAt: string, updatedAt: string);
+  /**
+   * Checks a node type name.
+   * @throws ArgumentException when it isn't 1 to 100 characters on one line, or is only spaces.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Checks a node type's icon.
+   * @throws ArgumentException when it isn't null or a Material Symbols name.
+   */
+  public static validateIcon(icon: string | null): void;
+  /**
+   * Checks a node type's color.
+   * @throws ArgumentException when it isn't null, a kit color's name or a #rrggbb color.
+   */
+  public static validateColor(color: string | null): void;
+  /**
+   * Reads a node type name from its `name` field.
+   * @throws JsonException at the field's path when it isn't a valid name.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Reads a node type's icon from its `icon` field.
+   * @throws JsonException at the field's path when it isn't null or a valid icon.
+   */
+  public static readIcon(reader: JsonReader): string | null;
+  /**
+   * Reads a node type's color from its `color` field.
+   * @throws JsonException at the field's path when it isn't null or a valid color.
+   */
+  public static readColor(reader: JsonReader): string | null;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeType;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A department of the organization: it has a name, a node type, an optional leader, and sits under the person, a teammate or another department. */
 export declare class Department {
   /** id. */
   public readonly id: string;
   /** The name, 1 to 100 characters on one line. */
   public readonly name: string;
-  /** The department it sits under, or null when it sits under the person. */
-  public readonly parentId: string | null;
+  /** The id of its node type, one of its organization's `nodeTypes`. */
+  public readonly typeId: string;
+  /** What it sits under. */
+  public readonly parent: OrganizationParent;
   /** The teammate who leads it, always one of its members, or null. */
   public readonly leaderId: string | null;
   /** Its place among its siblings, from 0. */
@@ -11781,7 +12125,8 @@ export declare class Department {
   public constructor(
     id: string,
     name: string,
-    parentId: string | null,
+    typeId: string,
+    parent: OrganizationParent,
     leaderId: string | null,
     order: number,
     createdAt: string,
@@ -11805,13 +12150,15 @@ export declare class Department {
    * @throws ArgumentException when it isn't a whole number from 0.
    */
   public static validateOrder(order: number): void;
+  /** The department it sits under, or null when it sits under the person or a teammate. */
+  public get parentId(): string | null;
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): Department;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
 
-/** A teammate's place in a department; a teammate is in at most one. */
+/** A teammate's place directly in a department, as `Organization.members` lists it. */
 export declare class DepartmentMember {
   /** teammate Id. */
   public readonly teammateId: string;
@@ -11827,40 +12174,146 @@ export declare class DepartmentMember {
   public toJson(): JsonObject;
 }
 
-/** The organization under the person: its departments, and the teammates in them; a teammate in none shows under "No department". */
+/**
+ * The organization under the person, as a tree: departments and teammates sit under the person, a teammate or a department,
+ * each with one parent and none under itself. A teammate with no place isn't in the organization.
+ */
 export declare class Organization {
-  /** The organization with no departments. */
-  public static readonly empty: Organization;
+  /** The organization's id. */
+  public readonly id: string;
+  /** Its name. */
+  public readonly name: string;
+  /** The default folder of its teammates' Organization chats that have no folder of their own, or null for each chat's own folder. */
+  public readonly folder: string | null;
+  /** Its place in the list of organizations, from 0. */
+  public readonly order: number;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
+  /** The kinds of node its departments are, in the order they were made. */
+  public readonly nodeTypes: readonly NodeType[];
   /** The departments, by their order among their siblings, then by when they were created. */
   public readonly departments: readonly Department[];
-  /** The teammates in a department. */
-  public readonly members: readonly DepartmentMember[];
+  /** The placed teammates, by their order among their siblings, then by id. */
+  public readonly placements: readonly TeammatePlacement[];
   /**
    * Creates a validated immutable value.
-   * @throws ArgumentException when two departments share an id, a parent or a member's department isn't one of the departments,
-   * or a teammate is in two departments.
+   * @throws ArgumentException when the id, a time or the folder is blank, the name is invalid, the order isn't a whole number from 0,
+   * two node types share an id or a name, a department's type isn't one of the node types, two departments share an id, a teammate is placed twice, a parent is neither the person, a placed teammate nor one of the departments,
+   * or a teammate or department sits under itself.
    */
   public constructor(
+    id: string,
+    name: string,
+    folder: string | null,
+    order: number,
+    createdAt: string,
+    updatedAt: string,
+    nodeTypes: readonly NodeType[],
     departments: readonly Department[],
-    members: readonly DepartmentMember[]);
+    placements: readonly TeammatePlacement[]);
   /**
-   * Returns the departments under a parent, in their order.
-   * @param parentId The parent department's id, or null for those under the person.
+   * Returns this organization with another tree.
+   * @param departments The departments.
+   * @param placements The placed teammates.
+   * @returns The organization, with the same id, name, folder, order, times and node types.
+   */
+  public withTree(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization;
+  /**
+   * Checks an organization name.
+   * @throws ArgumentException when it isn't 1 to 100 characters on one line, or is only spaces.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Reads and checks the `name` field.
+   * @throws JsonException when it is missing or invalid.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Checks a default folder.
+   * @throws ArgumentException when it is blank.
+   */
+  public static validateFolder(folder: string | null): void;
+  /**
+   * Reads and checks the `folder` field.
+   * @throws JsonException when it is missing, not text or null, or blank.
+   */
+  public static readFolder(reader: JsonReader): string | null;
+  /** The teammates placed directly in a department, as department memberships. */
+  public get members(): readonly DepartmentMember[];
+  /** The leaders: each department's leader, in the departments' order, then each placed teammate with a teammate or department under it. */
+  public get leaders(): readonly string[];
+  /**
+   * Finds a department's node type.
+   * @param departmentId The department.
+   * @returns Its node type, or null when no department has that id.
+   */
+  public typeOf(departmentId: string): NodeType | null;
+  /**
+   * Returns the departments directly under a parent, in their order.
+   * @param parent The parent.
    * @returns The departments.
    */
-  public childrenOf(parentId: string | null): readonly Department[];
+  public departmentsUnder(parent: OrganizationParent): readonly Department[];
   /**
-   * Returns the department a teammate is in.
+   * Returns the teammates placed directly under a parent, in their order.
+   * @param parent The parent.
+   * @returns The placements.
+   */
+  public placementsUnder(parent: OrganizationParent): readonly TeammatePlacement[];
+  /**
+   * Returns what sits directly under a parent: its departments in their order, then its teammates in theirs.
+   * @param parent The parent.
+   * @returns Each child as a parent value.
+   */
+  public childrenOf(parent: OrganizationParent): readonly OrganizationParent[];
+  /**
+   * Returns what a teammate or department sits under.
+   * @param node The teammate or department.
+   * @returns Its parent, or null for the person, an unplaced teammate or an unknown department.
+   */
+  public parentOf(node: OrganizationParent): OrganizationParent | null;
+  /**
+   * Returns the way from the top of the organization down to a teammate or department, the person left out.
+   * @param node The teammate or department.
+   * @returns Its ancestors from the top, then the node itself.
+   */
+  public pathOf(node: OrganizationParent): readonly OrganizationParent[];
+  /**
+   * Returns the teammates that have no place in the organization.
+   * @param teammateIds Every teammate's id, in the order to list them.
+   * @returns The unplaced ids, in that order.
+   */
+  public unplaced(teammateIds: readonly string[]): readonly string[];
+  /**
+   * Returns the department a teammate sits in: the nearest department above it, through teammates it sits under.
    * @param teammateId The teammate's id.
-   * @returns The department's id, or null when the teammate is in none.
+   * @returns The department's id, or null when no department is above it.
    */
   public departmentOf(teammateId: string): string | null;
+  /**
+   * Returns the teammate a teammate reports to: the teammate it sits under, or its department's leader, or for a leader,
+   * or in a department with none, the nearest teammate or leader above.
+   * @param teammateId The teammate's id.
+   * @returns The manager's id, or null when the teammate reports to the person.
+   */
+  public managerOf(teammateId: string): string | null;
+  /**
+   * Says why a teammate or department can't move under a parent, as views check a drop before they send it.
+   * @param node The teammate or department to move.
+   * @param parent Where it would go.
+   * @returns `Resources.personCannotMove`, `Resources.unknownOrganizationParent` or `Resources.organizationNodeUnderItself`,
+   * or null when the move is allowed.
+   */
+  public moveError(node: OrganizationParent, parent: OrganizationParent): string | null;
   /**
    * Returns the teammates a message to a target goes to, each once.
    * @param target The target.
    * @param teammateIds Every teammate's id, in the order to list everyone.
-   * @returns The ids: the teammate when it's one of them; a department's leader, then its other direct members; each
-   * department's leader, in the departments' order; or every teammate.
+   * @returns The ids of the teammates in the organization, never an unplaced one: the teammate; a department's leader,
+   * then every other teammate whose `departmentOf` is that department; the leaders, as `leaders` lists them, then each
+   * teammate placed directly under the person; or every placed teammate.
    */
   public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[];
   /** Reads a wire value and reports malformed fields at their JSON path. */
@@ -11869,35 +12322,77 @@ export declare class Organization {
   public toJson(): JsonObject;
 }
 
-/** Whom an organization message goes to. */
+/** What a node of the organization's tree is. */
+export declare enum OrganizationNodeKind {
+  /** The person, at the top. */
+  Person = "Person",
+  /** A teammate. */
+  Teammate = "Teammate",
+  /** A department. */
+  Department = "Department"
+}
+
+/** A node of the organization's tree, as a parent or a child: the person, a teammate or a department. */
+export declare class OrganizationParent {
+  /** The person, at the top of the organization. */
+  public static readonly person: OrganizationParent;
+  /** What the node is. */
+  public readonly kind: OrganizationNodeKind;
+  /** The teammate's or department's id, or null for the person. */
+  public readonly id: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a teammate or department names no id, the person names one, or the id is blank.
+   */
+  public constructor(kind: OrganizationNodeKind, id: string | null);
+  /** Returns a teammate node. */
+  public static teammate(teammateId: string): OrganizationParent;
+  /** Returns a department node. */
+  public static department(departmentId: string): OrganizationParent;
+  /** Returns a department node, or the person for null. */
+  public static departmentOrPerson(departmentId: string | null): OrganizationParent;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationParent;
+  /** Returns whether both name the same node. */
+  public equals(other: OrganizationParent): boolean;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A teammate's place in the organization: what it sits under, and its order among the teammates there. */
+export declare class TeammatePlacement {
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** What it sits under. */
+  public readonly parent: OrganizationParent;
+  /** Its order among the teammates under the same parent, from 0. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id is blank, the teammate is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(teammateId: string, parent: OrganizationParent, order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): TeammatePlacement;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Whom the person writes to in the Organization view. */
 export declare enum OrganizationTargetKind {
   /** One teammate. */
   Teammate = "Teammate",
   /** A department's leader and its direct members. */
   Department = "Department",
-  /** Every department's leader. */
+  /** Everyone who reports to the person: every department's leader and each teammate in no department. */
   Leaders = "Leaders",
   /** Every teammate, in a department or not. */
   Everyone = "Everyone"
 }
 
-/** Where an organization message stands for one recipient. */
-export declare enum OrganizationRecipientState {
-  /** Not started yet. */
-  Queued = "Queued",
-  /** Its chat has the message and its reply started. */
-  Started = "Started",
-  /** The person stopped the message before it started. */
-  Stopped = "Stopped",
-  /** The teammate was deleted before it started. */
-  Removed = "Removed",
-  /** It couldn't start; the reason says why. */
-  Failed = "Failed"
-}
-
-/** Whom an organization message goes to. */
+/** Whom the person writes to in the Organization view. */
 export declare class OrganizationTarget {
-  /** Every department's leader. */
+  /** Everyone who reports to the person: every department's leader and each teammate in no department. */
   public static readonly leaders: OrganizationTarget;
   /** Every teammate. */
   public static readonly everyone: OrganizationTarget;
@@ -11922,114 +12417,93 @@ export declare class OrganizationTarget {
   public toJson(): JsonObject;
 }
 
-/** One teammate an organization message goes to, and where it stands. */
-export declare class OrganizationRecipient {
-  /** The teammate's id. */
-  public readonly teammateId: string;
-  /** The teammate's name when the message was sent. */
-  public readonly teammateName: string;
-  /** Where it stands. */
-  public readonly state: OrganizationRecipientState;
-  /** The chat it went to, once started. */
-  public readonly chatId: string | null;
-  /** The message in that chat, once started; its reply answers it. */
-  public readonly messageId: string | null;
-  /** Why it failed, or null. */
-  public readonly reason: string | null;
-  /** Creates a validated immutable value. */
-  public constructor(
-    teammateId: string,
-    teammateName: string,
-    state: OrganizationRecipientState,
-    chatId?: string | null,
-    messageId?: string | null,
-    reason?: string | null);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationRecipient;
-  /** Returns a copy in another state, keeping the fields not given. */
-  public with(state: OrganizationRecipientState, chatId?: string | null, messageId?: string | null, reason?: string | null): OrganizationRecipient;
-  /** Returns the wire representation. */
-  public toJson(): JsonObject;
-}
-
-/** A message sent from the organization view, and each of its recipients. */
-export declare class OrganizationMessage {
-  /** The id. */
-  public readonly id: string;
-  /** Whom it went to. */
-  public readonly target: OrganizationTarget;
-  /** The text. */
-  public readonly text: string;
-  /** When it was sent. */
-  public readonly createdAt: string;
-  /** The teammates it went to, in the order the target lists them. */
-  public readonly recipients: readonly OrganizationRecipient[];
+/**
+ * The key of a teammate's Organization chat: the organization and the teammate it talks with.
+ */
+export declare class OrganizationChat {
   /**
-   * Creates a validated immutable value.
-   * @throws ArgumentException when the text is blank or a teammate is a recipient twice.
+   * The organization's id.
    */
-  public constructor(
-    id: string,
-    target: OrganizationTarget,
-    text: string,
-    createdAt: string,
-    recipients: readonly OrganizationRecipient[]);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationMessage;
-  /** Returns a copy with one recipient replaced, by its teammate. */
-  public withRecipient(recipient: OrganizationRecipient): OrganizationMessage;
-  /** Returns the wire representation. */
+  public readonly organizationId: string;
+  /**
+   * The teammate's id.
+   */
+  public readonly teammateId: string;
+
+  /**
+   * Initializes the key.
+   * @param organizationId The organization's id.
+   * @param teammateId The teammate's id.
+   * @throws ArgumentException when an id is blank.
+   */
+  public constructor(organizationId: string, teammateId: string);
+
+  /**
+   * Reads a key from untrusted JSON.
+   * @param value The untrusted value, expected to carry `organizationId` and `teammateId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The key.
+   * @throws JsonException when a field is missing or blank.
+   */
+  public static fromJson(value: unknown, path?: string): OrganizationChat;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `organizationId` and `teammateId`.
+   */
   public toJson(): JsonObject;
 }
 
-/** Parameters for sending an organization message. */
-export declare class OrganizationMessageSendParams {
-  /** Whom it goes to. */
-  public readonly target: OrganizationTarget;
-  /** The text. */
-  public readonly text: string;
-  /** Creates a validated immutable value. */
-  public constructor(
-    target: OrganizationTarget,
-    text: string);
-  /** Reads a wire value and reports malformed fields at their JSON path. */
-  public static fromJson(value: unknown, path?: string): OrganizationMessageSendParams;
-  /** Returns the wire representation. */
-  public toJson(): JsonObject;
-}
-
-/** Parameters for creating a department. */
+/** Parameters for creating a department, last among the departments under its parent, with an optional first member who leads it. */
 export declare class DepartmentCreateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** The name. */
   public readonly name: string;
-  /** The department it goes under, or null for the person. */
-  public readonly parentId: string | null;
-  /** Creates a validated immutable value. */
+  /** The id of its node type, one of the organization's node types. */
+  public readonly typeId: string;
+  /** What it goes under. */
+  public readonly parent: OrganizationParent;
+  /** The teammate placed in it first, from wherever it was, as its leader, or null. */
+  public readonly leaderId: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the name is invalid or the type or leader id is blank.
+   */
   public constructor(
+    organizationId: string,
     name: string,
-    parentId: string | null);
+    typeId: string,
+    parent: OrganizationParent,
+    leaderId?: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentCreateParams;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
 
-/** Parameters for renaming a department or setting or clearing its leader; an omitted field stays. */
+/** Parameters for renaming a department, changing its node type, or setting or clearing its leader; an omitted field stays. */
 export declare class DepartmentUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
   /** The new name, or undefined to keep it. */
   public readonly name: string | undefined;
   /** The new leader, null to clear it, or undefined to keep it. */
   public readonly leaderId: string | null | undefined;
+  /** The id of its new node type, or undefined to keep it. */
+  public readonly typeId: string | undefined;
   /**
    * Creates a validated immutable value.
    * @throws ArgumentException when it changes nothing or a field is invalid.
    */
   public constructor(
+    organizationId: string,
     departmentId: string,
     name: string | undefined,
-    leaderId: string | null | undefined);
+    leaderId: string | null | undefined,
+    typeId?: string);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentUpdateParams;
   /**
@@ -12043,21 +12517,122 @@ export declare class DepartmentUpdateParams {
   public toJson(): JsonObject;
 }
 
+/** Parameters for adding a node type to an organization. */
+export declare class NodeTypeCreateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The name. */
+  public readonly name: string;
+  /** A Material Symbols name, or null for the default icon. */
+  public readonly icon: string | null;
+  /** A kit color's name or a #rrggbb color, or null for the default color. */
+  public readonly color: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the organization id is blank or the name, icon or color is invalid.
+   */
+  public constructor(organizationId: string, name: string, icon?: string | null, color?: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming a node type or setting or clearing its icon or color; an omitted field stays. */
+export declare class NodeTypeUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The node type's id. */
+  public readonly typeId: string;
+  /** The new name, or undefined to keep it. */
+  public readonly name: string | undefined;
+  /** The new icon, null to clear it, or undefined to keep it. */
+  public readonly icon: string | null | undefined;
+  /** The new color, null to clear it, or undefined to keep it. */
+  public readonly color: string | null | undefined;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when it changes nothing or a field is invalid.
+   */
+  public constructor(
+    organizationId: string,
+    typeId: string,
+    name: string | undefined,
+    icon: string | null | undefined,
+    color: string | null | undefined);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeUpdateParams;
+  /**
+   * Returns the node type with this update's changes.
+   * @param type The node type as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed node type.
+   */
+  public applyTo(type: NodeType, updatedAt: string): NodeType;
+  /** Returns the wire representation, without the omitted fields. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters naming one node type of an organization. */
+export declare class NodeTypeIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The node type's id. */
+  public readonly typeId: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when an id is blank.
+   */
+  public constructor(organizationId: string, typeId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for placing a teammate in the organization, or taking it out. */
+export declare class TeammatePlaceParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** What it goes under, or null to take it out of the organization. */
+  public readonly parent: OrganizationParent | null;
+  /** Its place among the teammates under the parent, from 0; a place past the last puts it last. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id is blank, the teammate is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    organizationId: string,
+    teammateId: string,
+    parent: OrganizationParent | null,
+    order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): TeammatePlaceParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
 /** Parameters for moving a department under another parent or to another place among its siblings. */
 export declare class DepartmentMoveParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
-  /** The department it goes under, or null for the person. */
-  public readonly parentId: string | null;
-  /** Its place among its new siblings, from 0; a place past the last puts it last. */
+  /** What it goes under. */
+  public readonly parent: OrganizationParent;
+  /** Its place among the departments under its new parent, from 0; a place past the last puts it last. */
   public readonly order: number;
   /**
    * Creates a validated immutable value.
    * @throws ArgumentException when a field is blank, the department is its own parent, or the order isn't a whole number from 0.
    */
   public constructor(
+    organizationId: string,
     departmentId: string,
-    parentId: string | null,
+    parent: OrganizationParent,
     order: number);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentMoveParams;
@@ -12065,12 +12640,70 @@ export declare class DepartmentMoveParams {
   public toJson(): JsonObject;
 }
 
+/** Parameters naming one organization. */
+export declare class OrganizationIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** Creates a validated immutable value. */
+  public constructor(organizationId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for creating an organization, placed last in the list. */
+export declare class OrganizationCreateParams {
+  /** The name. */
+  public readonly name: string;
+  /** The default folder of its teammates' Organization chats, or null for each chat's own folder. */
+  public readonly folder: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the name is invalid or the folder is blank.
+   */
+  public constructor(name: string, folder: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming an organization and setting its default folder. */
+export declare class OrganizationUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The new name, or undefined to keep the name. */
+  public readonly name: string | undefined;
+  /** The new default folder, null for each chat's own folder, or undefined to keep the folder. */
+  public readonly folder: string | null | undefined;
+  /**
+   * Creates a validated immutable value that changes only the fields it is given.
+   * @throws ArgumentException when the id or the folder is blank, the name is invalid, or neither field is given.
+   */
+  public constructor(organizationId: string, name: string | undefined, folder: string | null | undefined);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationUpdateParams;
+  /**
+   * Returns the organization with this update's name and folder, keeping each one it doesn't give.
+   * @param organization The organization as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed organization.
+   */
+  public applyTo(organization: Organization, updatedAt: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
 /** Parameters naming one department. */
 export declare class DepartmentIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
   /** Creates a validated immutable value. */
   public constructor(
+    organizationId: string,
     departmentId: string);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentIdParams;
@@ -12080,17 +12713,49 @@ export declare class DepartmentIdParams {
 
 /** Parameters for putting a teammate in a department, or in none. */
 export declare class DepartmentMemberSetParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** teammate Id. */
   public readonly teammateId: string;
   /** The department, or null for none. */
   public readonly departmentId: string | null;
   /** Creates a validated immutable value. */
   public constructor(
+    organizationId: string,
     teammateId: string,
     departmentId: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentMemberSetParams;
   /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The parameters of `OrganizationLayoutSave`: the Organization view's layout, a JSON object the window defines and
+ * TeamRun keeps as it is.
+ */
+export declare class OrganizationLayoutSaveParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /**
+   * The layout.
+   */
+  public readonly layout: JsonObject;
+
+  /**
+   * Initializes the parameters.
+   */
+  public constructor(organizationId: string, layout: JsonObject);
+
+  /**
+   * Reads the parameters from untrusted JSON.
+   * @throws JsonException when `organizationId` is missing or blank, or `layout` is missing or not an object.
+   */
+  public static fromJson(value: unknown, path?: string): OrganizationLayoutSaveParams;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   */
   public toJson(): JsonObject;
 }
 
@@ -13300,6 +13965,63 @@ export declare class ContextUsage {
 }
 
 /**
+ * What a teammate last said: its latest completed reply that has text, in any chat, as `TeammateLastReplyList` returns it.
+ */
+export declare class TeammateLastReply {
+  /**
+   * The `Teammate` id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The reply's chat id.
+   */
+  public readonly chatId: string;
+  /**
+   * The reply's message id.
+   */
+  public readonly messageId: string;
+  /**
+   * The reply's Text details, joined by spaces.
+   */
+  public readonly text: string;
+  /**
+   * ISO 8601 timestamp of the reply's end.
+   */
+  public readonly endedAt: string;
+
+  /**
+   * Initializes the teammate's last reply.
+   * @throws ArgumentException when a field is blank.
+   */
+  public constructor(teammateId: string, chatId: string, messageId: string, text: string, endedAt: string);
+
+  /**
+   * Reads the teammate's last reply from untrusted JSON.
+   * @param value The untrusted value, with `teammateId`, `chatId`, `messageId`, `text` and `endedAt`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @throws JsonException when a field is missing or blank.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateLastReply;
+
+  /**
+   * The last reply a message makes for its teammate, or `null` unless it is a teammate's completed reply whose Text details hold more than whitespace.
+   * @param message The message.
+   */
+  public static of(message: Message): TeammateLastReply | null;
+
+  /**
+   * Whether the other last reply has the same fields.
+   * @param other The other last reply.
+   */
+  public equals(other: TeammateLastReply): boolean;
+
+  /**
+   * Writes the last reply as JSON.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
  * A teammate's latest reply in a chat that reports usage, with its time, as `TeammateUsageList` returns it.
  */
 export declare class TeammateUsage {
@@ -13354,6 +14076,95 @@ export declare class TeammateUsage {
    * @throws JsonException when a field is missing or invalid.
    */
   public static fromJson(value: unknown, path?: string): TeammateUsage;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * What a teammate worked on, as `TeammateWorkRead` returns it, for its Organization card.
+ */
+export declare class TeammateWork {
+  /**
+   * The `Teammate` id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The working folder of the chat the teammate last answered in, or `null` when it hasn't answered.
+   */
+  public readonly folder: string | null;
+  /**
+   * The working folder of each chat the teammate answered in, each once, the latest answered first.
+   */
+  public readonly folders: readonly string[];
+  /**
+   * The Markdown and text files the teammate's replies created or changed, each once, the latest changed first.
+   */
+  public readonly documents: readonly TeammateDocument[];
+
+  /**
+   * Initializes the teammate's work.
+   * @param teammateId The teammate's id.
+   * @param folder The latest chat's folder, or `null`.
+   * @param folders The chats' folders.
+   * @param documents The documents.
+   * @throws ArgumentException when the id is blank, or `folder` isn't one of `folders`.
+   */
+  public constructor(teammateId: string, folder: string | null, folders: readonly string[], documents: readonly TeammateDocument[]);
+
+  /**
+   * Reads the teammate's work from untrusted JSON.
+   * @param value The untrusted value, with `teammateId`, the nullable `folder`, `folders` and `documents`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The teammate's work.
+   * @throws JsonException when a field is missing or invalid.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateWork;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * A Markdown or text file a teammate's reply created or changed.
+ */
+export declare class TeammateDocument {
+  /**
+   * The file's absolute path.
+   */
+  public readonly path: string;
+  /**
+   * The id of the chat whose reply last changed it.
+   */
+  public readonly chatId: string;
+  /**
+   * ISO 8601 timestamp of the end of the reply that last changed it.
+   */
+  public readonly changedAt: string;
+
+  /**
+   * Initializes the document.
+   * @param path The file's absolute path.
+   * @param chatId The chat's id.
+   * @param changedAt The reply's end.
+   * @throws ArgumentException when a value is blank.
+   */
+  public constructor(path: string, chatId: string, changedAt: string);
+
+  /**
+   * Reads the document from untrusted JSON.
+   * @param value The untrusted value, with `path`, `chatId` and `changedAt`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The document.
+   * @throws JsonException when a field is missing or invalid.
+   */
+  public static fromJson(value: unknown, path?: string): TeammateDocument;
 
   /**
    * Renders the JSON object `fromJson` accepts.

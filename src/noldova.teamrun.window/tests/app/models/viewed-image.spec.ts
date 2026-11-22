@@ -11,9 +11,16 @@ import { MessageAttachment } from "@noldova/teamrun.protocol";
 import { ImageViewerData } from "../../../src/app/models/image-viewer-data";
 import { ViewedImage } from "../../../src/app/models/viewed-image";
 import { ImageHeaders } from "../../fixtures/image-headers.fixture";
+import { InstanceCase } from "../../fixtures/instance-case.fixture";
+import { PartReadError } from "../../fixtures/part-read-error.fixture";
 
 describe("ViewedImage", () => {
   const attachment = new MessageAttachment("plan.png", "image/png", 12, "D:/data/attachments/c1/plan.png");
+  const required = (image: ViewedImage | null): ViewedImage => {
+    if (Object.isNull(image))
+      throw new PartReadError("The spec's image wasn't read.");
+    return image;
+  };
 
   it("views a conversation's attachment by its saved path", () => {
     const image = ViewedImage.of("c1", attachment);
@@ -35,8 +42,8 @@ describe("ViewedImage", () => {
 
     expect([image?.key, image?.conversationId, image?.name, image?.mediaType, image?.path, image?.data, image?.messageId])
       .toEqual(["m4:markdown:2", "c1", "Image", "image/png", null, png, null]);
-    expect([["image/jpeg", ImageHeaders.jpeg(600, 300)], ["image/gif", ImageHeaders.gif(600, 300)], ["image/webp", ImageHeaders.lossyWebp(600, 300)],
-      ["image/svg+xml", "AAAA"]].map(([type, data]) => ViewedImage.fromDataUrl("c1", "m4", 0, `data:${type};base64,${data}`)?.mediaType))
+    expect([`data:image/jpeg;base64,${ImageHeaders.jpeg(600, 300)}`, `data:image/gif;base64,${ImageHeaders.gif(600, 300)}`,
+      `data:image/webp;base64,${ImageHeaders.lossyWebp(600, 300)}`, "data:image/svg+xml;base64,AAAA"].map(t => ViewedImage.fromDataUrl("c1", "m4", 0, t)?.mediaType))
       .toEqual(["image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
     expect(["data:text/html;base64,PGI+", "data:image/svg+xml,<svg/>", "data:image/png;base64,AA*A", "data:image/bmp;base64,Qk0=", "data:image/png;base64,AAAA",
       "https://example.com/a.png", "out/a.png"].map(t => ViewedImage.fromDataUrl("c1", "m4", 0, t))).toEqual([null, null, null, null, null, null, null]);
@@ -53,11 +60,12 @@ describe("ViewedImage", () => {
   });
 
   it("views a data URL only up to 40 million pixels, as its header says, before anything decodes it", () => {
-    const cases: readonly [string, string][] = [["image/png", ImageHeaders.png(8000, 5000)], ["image/png", ImageHeaders.png(8000, 5001)],
-      ["image/jpeg", ImageHeaders.jpeg(10_000, 4000)], ["image/jpeg", ImageHeaders.jpeg(10_000, 4001)], ["image/gif", ImageHeaders.gif(65_535, 65_535)],
-      ["image/webp", ImageHeaders.extendedWebp(16_383, 16_383)], ["image/webp", ImageHeaders.losslessWebp(5000, 8000)]];
+    const urls: readonly string[] = [`data:image/png;base64,${ImageHeaders.png(8000, 5000)}`, `data:image/png;base64,${ImageHeaders.png(8000, 5001)}`,
+      `data:image/jpeg;base64,${ImageHeaders.jpeg(10_000, 4000)}`, `data:image/jpeg;base64,${ImageHeaders.jpeg(10_000, 4001)}`,
+      `data:image/gif;base64,${ImageHeaders.gif(65_535, 65_535)}`, `data:image/webp;base64,${ImageHeaders.extendedWebp(16_383, 16_383)}`,
+      `data:image/webp;base64,${ImageHeaders.losslessWebp(5000, 8000)}`];
 
-    expect(cases.map(([type, data]) => !Object.isNull(ViewedImage.fromDataUrl("c1", "m4", 0, `data:${type};base64,${data}`))))
+    expect(urls.map(t => !Object.isNull(ViewedImage.fromDataUrl("c1", "m4", 0, t))))
       .toEqual([true, false, true, false, false, false, true]);
   });
 
@@ -100,25 +108,31 @@ describe("ViewedImage", () => {
     expect(ViewedImage.fromInstance(generated.toInstance())).toEqual(new ViewedImage("d7", "c1", "Generated image", "image/webp", null, null));
   });
 
-  it.each([
-    ["text that isn't JSON", "plan.png"],
-    ["a list", "[]"],
-    ["no key", JSON.stringify({ chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png" })],
-    ["a number for a name", JSON.stringify({ key: "k", chatId: "c1", name: 7, mediaType: "image/png", path: "a.png" })],
-    ["a path that is neither text nor null", JSON.stringify({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: 3 })],
-    ["a message that is neither text nor null", JSON.stringify({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png", messageId: 3 })],
-    ["a chat that is neither text nor null", JSON.stringify({ key: "k", chatId: 3, conversationId: "c1", name: "a.png", mediaType: "image/png", path: "a.png" })],
-    ["an earlier version's chat that is neither text nor null", JSON.stringify({ key: "k", conversationId: 3, name: "a.png", mediaType: "image/png", path: "a.png" })]
-  ])("refuses an instance with %s", (_, instance) => {
-    expect(ViewedImage.fromInstance(instance)).toBeNull();
-  });
+  const refusedInstances: readonly InstanceCase[] = [
+    new InstanceCase("text that isn't JSON", "plan.png"),
+    new InstanceCase("a list", "[]"),
+    new InstanceCase("no key", JSON.stringify({ chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png" })),
+    new InstanceCase("a number for a name", JSON.stringify({ key: "k", chatId: "c1", name: 7, mediaType: "image/png", path: "a.png" })),
+    new InstanceCase("a path that is neither text nor null", JSON.stringify({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: 3 })),
+    new InstanceCase("a message that is neither text nor null",
+      JSON.stringify({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png", messageId: 3 })),
+    new InstanceCase("a chat that is neither text nor null",
+      JSON.stringify({ key: "k", chatId: 3, conversationId: "c1", name: "a.png", mediaType: "image/png", path: "a.png" })),
+    new InstanceCase("an earlier version's chat that is neither text nor null",
+      JSON.stringify({ key: "k", conversationId: 3, name: "a.png", mediaType: "image/png", path: "a.png" }))
+  ];
+
+  for (const refused of refusedInstances)
+    it(`refuses an instance with ${refused.name}`, () => {
+      expect(ViewedImage.fromInstance(refused.instance)).toBeNull();
+    });
 
   it("keeps its chat as chatId in a tab's instance, and reads the chat of a tab an earlier version kept as conversationId", () => {
     const earlier = { key: "k", conversationId: "c1", name: "a.png", mediaType: "image/png", path: "a.png", messageId: "m1" };
     const image = ViewedImage.fromInstance(JSON.stringify(earlier));
 
     expect(image).toEqual(new ViewedImage("k", "c1", "a.png", "image/png", "a.png", null, "m1"));
-    expect(JSON.parse(image!.toInstance())).toEqual({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png", messageId: "m1" });
+    expect(JSON.parse(required(image).toInstance())).toEqual({ key: "k", chatId: "c1", name: "a.png", mediaType: "image/png", path: "a.png", messageId: "m1" });
     expect(ViewedImage.fromInstance(JSON.stringify({ ...earlier, chatId: null }))?.conversationId).toBeNull();
   });
 
@@ -130,5 +144,13 @@ describe("ViewedImage", () => {
 
     expect([among.images, among.index]).toEqual([[first, second], 1]);
     expect([alone.images, alone.index]).toEqual([[second], 0]);
+  });
+
+  it("reads the image at a place among the viewer's images, and the chosen image at a place past them", () => {
+    const first = ViewedImage.of("c1", attachment);
+    const second = ViewedImage.fromData("d7", "c1", "Generated image", "image/png", "iVBORw==");
+    const data = new ImageViewerData(second, [first, second]);
+
+    expect([data.imageAt(0), data.imageAt(1), data.imageAt(2), data.imageAt(-1)]).toEqual([first, second, second, second]);
   });
 });

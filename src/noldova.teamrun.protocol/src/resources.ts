@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class Resources {
   public static readonly mentionMarker: string = "@";
   public static readonly mentionEscape: string = "\\";
@@ -67,6 +69,7 @@ export class Resources {
   public static readonly invalidOutsideLabel: string = "An outside sender's label must be 1 to 40 characters on one line, with no line break, other control or format character, or @, and not only spaces.";
   public static readonly outsideSenderWithTeammate: string = "An outside sender has no teammate id.";
   public static readonly invalidTeammateName: string = "A teammate name must be 1 to 100 characters, where a separate accent or vowel sign counts as one: letters, digits, dash or underscore, with single spaces between words.";
+  public static readonly teammateWorkFolderUnlisted: string = "The folder a teammate last worked in must be one of its folders.";
   public static readonly invalidHarness: string = "The teammate harness is not supported.";
   public static readonly emptyTeammateUpdate: string = "A teammate update must change at least one field.";
   public static readonly teammateUpdateProviderUnread: string = "A teammate update that sets its model, effort, speed or mode must name the provider it read, or a new one.";
@@ -123,6 +126,8 @@ export class Resources {
   public static readonly approvedResponderPlanField: string = "approvedResponderPlan";
   public static readonly titleChosenField: string = "titleChosen";
   public static readonly attachedFolderField: string = "attachedFolder";
+  public static readonly organizationChatField: string = "organizationChat";
+  public static readonly organizationIdField: string = "organizationId";
   public static readonly expectedProviderIdField: string = "expectedProviderId";
   public static readonly unrestrictedField: string = "unrestricted";
   public static readonly attachmentsField: string = "attachments";
@@ -295,14 +300,16 @@ export class Resources {
   public static readonly tokensField: string = "tokens";
   public static readonly durationMsField: string = "durationMs";
   public static readonly updatedAtField: string = "updatedAt";
-  public static readonly parentIdField: string = "parentId";
+  public static readonly parentField: string = "parent";
+  public static readonly placementsField: string = "placements";
   public static readonly leaderIdField: string = "leaderId";
+  public static readonly typeIdField: string = "typeId";
+  public static readonly nodeTypesField: string = "nodeTypes";
+  public static readonly iconField: string = "icon";
+  public static readonly colorField: string = "color";
   public static readonly orderField: string = "order";
   public static readonly departmentIdField: string = "departmentId";
   public static readonly departmentsField: string = "departments";
-  public static readonly membersField: string = "members";
-  public static readonly targetField: string = "target";
-  public static readonly recipientsField: string = "recipients";
   public static readonly revisionField: string = "revision";
   public static readonly missingField: string = "missing";
   public static readonly stateField: string = "state";
@@ -334,11 +341,16 @@ export class Resources {
   public static readonly accountNotReported: string = "Account not reported";
   public static readonly rootPathField: string = "rootPath";
   public static readonly folderField: string = "folder";
+  public static readonly foldersField: string = "folders";
+  public static readonly documentsField: string = "documents";
+  public static readonly changedAtField: string = "changedAt";
   public static readonly projectIdField: string = "projectId";
   public static readonly projectField: string = "project";
   public static readonly folderMissingField: string = "folderMissing";
   public static readonly titleField: string = "title";
   public static readonly chatIdField: string = "chatId";
+  public static readonly toChatIdField: string = "toChatId";
+  public static readonly sendIdField: string = "sendId";
   public static readonly conversationIdField: string = Resources.chatIdField;
   public static readonly shownChatIdField: string = "shownChatId";
   public static readonly shownConversationIdField: string = Resources.shownChatIdField;
@@ -464,6 +476,7 @@ export class Resources {
   public static readonly sessionResetField: string = "sessionReset";
   public static readonly editedField: string = "edited";
   public static readonly chosenField: string = "chosen";
+  public static readonly startField: string = "start";
   public static readonly forkedSessionField: string = "forkedSession";
   public static readonly sessionKeptField: string = "sessionKept";
   public static readonly restoreRefusalField: string = "restoreRefusal";
@@ -556,11 +569,28 @@ export class Resources {
   public static readonly invalidDepartmentName: string = "A department name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
   public static readonly invalidDepartmentOrder: string = "A department's order among its siblings is a whole number from 0.";
   public static readonly departmentOwnParent: string = "A department can't be its own parent.";
+  public static readonly emptyOrganizationUpdate: string = "An organization update must change its name, its folder or both.";
   public static readonly emptyDepartmentUpdate: string = "A department update must change its name, its leader or both.";
   public static readonly duplicateDepartment: string = "Each department of an organization has its own id.";
-  public static readonly unknownParentDepartment: string = "A department's parent is a department of the same organization.";
-  public static readonly unknownMemberDepartment: string = "A teammate's department is a department of the same organization.";
-  public static readonly teammateInTwoDepartments: string = "A teammate is in at most one department.";
+  public static readonly invalidNodeTypeName: string = "A node type's name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
+  public static readonly nodeTypeIconPattern: RegExp = /^[a-z0-9_]{1,64}$/u;
+  public static readonly invalidNodeTypeIcon: string = "A node type's icon is a Material Symbols name of 1 to 64 lowercase letters, digits or underscores, or null.";
+  public static readonly nodeTypeColorPattern: RegExp = /^(#[0-9a-f]{6}|[a-z][a-z0-9-]{0,63})$/u;
+  public static readonly invalidNodeTypeColor: string = "A node type's color is a kit color's name, a #rrggbb color in lowercase, or null.";
+  public static readonly duplicateNodeType: string = "Each node type of an organization has its own id and its own name.";
+  public static readonly unknownNodeType: string = "A department's type is one of its organization's node types.";
+  public static readonly emptyNodeTypeUpdate: string = "A node type update changes its name, icon or color.";
+  public static readonly nodeTypeInUse: string = "A node type that a department has can't be deleted; give those departments another type first.";
+  public static readonly organizationParentIdRequired: string = "A teammate or department parent names its id; the person names none.";
+  public static readonly organizationNodeUnderItself: string = "A teammate or department can't be under itself.";
+  public static readonly invalidOrganizationOrder: string = "A place's order among its siblings is a whole number from 0.";
+  public static readonly unknownOrganizationParent: string = "A parent is the person, a placed teammate or a department of the same organization.";
+  public static readonly teammatePlacedTwice: string = "A teammate has at most one place in the organization.";
+  public static readonly invalidOrganizationName: string = "An organization name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
+  public static readonly blankOrganizationFolder: string = "An organization's default folder is a path or null, never blank.";
+  public static readonly invalidOrganizationListOrder: string = "An organization's order in the list is a whole number from 0.";
+  public static readonly defaultOrganizationId: string = "my-organization";
+  public static readonly personCannotMove: string = "The person stays at the top of the organization.";
   public static readonly targetIdRequired: string = "A teammate or department target names its id; leaders and everyone name none.";
   public static readonly recipientTwice: string = "A teammate is a recipient of a message at most once.";
   public static readonly usageHandOffRepeated: string = "A teammate's usage hand-offs name each teammate once.";
@@ -798,6 +828,6 @@ export class Resources {
   }
 
   public static formatMcpToolFailure(code: string, moduleCode: string | null, message: string): string {
-    return moduleCode === null ? `${code}: ${message}` : `${code} (${moduleCode}): ${message}`;
+    return Object.isNull(moduleCode) ? `${code}: ${message}` : `${code} (${moduleCode}): ${message}`;
   }
 }

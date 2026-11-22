@@ -9,16 +9,19 @@
 import fs, { mkdirSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
+import { mock } from "node:test";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ProjectImageReader } from "@noldova/teamrun.core";
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
+import { SystemCallError } from "../../fixtures/system-call-error.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 
 @TestClass
 export class FileSystemErrorsTests {
   @TestMethod
   public takesAnErrorWithAStringSyscallAsTheFileSystemsSoAReadIsRefusedAsGone(): void {
-    const error = Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" });
+    const error = new SystemCallError("EIO: i/o error, read", "EIO", "read");
 
     const thrown = FileSystemErrorsTests.readThrowing(error);
 
@@ -34,15 +37,14 @@ export class FileSystemErrorsTests {
 
   @TestMethod
   public letsAnErrorWhoseSyscallIsNotAStringThrough(): void {
-    const errors: unknown[] = [Object.assign(new Error("A number."), { code: "EIO", syscall: 1 }),
-      Object.assign(new Error("Nothing."), { code: "EIO", syscall: undefined })];
+    const errors: unknown[] = [new SystemCallError("A number.", "EIO", 1), new SystemCallError("Nothing.", "EIO", undefined)];
 
     Assert.areEqual(JSON.stringify([true, true]), JSON.stringify(errors.map(t => FileSystemErrorsTests.readThrowing(t) === t)));
   }
 
   @TestMethod
   public letsAnErrorWithACodeButNoSyscallThrough(): void {
-    const error = Object.assign(new Error("ENOENT, but from no file call."), { code: "ENOENT" });
+    const error = new CodedError("ENOENT, but from no file call.", "ENOENT");
 
     Assert.areEqual(true, FileSystemErrorsTests.readThrowing(error) === error);
   }
@@ -56,10 +58,9 @@ export class FileSystemErrorsTests {
     size.writeUInt32BE(2, 0);
     size.writeUInt32BE(3, 4);
     writeFileSync(path, Buffer.concat([Buffer.from("89504e470d0a1a0a0000000d", "hex"), Buffer.from("IHDR", "latin1"), size, Buffer.alloc(5)]));
-    const original = fs.readSync;
-    fs.readSync = () => {
+    const read = mock.method(fs, "readSync", (): number => {
       throw error;
-    };
+    });
     syncBuiltinESMExports();
     try {
       ProjectImageReader.read(project, path);
@@ -69,7 +70,7 @@ export class FileSystemErrorsTests {
       return caught;
     }
     finally {
-      fs.readSync = original;
+      read.mock.restore();
       syncBuiltinESMExports();
     }
   }

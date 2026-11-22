@@ -449,6 +449,10 @@ export class Resources {
     return `"${command}"`;
   }
 
+  public static formatHandlerMissing(name: string): string {
+    return `TeamRun has no command or method ${name} for its tool.`;
+  }
+
   public static formatDatabaseFileName(moduleId: string): string {
     return `${moduleId}${Resources.databaseFileExtension}`;
   }

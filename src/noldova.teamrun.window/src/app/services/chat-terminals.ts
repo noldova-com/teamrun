@@ -41,7 +41,7 @@ export class ChatTerminals {
     this.store = store;
     this.owners = TerminalOwners.provide(context, () => this.newOwner());
     this.runner = runner ?? this.owners;
-    this.inline = inline?.(this.owners, { listAsync: t => this.listKeptAsync(t), save: (owner, run) => this.keep(owner, run) }) ?? null;
+    this.inline = inline?.(this.owners, { listAsync: t => this.listKeptAsync(t), save: (owner, run) => this.keepAsync(owner, run) }) ?? null;
     this.unwatch = store.onShownConversationChanged(t => this.show(t));
     this.unwatchDeleted = context.onEvent(Resources.formatQualifiedName(EventName.ConversationDeleted), t => this.close(ConversationIdParams.fromJson(t).conversationId));
     this.show(store.shownConversationId());
@@ -175,11 +175,15 @@ export class ChatTerminals {
     }
   }
 
-  private keep(owner: string, run: IStoredRun): void {
+  private async keepAsync(owner: string, run: IStoredRun): Promise<void> {
     const conversationId = ChatTerminals.conversationOf(owner);
     const output = new RunOutput(conversationId, run.place.messageId, run.place.site, run.place.block, run.output.toJson());
-    this.context.requestAsync(Resources.formatQualifiedName(MethodName.RunOutputSave), output.toJson()).catch((error: unknown) =>
-      this.store.reportFailure(ChatAction.KeepRunOutput, conversationId, ChatTerminals.messageOf(error), conversationId));
+    try {
+      await this.context.requestAsync(Resources.formatQualifiedName(MethodName.RunOutputSave), output.toJson());
+    }
+    catch (error) {
+      this.store.reportFailure(ChatAction.KeepRunOutput, conversationId, ChatTerminals.messageOf(error), conversationId);
+    }
   }
 
   private static conversationOf(owner: string): string {

@@ -179,7 +179,7 @@ export class CodexAdapter implements IProviderAdapter {
     log: ILog | null = null,
     platform: string = process.platform,
     sweep: IOrphanSweep = new ProcessTree(platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace, undefined,
-      PowershellSession.shared),
+      PowershellSession.shared, undefined, log),
     idleTimer: ITimer = new NodeTimer()) {
     this.log = log;
     this.idleTimer = idleTimer;
@@ -912,7 +912,7 @@ export class CodexAdapter implements IProviderAdapter {
       await target.onObservedAsync(parent.observed);
       const turn = new CodexTurn(parent.threadId, target, parent.observed, this.itemReader, new DeltaStream(target, this.timings.streamInterval));
       target.end(await this.runTurnOnThread(client, turn, target, [CodexAdapter.textInputOf(Resources.codexWakePrompt)],
-        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, held.mode, held.model, held.effort, held.cwd, held.params, null, null));
+        this.totals.get(parent.threadId) ?? null, signal, () => undefined, null, null, null, held, null, null, target.planFirst ? Resources.codexPlanMode : target.mode ?? held.mode, held.model, held.effort, held.cwd, held.params, null, null));
     }
     finally {
       release();

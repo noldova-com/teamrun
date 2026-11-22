@@ -6,20 +6,24 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type Signal, type WritableSignal, computed, effect, inject, input, signal, untracked }
+import { Component, DestroyRef, type InputSignal, type Signal, type WritableSignal, computed, effect, inject, input, signal, untracked }
   from "@angular/core";
 
 import "@noldova/context.core";
+import { WindowPartTokens } from "@noldova/desktop.window";
 import { NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 import { IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, TooltipDirective } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { CatalogReads } from "../../models/catalog-reads";
+import { CatalogSource } from "../../models/catalog-source";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ConversationActions } from "../../services/conversation-actions";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
 import { ComposerDefaultService } from "../../services/composer-default.service";
+import { EngineResync } from "../../services/engine-resync";
 import { FormatterService } from "../../services/formatter.service";
 import { UsageFormatterService } from "../../services/usage-formatter.service";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -50,6 +54,7 @@ export class ConversationMembersComponent {
   protected readonly attachedFolder: Signal<string | null> = computed(() => this.store.conversation(this.conversationId())?.attachedFolder ?? null);
   protected readonly others: Signal<readonly Teammate[]> = computed(() => this.store.teammates().filter(t => !this.members().includes(t)));
   private readonly catalogs: WritableSignal<ReadonlyMap<string, ModelCatalog>> = signal(new Map());
+  private readonly catalogReads: CatalogReads = new CatalogReads();
   private readonly defaultSettings: Signal<ComposerSettings | null> = computed(() => this.choices.choiceOf(this.conversationId())
     ?? ComposerSettings.startingWith(this.store.defaultTeammate(), this.defaults.defaultChoice()));
   private readonly defaultKind: Signal<string | null> = computed(() => this.defaultSettings()?.kind ?? this.store.kinds()[0]?.id ?? null);
@@ -66,15 +71,21 @@ export class ConversationMembersComponent {
   });
 
   public constructor() {
+    const resynced: WritableSignal<number> = signal(0);
+    inject(DestroyRef).onDestroy(EngineResync.on(inject(WindowPartTokens.context), () => resynced.update(t => t + 1)));
     effect(() => {
+      resynced();
       const kind = this.defaultKind();
-      const teammates = this.store.teammates().filter(t => !this.store.isTeammateUnavailable(t.id))
-        .map((t): [string, string | null] => [this.store.providers().find(u => u.id === t.providerId)!.kind, t.providerId]);
-      const wanted: readonly [string, string | null][] = Object.isNull(kind) ? teammates : [...teammates, [kind, this.defaultSettings()?.providerId ?? null]];
+      const teammates = this.store.teammates().flatMap(t => {
+        const provider = this.store.providers().find(u => u.id === t.providerId);
+        return Object.isUndefined(provider) || this.store.isTeammateUnavailable(t.id) ? [] : [new CatalogSource(provider.kind, t.providerId)];
+      });
+      const wanted: readonly CatalogSource[] = Object.isNull(kind) ? teammates : [...teammates, new CatalogSource(kind, this.defaultSettings()?.providerId ?? null)];
       untracked(() => {
-        for (const [wantedKind, provider] of wanted)
-          void this.store.modelCatalogs.load(wantedKind, provider)
-            .then(t => this.catalogs.update(u => new Map(u).set(ConversationMembersComponent.catalogKey(wantedKind, provider), t)));
+        for (const source of wanted) {
+          const key = ConversationMembersComponent.catalogKey(source.kind, source.providerId);
+          this.catalogReads.follow(key, this.store.modelCatalogs.load(source.kind, source.providerId), t => this.catalogs.update(u => new Map(u).set(key, t)));
+        }
       });
     });
   }
