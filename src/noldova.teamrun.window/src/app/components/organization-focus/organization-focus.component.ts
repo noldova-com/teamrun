@@ -32,6 +32,7 @@ import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.compone
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
