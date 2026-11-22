@@ -48,6 +48,36 @@ import { BoundingWork } from "../../fixtures/bounding-work.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 
+class ProviderLabelCase {
+  public readonly kind: string;
+  public readonly label: string;
+
+  public constructor(kind: string, label: string) {
+    this.kind = kind;
+    this.label = label;
+  }
+}
+
+class ProfileFolderCase {
+  public readonly label: string;
+  public readonly folder: string;
+
+  public constructor(label: string, folder: string) {
+    this.label = label;
+    this.folder = folder;
+  }
+}
+
+class SignOutCase {
+  public readonly provider: Provider;
+  public readonly failure: Error | null;
+
+  public constructor(provider: Provider, failure: Error | null) {
+    this.provider = provider;
+    this.failure = failure;
+  }
+}
+
 @TestClass
 export class ProvidersServiceTests {
   @TestMethod
@@ -70,8 +100,10 @@ export class ProvidersServiceTests {
     await using host = await CoreHost.createAsync();
     host.registry.register(new FakeProviderAdapter("other"));
 
-    for (const [kind, label] of [["other", "Carl"], ["fake", "zeta"], ["fake", "Émile"], ["other", "beta"], ["fake", "alpha"], ["fake", "edgar"]] as const)
-      await host.createProviderAsync(kind, label);
+    const cases = [new ProviderLabelCase("other", "Carl"), new ProviderLabelCase("fake", "zeta"), new ProviderLabelCase("fake", "Émile"), new ProviderLabelCase("other", "beta"),
+      new ProviderLabelCase("fake", "alpha"), new ProviderLabelCase("fake", "edgar")];
+    for (const t of cases)
+      await host.createProviderAsync(t.kind, t.label);
 
     Assert.areEqual(["fake alpha", "fake edgar", "fake Émile", "fake zeta", "other beta", "other Carl"].join(), (await host.providers.listAsync()).map(t => `${t.kind} ${t.label}`).join());
   }
@@ -80,16 +112,17 @@ export class ProvidersServiceTests {
   public async makesANewEmptyPrivateProfileFolderNamedAfterTheLabel(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const folder = (name: string): string => join(host.directory.path, "profiles", "fake", name);
-    const labels: readonly (readonly [string, string])[] = [
-      ["Work", "Work"], ["a/b\\c:d*e?f\"g<h>i|j\u0001k", "a-b-c-d-e-f-g-h-i-j-k"], ["  ..Team. .", "Team"], ["CON", "_CON"], ["nul.txt", "_nul.txt"],
-      ["COM0", "_COM0"], ["LPT³", "_LPT³"], ["COM10", "COM10"], ["x".repeat(70), "x".repeat(60)], ["\u{1F600}".repeat(70), "\u{1F600}".repeat(60)], [`${"a".repeat(59)}. b`, "a".repeat(59)]];
+    const cases = [
+      new ProfileFolderCase("Work", "Work"), new ProfileFolderCase("a/b\\c:d*e?f\"g<h>i|j\u0001k", "a-b-c-d-e-f-g-h-i-j-k"), new ProfileFolderCase("  ..Team. .", "Team"), new ProfileFolderCase("CON", "_CON"),
+      new ProfileFolderCase("nul.txt", "_nul.txt"), new ProfileFolderCase("COM0", "_COM0"), new ProfileFolderCase("LPT³", "_LPT³"), new ProfileFolderCase("COM10", "COM10"),
+      new ProfileFolderCase("x".repeat(70), "x".repeat(60)), new ProfileFolderCase("\u{1F600}".repeat(70), "\u{1F600}".repeat(60)), new ProfileFolderCase(`${"a".repeat(59)}. b`, "a".repeat(59))];
 
     const created: Provider[] = [];
-    for (const [label] of labels)
-      created.push(await host.providers.createAsync(new ProviderCreateParams("fake", label, null)));
+    for (const t of cases)
+      created.push(await host.providers.createAsync(new ProviderCreateParams("fake", t.label, null)));
 
-    Assert.areEqual(labels.map(([, name]) => folder(name)).join("\n"), created.map(t => t.profileDir).join("\n"));
-    Assert.areEqual(labels.length, (await host.providers.listAsync()).length);
+    Assert.areEqual(cases.map(t => folder(t.folder)).join("\n"), created.map(t => t.profileDir).join("\n"));
+    Assert.areEqual(cases.length, (await host.providers.listAsync()).length);
     for (const provider of created)
       Assert.areEqual(0, readdirSync(provider.profileDir).length);
     if (process.platform !== "win32")
@@ -341,7 +374,7 @@ export class ProvidersServiceTests {
     Assert.areEqual(AuthStatus.LoggedIn, checked.authStatus);
     Assert.areEqual("dev@example.com", checked.identity?.email);
     Assert.areEqual("1.0.0", checked.harnessVersion);
-    Assert.isFalse(checked.lastCheckedAt === null);
+    Assert.isFalse(Object.isNull(checked.lastCheckedAt));
     Assert.areEqual(AuthStatus.Error, failed.authStatus);
     Assert.areEqual("codex.exe not found", failed.lastError);
     Assert.areEqual(AuthStatus.Error, (await host.providers.findAsync(provider.id))?.authStatus);
@@ -396,11 +429,15 @@ export class ProvidersServiceTests {
     Assert.isTrue(kept.ownMcpServers);
     Assert.isFalse(moved.ownMcpServers);
     Assert.isTrue(movedOn.ownMcpServers);
-    Assert.isTrue((await host.providers.findAsync(provider.id))!.ownMcpServers);
+    const stored = await host.providers.findAsync(provider.id);
+    Assert.isNotNull(stored);
+    Assert.isTrue(stored.ownMcpServers);
     Assert.isFalse(off.ownMcpServers);
     Assert.areEqual(ErrorCode.InvalidParams, refused.info.name);
     Assert.areEqual("Fake provider can't switch on its own MCP servers here: it reads its servers only with the person's settings.", refused.info.message);
-    Assert.isFalse((await host.providers.findAsync(sealed.id))!.ownMcpServers);
+    const storedSealed = await host.providers.findAsync(sealed.id);
+    Assert.isNotNull(storedSealed);
+    Assert.isFalse(storedSealed.ownMcpServers);
   }
 
   @TestMethod
@@ -524,23 +561,33 @@ export class ProvidersServiceTests {
     const member = new ConversationMemberParams(conversation.id, alice.id);
 
     await host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Personal", provider.profileDir));
-    const renamedSession = (await host.conversations.findMemberAsync(member))?.nativeSessionId ?? null;
-    const renamedReset = (await host.conversations.findAsync(conversation.id))?.sessionReset ?? true;
+    const renamedMember = await host.conversations.findMemberAsync(member);
+    const renamed = await host.conversations.findAsync(conversation.id);
+    Assert.isNotNull(renamedMember);
+    Assert.isNotNull(renamed);
+    const renamedSession = renamedMember.nativeSessionId;
+    const renamedReset = renamed.sessionReset;
     await host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Personal", join(host.directory.path, "profiles", "moved")));
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "Again", settings, provider.id));
     await host.engine.waitForIdle();
-    const direct = host.adapter.requests.at(-1)!.resumeNativeSessionId;
+    const directRequest = host.adapter.requests.at(-1);
+    Assert.isDefined(directRequest);
+    const direct = directRequest.resumeNativeSessionId;
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice again", null, null, [], [alice.id]));
     await host.engine.waitForIdle();
-    const teammate = host.adapter.requests.at(-1)!.resumeNativeSessionId;
+    const teammateRequest = host.adapter.requests.at(-1);
+    Assert.isDefined(teammateRequest);
+    const teammate = teammateRequest.resumeNativeSessionId;
     await host.engine.sendAsync(new MessageSendParams(untouched.id, "Again", settings, other.id));
     await host.engine.waitForIdle();
+    const untouchedRequest = host.adapter.requests.at(-1);
 
     Assert.isFalse(Object.isNull(renamedSession));
     Assert.isFalse(renamedReset);
     Assert.isNull(direct);
     Assert.isNull(teammate);
-    Assert.isFalse(Object.isNull(host.adapter.requests.at(-1)!.resumeNativeSessionId));
+    Assert.isDefined(untouchedRequest);
+    Assert.isFalse(Object.isNull(untouchedRequest.resumeNativeSessionId));
   }
 
   @TestMethod
@@ -553,8 +600,9 @@ export class ProvidersServiceTests {
     await host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Work", join(host.directory.path, "profiles", "moved")));
 
     const reset = await host.conversations.findAsync(conversation.id);
-    Assert.isFalse(reset?.sessionReset ?? true);
-    Assert.isNull(reset?.forkedSession ?? null);
+    Assert.isNotNull(reset);
+    Assert.isFalse(reset.sessionReset);
+    Assert.isNull(reset.forkedSession);
   }
 
   @TestMethod
@@ -567,7 +615,9 @@ export class ProvidersServiceTests {
     const reply = async (providerId: string): Promise<string | null> => {
       await host.engine.sendAsync(new MessageSendParams(conversation.id, "Hello", settings, providerId));
       await host.engine.waitForIdle();
-      return host.adapter.requests.at(-1)!.resumeNativeSessionId;
+      const request = host.adapter.requests.at(-1);
+      Assert.isDefined(request);
+      return request.resumeNativeSessionId;
     };
     await reply(moved.id);
     await reply(kept.id);
@@ -584,7 +634,9 @@ export class ProvidersServiceTests {
     Assert.isNull(afterMoveOnMoved);
     Assert.isFalse(Object.isNull(freshOnMoved));
     Assert.areEqual(freshOnMoved, againOnMoved);
-    Assert.isFalse((await host.conversations.findAsync(conversation.id))?.sessionReset ?? true);
+    const stored = await host.conversations.findAsync(conversation.id);
+    Assert.isNotNull(stored);
+    Assert.isFalse(stored.sessionReset);
   }
 
   @TestMethod
@@ -596,7 +648,9 @@ export class ProvidersServiceTests {
     const reply = async (): Promise<string | null> => {
       await host.engine.sendAsync(new MessageSendParams(conversation.id, "Hello", settings, provider.id));
       await host.engine.waitForIdle();
-      return host.adapter.requests.at(-1)!.resumeNativeSessionId;
+      const request = host.adapter.requests.at(-1);
+      Assert.isDefined(request);
+      return request.resumeNativeSessionId;
     };
     await reply();
     await host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Work", join(host.directory.path, "profiles", "first")));
@@ -619,7 +673,9 @@ export class ProvidersServiceTests {
     const refused = await Assert.throwsAsync(() => host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Work",
       join(host.directory.path, "profiles", "moved"))), ServiceException);
     const renamed = await host.providers.updateAsync(new ProviderUpdateParams(provider.id, "Personal", provider.profileDir));
-    await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
+    const reply = sent.replies[0];
+    Assert.isDefined(reply);
+    await host.engine.cancelAsync(new MessageIdParams(reply.id));
 
     Assert.areEqual(ErrorCode.Conflict, refused.info.name);
     Assert.areEqual(provider.profileDir, (await host.providers.findAsync(provider.id))?.profileDir);
@@ -734,17 +790,23 @@ export class ProvidersServiceTests {
     const spare = await host.createProviderAsync("fake", "Spare");
     const create = async (name: string, ...fallbacks: TeammateFallback[]): Promise<string> => (await host.teammates.createAsync(new TeammateCreateParams(name, null, work.id, Harness.Provider,
       null, null, null, null, null, [], true, fallbacks))).id;
-    const ids = [await create("Ada", new TeammateFallback(home.id), new TeammateFallback(spare.id), new TeammateFallback(home.id, "fake-large")),
-      await create("Bo", new TeammateFallback(spare.id)), await create("Cy")];
+    const adaId = await create("Ada", new TeammateFallback(home.id), new TeammateFallback(spare.id), new TeammateFallback(home.id, "fake-large"));
+    const ids = [adaId, await create("Bo", new TeammateFallback(spare.id)), await create("Cy")];
     const before = (await host.context.database.changeFeed.readAfterAsync(0)).length;
 
     await host.providers.deleteAsync(new ProviderIdParams(home.id));
     const changes = (await host.context.database.changeFeed.readAfterAsync(0)).slice(before).filter(t => t.entity === ChangeEntity.Teammate);
 
-    Assert.areEqual(`${spare.id}|${spare.id}|`, (await Promise.all(ids.map(t => host.teammates.findAsync(t)))).map(t => t?.fallbacks.map(u => u.providerId).join()).join("|"));
-    Assert.areEqual(`${ids[0]} ${ChangeOperation.Update} ${JSON.stringify((await host.teammates.findAsync(ids[0] ?? ""))?.toJson())}`,
+    const teammates = await Promise.all(ids.map(t => host.teammates.findAsync(t)));
+    Assert.areEqual(`${spare.id}|${spare.id}|`, teammates.map(t => {
+      Assert.isNotNull(t);
+      return t.fallbacks.map(u => u.providerId).join();
+    }).join("|"));
+    const ada = await host.teammates.findAsync(adaId);
+    Assert.isNotNull(ada);
+    Assert.areEqual(`${adaId} ${ChangeOperation.Update} ${JSON.stringify(ada.toJson())}`,
       changes.map(t => `${t.entityId} ${t.operation} ${t.payload}`).join(","));
-    Assert.isTrue((await host.teammates.findAsync(ids[0] ?? ""))?.sustain === true);
+    Assert.isTrue(ada.sustain);
   }
 
   @TestMethod
@@ -1186,21 +1248,23 @@ export class ProvidersServiceTests {
     await host.providers.checkAsync(new ProviderIdParams(kept.id));
     const outcomes: unknown[] = [];
 
-    for (const [target, failure] of [[provider, null], [kept, new Error("The sign-out timed out.")]] as const) {
+    for (const signOut of [new SignOutCase(provider, null), new SignOutCase(kept, new Error("The sign-out timed out."))]) {
       const held = Promise.withResolvers<void>();
       adapter.signOutHold = held.promise;
-      adapter.signOutFailure = failure;
-      const signingOut = host.providers.signOutAsync(new ProviderIdParams(target.id));
-      await host.providers.setEnabledAsync(new ProviderEnabledParams(target.id, false));
+      adapter.signOutFailure = signOut.failure;
+      const signingOut = host.providers.signOutAsync(new ProviderIdParams(signOut.provider.id));
+      await host.providers.setEnabledAsync(new ProviderEnabledParams(signOut.provider.id, false));
       held.resolve();
       outcomes.push(await signingOut.then(t => t.authStatus, (error: unknown) => error instanceof Error ? error.message : null));
     }
 
     Assert.areEqual(`${AuthStatus.Unknown},The sign-out timed out.`, outcomes.join(","));
     Assert.areEqual([provider, kept].map(() => AuthStatus.Unknown).join(","), (await Promise.all([provider, kept].map(t => host.providers.findAsync(t.id)))).map(t => t?.authStatus).join(","));
-    Assert.isNull((await host.providers.findAsync(provider.id))?.identity ?? null);
-    Assert.areEqual("1.0.0", (await host.providers.findAsync(provider.id))?.harnessVersion);
-    Assert.isFalse((await host.providers.findAsync(provider.id))?.enabled ?? true);
+    const signedOut = await host.providers.findAsync(provider.id);
+    Assert.isNotNull(signedOut);
+    Assert.isNull(signedOut.identity);
+    Assert.areEqual("1.0.0", signedOut.harnessVersion);
+    Assert.isFalse(signedOut.enabled);
     Assert.areEqual(2, adapter.checkedProviders.length);
     Assert.areEqual(AuthStatus.Unknown, host.listener.events.filter(t => t.name === EventName.ProviderUpdated).map(t => Provider.fromJson(t.payload)).findLast(t =>
       t.id === provider.id)?.authStatus);
@@ -1214,14 +1278,14 @@ export class ProvidersServiceTests {
     const kept = await host.createProviderAsync("leaving", "Kept");
     const outcomes: unknown[] = [];
 
-    for (const [target, failure] of [[provider, null], [kept, new Error("The sign-out timed out.")]] as const) {
+    for (const signOut of [new SignOutCase(provider, null), new SignOutCase(kept, new Error("The sign-out timed out."))]) {
       const held = Promise.withResolvers<void>();
       adapter.signOutHold = held.promise;
-      adapter.signOutFailure = failure;
-      const signingOut = host.providers.signOutAsync(new ProviderIdParams(target.id));
-      const folder = join(host.directory.path, "profiles", `${target.label}-moved`);
-      await host.providers.updateAsync(new ProviderUpdateParams(target.id, target.label, folder));
-      await host.providers.checkAsync(new ProviderIdParams(target.id));
+      adapter.signOutFailure = signOut.failure;
+      const signingOut = host.providers.signOutAsync(new ProviderIdParams(signOut.provider.id));
+      const folder = join(host.directory.path, "profiles", `${signOut.provider.label}-moved`);
+      await host.providers.updateAsync(new ProviderUpdateParams(signOut.provider.id, signOut.provider.label, folder));
+      await host.providers.checkAsync(new ProviderIdParams(signOut.provider.id));
       held.resolve();
       outcomes.push(await signingOut.then(t => `${t.authStatus}:${t.profileDir === folder}`, (error: unknown) => error instanceof Error ? error.message : null));
     }
@@ -1263,10 +1327,13 @@ export class ProvidersServiceTests {
       new Provider(id, "usual", "Home", join(host.directory.path, "profiles", "Home"), AuthStatus.Unknown, null, null, null, null, at));
     for (const provider of inserted)
       await host.context.database.connection.executeAsync(new SqlQuery(Resources.insertProvider, [provider.id, provider.kind, JSON.stringify(provider.toJson()), at, at]));
-    const [first, second] = inserted;
+    const first = inserted[0];
+    const second = inserted[1];
+    Assert.isDefined(first);
+    Assert.isDefined(second);
 
-    Assert.areEqual(first!.id, (await host.providers.findUsualAsync("usual"))?.id);
-    Assert.areEqual([first!.id, second!.id].join(","), (await host.providers.listAsync()).filter(t => t.label === "Home" && t.kind === "usual").map(t => t.id).join(","));
+    Assert.areEqual(first.id, (await host.providers.findUsualAsync("usual"))?.id);
+    Assert.areEqual([first.id, second.id].join(","), (await host.providers.listAsync()).filter(t => t.label === "Home" && t.kind === "usual").map(t => t.id).join(","));
     Assert.isNull(await host.providers.findUsualAsync("fake"));
     Assert.isNull(await host.providers.findUsualAsync("gone"));
   }

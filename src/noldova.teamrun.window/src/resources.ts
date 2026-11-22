@@ -24,8 +24,11 @@ import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
 import { TeammateStatus } from "./app/enums/teammate-status";
 import { BrowserStepWords } from "./app/models/browser-step-words";
+import { CiLabel } from "./app/models/ci-label";
 import { GrantColumnShares } from "./app/models/grant-column-shares";
 import { LowRiskReadWords } from "./app/models/low-risk-read-words";
+import { PanStep } from "./app/models/pan-step";
+import { RelativeTimeUnit } from "./app/models/relative-time-unit";
 import { TeammateColumnShares } from "./app/models/teammate-column-shares";
 import type { ProviderAction } from "./app/types/provider-action";
 
@@ -53,7 +56,6 @@ export class Resources {
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
   public static readonly errorCodeField: string = "code";
-  public static readonly errorDetailsField: string = "details";
   public static readonly errorArgumentsField: string = "arguments";
   public static readonly modelCatalogLifetime: number = 300_000;
   public static readonly draftSaveInterval: number = 500;
@@ -260,16 +262,17 @@ export class Resources {
   public static readonly imageCloseTabKey: string = "w";
   public static readonly imagePreviousKey: string = "ArrowLeft";
   public static readonly imageNextKey: string = "ArrowRight";
-  public static readonly imagePanKeys: Readonly<Record<string, readonly [number, number]>> = {
-    ArrowLeft: [-1, 0],
-    ArrowRight: [1, 0],
-    ArrowUp: [0, -1],
-    ArrowDown: [0, 1]
+  public static readonly imagePanKeys: Readonly<Record<string, PanStep>> = {
+    ArrowLeft: new PanStep(-1, 0),
+    ArrowRight: new PanStep(1, 0),
+    ArrowUp: new PanStep(0, -1),
+    ArrowDown: new PanStep(0, 1)
   };
   public static readonly imagePanFraction: number = 0.1;
   public static readonly imageZoomInKeys: readonly string[] = ["+", "="];
   public static readonly imageZoomOutKey: string = "-";
   public static readonly imageFitKey: string = "0";
+  public static readonly imageDisabledButtonSelector: string = "button:disabled";
   public static readonly imageCloseSelector: string = ".nol-teamrun-image-close";
   public static readonly imageSizeLimit: number = 256;
   public static readonly generatedImageLimit: number = 32;
@@ -384,12 +387,12 @@ export class Resources {
     [ReviewDecision.Approved]: "Approved"
   };
   public static readonly teammateDocumentSeparator: string = ", ";
-  public static readonly teammateCiLabels: Readonly<Record<CheckState, readonly [text: string, look: string]>> = {
-    [CheckState.Failed]: ["CI failed", "ci-failed"],
-    [CheckState.Running]: ["CI running", "ci-running"],
-    [CheckState.Queued]: ["CI running", "ci-running"],
-    [CheckState.Succeeded]: ["CI passed", "ci-passed"],
-    [CheckState.Neutral]: ["CI passed", "ci-passed"]
+  public static readonly teammateCiLabels: Readonly<Record<CheckState, CiLabel>> = {
+    [CheckState.Failed]: new CiLabel("CI failed", "ci-failed"),
+    [CheckState.Running]: new CiLabel("CI running", "ci-running"),
+    [CheckState.Queued]: new CiLabel("CI running", "ci-running"),
+    [CheckState.Succeeded]: new CiLabel("CI passed", "ci-passed"),
+    [CheckState.Neutral]: new CiLabel("CI passed", "ci-passed")
   };
   public static readonly organizationViewField: string = "view";
   public static readonly organizationFocusField: string = "focus";
@@ -1085,8 +1088,8 @@ export class Resources {
   public static readonly messagesSearchHeading: string = "In messages";
   public static readonly messagesSearchIcon: string = "notes";
   public static readonly relativeTime: Intl.RelativeTimeFormat = new Intl.RelativeTimeFormat("en-US", { numeric: "always" });
-  public static readonly relativeTimeUnits: readonly { readonly unit: Intl.RelativeTimeFormatUnit; readonly minutes: number }[] = [
-    { unit: "minute", minutes: 1 }, { unit: "hour", minutes: 60 }, { unit: "day", minutes: 1_440 }, { unit: "month", minutes: 43_200 }, { unit: "year", minutes: 525_600 }];
+  public static readonly relativeTimeUnits: readonly RelativeTimeUnit[] = [new RelativeTimeUnit("minute", 1), new RelativeTimeUnit("hour", 60),
+    new RelativeTimeUnit("day", 1_440), new RelativeTimeUnit("month", 43_200), new RelativeTimeUnit("year", 525_600)];
   public static readonly focusComposerCommand: string = "teamrun.focusComposer";
   public static readonly focusComposerTitle: string = "Go to the message box";
   public static readonly focusComposerIcon: string = "edit_note";

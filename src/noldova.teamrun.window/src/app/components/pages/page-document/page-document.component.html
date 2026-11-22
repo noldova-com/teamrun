@@ -30,7 +30,7 @@ LICENSE file in the root directory of this source tree.
       [isUnavailable]="true" [nolTooltip]="printTooltip" [nolTooltipSide]="below"></button>
   }
   <button #more nol-toolbar-button nolToolbarItem type="button" data-action="more" [label]="resources.more" [icon]="resources.moreGlyph"
-    [nolTooltip]="resources.more" [nolTooltipSide]="below" [nolMenuTriggerFor]="moreMenu" [nolMenuAlignment]="end"></button>
+    [nolTooltip]="resources.more" [nolTooltipSide]="below" [nolMenuTriggerFor]="moreMenu" [nolMenuAlignment]="end" [isPressedWhileOpen]="true"></button>
 </div>
 <ng-template #moreMenu>
   <nol-menu>
