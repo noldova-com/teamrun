@@ -55,6 +55,10 @@ export class LinkedSite {
     return `${step.to}, ${LinkedSite.OPENED_FROM} ${step.from}`;
   }
 
+  public behindNameOf(step: ILinkStep): string {
+    return `${this.urlOf(step.to)}, ${LinkedSite.OPENED_FROM} ${step.from}`;
+  }
+
   public urlOf(title: string): string {
     return `${this.origin}/${title.toLowerCase()}`;
   }
@@ -127,7 +131,7 @@ export class LinkedSite {
   }
 
   public async expectShownAsync(application: ElectronApplication, page: Page, title: string, name: string = title): Promise<void> {
-    await TeamRunApp.showTabAsync(page, name);
+    await TeamRunApp.showTabAsync(page, name, title);
     await expect(page.locator(`${LinkedSite.FIELD}:visible`), `${title}'s address field`).toHaveValue(this.urlOf(title), { timeout: 30_000 });
     await expect.poll(() => this.isLoadedAsync(application, title), { message: `${title}'s page loaded`, ...TeamRunApp.pollOf(30_000) }).toBe(true);
   }
