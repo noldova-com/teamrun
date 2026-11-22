@@ -249,7 +249,7 @@ export class ChatWakesTests {
     await host.engine.reconcileAsync();
     await host.engine.waitForIdle();
 
-    Assert.areEqual(JSON.stringify([Resources.formatWakesNotSettled(woken.id, "ServiceException")]),
+    Assert.areEqual(JSON.stringify([`The wakes waiting on chat ${woken.id} weren't settled: ServiceException`]),
       JSON.stringify(host.log.lines.filter(t => t.startsWith("The wakes waiting on chat"))));
     Assert.areEqual("Ready", await ChatWakesTests.statesAsync(host));
     Assert.areEqual(1, host.adapter.requests.length);
