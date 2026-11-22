@@ -174,6 +174,23 @@ describe("ModelCatalogCache", () => {
     expect([other.models, other.modes, other.defaultMode, other.defaultTakesListedEfforts]).toEqual([[], [], null, false]);
   });
 
+  it("reads a list again at the next load after a read failed, instead of keeping the failure as fresh, and keeps the list a later read gives", async () => {
+    const fetchModels = vi.fn(async (_kind: string, _provider: string | null, _refresh: boolean): Promise<ProviderModelList> => {
+      throw new Error("offline");
+    });
+    const cache = new ModelCatalogCache(fetchModels, clock);
+
+    const failed = await cache.load("codex", "a");
+    fetchModels.mockResolvedValue(new ProviderModelList([new ProviderModel("gpt-5", "GPT-5", "", [], true, null, true)], true));
+    const read = await cache.load("codex", "a");
+    const kept = await cache.load("codex", "a");
+
+    expect([failed.failed, read.failed, kept.failed]).toEqual([true, false, false]);
+    expect(kept.models.map(t => t.id)).toEqual(["gpt-5"]);
+    expect(fetchModels).toHaveBeenCalledTimes(2);
+    expect(fetchModels.mock.calls.map(t => t[2])).toEqual([false, false]);
+  });
+
   it("coalesces requests and bounds pending requests and kept catalogs", async () => {
     let complete!: (list: ProviderModelList) => void;
     const pending = new Promise<ProviderModelList>(resolve => complete = resolve);
