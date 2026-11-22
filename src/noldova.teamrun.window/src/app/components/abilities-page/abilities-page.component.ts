@@ -11,7 +11,7 @@ import { Component, type Signal, type WritableSignal, computed, inject, signal }
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { AbilityAnswer, ProviderAbilities, type ProviderAbility, type ProviderKind } from "@noldova/teamrun.protocol";
-import { SelectComponent, SelectOption } from "@noldova/ui.components.angular";
+import { ButtonComponent, ButtonVariant, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import type { IAbilityGroupView } from "../../interfaces/i-ability-group-view";
@@ -22,13 +22,14 @@ import { ChatStoreService } from "../../services/chat-store.service";
 
 @Component({
   selector: "nol-teamrun-abilities-page",
-  imports: [SelectComponent],
+  imports: [ButtonComponent, SelectComponent],
   providers: [ChatStoreService.provider],
   templateUrl: "./abilities-page.component.html",
   styleUrl: "./abilities-page.component.css"
 })
 export class AbilitiesPageComponent {
   protected readonly resources: typeof Resources = Resources;
+  protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly context: IWindowPartContext = inject(WindowPartTokens.context);
   private readonly rows: AbilitySettingsRows | null = AbilitySettingsRows.of(this.context);
@@ -43,6 +44,11 @@ export class AbilitiesPageComponent {
     return Object.isNullOrUndefined(kind) || Object.isNullOrUndefined(abilities) ? []
       : AbilityGroup.all.map(t => ({ title: t.title, rows: t.abilities.map(u => AbilitiesPageComponent.rowOf(abilities, u, kind.displayName)) }));
   });
+
+  protected async retryKinds(): Promise<void> {
+    if (!this.store.loadingKinds())
+      await this.store.initialize();
+  }
 
   protected choose(id: string): void {
     this.chosen.set(id);
