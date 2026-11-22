@@ -51,8 +51,7 @@ import {
   type Project,
   ProjectOpenParams,
   ProviderCreateParams,
-  type Provider,
-  Resources
+  type Provider
 } from "@noldova/teamrun.protocol";
 
 import { BoundingWork } from "./bounding-work.fixture.js";
