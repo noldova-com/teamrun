@@ -234,7 +234,7 @@ describe("TeammateDialogComponent", () => {
         .toEqual(["Claude Code · Home · This computer", "Claude Code · Personal · This computer", "Codex · Team · This computer", "Codex · Work · This computer",
           [Resources.sustainUnreadKindsGroup, [["Cursor", true], ["Grok CLI", true]]]]);
       expect([field(".nol-teamrun-resets-soonest input").matches(":checked"), entrySelect(4, "model").options().map(t => t instanceof SelectOption ? t.title : null)])
-        .toEqual([true, [Resources.formatDefaultModel("Other model"), "Other model"]]);
+        .toEqual([true, [Resources.formatDefaultModel("gpt-5"), "gpt-5", "gpt-5-mini"]]);
     });
 
     it("adds, changes, moves and removes entries, labels a move on a provider not yet checked, and saves the list with the switch and option", async () => {
@@ -274,7 +274,7 @@ describe("TeammateDialogComponent", () => {
       }
       await submit();
 
-      expect(first).toEqual(["4", "Claude Code · Home · This computer", "Other model"]);
+      expect(first).toEqual(["4", "Claude Code · Personal · This computer", Resources.formatDefaultModel("gpt-5")]);
       expect(add.disabled).toBe(true);
       const entries = [`${sustained.providerId} ${String(sustained.model)}`, ...stored().fallbacks.map(t => `${t.providerId} ${String(t.model)}`)];
       expect(new Set(entries).size).toBe(entries.length);
