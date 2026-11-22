@@ -135,7 +135,7 @@
     "@noldova/git": "0.0.6",
     "@noldova/git.github": "0.0.6",
     "@noldova/teamrun": "0.0.7",
-    "@noldova/terminal": "0.0.3"
+    "@noldova/terminal": "0.0.5"
   },
   "devDependencies": {
     "@noldova/desktop.build": "0.0.11",
