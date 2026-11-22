@@ -7,7 +7,6 @@
  */
 import type { MessageAttachment, WaitingMessage } from "@noldova/teamrun.protocol";
 
-/** A waiting message's edit: the message before and after it, and the files the edited message keeps. */
 export class WaitingEdit {
   public readonly current: WaitingMessage;
   public readonly edited: WaitingMessage;

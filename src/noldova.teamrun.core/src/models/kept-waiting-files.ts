@@ -7,7 +7,6 @@
  */
 import type { MessageAttachment, MessageSendParams } from "@noldova/teamrun.protocol";
 
-/** A waiting message with its files copied into its own folder, and those files. */
 export class KeptWaitingFiles {
   public readonly message: MessageSendParams;
   public readonly files: readonly MessageAttachment[];
