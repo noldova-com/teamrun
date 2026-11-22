@@ -1266,23 +1266,23 @@ describe("OrganizationViewComponent", () => {
     it.each(["Board", "Focus"])("adds a teammate to a unit and directly under you from Find a teammate on the %s, as in the Tree", async view => {
       await editAsync();
       await pickView(view);
-      const unitAdd = view === "Board" ? one(".add-member", lane("Build")) : one(".add-member", outlineRow("Build"));
+      const unitAdd = view === "Board" ? one(".add-member", lane("Design")) : one(".add-member", outlineRow("Design"));
 
       const before = await searchAsync(unitAdd, "");
       const hint = searchTexts(".nol-quick-input-empty");
-      await userEvent.type(searchField(), "al");
+      await userEvent.type(searchField(), "off");
       await settle();
       const found = searchTexts(".nol-quick-input-option .nol-quick-input-title");
-      await pickAsync("Alice");
-      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
-      await searchAsync(one(".add-report"), "off");
       await pickAsync("Offline");
       await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
+      await searchAsync(one(".add-report"), "al");
+      await pickAsync("Alice");
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
 
-      expect([before, hint, found, all(".add-report").length]).toEqual([[], ["Type a teammate's name."], ["Alice"], 1]);
+      expect([before, hint, found, all(".add-report").length]).toEqual([[], ["Type a teammate's name."], ["Offline"], 1]);
       expect(asked).toEqual([
-        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }),
-        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })
       ]);
     });
 
