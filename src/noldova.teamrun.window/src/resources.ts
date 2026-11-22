@@ -7,7 +7,9 @@
  */
 
 import type { FocusOrigin } from "@angular/cdk/a11y";
+import { GitHubNames } from "@noldova/git.github.protocol";
 import { CheckState, ReviewDecision } from "@noldova/git.hosting.protocol";
+import { GitNames } from "@noldova/git.protocol";
 import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
@@ -538,6 +540,13 @@ export class Resources {
     [ApprovalKind.Tool]: "tool",
     [ApprovalKind.Question]: null,
     [ApprovalKind.Permission]: null
+  };
+  public static readonly permissionModuleNames: Readonly<Record<string, string>> = {
+    [GitNames.moduleId]: "Git",
+    [GitHubNames.moduleId]: "GitHub",
+    [Resources.browserModuleId]: "Browser",
+    [Resources.computerUseModuleId]: "Computer use",
+    [Resources.moduleId]: "TeamRun"
   };
   public static readonly permissionWaitMilliseconds: number = 300_000;
   public static readonly secretDetailValue: string = "hidden";
@@ -2014,6 +2023,11 @@ export class Resources {
 
   public static formatApprovalKind(provider: string, kind: string): string {
     return `${provider}${Resources.titleSeparator}${kind}`;
+  }
+
+  public static formatServedRequester(module: string, tool: string, teammate: string, chat: string | null): string {
+    const who = Object.isNull(chat) ? teammate : `${teammate} in "${chat}"`;
+    return [Resources.permissionModuleNames[module] ?? module, tool, who].join(Resources.titleSeparator);
   }
 
   public static formatApprovalNativeKind(nativeKind: string): string {

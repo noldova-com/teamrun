@@ -42,12 +42,13 @@ export class ApprovalPermission {
     [RequestRisk.High]: PermissionRisk.High
   };
 
-  public static toRequest(approval: Approval, requesterName: string, answer: ApprovalAnswer | null, providerName: string | null = null): PermissionRequest {
+  public static toRequest(approval: Approval, requesterName: string, answer: ApprovalAnswer | null, providerName: string | null = null,
+    chatTitle: string | null = null): PermissionRequest {
     const requester = new PermissionRequester(requesterName, Resources.approvalRequesterKind);
     const options = approval.options.map(t =>
       new PermissionOption(t.id, t.label, t.outcome === ApprovalOutcome.Approved ? PermissionEffect.Allow : PermissionEffect.Deny, ApprovalPermission.SCOPES[t.scope]));
     if (approval.kind === ApprovalKind.Permission)
-      return ApprovalPermission.permissionOf(approval, requester, options, answer);
+      return ApprovalPermission.permissionOf(approval, requester, options, answer, chatTitle);
     const subAgent = ApprovalPermission.subAgentOf(approval);
     return new PermissionRequest(approval.id, requester, Resources.approvalHeadings[approval.kind], null,
       { ...ApprovalPermission.kindOf(approval.kind, providerName), details: ApprovalPermission.withNativeKind([approval.summary], approval.nativeKind), ...Object.isNull(subAgent) ? {} : { description: Resources.formatSubAgentAsks(subAgent) }, options, ...ApprovalPermission.state(answer) });
@@ -60,10 +61,11 @@ export class ApprovalPermission {
   }
 
   private static permissionOf(approval: Approval, requester: PermissionRequester, options: readonly PermissionOption[],
-    answer: ApprovalAnswer | null): PermissionRequest {
+    answer: ApprovalAnswer | null, chatTitle: string | null): PermissionRequest {
     const payload = PermissionPayload.fromJson(approval.payload);
     const details = payload.details.map(t => Resources.formatPermissionDetail(t.label, t.value));
     return new PermissionRequest(approval.id, requester, approval.summary, ApprovalPermission.RISKS[payload.risk], {
+      ...Object.isNull(payload.served) ? {} : { kind: Resources.formatServedRequester(payload.module, payload.served.tool, requester.name, chatTitle) },
       ...details.length > 0 ? { details: details.join("\n") } : {},
       options,
       expiresAt: new Date(Date.parse(approval.createdAt) + Resources.permissionWaitMilliseconds),

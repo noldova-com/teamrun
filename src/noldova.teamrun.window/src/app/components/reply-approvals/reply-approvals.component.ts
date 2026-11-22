@@ -37,14 +37,16 @@ export class ReplyApprovalsComponent {
     const kind = Object.isNull(provenance) ? null : provenance.observed.kind ?? provenance.requested.kind;
     return this.store.kinds().find(t => t.id === kind)?.displayName ?? null;
   });
+  protected readonly chatTitle: Signal<string | null> = computed(() => this.store.conversation(this.reply().chatId)?.title ?? null);
   protected readonly approvals: Signal<readonly ReplyApproval[]> = computed(() => {
     const requester = this.requester();
     const providerName = this.providerName();
+    const chatTitle = this.chatTitle();
     const ids = this.ids();
     return this.store.approvalsOf(this.reply().id).filter(t => (t.kind === ApprovalKind.Question || t.status === ApprovalStatus.Pending)
       && (Object.isNull(ids) || ids.includes(t.id))).map(t => {
       const answer = this.store.answerOf(t.id);
-      return new ReplyApproval(t, answer, t.kind === ApprovalKind.Question ? null : ApprovalPermission.toRequest(t, requester, answer, providerName));
+      return new ReplyApproval(t, answer, t.kind === ApprovalKind.Question ? null : ApprovalPermission.toRequest(t, requester, answer, providerName, chatTitle));
     });
   });
 

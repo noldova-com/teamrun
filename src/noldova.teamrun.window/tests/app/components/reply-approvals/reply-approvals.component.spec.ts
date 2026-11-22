@@ -271,7 +271,7 @@ describe("ReplyApprovalsComponent", () => {
     const choose = async (id: string): Promise<void> => {
       const button = option(id);
       expect(button).toBeInstanceOf(HTMLButtonElement);
-      if (button instanceof HTMLButtonElement)
+      if (!Object.isNull(button))
         await click(button);
     };
 
@@ -632,6 +632,27 @@ describe("ReplyApprovalsComponent", () => {
       expect(details.textContent).toBe("Message: Name the chat's folder\nFiles: M src/a.ts");
       expect(root().querySelector(".nol-permission-card-more")).toBeNull();
       AppearanceFixture.expectPixels(content, 2 * Number.parseFloat(style.lineHeight));
+    });
+
+    it("names under a served call's title its module, its tool, the teammate and the chat, never the action's ID, as the design draws it", async () => {
+      context.answer(MethodName.ApprovalList, () => [new Approval("ap1", "m2", ApprovalKind.Permission, "git.commit", "Commit 2 files to dev8/1719-gemini-folder-trust",
+        { module: "git", subject: "teamrun", risk: "Medium", details: [], servedTool: "git_commit", servedInput: { message: "Name the chat's folder" } },
+        SampleData.approval.options, ApprovalStatus.Pending, null, SampleData.timestamp, null).toJson()]);
+      await render();
+      root().style.width = "40rem";
+      const heading = required(".nol-permission-card-heading").getBoundingClientRect();
+      const kind = required(".nol-permission-card-kind");
+
+      expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
+      expect([kind.textContent?.trim(), root().textContent?.includes("git.commit")]).toEqual(["Git · git_commit · Alice in \"First\"", false]);
+      AppearanceFixture.expectPixels(kind.getBoundingClientRect().left, heading.left);
+      expect(kind.getBoundingClientRect().top).toBeGreaterThanOrEqual(heading.bottom - 1);
+
+      fixture.componentRef.setInput("reply", new Message("m2", "c9", 1, MessageAuthor.Provider, "m1", MessageStatus.AwaitingApproval, [], SampleData.provenance,
+        SampleData.timestamp, SampleData.timestamp, null, [], "alice", "Alice"));
+      await fixture.whenStable();
+
+      expect(textOf(".nol-permission-card-kind")).toBe("Git · git_commit · Alice");
     });
 
     it("shows a push card's five details whole, five lines tall with no Show all", async () => {
