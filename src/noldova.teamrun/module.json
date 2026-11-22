@@ -10,7 +10,7 @@
   "contributes": {
     "methods": [
       "teamrun.teammateList", "teamrun.teammateCreate", "teamrun.teammateUpdate", "teamrun.teammateDelete", "teamrun.organizationList", "teamrun.organizationCreate", "teamrun.organizationUpdate", "teamrun.organizationDelete", "teamrun.organizationChatOpen", "teamrun.departmentCreate", "teamrun.departmentUpdate",
-      "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.teammatePlace", "teamrun.organizationLayoutRead", "teamrun.organizationLayoutSave", "teamrun.defaultTeammateRead",
+      "teamrun.departmentMove", "teamrun.departmentDelete", "teamrun.departmentMemberSet", "teamrun.nodeTypeCreate", "teamrun.nodeTypeUpdate", "teamrun.nodeTypeDelete", "teamrun.teammatePlace", "teamrun.organizationLayoutRead", "teamrun.organizationLayoutSave", "teamrun.defaultTeammateRead",
       "teamrun.defaultTeammateSet", "teamrun.conversationAddMember",
       "teamrun.conversationRemoveMember", "teamrun.conversationSetMemberMode", "teamrun.conversationSetMemberSettings", "teamrun.conversationSetPlanFirst", "teamrun.conversationListMembers", "teamrun.attachmentPrepare", "teamrun.attachmentDiscard", "teamrun.attachmentRead", "teamrun.attachmentShare", "teamrun.attachmentExists", "teamrun.writtenImageRead", "teamrun.writtenImageShare", "teamrun.linkedFolderList", "teamrun.draftSave", "teamrun.draftRead", "teamrun.draftDiscard", "teamrun.readingPositionList", "teamrun.readingPositionSave", "teamrun.runOutputList", "teamrun.runOutputSave", "teamrun.dataFolderRead", "teamrun.firstLaunchRead", "teamrun.firstLaunchFinish", "teamrun.providerKindList",
       "teamrun.providerListModels", "teamrun.providerModelCatalog", "teamrun.providerKindInstallationList", "teamrun.providerKindInstall",
