@@ -24,6 +24,9 @@ export class NodeTypeUpdateParamsTests {
     Assert.areEqual('{"id":"n1","name":"Squad","icon":"domain","color":"teal","createdAt":"c","updatedAt":"v"}', JSON.stringify(renamed.applyTo(type, "v").toJson()));
     Assert.areEqual('{"id":"n1","name":"Team","icon":"groups","color":null,"createdAt":"c","updatedAt":"v"}',
       JSON.stringify(NodeTypeUpdateParams.fromJson(json).applyTo(type, "v").toJson()));
+    const recolored = NodeTypeUpdateParams.fromJson({ organizationId: "o1", typeId: "n1", color: "#00ff00" });
+    Assert.areEqual('{"organizationId":"o1","typeId":"n1","color":"#00ff00"}', JSON.stringify(recolored.toJson()));
+    Assert.areEqual("Department|domain|#00ff00", [recolored.applyTo(type, "v").name, recolored.applyTo(type, "v").icon, recolored.applyTo(type, "v").color].join("|"));
     Assert.areEqual("$.input.icon", Assert.throws(() => NodeTypeUpdateParams.fromJson({ ...json, icon: "No" }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.typeId", Assert.throws(() => NodeTypeUpdateParams.fromJson({ organizationId: "o1", name: "Team" }, "$.input"), JsonException).path);
   }
