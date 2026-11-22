@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Organization:** while editing, every teammate's card takes it out of the organization once you confirm, saying whom the teammates and units under it will report to; the teammate keeps its chats and can be added back, and a unit member's card still moves it out of its unit, now named Move out of unit (#154).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
