@@ -352,6 +352,15 @@ describe("OrganizationChatComponent", () => {
     const reach = (): HTMLElement | null => element().querySelector<HTMLElement>(".nol-teamrun-composer-reach");
     await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 2 teammates"));
     const described = [box()?.getAttribute("aria-describedby"), reach()?.id];
+    const shown = (found: HTMLElement | null): HTMLElement => {
+      if (Object.isNull(found))
+        throw new Error("The count or the message box isn't shown.");
+      return found;
+    };
+    const [line, field] = [shown(reach()), shown(box())];
+    const textStart = (on: HTMLElement): number => on.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(on).borderInlineStartWidth)
+      + Number.parseFloat(getComputedStyle(on).paddingInlineStart);
+    expect([textStart(line) - textStart(field), line.getBoundingClientRect().bottom <= field.getBoundingClientRect().top]).toEqual([0, true]);
 
     context.emit(EventName.OrganizationChanged, SampleData.organizationOf([design], placed("alice")).toJson());
     await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 1 teammate"));
