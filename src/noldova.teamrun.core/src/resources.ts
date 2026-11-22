@@ -389,8 +389,8 @@ export class Resources {
   public static readonly renameChatIdColumns: readonly string[] = ["ALTER TABLE messages RENAME COLUMN conversationId TO chatId",
     "ALTER TABLE drafts RENAME COLUMN conversationId TO chatId", "ALTER TABLE readingPositions RENAME COLUMN conversationId TO chatId",
     "ALTER TABLE chatTeammates RENAME COLUMN conversationId TO chatId"];
-  public static readonly dropLegacyChatIndexes: readonly string[] = ["DROP INDEX IX_conversations_projectId", "DROP INDEX IX_messages_conversationId_sequence",
-    "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
+  public static readonly dropLegacyChatIndexes: readonly string[] = ["DROP INDEX IX_conversations_projectId", "DROP INDEX IF EXISTS IX_messages_conversationId_sequence",
+    "DROP INDEX IF EXISTS UX_messages_conversationId_sequence", "DROP INDEX IX_messages_conversationId_status", "DROP INDEX IX_conversationTeammates_teammateId"];
   public static readonly renameChatEntities: readonly string[] = ["UPDATE __changes SET entity = 'Chat' WHERE entity = 'Conversation'",
     "UPDATE __changes SET entity = 'ChatMember' WHERE entity = 'ConversationMember'"];
   public static readonly updateMessageCheckpoint: string = "UPDATE messages SET checkpointId = ? WHERE id = ?";
