@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readdir, readlink, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -34,11 +34,14 @@ export class ChatFolders {
   public prepare(conversationId: string): string {
     const folder = this.pathOf(conversationId);
     const git = join(folder, Resources.gitDirectoryName);
-    if (!existsSync(join(git, Resources.gitHeadFileName))) {
+    const head = join(git, Resources.gitHeadFileName);
+    if (!existsSync(head)) {
       mkdirSync(join(git, Resources.gitObjectsDirectoryName), { recursive: true });
       mkdirSync(join(git, Resources.gitBranchesPath), { recursive: true });
       writeFileSync(join(git, Resources.gitConfigFileName), Resources.chatGitConfig);
-      writeFileSync(join(git, Resources.gitHeadFileName), Resources.chatGitHead);
+      const written = join(git, Resources.chatGitHeadDraftFileName);
+      writeFileSync(written, Resources.chatGitHead);
+      renameSync(written, head);
     }
     return folder;
   }
