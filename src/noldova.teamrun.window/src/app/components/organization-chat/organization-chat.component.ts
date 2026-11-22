@@ -165,10 +165,10 @@ export class OrganizationChatComponent {
     try {
       let isSent = true;
       const unreached = this.recipients().filter(t => !this.reached.has(t));
-      for (const [index, teammateId] of unreached.entries()) {
+      for (const teammateId of unreached) {
         const chatId = this.stopAsked() ? null : this.chatOf(teammateId) ?? await this.open(teammateId);
         if (this.stopAsked()) {
-          this.skipped.set(new Set(unreached.slice(index)));
+          this.skipped.set(new Set(unreached.slice(unreached.indexOf(teammateId))));
           break;
         }
         if (!Object.isNull(chatId) && await this.deliver(text, settings.withResponder(teammateId), chatId, attachments, teammateId)) {
