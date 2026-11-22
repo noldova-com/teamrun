@@ -1,0 +1,33 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="resources.organizationTypesTitle" (dismissed)="closed.emit()">
+  <div class="nol-teamrun-form">
+    @if (types().length === 0) {
+      <p class="types-empty">{{ resources.organizationNoTypes }}</p>
+    } @else {
+      <ul class="types" role="list">
+        @for (type of types(); track type.id) {
+          <li class="type-row">
+            <span class="type-icon"><nol-teamrun-organization-type-icon [type]="type" /></span>
+            <span class="type-name">{{ type.name }}</span>
+            <button type="button" nol-icon-button class="type-edit" [icon]="resources.organizationEditTypeIcon"
+              [label]="resources.formatOrganizationEditType(type.name)" (click)="edit(type)"></button>
+            <button type="button" nol-icon-button class="type-delete" [icon]="resources.organizationDeleteIcon"
+              [label]="resources.formatOrganizationDeleteNamed(type.name)" (click)="remove(type)"></button>
+          </li>
+        }
+      </ul>
+    }
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </div>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-new-type" [variant]="text" (click)="edit(null)">{{ resources.organizationNewTypeOption }}</button>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" (click)="closed.emit()">{{ resources.closeLabel }}</button>
+</nol-dialog>

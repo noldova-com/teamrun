@@ -37,6 +37,7 @@ import { OrganizationFocusComponent } from "../organization-focus/organization-f
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationChatsComponent } from "../organization-chats/organization-chats.component";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationTypesDialogComponent } from "../organization-types-dialog/organization-types-dialog.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
@@ -112,6 +113,10 @@ export class OrganizationViewComponent {
 
   protected toggleEditing(): void {
     this.editing.update(t => !t);
+  }
+
+  protected openTypes(): void {
+    OrganizationTypesDialogComponent.open(this.dialogs, this.organization);
   }
 
   protected addDepartment(): void {

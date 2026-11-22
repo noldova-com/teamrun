@@ -22,13 +22,17 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
   Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
   In the Tree it edits every place: it adds a teammate, found by a search over the team and moved from wherever it was, or a department, with its name and an optional leader, any teammate or a new one, under you, any teammate or any department, and moves either anywhere by its menu or by dragging it, refusing a move that would put it under itself before it is sent; a department's leader can be any teammate (#399).
   The view, the collapsed departments and the cards' fields are kept across a restart.
-- **Organization:** each organization keeps its own node types, such as Branch, Team or Department, each with a name and an optional icon and color; a new organization has none, and adding its first department adds a Department type, while today's departments become that type in their own organization; a type a department still has can't be deleted, and the views to choose, rename and delete types come in their own change (#442).
+- **Organization:** each organization keeps its own node types, such as Branch, Team or Department, each with a name and an optional icon and color; a new organization has none, and today's departments become a Department type in their own organization.
+  Adding a department chooses its type, or makes a new one with New type…, and Edit structure changes a department's type and opens Types, which edits and deletes the organization's types; a type a department still has can't be deleted, and says why.
+  A type's icon, from the kit's icons, shows in its color, a standard one or a custom one, before its departments' names in the Tree, the Board, Focus and the Explorer, and choices name a department with its type.
+  The organization's words call a department a unit, such as Add unit, and a unit's own Delete, Remove and name field take its type's name, such as Delete Team (#101).
 - **Organization:** the Tree shows each message moving along its lines between you and your teammates and between teammates: a slow, faint flow of small pulses while it is written, a pulse when it is sent, then a glow on the receiver's card, and an answer that stops fades away (#444).
   A teammate's message to another teammate's Organization chat is written from the moment its send starts, and fades if the send is refused, cancelled or fails.
   Show messages moving in the organization, in TeamRun's settings, turns it off, and the Tree stays still while the system asks for reduced motion.
 
 ### Fixed
 
+- **Organization:** removing a member from a unit now says the teammate will report to you, where it goes, rather than that it stays in no unit (#137).
 - **Default teammate:** its row in Teammates now names its model and effort, such as GPT-5 and Extra high, rather than their ids, also when no teammate in the list chooses a model or effort on its provider (#214).
 - **Pages:** an error from opening a page in the browser, saving it or copying its path now goes away when you switch chats, rather than staying over the other chat's pages, and one that comes after you switched isn't shown (#216).
 - **Pages:** a page's More button now looks pressed while its menu is open, and idle again once the menu closes (#22).

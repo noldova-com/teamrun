@@ -108,6 +108,14 @@ describe("OrganizationCardComponent's shapes", () => {
     expect([kept, fluid, classes()]).toEqual([[false, false], [true, false], [false, true]]);
   });
 
+  it("offers You as the place of a teammate the organization places nowhere while it is edited", async () => {
+    await create(null);
+    fixture.componentRef.setInput("editing", true);
+    await settle();
+
+    expect(element().querySelector(".move-choice .nol-select-value")?.textContent?.trim()).toBe("You");
+  });
+
   describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
