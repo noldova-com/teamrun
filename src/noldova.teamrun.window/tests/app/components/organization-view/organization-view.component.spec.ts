@@ -1220,6 +1220,11 @@ describe("OrganizationViewComponent", () => {
         return [one(".leader-choice", lane("Design")), lane("Design")];
       one(".obtn", outlineRow("Design")).click();
       await settle();
+      if (all(".focus nol-canvas-map").length > 0) {
+        one(".focus .nol-canvas-map-toggle").click();
+        await settle();
+      }
+      await Wait.until(() => expect(all(".focus nol-canvas-map").length).toBe(0));
       return [one(".unit-head .leader-choice"), one(".unit-head")];
     };
 
