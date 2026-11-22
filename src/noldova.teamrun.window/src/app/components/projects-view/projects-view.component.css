@@ -51,6 +51,10 @@ nol-section-header + p.nol-teamrun-row,
   margin-block-start: var(--nol-row-gap, calc(2 * var(--nol-tab-inset)));
 }
 
+.nol-teamrun-projects > :is(.nol-teamrun-drop-list, .nol-teamrun-organization-list) + nol-section-header {
+  margin-block-start: var(--nol-row-gap, calc(2 * var(--nol-tab-inset)));
+}
+
 .nol-teamrun-row:hover {
   background-color: var(--nol-hover);
 }

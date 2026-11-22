@@ -2201,7 +2201,7 @@ describe("ProjectsViewComponent", () => {
       AppearanceFixture.expectPixels(box(showMore).height, AppearanceFixture.measureLook("tree-row-height"));
     });
 
-    it("sets Projects' top a section header's space under Open folder, and under the pins, as Pinned's top is under Open folder", async () => {
+    it("sets Projects' top a section header's space under Open folder, as Pinned's top is under Open folder, and the action rows' gap under the pins", async () => {
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       const openFolder = action(Resources.openProjectLabel);
@@ -2212,10 +2212,35 @@ describe("ProjectsViewComponent", () => {
       await choose(conversationRow(second.title), Resources.pinLabel);
 
       AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, headerSpace());
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, rowGap());
     });
 
-    it("stands Open folder the rows' gap under New chat at a tree row's height, and Projects and Chats, at a heading's height, a section header's space under the one above", async () => {
+    it("spaces each section header the action rows' gap under the section above, collapsed or expanded, and the first a section header's space under the actions", async () => {
+      conversations = [SampleData.conversation, scratch, second];
+      await createOrganization();
+      await choose(conversationRow(second.title), Resources.pinLabel);
+      await settle();
+      const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
+      const below = (title: string, above: Element): number => box(header(title)).top - box(above).bottom;
+      const [newChat, openFolder] = [action(Resources.newConversationLabel), action(Resources.openProjectLabel)];
+      const actionGap = box(openFolder).top - box(newChat).bottom;
+      const expanded = [below(Resources.organizationsTitle, part(element(), ".nol-teamrun-pins")),
+        below(Resources.projectsViewTitle, part(element(), ".nol-teamrun-organization-list")), below(Resources.chatsTitle, part(element(), ".nol-teamrun-project-list"))];
+      const rows = [".nol-teamrun-pins", ".nol-teamrun-organization-list", ".nol-teamrun-project-list"].map(t => part(element(), t).childElementCount);
+      for (const title of [Resources.pinnedTitle, Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle])
+        part(header(title), ".nol-section-header-toggle").click();
+      await settle();
+      const collapsed = [below(Resources.organizationsTitle, header(Resources.pinnedTitle)), below(Resources.projectsViewTitle, header(Resources.organizationsTitle)),
+        below(Resources.chatsTitle, header(Resources.projectsViewTitle))];
+
+      expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
+      expect([rows.every(t => t > 0), element().querySelector(".nol-teamrun-organization-row, .nol-teamrun-project-row, .nol-teamrun-conversation-row")]).toEqual([true, null]);
+      for (const gap of [...expanded, ...collapsed])
+        AppearanceFixture.expectPixels(gap, actionGap);
+      AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, headerSpace());
+    });
+
+    it("stands Open folder the rows' gap under New chat at a tree row's height, Projects at a heading's height a section header's space under it, and Chats the rows' gap under Projects", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
@@ -2233,7 +2258,7 @@ describe("ProjectsViewComponent", () => {
         AppearanceFixture.expectPixels(box(row).height, height);
       AppearanceFixture.expectPixels(box(openFolder).top - box(newChat).bottom, rowGap());
       AppearanceFixture.expectPixels(box(projects).top - box(openFolder).bottom, headerSpace());
-      AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, rowGap());
     });
 
     it("draws Open browser as Open folder is drawn, the rows' gap under it, with its glyph and label at Open folder's insets and colours, and Projects a step under it", async () => {
@@ -2255,13 +2280,13 @@ describe("ProjectsViewComponent", () => {
       expect(colors(openBrowser)).toEqual(colors(openFolder));
     });
 
-    it("sets Chats a section header's space under the projects, with its rows at the pins' inset and height and their actions at a tab close's inset", async () => {
+    it("sets Chats the rows' gap under the projects, with its rows at the pins' inset and height and their actions at a tab close's inset", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const row = conversationRow(scratch.title);
 
       AppearanceFixture.expectPixels(box(find<HTMLElement>("nol-section-header", Resources.chatsTitle)).top - box(part(element(), ".nol-teamrun-project-list")).bottom,
-        headerSpace());
+        rowGap());
       AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
       AppearanceFixture.expectPixels(box(part(row, ".nol-teamrun-conversation-title")).left - box(row).left, space(2));
       AppearanceFixture.expectPixels(box(row).right - box(part(row, ".nol-teamrun-row-actions")).right, closeInset());
@@ -2450,7 +2475,7 @@ describe("ProjectsViewComponent", () => {
 
       expect(getComputedStyle(part(projects, ".nol-section-header-caret")).rotate).toBe("-90deg");
       AppearanceFixture.expectPixels(box(projects).height, height);
-      AppearanceFixture.expectPixels(box(header(Resources.chatsTitle)).top - box(projects).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(header(Resources.chatsTitle)).top - box(projects).bottom, rowGap());
     });
 
     it("starts a project's name as typed, with its twistie in the gutter centred on the headings' icons", async () => {
@@ -2641,12 +2666,27 @@ describe("ProjectsViewComponent", () => {
   });
 
   describe("the Organizations group", () => {
+    it("lists Pinned, then Organizations, then Projects, then Chats, in the view, in Tab order and in the order a screen reader reads the groups", async () => {
+      conversations = [SampleData.conversation, scratch, second];
+      await createOrganization();
+      await choose(conversationRow(second.title), Resources.pinLabel);
+      await settle();
+      const order = [Resources.pinnedTitle, Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle];
+      const tops = order.map(t => find<HTMLElement>("nol-section-header", t).getBoundingClientRect().top);
+      const toggles = [...element().querySelectorAll(".nol-section-header-toggle")].map(t => t.closest("nol-section-header")?.querySelector(".nol-section-header-label")?.textContent?.trim());
+
+      expect(headers()).toEqual(order);
+      expect(tops).toEqual([...tops].sort((a, b) => a - b));
+      expect([toggles, element().querySelectorAll("[tabindex]:not([tabindex='0']):not([tabindex='-1'])").length]).toEqual([order, 0]);
+      expect([...element().querySelectorAll("[role='tree']")].map(t => t.getAttribute("aria-label"))).toEqual(order);
+    });
+
     it("lists each organization with its own teammates in no department first, with no group for them, then each department by its path with its teammates by name, and keeps Organization chats out of Chats", async () => {
       conversations = [SampleData.conversation, scratch, grokChat];
       await createOrganization();
       const levels = [...element().querySelectorAll(".nol-teamrun-organization-list [role='treeitem']")].map(t => t.getAttribute("aria-level"));
 
-      expect(headers()).toEqual([Resources.projectsViewTitle, Resources.chatsTitle, Resources.organizationsTitle]);
+      expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle]);
       expect(names()).toEqual([organization.name, "Grok", "Opus 1", "Marketing", "DevOps", "Agy", "Builder", "Sol", "DevOps \u203a Infra", "Mia", "Labs", "Research", "Nova"]);
       expect(levels).toEqual(["1", "2", "2", "2", "2", "3", "3", "3", "2", "3", "1", "2", "3"]);
       expect(chats()).toEqual([scratch.title]);
@@ -2811,7 +2851,7 @@ describe("ProjectsViewComponent", () => {
       context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
       await settle();
 
-      expect(shown).toEqual([Resources.projectsViewTitle, Resources.organizationsTitle]);
+      expect(shown).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
       expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
     });
 
