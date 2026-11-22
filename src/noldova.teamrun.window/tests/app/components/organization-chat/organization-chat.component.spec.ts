@@ -104,7 +104,7 @@ describe("OrganizationChatComponent", () => {
     await Wait.until(() => expect(element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled).toBe(false));
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
   };
-  const texts = (selector: string): (string | undefined)[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim());
+  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => Required.of(t.textContent).trim());
   const type = async (text: string): Promise<void> => {
     const box = element().querySelector<HTMLTextAreaElement>("nol-teamrun-composer textarea");
     if (Object.isNull(box))
@@ -129,6 +129,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fixture?.whenStable();
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -187,6 +188,53 @@ describe("OrganizationChatComponent", () => {
 
     await Wait.until(() => expect(element().querySelector("[role=alert]")?.textContent?.trim()).toBe("There is no teammate alice."));
     expect([element().querySelector("nol-teamrun-composer"), element().querySelector("nol-teamrun-history"), opened]).toEqual([null, null, ["alice"]]);
+  });
+
+  it("forgets why a chat couldn't open once another is chosen under To", async () => {
+    openAnswer = () => Promise.reject(new Error("There is no teammate alice."));
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["There is no teammate alice."]));
+
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    expect(texts("[role=alert]")).toEqual([]);
+  });
+
+  it("forgets a teammate's chat failing to open once another target is chosen while it opens", async () => {
+    let refuse: (error: Error) => void = () => undefined;
+    openAnswer = () => new Promise<JsonValue>((_, reject) => {
+      refuse = reject;
+    });
+    const requested = vi.spyOn(OrganizationStoreService.prototype, "requestOrganizationChat");
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(opened).toEqual(["alice"]));
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    const request = requested.mock.results[0];
+    if (request?.type !== "return")
+      throw new Error("The panel didn't request Alice's chat.");
+    refuse(new Error("There is no teammate alice."));
+    await request.value.then(() => undefined, () => undefined);
+    await fixture.whenStable();
+
+    expect([requested.mock.calls, texts("[role=alert]")]).toEqual([[["alice"]], []]);
+  });
+
+  it("says why a send to a group failed until a send reaches every recipient", async () => {
+    openAnswer = () => Promise.reject(new Error("The runtime is busy."));
+    await create(OrganizationTarget.department("d1"));
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["The runtime is busy."]));
+
+    openAnswer = id => chatOf(id).toJson();
+    await sendNow();
+    await Wait.until(() => expect(sent()).toHaveLength(2));
+    await fixture.whenStable();
+
+    expect(texts("[role=alert]")).toEqual([]);
   });
 
   it("sends one message to each recipient's own Organization chat, answered by that recipient, lists them with their reply status, and opens one's chat", async () => {
