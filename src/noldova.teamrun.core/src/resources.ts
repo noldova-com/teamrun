@@ -1332,6 +1332,10 @@ export class Resources {
     return `The message "${messageId}" is not a running reply.`;
   }
 
+  public static formatReadyWakeWithoutText(wakeId: string): string {
+    return `The ready wake "${wakeId}" has no text to deliver.`;
+  }
+
   public static formatReplyWithoutProvenance(messageId: string): string {
     return `The reply "${messageId}" has no provenance, so the provider that writes it is unknown.`;
   }

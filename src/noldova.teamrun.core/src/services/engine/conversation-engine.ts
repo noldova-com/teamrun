@@ -105,7 +105,11 @@ import type { ITurnToolSessions } from "../../interfaces/i-turn-tool-sessions.js
 import { Guid } from "../../models/guid.js";
 import type { OutsideReply } from "../../models/outside-reply.js";
 import { PermissionAsk } from "../../models/permission-ask.js";
+import { DeliveredWake } from "../../models/delivered-wake.js";
+import { PlanApproval } from "../../models/plan-approval.js";
 import { ReplyProvenance } from "../../models/reply-provenance.js";
+import { StoredSend } from "../../models/stored-send.js";
+import { UsageHandOff } from "../../models/usage-hand-off.js";
 import { ReplyWork } from "../../models/reply-work.js";
 import { ReportedSharedMcpFailures } from "../../models/reported-shared-mcp-failures.js";
 import { SendAsk } from "../../models/send-ask.js";
@@ -568,7 +572,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           await this.wakes.addAsync(wake, transaction);
         if (!Object.isNull(opening))
           await this.conversations.giveTitleAsync(conversation.id, new ConversationTitle(opening).text, transaction);
-        return { message, pending, wake, opening, joined, joining };
+        return new StoredSend(message, pending, wake, opening, joined, joining);
       });
       sent = message;
       work = pending;
@@ -777,7 +781,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         new ReplyPlan([], null, plan.text, false, true).toJson(), new Date().toISOString()));
       await this.messages.updateAsync(approved, transaction);
       await this.conversations.approvePlanAsync(reply.conversationId, reply.teammateId, transaction);
-      return { reply, approved, provenance };
+      return new PlanApproval(reply, approved, provenance);
     });
     const named = !Object.isNull(reply.teammateId);
     try {
@@ -1799,7 +1803,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       await this.messages.updateAsync(ended, transaction);
       if (!Object.isNull(next))
         await this.messages.insertAsync(next.message, transaction);
-      return { next, member };
+      return new UsageHandOff(next, member);
     });
     if (!Object.isNull(next)) {
       work.splice(index + 1, 0, next);
@@ -2332,7 +2336,11 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         return;
       }
       const next = (await this.wakes.listAsync(ChatWakeState.Ready)).find(t => t.chatId === conversationId);
-      if (Object.isUndefined(next) || Object.isNull(next.text) || await this.deliverWakeAsync(next, next.text, null))
+      if (Object.isUndefined(next))
+        return;
+      if (Object.isNull(next.text))
+        throw new ServiceException(ErrorCode.Internal, Resources.formatReadyWakeWithoutText(next.id), [next.id]);
+      if (await this.deliverWakeAsync(next, next.text, null))
         return;
     }
   }
@@ -2387,7 +2395,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if (!Object.isNull(item))
         await this.messages.insertAsync(item.message, transaction);
       await this.wakes.updateAsync(wake.settled(Object.isNull(item) ? ChatWakeState.Undeliverable : ChatWakeState.Delivered, body, hop), transaction);
-      return { stored, item };
+      return new DeliveredWake(stored, item);
     }).catch((error: unknown) => {
       leave();
       throw error;

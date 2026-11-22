@@ -5378,6 +5378,11 @@ export declare class Resources {
   public static formatReplyWithoutProvenance(messageId: string): string;
 
   /**
+   * Composes the internal error for a stored Ready wake without the text it delivers; the chat's wakes are then not settled, and the log says so.
+   */
+  public static formatReadyWakeWithoutText(wakeId: string): string;
+
+  /**
    * Composes the invalid-parameters message for a relative profile directory.
    */
   public static formatProfileDirNotAbsolute(profileDir: string): string;

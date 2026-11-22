@@ -7,17 +7,17 @@
  */
 
 import "@noldova/context.core";
-import type { JsonObject } from "@noldova/context.json";
+import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
-import { ErrorCode, type IMcpToolHost, type McpToolCallParams, type McpToolListParams, McpServer, type Message, MessageIdParams, type ProviderMode, type RequestedSettings,
+import { ErrorCode, type IMcpToolHost, type McpToolCallParams, type McpToolListParams, McpServer, type Message, MessageIdParams, type RequestedSettings,
   Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
-import type { IConversationsService } from "../../interfaces/i-conversations.service.js";
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
-import type { ITurnToolSession } from "../../interfaces/i-turn-tool-session.js";
 import type { ITurnToolSessions } from "../../interfaces/i-turn-tool-sessions.js";
 import { McpEndpoint } from "../../models/mcp-endpoint.js";
 import type { MemberToken } from "../../models/member-token.js";
+import { ToolReach } from "../../models/tool-reach.js";
+import { TurnToolSession } from "../../models/turn-tool-session.js";
 import { TurnTools } from "../../models/turn-tools.js";
 import type { WorkFolder } from "../../models/work-folder.js";
 import { Resources } from "../../resources.js";
@@ -28,18 +28,17 @@ import { SessionTokens } from "./session-tokens.js";
 import type { TurnState } from "./turn-state.js";
 
 export class McpToolCalls {
-  private readonly conversations: IConversationsService;
   private readonly tools: ITurnToolSessions | null;
   private readonly members: MemberTokens;
   private readonly sessionTokens: SessionTokens = new SessionTokens();
-  private readonly sessions: TurnState["sessions"];
+  private readonly sessions: TurnToolSession[];
   private readonly toolModeOfAsync: IEngineCallbacks["toolModeOfAsync"];
   private readonly modeIn: IEngineCallbacks["modeIn"];
   private readonly nameOf: IEngineCallbacks["nameOf"];
   private readonly cancelAsync: IEngineCallbacks["cancelAsync"];
+  private readonly requireConversationAsync: IEngineCallbacks["requireConversationAsync"];
 
   public constructor(services: EngineServices, state: TurnState, callbacks: IEngineCallbacks) {
-    this.conversations = services.conversations;
     this.tools = services.tools;
     this.members = new MemberTokens(services.conversations);
     this.sessions = state.sessions;
@@ -47,6 +46,7 @@ export class McpToolCalls {
     this.modeIn = callbacks.modeIn;
     this.nameOf = callbacks.nameOf;
     this.cancelAsync = callbacks.cancelAsync;
+    this.requireConversationAsync = callbacks.requireConversationAsync;
   }
 
   public async stopSessionAsync(session: string, reason: string): Promise<void> {
@@ -98,7 +98,7 @@ export class McpToolCalls {
     if (Object.isNull(this.tools))
       return null;
     const token = await this.members.issueAsync(reply.conversationId, reply.teammateId);
-    const projectId = (await this.conversations.findAsync(reply.conversationId))?.projectId ?? null;
+    const projectId = (await this.requireConversationAsync(reply.conversationId)).projectId;
     const scope = Resources.formatToolScope(reply.conversationId, reply.teammateId);
     const host: IMcpToolHost = {
       listToolsAsync: signal => this.listToolsOf(scope, signal),
@@ -109,8 +109,7 @@ export class McpToolCalls {
     const endpoint = Object.isNull(this.tools.endpoint) ? null : new McpEndpoint(this.tools.endpoint, this.sessionTokens, session.id);
     const tools = new TurnTools(host, this.tools.approvedTools, endpoint);
     this.sessionTokens.open(session.id, token);
-    this.sessions.push({ scope, member: token, session, tools, run, sender, reply, mode: this.modeIn(requested), stopped: false,
-      stops: new AbortController() });
+    this.sessions.push(new TurnToolSession(scope, token, session, tools, run, sender, reply, this.modeIn(requested)));
     return tools;
   }
 
@@ -124,17 +123,14 @@ export class McpToolCalls {
     closed.session.end();
   }
 
-  private latestOpenOf(scope: string): { readonly session: ITurnToolSession; readonly tools: TurnTools; readonly reply: Message; readonly mode: ProviderMode | null;
-    readonly stopped: boolean; readonly stops: AbortController } | null {
+  private latestOpenOf(scope: string): TurnToolSession | null {
     return this.sessions.findLast(t => t.scope === scope) ?? null;
   }
 
-  private async reachOfAsync(token: string): Promise<{ readonly member: MemberToken | null;
-    readonly open: { readonly session: ITurnToolSession; readonly tools: TurnTools; readonly reply: Message; readonly mode: ProviderMode | null;
-    readonly stopped: boolean; readonly stops: AbortController } | null }> {
+  private async reachOfAsync(token: string): Promise<ToolReach> {
     const owner = await this.memberOfSessionAsync(token);
     const session = Object.isNull(owner) ? null : this.sessionTokens.find(token);
-    return { member: owner, open: this.sessions.find(t => t.session.id === session) ?? null };
+    return new ToolReach(owner, this.sessions.find(t => t.session.id === session) ?? null);
   }
 
   private async memberOfSessionAsync(token: string): Promise<MemberToken | null> {
@@ -154,16 +150,14 @@ export class McpToolCalls {
     return this.callToolIn(this.latestOpenOf(scope), name, input, signal);
   }
 
-  private async callToolIn(open: { readonly session: ITurnToolSession; readonly reply: Message; readonly mode: ProviderMode | null; readonly stopped: boolean;
-    readonly stops: AbortController } | null,
-    name: string, input: JsonObject, signal: AbortSignal): Promise<JsonObject> {
+  private async callToolIn(open: TurnToolSession | null, name: string, input: JsonObject, signal: AbortSignal): Promise<JsonObject> {
     if (Object.isNull(open))
       return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.noRunningTurnCode, Resources.mcpNoRunningTurn));
     if (this.hasStopped(open))
       return McpToolCalls.turnStopped();
     const mode = await this.toolModeOfAsync(open);
     if (mode?.readOnly === true && !(await open.session.listToolsAsync(signal))
-      .some(t => t["name"] === name && (t["annotations"] as JsonObject | undefined)?.["readOnlyHint"] === true))
+      .some(t => t["name"] === name && McpToolCalls.isReadOnly(t)))
       return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.deniedFailure, Resources.readOnlyModeCode, Resources.formatReadOnlyModeRefused(name, mode.name)));
     if (this.hasStopped(open))
       return McpToolCalls.turnStopped();
@@ -171,8 +165,17 @@ export class McpToolCalls {
     return open.session.callToolAsync(name, input, AbortSignal.any([signal, open.stops.signal]));
   }
 
-  private hasStopped(open: { readonly session: ITurnToolSession; readonly stopped: boolean }): boolean {
+  private hasStopped(open: TurnToolSession): boolean {
     return open.stopped || !this.sessions.some(t => t.session === open.session);
+  }
+
+  private static isReadOnly(tool: JsonObject): boolean {
+    const annotations = tool["annotations"];
+    return McpToolCalls.isJsonObject(annotations) && annotations["readOnlyHint"] === true;
+  }
+
+  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
   private static turnStopped(): JsonObject {

@@ -238,6 +238,24 @@ export class ChatWakesTests {
   }
 
   @TestMethod
+  public async logsAReadyWakeWithoutTextRatherThanSkippingItSilently(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", null, 1);
+
+    await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([Resources.formatWakesNotSettled(woken.id, "ServiceException")]),
+      JSON.stringify(host.log.lines.filter(t => t.startsWith("The wakes waiting on chat"))));
+    Assert.areEqual("Ready", await ChatWakesTests.statesAsync(host));
+    Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
   public async deliversAReadyWakeThatMeetsAHeldProjectOnlyOnceTheHoldEnds(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
