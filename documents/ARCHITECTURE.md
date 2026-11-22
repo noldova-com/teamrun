@@ -1854,6 +1854,7 @@ Antigravity's ACP server 1.3.0 names it in `_meta.mcp` as `server` and `tool`, b
 - A question is an approval of the kind `ApprovalKind.Question`: its `questions` hold each question's id, header, text, options with their descriptions, and whether it takes several choices, the person's own text, or a secret.
   Its options are Answer and Skip, and `teamrun.approvalDecide` takes the answers with Answer: each question's choices and its own text.
 - The turn gets every answer, and the stored approval keeps the answers to the questions that aren't secret, so a secret answer never reaches the database, an event or `list-approvals`.
+  A question a turn posts, whose answer goes back as the chat's next message, keeps and sends only the answers that aren't secret, and an answer of secrets alone sends nothing.
 - A sub-agent's questions name it: the provider passes the sub-agent's description in the `QuestionAsk`, as Claude Code's and Codex's sub-agents do, and the approval's payload keeps it as `subAgent`, as an approval's does.
   The question card then says "<sub-agent> asks" under its heading, and the sub-agent's row shows it waits, as for an approval.
 - A Codex MCP tool call that needs approval reaches the person as a `Tool` approval.
