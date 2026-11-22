@@ -139,6 +139,41 @@ export class AcpChannelTests {
   }
 
   @TestMethod
+  public async staysBusyUntilTheTurnTheAgentStartsHasSwitchedItsModeAndEnded(): Promise<void> {
+    const person = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    person.wakeTurn = new WakeTurn({});
+    const woken = person.wakeTurn.follow(reply, new AbortController().signal);
+    const switched = Promise.withResolvers<void>();
+    const turn = new AcpTurn("agent", "Agent", "Agent tool", person, new AbortController().signal, 1);
+    const channel = AcpChannelTests.channel(turn, person, [], undefined, t => {
+      const wake = new AcpTurn("agent", "Agent", "Agent tool", t, new AbortController().signal, 1);
+      wake.switchingMode(switched.promise);
+      return Promise.resolve(wake);
+    });
+    const observed = new ObservedSettings("agent", null, null, null);
+    await turn.beginAsync("s", false, observed);
+    channel.follow("s", observed);
+    await channel.onNotificationAsync("_x.ai/task_backgrounded", JsonReader.fromValue({ sessionId: "s", update: { sessionUpdate: "task_backgrounded", task_id: "t", command: "npm test" } }));
+    await turn.finishAsync();
+    const idle = channel.whenIdle();
+
+    await channel.onNotificationAsync("_x.ai/task_completed", JsonReader.fromValue({ sessionId: "s", update: { sessionUpdate: "task_completed", task_snapshot: { task_id: "t", exit_code: 0 },
+      will_wake: true } }));
+    await AcpChannelTests.chunkAsync(channel, "woken", { _meta: { promptId: "task-completed-t" } });
+    await AcpChannelTests.updateAsync(channel, "turn_completed", { prompt_id: "task-completed-t" });
+    const switching = channel.isIdle;
+    switched.resolve();
+    const result = await woken;
+    await idle;
+
+    Assert.isFalse(switching);
+    Assert.areEqual(TurnOutcome.Completed, result.outcome);
+    Assert.areEqual(JSON.stringify(["woken"]), JSON.stringify(reply.texts));
+    Assert.isTrue(channel.isIdle);
+  }
+
+  @TestMethod
   public async keepsABackgroundSubAgentPastItsTurnAndWakesTheChatWithItsResult(): Promise<void> {
     const person = new RecordingTurnListener();
     const reply = new RecordingTurnListener();

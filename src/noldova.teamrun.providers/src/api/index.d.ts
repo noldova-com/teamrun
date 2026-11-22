@@ -6694,6 +6694,33 @@ export declare class Resources {
    */
   public static formatPlanUnread(provider: string, error: string): string;
   /**
+   * Notes on a woken reply that the provider, started to approve its own tools, keeps doing so in this reply.
+   * @param kind The provider's display name.
+   * @returns Such as "Grok was started to approve its own tools, so it still doesn't ask before using them in this reply; the chat's mode applies in full from
+   * Grok's next reply.".
+   */
+  public static formatWakeStillApproves(kind: string): string;
+  /**
+   * Notes on a woken reply that the provider refused the switch to the chat's current mode.
+   * @param kind The provider's display name.
+   * @param reason Why it refused.
+   * @returns Such as "Grok couldn't switch this reply to the chat's current mode, so it runs in the mode it had: Mode refused".
+   */
+  public static formatWakeModeKept(kind: string, reason: string): string;
+  /**
+   * Notes on a woken reply whose chat's mode differs from its session's that the steps before the switch may have run in the earlier mode.
+   * @param kind The provider's display name.
+   * @returns Such as "Grok began this reply on its own, so the steps it took before switching to the chat's current mode may have run in the mode it had.".
+   */
+  public static formatWakeBeganInEarlierMode(kind: string): string;
+  /**
+   * Logs a woken reply's mode note that couldn't be added.
+   * @param kind The provider kind's id.
+   * @param reason Why it couldn't be added.
+   * @returns Such as "[grok] A woken reply's mode note was lost: The turn ended".
+   */
+  public static formatWakeModeNoteLost(kind: string, reason: string): string;
+  /**
    * Describes a turn whose session stays in an unrestricted mode after TeamRun tried to switch it to the default.
    * @param kind The provider's display name.
    * @param mode The unrestricted mode's name.
@@ -12964,7 +12991,7 @@ export interface IAcpPlanReader {
   readonly methods: readonly string[];
   /** The native kind the plan's approval shows, such as Cursor's `create_plan`. */
   readonly nativeKind: string;
-  /** Whether the agent leaves its plan mode by itself once told the plan is approved, as Grok does; a turn otherwise switches it out first. */
+  /** Whether the agent leaves its plan mode by itself, for its default mode, once told the plan is approved, as Grok does; a turn otherwise switches it out first. */
   readonly leavesPlan: boolean;
   /**
    * The request's plan: its Markdown text and its to-dos as steps; `null` when the agent handed over no plan, and a turn then answers as if the
@@ -16178,8 +16205,8 @@ export declare class AcpTurn implements IAcpClientListener {
    * @param plans Reads the agent's own plan requests; none by default. A plan request of the turn's session reports its plan text, and its
    * to-dos as the reply's plan, asks the person to Approve plan or Keep planning, reports the plan text again as approved or refused, and
    * answers the agent with the person's choice; a dismissed or stopped ask answers as cancelled.
-   * @param leavePlan Switches the session out of its plan mode once the person approved a plan, before the agent is answered, unless the
-   * reader's `leavesPlan` says the agent leaves it by itself; nothing by default.
+   * @param leavePlan Called once the person approved a plan, before the agent is answered: the adapter switches the session out of its plan
+   * mode, or, when the reader's `leavesPlan` says the agent leaves it by itself, notes the mode the agent leaves it for; nothing by default.
    * When it fails, the turn reports a note with `Resources.formatPlanModeKept` and the plan is still approved.
    * @param approvedTools The names of TeamRun's tools the person approved for every call; none by default.
    * @param mcpToolOf Reads which MCP server and tool a permission request is for, as `IAcpAgent.mcpToolOf`; none by default. A request it reads
@@ -16237,6 +16264,18 @@ export declare class AcpTurn implements IAcpClientListener {
    * blank for a resumed one.
    */
   public beginAsync(sessionId: string, resumed: boolean, observed: ObservedSettings, roleApplied?: import("@noldova/teamrun.protocol").RoleApplication | null): Promise<void>;
+
+  /**
+   * Holds the end of a woken turn until a switch of its session's mode settles.
+   * @param settled Settles, never rejecting, once the switch is answered or given up.
+   */
+  public switchingMode(settled: Promise<void>): void;
+
+  /**
+   * Runs an action once the turn's mode switch settles, at once when there is none.
+   * @param then The action, such as ending the woken reply.
+   */
+  public afterModeSwitch(then: () => void): void;
 
   /**
    * Flushes remaining text and stops delivery, except of the updates of the background sub-agents it keeps, and ends its other sub-agents as Stopped.

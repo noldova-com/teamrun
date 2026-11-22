@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import "@noldova/context.core";
 import { JsonReader, type JsonValue } from "@noldova/context.json";
 import { Resources as CoreResources, type ForkRequest, type ILog, type IProviderAdapter, type ITimer, type ITurnListener, NodeTimer, PlanReading, type ProfileSearch, SharedMcpFailure,
-  SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type McpEndpoint, type TurnRequest, TurnOutcome, TurnResult, type TurnSteer, type TurnTools }
+  SharedMcpFailureKind, SharedMcpRefusal, SignInCheck, TimeoutException, TurnDetail, type McpEndpoint, type TurnRequest, TurnOutcome, TurnResult, type TurnSteer, type TurnTools, type WakeTurn }
   from "@noldova/teamrun.core";
 import { RoleApplication, AuthStatus, DetailKind, ForkedSession, type MessageAttachment, ObservedSettings, type OwnMcpServer, type PlanWindow, ReplyAction, ReplyUsage, type Provider,
   ProviderIdentity, type ProviderKind, type ProviderMode, ProviderModel, ProviderModelList, RequestedSettings, Resources as ProtocolResources,
@@ -83,6 +83,7 @@ export class AcpAdapter implements IProviderAdapter {
   private readonly kept: Map<AcpClient, AcpKeptSession> = new Map();
   private readonly runningSessions: Set<string> = new Set();
   private readonly closingSessions: Set<string> = new Set();
+  private readonly sessionModes: Map<AcpClient | null, string | null> = new Map();
   private shutdowns: number = 0;
 
   public readonly descriptor: ProviderKind;
@@ -342,7 +343,10 @@ export class AcpAdapter implements IProviderAdapter {
       });
       if (!Object.isNull(sender))
         t.adoptSender(sender);
-      return createTurn(t, u);
+      await this.noteWakeModeAsync(client, request.requested.mode, t);
+      const woken = createTurn(t, u);
+      woken.switchingMode(this.switchWakeMode(client, sessionId, t));
+      return woken;
     },
       t => client?.notify(Resources.acpSessionCancel, { sessionId: t }), (reason, session, seen) => this.wakeResult(reason, session, seen), this.descriptor.displayName,
       (t, u) => this.endTaskTree(client!, t, u), t => this.cancelSubAgent(client!, t), commands, terminals);
@@ -886,12 +890,40 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async leavePlan(client: AcpClient | null, sessionId: string, asked: TurnRequest, request: TurnRequest): Promise<void> {
+    if (this.agent.plans?.leavesPlan === true) {
+      this.sessionModes.set(client, this.agent.defaultMode);
+      return;
+    }
     if (asked === request || Object.isNull(client))
       return;
     const wanted = this.agent.modes.find(t => t.id === asked.requested.mode && t.id !== this.planMode);
     const mode = Object.isUndefined(wanted) || this.runsInDefault(wanted.id) ? this.agent.defaultMode : wanted.id;
     if (!Object.isNull(mode))
       await client.request(Resources.acpSessionSetMode, { sessionId, modeId: mode });
+  }
+
+  private async noteWakeModeAsync(client: AcpClient | null, launched: string | null, wake: WakeTurn): Promise<void> {
+    const mode = wake.mode ?? this.agent.defaultMode;
+    if (!Object.isNull(launched) && launched === this.agent.launchMode && mode !== launched)
+      await wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeStillApproves(this.descriptor.displayName), null, null));
+    if (this.sessionModeOf(wake.mode) !== this.sessionModes.get(client))
+      await wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeBeganInEarlierMode(this.descriptor.displayName), null, null));
+  }
+
+  private switchWakeMode(client: AcpClient | null, sessionId: string | null, wake: WakeTurn): Promise<void> {
+    const modeId = this.sessionModeOf(wake.mode);
+    let switched = Promise.resolve();
+    if (!Object.isNull(client) && !Object.isNull(sessionId) && !Object.isNull(modeId))
+      switched = client.request(Resources.acpSessionSetMode, { sessionId, modeId }).then(() => {
+        this.sessionModes.set(client, modeId);
+      }, (error: unknown) =>
+        wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatWakeModeKept(this.descriptor.displayName, FailureDescriber.describe(error)), null, null)))
+        .catch((error: unknown) => this.sessionLog?.write(Resources.formatWakeModeNoteLost(this.descriptor.id, FailureDescriber.describe(error))));
+    return switched;
+  }
+
+  private sessionModeOf(mode: string | null): string | null {
+    return Object.isNull(mode) || this.runsInDefault(mode) ? this.agent.defaultMode : mode;
   }
 
   private plannedOf(request: TurnRequest): TurnRequest {
@@ -924,6 +956,7 @@ export class AcpAdapter implements IProviderAdapter {
       else if (Object.isUndefined(option) && session.id !== mode)
         await client.request(Resources.acpSessionSetMode, { sessionId, modeId: session.id });
       mode = current.find(t => t.category === Resources.acpModeCategory)?.currentValue ?? session.id;
+      this.sessionModes.set(client, session.id);
     }
     else if (!Object.isUndefined(session) && session.id !== this.agent.defaultMode)
       throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, session.name));
@@ -1293,6 +1326,7 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async close(client: AcpClient): Promise<void> {
+    this.sessionModes.delete(client);
     const kept = this.kept.get(client);
     if (!Object.isUndefined(kept)) {
       this.kept.delete(client);

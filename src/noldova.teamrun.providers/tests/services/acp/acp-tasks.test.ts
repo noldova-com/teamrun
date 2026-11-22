@@ -18,6 +18,7 @@ import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { LimitWaits } from "../../fixtures/limit-waits.fixture.js";
 import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { RefusedStopStarter } from "../../fixtures/refused-stop-starter.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -471,6 +472,131 @@ export class AcpTasksTests {
   }
 
   @TestMethod
+  @TestData(null, "", "[\"mode=default\"]", false)
+  @TestData("ask", "", "[\"mode=ask\"]", true)
+  @TestData("bypassPermissions", "", "[\"mode=default\"]", false)
+  @TestData("default", "bypassPermissions", "[\"mode=default\"]", false)
+  @TestData(null, "bypassPermissions", "[\"mode=default\"]", false)
+  public async switchesTheTurnGrokStartsToTheModeTheChatHoldsWhenItStartsAndSaysItsFirstStepsMayHaveRunInTheSessionsMode(mode: string | null, launched: string,
+    sets: string, earlier: boolean): Promise<void> {
+    await using host = new GrokTestHost();
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    reply.decisions.push("yes");
+    listener.wakeTurn = new WakeTurn({}, false, () => false, mode);
+    const woken = listener.wakeTurn.follow(reply, new AbortController().signal);
+
+    await AcpTasksTests.adapter(host).runTurn(host.request("background", null, null, null, null, launched === "" ? null : launched), listener, new AbortController().signal);
+    AcpTasksTests.endTask(host, { wakeReason: "approve" });
+    const wake = await woken;
+
+    Assert.areEqual(TurnOutcome.Completed, wake.outcome);
+    Assert.isTrue(reply.texts.some(t => t.includes(`"sets":${sets}`)));
+    Assert.areEqual(launched !== "", reply.texts.includes(Resources.formatWakeStillApproves(Resources.grokDisplayName)));
+    Assert.areEqual(earlier, reply.texts.includes(Resources.formatWakeBeganInEarlierMode(Resources.grokDisplayName)));
+  }
+
+  @TestMethod
+  public async saysOnlyTheFirstOfTwoTurnsGrokStartsInTheSameModeMayHaveBegunInAnEarlierMode(): Promise<void> {
+    await using host = new GrokTestHost();
+    const listener = new RecordingTurnListener();
+    const first = new RecordingTurnListener();
+    const second = new RecordingTurnListener();
+    second.decisions.push("yes");
+    const firstTurn = new WakeTurn({}, false, () => false, "ask");
+    const secondTurn = new WakeTurn({}, false, () => false, "ask");
+    listener.wakeTurns.push(firstTurn, secondTurn);
+    const firstWoken = firstTurn.follow(first, new AbortController().signal);
+    const secondWoken = secondTurn.follow(second, new AbortController().signal);
+
+    await AcpTasksTests.adapter(host).runTurn(host.request("background-and-sub-agent"), listener, new AbortController().signal);
+    writeFileSync(join(host.directory.resolve("person"), "sub-agent-end.json"), "{}");
+    renameSync(join(host.directory.resolve("person"), "sub-agent-end.json"), join(host.directory.resolve("person"), "sub-agent-end.txt"));
+    const firstWake = await firstWoken;
+    AcpTasksTests.endTask(host, { wakeReason: "approve" });
+    const secondWake = await secondWoken;
+
+    Assert.areEqual(JSON.stringify([TurnOutcome.Completed, TurnOutcome.Completed]), JSON.stringify([firstWake.outcome, secondWake.outcome]));
+    Assert.isTrue(first.texts.includes(Resources.formatWakeBeganInEarlierMode(Resources.grokDisplayName)));
+    Assert.isTrue(second.texts.some(t => t.includes("\"sets\":[\"mode=ask\",\"mode=ask\"]")));
+    Assert.isFalse(second.texts.includes(Resources.formatWakeBeganInEarlierMode(Resources.grokDisplayName)));
+  }
+
+  @TestMethod
+  public async saysNoEarlierModeOnATurnGrokStartsInTheDefaultModeItLeftAnApprovedPlanFor(): Promise<void> {
+    await using host = new GrokTestHost();
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+    listener.wakeTurn = new WakeTurn({}, false, () => false, null);
+    const woken = listener.wakeTurn.follow(reply, new AbortController().signal);
+    const asked = host.request("plan-then-background");
+
+    await AcpTasksTests.adapter(host).runTurn(asked.withRequested(asked.requested.withPlanFirst(true)), listener, new AbortController().signal);
+    AcpTasksTests.endTask(host, {});
+    const wake = await woken;
+
+    Assert.areEqual(JSON.stringify([1, TurnOutcome.Completed]), JSON.stringify([listener.asks.length, wake.outcome]));
+    Assert.isFalse(reply.texts.includes(Resources.formatWakeBeganInEarlierMode(Resources.grokDisplayName)));
+  }
+
+  @TestMethod
+  public async tellsTheReplyOfTheTurnGrokStartsThatItKeepsItsModeWhenGrokRefusesTheSwitch(): Promise<void> {
+    await using host = new GrokTestHost();
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    reply.decisions.push("yes");
+    listener.wakeTurn = new WakeTurn({}, false, () => false, "ask");
+    const woken = listener.wakeTurn.follow(reply, new AbortController().signal);
+
+    await AcpTasksTests.adapter(host, host.elapsedIdleTimer, { ...host.environment, TEAMRUN_FAKE_ACP_SET_MODE: "fail" }).runTurn(host.request("background"), listener,
+      new AbortController().signal);
+    AcpTasksTests.endTask(host, { wakeReason: "approve" });
+    const wake = await woken;
+
+    Assert.areEqual(TurnOutcome.Completed, wake.outcome);
+    Assert.isTrue(reply.texts.some(t => t.startsWith(Resources.formatWakeModeKept(Resources.grokDisplayName, "")) && t.includes("Mode refused")));
+  }
+
+  @TestMethod
+  public async logsTheKeptModeNoteTheReplyOfTheTurnGrokStartsCouldNotTakeAndStillEndsIt(): Promise<void> {
+    await using host = new GrokTestHost();
+    const log = new RecordingLog();
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    reply.decisions.push("yes");
+    reply.refusedDetail = Resources.formatWakeModeKept(Resources.grokDisplayName, "");
+    listener.wakeTurn = new WakeTurn({}, false, () => false, "ask");
+    const woken = listener.wakeTurn.follow(reply, new AbortController().signal);
+
+    await AcpTasksTests.adapter(host, host.elapsedIdleTimer, { ...host.environment, TEAMRUN_FAKE_ACP_SET_MODE: "fail" }, log).runTurn(host.request("background"),
+      listener, new AbortController().signal);
+    AcpTasksTests.endTask(host, { wakeReason: "approve" });
+    const wake = await woken;
+
+    Assert.areEqual(TurnOutcome.Completed, wake.outcome);
+    Assert.isTrue(log.lines.includes(Resources.formatWakeModeNoteLost(Resources.grokKindId, "The listener refused the detail.")));
+  }
+
+  @TestMethod
+  public async tellsTheReplyOfTheTurnGrokStartsThatItKeepsItsModeWhenGrokRefusesTheSwitchOnlyAfterTheTurnsLastUpdate(): Promise<void> {
+    await using host = new GrokTestHost();
+    const listener = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    reply.decisions.push("yes");
+    listener.wakeTurn = new WakeTurn({}, false, () => false, "ask");
+    const woken = listener.wakeTurn.follow(reply, new AbortController().signal);
+
+    await AcpTasksTests.adapter(host, host.elapsedIdleTimer, { ...host.environment, TEAMRUN_FAKE_ACP_SET_MODE: "late" }).runTurn(host.request("background"), listener,
+      new AbortController().signal);
+    AcpTasksTests.endTask(host, { wakeReason: "approve" });
+    const wake = await woken;
+
+    Assert.areEqual(TurnOutcome.Completed, wake.outcome);
+    Assert.isTrue(reply.texts.some(t => t.startsWith(Resources.formatWakeModeKept(Resources.grokDisplayName, "")) && t.includes("Mode refused late")));
+  }
+
+  @TestMethod
   public async closesGrokWhenTheTurnItSaidItWouldStartDoesNotStartInTime(): Promise<void> {
     await using host = new GrokTestHost();
     const timings = new ProviderTimings(2000, 2000, 10_000, 2000, 100, 100, 100, host.timings.killWait, 100, 1, 10, 50);
@@ -903,10 +1029,11 @@ export class AcpTasksTests {
       ...Object.isNull(willWake) ? {} : { will_wake: willWake } } }));
   }
 
-  private static adapter(host: GrokTestHost, idleTimer: ITimer = host.elapsedIdleTimer): GrokAdapter {
-    return host.createAdapter(host.environment, host.command, host.terminator, host.timings, new NodeProcessStarter(host.terminator),
+  private static adapter(host: GrokTestHost, idleTimer: ITimer = host.elapsedIdleTimer, environment: NodeJS.ProcessEnv = host.environment,
+    log: RecordingLog | null = null): GrokAdapter {
+    return host.createAdapter(environment, host.command, host.terminator, host.timings, new NodeProcessStarter(host.terminator),
       new ProcessTree(process.platform, new CommandRunner(new NodeProcessStarter(host.terminator)), process.env, Resources.processListTimeout, host.timer,
-      host.timings.stopGrace), host.timer, null, idleTimer);
+      host.timings.stopGrace), host.timer, log, idleTimer);
   }
 
   private static async tree(host: GrokTestHost): Promise<number[]> {

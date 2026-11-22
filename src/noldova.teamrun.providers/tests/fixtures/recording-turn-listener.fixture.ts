@@ -40,6 +40,7 @@ export class RecordingTurnListener implements ITurnListener {
   public heldAnswer: Promise<readonly QuestionAnswer[] | null> | null = null;
   public sharedFailureError: Error | null = null;
   public heldDetail: Promise<void> | null = null;
+  public refusedDetail: string | null = null;
   public readonly finishedDetails: TurnDetail[] = [];
 
   public onSteerable?: (steer: ((steer: TurnSteer) => Promise<boolean>) | null) => void;
@@ -63,6 +64,8 @@ export class RecordingTurnListener implements ITurnListener {
   }
 
   public async onDetailAsync(detail: TurnDetail): Promise<void> {
+    if (!Object.isNull(this.refusedDetail) && detail.text.startsWith(this.refusedDetail))
+      throw new Error("The listener refused the detail.");
     this.details.push(detail);
     const held = this.heldDetail;
     this.heldDetail = null;

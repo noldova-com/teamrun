@@ -81,6 +81,7 @@ export class AcpTurn implements IAcpClientListener {
   private notice: RegExp | null = null;
   private refusalOf: (text: string) => Error | null = () => null;
   private refused: Error | null = null;
+  private modeSwitch: Promise<void> = Promise.resolve();
 
   public constructor(kindId: string, providerName: string, toolTitle: string, listener: ITurnListener, signal: AbortSignal, streamInterval: number,
     savedImageOf: (tool: JsonReader, sessionId: string) => SavedImage | null = () => null, routedMcpTool: string | null = null,
@@ -121,6 +122,14 @@ export class AcpTurn implements IAcpClientListener {
     this.active = true;
     await this.listener.onStartedAsync(new TurnStart(sessionId, resumed, roleApplied));
     await this.listener.onObservedAsync(observed);
+  }
+
+  public switchingMode(settled: Promise<void>): void {
+    this.modeSwitch = settled;
+  }
+
+  public afterModeSwitch(then: () => void): void {
+    void this.modeSwitch.then(then);
   }
 
   public async finishAsync(): Promise<void> {
@@ -469,7 +478,7 @@ export class AcpTurn implements IAcpClientListener {
     if (!Object.isNull(decided))
       await this.listener.onDetailAsync(decided);
     if (approved)
-      this.planning = !reader.leavesPlan && await this.leavePlan(sessionId).then(() => false, async (error: unknown) => {
+      this.planning = await this.leavePlan(sessionId).then(() => false, async (error: unknown) => {
         await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.formatPlanModeKept(this.providerName, FailureDescriber.describe(error)), null, null));
         return true;
       });

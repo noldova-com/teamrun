@@ -35,7 +35,7 @@ export class GrokPlanReaderTests {
   }
 
   @TestMethod
-  public async approvesGroksPlanUnderBothNamesWithoutSwitchingItsSessionSinceGrokLeavesPlanByItself(): Promise<void> {
+  public async approvesGroksPlanUnderBothNamesAndTellsTheAdapterItWasApproved(): Promise<void> {
     const run = async (method: string): Promise<string> => {
       const listener = new RecordingTurnListener();
       listener.decisions.push(Resources.acpApprovePlanOption);
@@ -55,7 +55,7 @@ export class GrokPlanReaderTests {
     Assert.isDefined(prefixed);
     Assert.isDefined(plain);
 
-    Assert.areEqual(JSON.stringify([`{"outcome":"approved"} false,true exit_plan_mode:Tidy 0`, `{"outcome":"approved"} false,true exit_plan_mode:Tidy 0`]),
+    Assert.areEqual(JSON.stringify([`{"outcome":"approved"} false,true exit_plan_mode:Tidy 1`, `{"outcome":"approved"} false,true exit_plan_mode:Tidy 1`]),
       JSON.stringify([await run(prefixed), await run(plain)]));
   }
 }

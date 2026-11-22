@@ -3962,6 +3962,22 @@ export class Resources {
     return `${kind} doesn't offer the mode ${mode} in this session. Choose another mode for the teammate.`;
   }
 
+  public static formatWakeStillApproves(kind: string): string {
+    return `${kind} was started to approve its own tools, so it still doesn't ask before using them in this reply; the chat's mode applies in full from ${kind}'s next reply.`;
+  }
+
+  public static formatWakeModeKept(kind: string, reason: string): string {
+    return `${kind} couldn't switch this reply to the chat's current mode, so it runs in the mode it had: ${reason}`;
+  }
+
+  public static formatWakeBeganInEarlierMode(kind: string): string {
+    return `${kind} began this reply on its own, so the steps it took before switching to the chat's current mode may have run in the mode it had.`;
+  }
+
+  public static formatWakeModeNoteLost(kind: string, reason: string): string {
+    return `[${kind}] A woken reply's mode note was lost: ${reason}`;
+  }
+
   public static formatUnrestrictedMode(kind: string, mode: string): string {
     return `${kind}'s session is in the mode ${mode}, which lifts its restrictions, and it couldn't switch to its default mode, so TeamRun didn't send the prompt.`;
   }
