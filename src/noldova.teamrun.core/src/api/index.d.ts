@@ -1675,7 +1675,8 @@ export interface IBackgroundTasksService {
 
   /**
    * Adds output to a running task, keeping the latest `Resources.maximumBackgroundTaskOutput`
-   * characters, and publishes it; nothing for an unknown or ended task or empty text.
+   * characters, and publishes it, the output gathered since the last publish cut to its latest that many characters too;
+   * nothing for an unknown or ended task or empty text.
    * @param messageId The id of the reply that started the task.
    * @param taskId The provider's id of the task.
    * @param text The new output.
@@ -2295,6 +2296,8 @@ export interface IConversationEngine {
    * message's; refused, or with a file that can't be copied, it waits as Queue. Until a reply offers a steer, it waits like Queue.
    * A message from outside goes only after `refuseRaisedModeAsync` passes its send again, so a mode the person changed since it was
    * added refuses it, kept with that failure.
+   * Once the message is kept, a delivery that throws is logged with `Resources.formatWaitingMessageNotDelivered` and the message waits,
+   * so the request still answers with it.
    * @param params The send and how it goes.
    * @param fromOutside Whether a client other than TeamRun's window added it; by default, it didn't.
    * @returns The waiting message, as added.
@@ -2331,7 +2334,7 @@ export interface IConversationEngine {
 
   /**
    * Makes a waiting message Stop and send, clearing its failure, publishes `WaitingMessagesChanged`, and stops the chat's running
-   * replies, or sends it when there are none.
+   * replies, or sends it when there are none; a stop or a send that throws is logged, as for `addWaitingAsync`, and the message waits.
    * @param params The waiting message.
    * @returns The waiting message, as Stop and send.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown waiting message.
@@ -3276,6 +3279,8 @@ export declare class Resources {
   public static formatChatSendingStopped(chatId: string, reason: string): string;
   /** The log line for a tool call's record that couldn't be stored; the records after it are still stored. */
   public static formatToolCallNotKept(chatId: string, failureKind: string): string;
+  /** The log line for a waiting message whose delivery failed after it was kept; the request still answers with it, and it waits. */
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string;
   /** The log line for a message the provider took as a steer that couldn't be kept in the chat; the next waiting message goes on. */
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string;
   /** The log line for a steer the provider refused with an error; the message waits as Queue. */
@@ -3492,6 +3497,11 @@ export declare class Resources {
    * The `HEAD` of a chat folder's Git root, on a `main` branch with no commit.
    */
   public static readonly chatGitHead: string;
+  /**
+   * The file a chat folder's `HEAD` is written to before it is renamed to `HEAD`, so a write cut short never leaves a broken one:
+   * `HEAD.teamrun`.
+   */
+  public static readonly chatGitHeadDraftFileName: string;
   /**
    * The `config` of a chat folder's Git root.
    */
@@ -5400,6 +5410,11 @@ export declare class Resources {
   public static formatReplyWithoutProvenance(messageId: string): string;
 
   /**
+   * Composes the internal error for a stored Ready wake without the text it delivers; the chat's wakes are then not settled, and the log says so.
+   */
+  public static formatReadyWakeWithoutText(wakeId: string): string;
+
+  /**
    * Composes the invalid-parameters message for a relative profile directory.
    */
   public static formatProfileDirNotAbsolute(profileDir: string): string;
@@ -7176,7 +7191,9 @@ export declare class ChatFolders {
   public exists(conversationId: string): boolean;
 
   /**
-   * Makes the folder and its Git root when either is missing, keeping what the folder holds.
+   * Makes the folder and its Git root when either is missing, keeping what the folder holds; the Git root's `HEAD`, which tells
+   * whether the root is made, is written beside it as `Resources.chatGitHeadDraftFileName` and renamed, so a write cut short is
+   * made again by the next call.
    * @param conversationId The conversation id.
    * @returns The folder's path.
    * @throws {Error} When the system refuses to make it.

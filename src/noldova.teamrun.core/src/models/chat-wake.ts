@@ -8,11 +8,12 @@
 
 import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
-import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
+import { JsonReader, type JsonObject } from "@noldova/context.json";
 
 import { ChatWakeKind } from "../enums/chat-wake-kind.js";
 import { ChatWakeState } from "../enums/chat-wake-state.js";
 import { Resources } from "../resources.js";
+import { JsonObjects } from "./json-objects.js";
 
 export class ChatWake {
   public readonly id: string;
@@ -21,6 +22,7 @@ export class ChatWake {
   public readonly sourceMessageId: string;
   public readonly watchedChatId: string;
   public readonly watchedIds: readonly string[];
+  public readonly firstWatchedId: string;
   public readonly state: ChatWakeState;
   public readonly text: string | null;
   public readonly hop: number | null;
@@ -33,7 +35,8 @@ export class ChatWake {
     ArgumentException.throwIfNullOrWhitespace(chatId, Resources.chatIdParameterName);
     ArgumentException.throwIfNullOrWhitespace(sourceMessageId, Resources.sourceMessageIdParameterName);
     ArgumentException.throwIfNullOrWhitespace(watchedChatId, Resources.watchedChatIdParameterName);
-    if (watchedIds.length === 0)
+    const [first, ...rest] = watchedIds;
+    if (Object.isUndefined(first))
       throw new ArgumentException(Resources.wakeWatchesNothing, Resources.watchedIdsParameterName);
 
     this.id = id;
@@ -41,7 +44,8 @@ export class ChatWake {
     this.chatId = chatId;
     this.sourceMessageId = sourceMessageId;
     this.watchedChatId = watchedChatId;
-    this.watchedIds = [...watchedIds];
+    this.watchedIds = [first, ...rest];
+    this.firstWatchedId = first;
     this.state = state;
     this.text = text;
     this.hop = hop;
@@ -63,7 +67,7 @@ export class ChatWake {
       reader.readNullableString(Resources.textField),
       reader.readNullableInteger(Resources.hopField),
       reader.readNonBlankString(Resources.createdAtField),
-      ChatWake.isJsonObject(view) ? view : null);
+      JsonObjects.is(view) ? view : null);
   }
 
   public settled(state: ChatWakeState, text: string, hop: number | null, view: JsonObject | null = this.view): ChatWake {
@@ -84,9 +88,5 @@ export class ChatWake {
       [Resources.createdAtField]: this.createdAt,
       ...Object.isNull(this.view) ? {} : { [Resources.viewField]: this.view }
     };
-  }
-
-  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 }

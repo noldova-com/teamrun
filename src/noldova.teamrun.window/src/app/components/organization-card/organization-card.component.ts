@@ -64,6 +64,7 @@ export class OrganizationCardComponent {
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
   public readonly departmentName: InputSignal<string | undefined> = input<string | undefined>(undefined);
+  public readonly reportsTo: InputSignal<string | null> = input<string | null>(null);
   public readonly message: OutputEmitterRef<void> = output<void>();
 
   protected readonly resources: typeof Resources = Resources;
