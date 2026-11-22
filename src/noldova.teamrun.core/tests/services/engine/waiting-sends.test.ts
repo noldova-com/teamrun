@@ -651,6 +651,30 @@ export class WaitingSendsTests {
   }
 
   @TestMethod
+  public async answersWithAKeptWaitingMessageAndLogsWhenItsDeliveryFails(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const chat = await host.createConversationAsync();
+    const findOpenReplyAsync = host.messages.findOpenReplyAsync.bind(host.messages);
+    let failing = true;
+    host.messages.findOpenReplyAsync = async (chatId, transaction) => {
+      if (failing)
+        throw new Error("The disk is full");
+      return await findOpenReplyAsync(chatId, transaction);
+    };
+
+    const added = await host.engine.addWaitingAsync(new WaitingMessageAddParams(await WaitingSendsTests.paramsAsync(host, chat.id, "Kept"), MessageDelivery.Queue));
+    const now = await host.engine.sendWaitingNowAsync(new WaitingMessageIdParams(added.id));
+    const listed = (await host.engine.listWaitingAsync(new ChatIdParams(chat.id))).messages;
+    failing = false;
+
+    Assert.areEqual(added.id, listed.map(t => t.id).join(","));
+    Assert.areEqual(MessageDelivery.StopAndSend, now.delivery);
+    Assert.areEqual(0, host.adapter.requests.length);
+    const line = Resources.formatWaitingMessageNotDelivered(chat.id, "Error");
+    Assert.areEqual(JSON.stringify([line, line]), JSON.stringify(host.log.lines.filter(t => t.includes("not delivered"))));
+  }
+
+  @TestMethod
   public async stopsTheRunningReplyForAStopAndSendMessageAndSendsItBeforeTheQueuedOnes(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.createConversationAsync();
