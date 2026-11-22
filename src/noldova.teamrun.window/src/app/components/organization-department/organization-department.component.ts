@@ -10,7 +10,7 @@ import { NgTemplateOutlet } from "@angular/common";
 import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, type SelectOption, TextFieldComponent }
+import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
   from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
