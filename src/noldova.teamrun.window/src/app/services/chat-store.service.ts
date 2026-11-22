@@ -1863,9 +1863,9 @@ export class ChatStoreService {
       .catch(() => this.reportFailure(ChatAction.OpenPage, conversationId, Resources.chatPageNotShown, conversationId));
   }
 
-  public async openBrowser(report: (message: string) => void = this.actionFailed(ChatAction.OpenBrowser, Resources.browserLinkProfile)): Promise<void> {
+  public async openBrowser(report: (message: string) => void = this.actionFailed(ChatAction.OpenBrowser, Resources.browserOpenPageCommand)): Promise<void> {
     await this.attempt(async () => {
-      await this.context.runCommandAsync(Resources.browserOpenPageCommand, { [Resources.browserProfileKeyField]: Resources.browserLinkProfile });
+      await this.context.runCommandAsync(Resources.browserOpenPageCommand, {});
     }, report);
   }
 
