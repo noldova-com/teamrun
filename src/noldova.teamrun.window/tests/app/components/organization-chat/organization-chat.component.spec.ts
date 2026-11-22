@@ -14,7 +14,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
+  AttachmentInput, Conversation, ConversationIdParams, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
   MethodName, type Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
@@ -25,9 +25,11 @@ import { ChatStoreService } from "../../../../src/app/services/chat-store.servic
 import { OrganizationCatalog } from "../../../../src/app/services/organization-catalog";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { Resources } from "../../../../src/resources";
+import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationChatComponent", () => {
@@ -391,5 +393,82 @@ describe("OrganizationChatComponent", () => {
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
     await Wait.until(() => expect(sent()).toHaveLength(2));
     await Wait.until(() => expect(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey)).toBe("{}"));
+  });
+
+  describe("Stop", () => {
+    const stopButton = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-stop");
+    const cancelled = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationCancel))
+      .map(t => ConversationIdParams.fromJson(t.parameters).conversationId);
+    const answerReplies = (): void => {
+      context.answer(MethodName.MessageSend, t => new MessageSendResult(SampleData.userMessage, [reply(MessageSendParams.fromJson(t).chatId, MessageStatus.Running)]).toJson())
+        .answer(MethodName.ConversationCancel, t => [reply(ConversationIdParams.fromJson(t).conversationId, MessageStatus.Cancelled).toJson()]);
+    };
+    const stop = async (): Promise<void> => {
+      await Wait.until(() => expect(stopButton()?.disabled).toBe(false));
+      Required.of(stopButton()).click();
+      await fixture.whenStable();
+    };
+
+    beforeEach(() => {
+      kept = [chatOf("alice"), chatOf("bob")];
+    });
+
+    it("shows Stop beside Send once every recipient is replying, stops each reply, marks them Stopped, and goes away", async () => {
+      await create(OrganizationTarget.department("d1"));
+      answerReplies();
+      const before = stopButton();
+      await type("Status?");
+      await sendNow();
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Replying", "Replying"]));
+      const stopBox = Required.of(stopButton()).getBoundingClientRect();
+      const sendBox = Required.of(element().querySelector<HTMLElement>(".nol-teamrun-composer-send")).getBoundingClientRect();
+
+      await stop();
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Stopped", "Stopped"]));
+      await Wait.until(() => expect(stopButton()).toBeNull());
+
+      expect([before, stopBox.right <= sendBox.left, stopBox.top + stopBox.height / 2 - (sendBox.top + sendBox.height / 2), cancelled().sort(), sent().map(t => t.chatId),
+        box()?.value, element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled])
+        .toEqual([null, true, 0, ["org-alice", "org-bob"], ["org-alice", "org-bob"], "", true]);
+    });
+
+    it("sends to no recipient not yet started when Stop comes between sends, stops the reply already started, and takes a new message at once", async () => {
+      await create(OrganizationTarget.department("d1"));
+      answerReplies();
+      const first = new DeferredResponse();
+      context.answer(MethodName.MessageSend, async t => {
+        const chatId = MessageSendParams.fromJson(t).chatId;
+        await first.promise;
+        return new MessageSendResult(SampleData.userMessage, [reply(chatId, MessageStatus.Running)]).toJson();
+      });
+      await type("Status?");
+      await sendNow();
+      await Wait.until(() => expect(sent()).toHaveLength(1));
+      await stop();
+      const stopping = [stopButton()?.disabled, stopButton()?.getAttribute("aria-label")];
+      first.resolve(null);
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Stopped", "Stopped"]));
+      await Wait.until(() => expect(stopButton()).toBeNull());
+      await Wait.until(() => expect(box()?.value).toBe(""));
+
+      expect([stopping, sent().map(t => t.chatId), cancelled()]).toEqual([[true, Resources.stoppingLabel], ["org-alice"], ["org-alice"]]);
+    });
+
+    it("sends to no one and opens no other chat when Stop comes while the first recipient's chat is still opening", async () => {
+      kept = [];
+      const opening = new DeferredResponse();
+      openAnswer = id => id === "alice" ? opening.promise : chatOf(id).toJson();
+      await create(OrganizationTarget.department("d1"));
+      answerReplies();
+      await type("Status?");
+      await sendNow();
+      await Wait.until(() => expect(opened).toEqual(["alice"]));
+      await stop();
+      opening.resolve(chatOf("alice").toJson());
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Stopped", "Stopped"]));
+      await Wait.until(() => expect(stopButton()).toBeNull());
+
+      expect([sent(), cancelled(), opened, box()?.value]).toEqual([[], [], ["alice"], ""]);
+    });
   });
 });

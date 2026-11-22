@@ -39,6 +39,12 @@ export class OrganizationChatComponent {
   private readonly opening: Map<string, Promise<string | null>> = new Map();
   private readonly reached: Set<string> = new Set();
   private readonly reading: Set<string> = new Set();
+  private readonly sending: WritableSignal<boolean> = signal(false);
+  private readonly stopAsked: WritableSignal<boolean> = signal(false);
+  private readonly sentTo: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly skipped: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly replying: Signal<readonly string[]> = computed(() => [...this.sentTo()].filter(t => !Object.isNull(this.store.runningReplyOf(t))));
+  private readonly running: Signal<boolean> = computed(() => this.sending() || this.replying().length > 0);
   private retrying: string | null = null;
 
   public readonly target: ModelSignal<OrganizationTarget> = model.required<OrganizationTarget>();
@@ -75,11 +81,12 @@ export class OrganizationChatComponent {
     this.organizations.organization().recipientsOf(this.target(), this.store.teammates().map(t => t.id)));
   protected readonly fanOutKey: Signal<string> = computed(() => Resources.formatOrganizationFanOutKey(this.organizations.id(), [...this.recipients()].sort()));
   protected readonly fanOut: ComposerFanOut = new ComposerFanOut((text, settings, attachments, sources) => this.sendToEach(text, settings, attachments, sources),
-    computed(() => Resources.formatOrganizationReach(this.recipients().length)));
+    computed(() => Resources.formatOrganizationReach(this.recipients().length)), this.running, computed(() => this.stopAsked() && this.running()), () => this.stop());
   protected readonly rows: Signal<readonly OrganizationRecipientRow[]> = computed(() => this.recipients()
     .flatMap(id => this.store.teammates().filter(t => t.id === id)).map(teammate => {
     const chatId = this.chatOf(teammate.id);
-    const status = Object.isNull(chatId) ? undefined : this.store.runningReplyOf(chatId)?.status ?? this.ended().get(chatId) ?? this.latest().get(chatId);
+    const status = this.skipped().has(teammate.id) ? MessageStatus.Cancelled
+      : Object.isNull(chatId) ? undefined : this.store.runningReplyOf(chatId)?.status ?? this.ended().get(chatId) ?? this.latest().get(chatId);
     return new OrganizationRecipientRow(teammate.id, teammate.name,
       Object.isUndefined(status) ? Resources.organizationRecipientNoReply : Resources.organizationRecipientStatusLabels[status]);
   }));
@@ -151,19 +158,49 @@ export class OrganizationChatComponent {
       this.retrying = retrying;
       this.reached.clear();
     }
-    let isSent = true;
-    for (const teammateId of this.recipients().filter(t => !this.reached.has(t))) {
-      const chatId = this.chatOf(teammateId) ?? await this.open(teammateId);
-      if (!Object.isNull(chatId) && await this.deliver(text, settings.withResponder(teammateId), chatId, attachments, teammateId))
-        this.reached.add(teammateId);
-      else
-        isSent = false;
+    this.stopAsked.set(false);
+    this.sentTo.set(new Set());
+    this.skipped.set(new Set());
+    this.sending.set(true);
+    try {
+      let isSent = true;
+      const unreached = this.recipients().filter(t => !this.reached.has(t));
+      for (const [index, teammateId] of unreached.entries()) {
+        const chatId = this.stopAsked() ? null : this.chatOf(teammateId) ?? await this.open(teammateId);
+        if (this.stopAsked()) {
+          this.skipped.set(new Set(unreached.slice(index)));
+          break;
+        }
+        if (!Object.isNull(chatId) && await this.deliver(text, settings.withResponder(teammateId), chatId, attachments, teammateId)) {
+          this.reached.add(teammateId);
+          this.sentTo.update(t => new Set(t).add(chatId));
+        }
+        else
+          isSent = false;
+      }
+      const isStopped = this.stopAsked();
+      if (isStopped)
+        await this.stopReplies();
+      if (isSent || isStopped) {
+        this.retrying = null;
+        this.reached.clear();
+      }
+      return isSent || isStopped;
     }
-    if (isSent) {
-      this.retrying = null;
-      this.reached.clear();
+    finally {
+      this.sending.set(false);
     }
-    return isSent;
+  }
+
+  private async stop(): Promise<void> {
+    this.stopAsked.set(true);
+    if (!this.sending())
+      await this.stopReplies();
+  }
+
+  private async stopReplies(): Promise<void> {
+    await Promise.all(this.replying().map(t => this.store.stop(t)));
+    this.stopAsked.set(false);
   }
 
   private deliver(text: string, settings: ComposerSettings, chatId: string, attachments: readonly AttachmentInput[], teammateId: string): Promise<boolean> {
