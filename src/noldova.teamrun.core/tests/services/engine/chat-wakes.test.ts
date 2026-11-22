@@ -38,6 +38,7 @@ import {
 
 import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 
 @TestClass
 export class ChatWakesTests {
@@ -235,6 +236,24 @@ export class ChatWakesTests {
     Assert.isNull(wake);
     Assert.areEqual(0, (await ChatWakesTests.chatAsync(host, chat.id)).length);
     activity.requireIdle(project.rootPath);
+  }
+
+  @TestMethod
+  public async logsAReadyWakeWithoutTextRatherThanSkippingItSilently(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const woken = await host.createConversationAsync(project, "Release plan");
+    const fixes = await host.createConversationAsync(project, "Fixes");
+    const asked = await ChatWakesTests.askDefault(host, woken.id);
+    await ChatWakesTests.insertAsync(host, "w1", "Reply", woken.id, asked.id, fixes.id, ["r1"], "Ready", null, 1);
+
+    await host.engine.reconcileAsync();
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([`The wakes waiting on chat ${woken.id} weren't settled: ServiceException`]),
+      JSON.stringify(host.log.lines.filter(t => t.startsWith("The wakes waiting on chat"))));
+    Assert.areEqual("Ready", await ChatWakesTests.statesAsync(host));
+    Assert.areEqual(1, host.adapter.requests.length);
   }
 
   @TestMethod
@@ -674,7 +693,7 @@ export class ChatWakesTests {
     host.adapter.holdTurn = async request => {
       if (request !== host.adapter.requests[0])
         return;
-      const broken = host.events.subscribe({
+      const broken = FailingDelivery.on(host.events, {
         onEvent: event => {
           if (event.name === EventName.MessageCreated && Message.fromJson(event.payload).conversationId === second.id)
             throw new RangeError("The window is gone.");

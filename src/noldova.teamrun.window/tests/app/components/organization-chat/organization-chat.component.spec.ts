@@ -14,7 +14,8 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, Message, MessageAttachment, MessageAuthor, MessageDelivery, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
+  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessageDelivery, MessagePageParams,
+  MessageSendParams, MessageSendResult, MessageStatus,
   MethodName, type Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
@@ -416,6 +417,44 @@ describe("OrganizationChatComponent", () => {
     await typeAndSettle(element(), "@");
 
     expect([toOne.every(t => t > 0), shown()]).toEqual([true, [0, 0]]);
+  });
+
+  it.each([
+    { title: "a department, its member under its leader included", target: OrganizationTarget.department("d1"), expected: "Goes to 2 teammates" },
+    { title: "the leaders and your direct reports", target: OrganizationTarget.leaders, expected: "Goes to 1 teammate" },
+    { title: "everyone", target: OrganizationTarget.everyone, expected: "Goes to 2 teammates" }
+  ])("says before sending how many teammates a message to $title goes to", async ({ target, expected }) => {
+    organization = SampleData.organizationOf([design], [new TeammatePlacement("alice", OrganizationParent.department("d1"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0)]);
+    await create(target);
+
+    await Wait.until(() => expect(texts(".nol-teamrun-composer-reach")).toEqual([expected]));
+    expect(sent()).toEqual([]);
+  });
+
+  it("gives the message box the count as its description, follows a change of structure, and shows none for one teammate's chat", async () => {
+    await create(OrganizationTarget.department("d1"));
+    const reach = (): HTMLElement | null => element().querySelector<HTMLElement>(".nol-teamrun-composer-reach");
+    await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 2 teammates"));
+    const described = [box()?.getAttribute("aria-describedby"), reach()?.id];
+    const shown = (found: HTMLElement | null): HTMLElement => {
+      if (Object.isNull(found))
+        throw new Error("The count or the message box isn't shown.");
+      return found;
+    };
+    const [line, field] = [shown(reach()), shown(box())];
+    const textStart = (on: HTMLElement): number => on.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(on).borderInlineStartWidth)
+      + Number.parseFloat(getComputedStyle(on).paddingInlineStart);
+    expect([textStart(line) - textStart(field), line.getBoundingClientRect().bottom <= field.getBoundingClientRect().top]).toEqual([0, true]);
+
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([design], placed("alice")).toJson());
+    await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 1 teammate"));
+    fixture.componentRef.setInput("target", OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-composer-fan-out")).toBeNull());
+    await Wait.until(() => expect(box()).not.toBeNull());
+
+    expect([described[0] === described[1], described[0]?.startsWith(Resources.composerReachIdPrefix), reach(), box()?.hasAttribute("aria-describedby")])
+      .toEqual([true, true, null, false]);
   });
 
   it("shows no reply yet for recipients whose chats exist but who never replied", async () => {

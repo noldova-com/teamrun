@@ -148,6 +148,8 @@ import { WaitingMessagesComponent } from "../waiting-messages/waiting-messages.c
   }
 })
 export class ComposerComponent {
+  private static count: number = 0;
+
   private readonly box: Signal<ElementRef<HTMLTextAreaElement>> = viewChild.required<ElementRef<HTMLTextAreaElement>>("box");
   private readonly retry: Signal<ElementRef<HTMLButtonElement> | undefined> = viewChild("retry", { read: ElementRef });
   private readonly picker: Signal<MenuTriggerDirective> = viewChild.required("picker", { read: MenuTriggerDirective });
@@ -309,6 +311,7 @@ export class ComposerComponent {
 
   protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
   protected readonly replyingDelivery: Signal<MessageDelivery> = computed(() => this.whileReplying() ?? this.store.whileReplying());
+  protected readonly reachId: string = `${Resources.composerReachIdPrefix}${ComposerComponent.count++}`;
 
   public constructor() {
     const store = this.store;

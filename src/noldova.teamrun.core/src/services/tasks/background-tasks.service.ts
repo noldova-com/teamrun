@@ -18,7 +18,8 @@ import {
   Event,
   EventName,
   type BackgroundTaskIdParams,
-  type BackgroundTaskListParams
+  type BackgroundTaskListParams,
+  Resources as ProtocolResources
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -83,7 +84,9 @@ export class BackgroundTasksService implements IBackgroundTasksService {
     const task = this.find(messageId, taskId);
     if (Object.isNull(task) || !task.isRunning || text.length === 0)
       return;
-    this.pending.set(task.id, `${this.pending.get(task.id) ?? String.empty}${text}`);
+    const pending = `${this.pending.get(task.id) ?? String.empty}${text}`;
+    const limit = ProtocolResources.maximumBackgroundTaskOutput;
+    this.pending.set(task.id, pending.length > limit ? pending.slice(pending.length - limit) : pending);
     this.flushTimer ??= setTimeout(() => this.flush(), this.outputInterval);
   }
 
@@ -91,10 +94,9 @@ export class BackgroundTasksService implements IBackgroundTasksService {
     const task = this.find(messageId, end.taskId);
     if (Object.isNull(task) || !task.isRunning)
       return;
-    this.flushOne(task.id);
+    const running = this.flushOne(task);
     this.stops.delete(task.id);
     this.teammates.delete(task.id);
-    const running = this.tasks.get(task.id)!;
     this.tasks.delete(task.id);
     const ended = running.withEnd(end.status, end.exitCode, this.now());
     this.store(ended);
@@ -200,8 +202,7 @@ export class BackgroundTasksService implements IBackgroundTasksService {
     const now = this.now();
     const stopped: BackgroundTask[] = [];
     for (const task of [...this.tasks.values()].filter(t => t.isRunning)) {
-      this.flushOne(task.id);
-      stopped.push(this.tasks.get(task.id)!.withEnd(BackgroundTaskStatus.Stopped, null, now));
+      stopped.push(this.flushOne(task).withEnd(BackgroundTaskStatus.Stopped, null, now));
     }
     for (const task of stopped)
       await saved?.saveAsync(task);
@@ -240,18 +241,19 @@ export class BackgroundTasksService implements IBackgroundTasksService {
 
   private flush(): void {
     this.flushTimer = null;
-    for (const id of [...this.pending.keys()])
-      this.flushOne(id);
+    for (const task of [...this.tasks.values()].filter(t => this.pending.has(t.id)))
+      this.flushOne(task);
   }
 
-  private flushOne(id: string): void {
-    const text = this.pending.get(id);
-    const task = this.tasks.get(id);
-    this.pending.delete(id);
-    if (Object.isUndefined(text) || Object.isUndefined(task))
-      return;
-    this.tasks.set(id, task.withOutput(text));
-    this.events.publish(new Event(EventName.BackgroundTaskOutput, new BackgroundTaskOutputPayload(task.conversationId, id, text).toJson()));
+  private flushOne(task: BackgroundTask): BackgroundTask {
+    const text = this.pending.get(task.id);
+    this.pending.delete(task.id);
+    if (Object.isUndefined(text))
+      return task;
+    const written = task.withOutput(text);
+    this.tasks.set(task.id, written);
+    this.events.publish(new Event(EventName.BackgroundTaskOutput, new BackgroundTaskOutputPayload(task.conversationId, task.id, text).toJson()));
+    return written;
   }
 
   private store(task: BackgroundTask): void {
