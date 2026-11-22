@@ -117,7 +117,7 @@
     "start": "noldova-desktop-build start"
   },
   "dependencies": {
-    "@noldova/browser": "0.0.3",
+    "@noldova/browser": "0.0.6",
     "@noldova/checkpoints": "0.0.3",
     "@noldova/computer-use": "0.0.2",
     "@noldova/context.collections": "0.0.12",
