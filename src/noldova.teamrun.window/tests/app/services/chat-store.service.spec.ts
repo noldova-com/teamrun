@@ -133,9 +133,11 @@ import { ProviderChoice } from "../../../src/app/models/provider-choice";
 import { ReadingPosition } from "../../../src/app/models/reading-position";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { Resources } from "../../../src/resources";
+import { CodedError } from "../../fixtures/coded-error.fixture";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeTerminalLauncher } from "../../fixtures/fake-terminal-launcher.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../fixtures/refused-error.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../fixtures/teammate.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
@@ -174,7 +176,7 @@ describe("ChatStoreService", () => {
   const gone = (...conversationIds: string[]): void => void context.answer(MethodName.ConversationListMembers, t => {
     const conversationId = ConversationIdParams.fromJson(t).conversationId;
     if (conversationIds.includes(conversationId))
-      throw Object.assign(new Error(`Conversation ${conversationId} was not found.`), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: [conversationId] } });
+      throw new RefusedError(`Conversation ${conversationId} was not found.`, ErrorCode.NotFound, conversationId);
     return [];
   });
 
@@ -248,7 +250,8 @@ describe("ChatStoreService", () => {
     await store.initialize();
     expect([...context.events].sort()).toEqual([
       "teamrun.approvalCreated", "teamrun.approvalUpdated", "teamrun.backgroundTaskOutput", "teamrun.backgroundTaskUpdated", "teamrun.backgroundTasksCleared",
-      "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageUpdated",
+      "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageSendAbandoned",
+      "teamrun.messageSending", "teamrun.messageUpdated",
       "teamrun.organizationChanged", "teamrun.organizationLayoutUpdated", "teamrun.organizationRemoved", "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
       "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyCheckpointEnded", "teamrun.replyCheckpointStarted", "teamrun.replyThinking", "teamrun.signInLink",
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.waitingMessagesChanged", "teamrun.windowReloadRequested"
@@ -2278,7 +2281,7 @@ describe("ChatStoreService", () => {
     context.answer(MethodName.ConversationListMembers, t => {
       const conversationId = ConversationIdParams.fromJson(t).conversationId;
       if (conversationId === "gone")
-        throw Object.assign(new Error("Conversation gone was not found."), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: ["gone"] } });
+        throw new RefusedError("Conversation gone was not found.", ErrorCode.NotFound, "gone");
       if (conversationId === "down")
         throw new Error("The runtime stopped.");
       return [];
@@ -2300,7 +2303,7 @@ describe("ChatStoreService", () => {
   it("asks Core once about a chat it doesn't list while several ask at once, and again once that answer is in", async () => {
     context.answer(MethodName.ConversationListMembers, t => {
       if (ConversationIdParams.fromJson(t).conversationId === "gone")
-        throw Object.assign(new Error("Conversation gone was not found."), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: ["gone"] } });
+        throw new RefusedError("Conversation gone was not found.", ErrorCode.NotFound, "gone");
       return [];
     });
     await store.initialize();
@@ -2832,7 +2835,7 @@ describe("ChatStoreService", () => {
 
   it("keeps the card of a person's decision refused with a Conflict that names nothing, with no error", async () => {
     context.answer(MethodName.ApprovalDecide, () => {
-      throw Object.assign(new Error("Message m2 is not open."), { code: ErrorCode.Conflict });
+      throw new CodedError("Message m2 is not open.", ErrorCode.Conflict);
     });
     await store.initialize();
     await store.selectConversation("c1");

@@ -2122,6 +2122,10 @@ export class Resources {
     return `department:${departmentId}`;
   }
 
+  public static formatOrganizationFlowSendId(sendId: string): string {
+    return `send:${sendId}`;
+  }
+
   public static formatOrganizationFlowId(messageId: string, outbound: boolean): string {
     return `${messageId}:${outbound ? "out" : "in"}`;
   }

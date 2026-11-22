@@ -8,6 +8,8 @@
 
 import { signal } from "@angular/core";
 
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import { Chat, Department, DepartmentMoveParams, MethodName, Organization, OrganizationChat, OrganizationParent, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 import { OrganizationScope } from "../../../src/app/services/organization-scope";
@@ -47,7 +49,7 @@ describe("OrganizationStoreService", () => {
 
   it("reads the catalog again on reload and says why its listing failed", async () => {
     let fails = true;
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => fails ? Promise.reject(new Error("The runtime is gone.")) : [organizationOf("my-organization", "Design").toJson()]);
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => fails ? Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "The runtime is gone.")) : [organizationOf("my-organization", "Design").toJson()]);
     const store = new OrganizationStoreService(context, new OrganizationScope());
 
     await store.reload();

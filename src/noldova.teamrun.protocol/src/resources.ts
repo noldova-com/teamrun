@@ -349,6 +349,8 @@ export class Resources {
   public static readonly folderMissingField: string = "folderMissing";
   public static readonly titleField: string = "title";
   public static readonly chatIdField: string = "chatId";
+  public static readonly toChatIdField: string = "toChatId";
+  public static readonly sendIdField: string = "sendId";
   public static readonly conversationIdField: string = Resources.chatIdField;
   public static readonly shownChatIdField: string = "shownChatId";
   public static readonly shownConversationIdField: string = Resources.shownChatIdField;

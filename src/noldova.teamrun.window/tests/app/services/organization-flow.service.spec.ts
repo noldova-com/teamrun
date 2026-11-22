@@ -8,7 +8,7 @@
 
 import { signal } from "@angular/core";
 
-import { EventName, Message, MessageAuthor, MessageSender, MessageStatus } from "@noldova/teamrun.protocol";
+import { EventName, Message, MessageAuthor, MessageSendAbandonedPayload, MessageSender, MessageSendingPayload, MessageStatus } from "@noldova/teamrun.protocol";
 
 import { OrganizationFlowService } from "../../../src/app/services/organization-flow.service";
 import { Resources } from "../../../src/resources";
@@ -34,12 +34,16 @@ describe("OrganizationFlowService", () => {
       context.emit(EventName.MessageUpdated, message.toJson());
   };
   const shown = (): string[] => service.flows().map(t => `${t.id} ${t.fromKey}>${t.toKey} ${t.stage}`);
+  const receivers = new Map([["c2", "opus"], ["c3", "grok"]]);
+  const receiverOf = (chatId: string): string | null => receivers.get(chatId) ?? null;
+  const sending = (sendId: string, toChatId: string): void =>
+    context.emit(EventName.MessageSending, new MessageSendingPayload(sendId, "c3", "grok", toChatId).toJson());
 
   beforeEach(() => {
     reduced.set(false);
     context = new FakeWindowPartContext();
     clock = new FakeClock(0);
-    service = OrganizationFlowService.of(context, reduced, clock);
+    service = OrganizationFlowService.of(context, reduced, clock, receiverOf);
   });
 
   afterEach(() => {
@@ -76,6 +80,56 @@ describe("OrganizationFlowService", () => {
     expect([first, kept, shown()]).toEqual([["r2:in grok>opus Sent"], ["r2:in grok>opus Sent"], []]);
   });
 
+  it("shows a teammate's send writing from its start to the chat's teammate, then sent once its message arrives, with no second pulse from the reply", () => {
+    sending("send-1", "c2");
+    const writing = shown();
+    context.emit(EventName.MessageCreated, sent.toJson());
+    const delivered = shown();
+    send(replyOf("r2", sent, "opus", MessageStatus.Pending), replyOf("r2", sent, "opus", MessageStatus.Running));
+
+    expect([writing, delivered]).toEqual([["send:send-1 grok>opus Writing"], ["send:send-1 grok>opus Sent"]]);
+    expect(shown()).toEqual(["send:send-1 grok>opus Sent", "r2:out opus>grok Writing"]);
+  });
+
+  it("settles a teammate's send only on its own message to its chat, not on another sender's message there or its message to another chat", () => {
+    const elsewhere = new Message("m3", "c4", 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, at, null, at, [], null, null, [],
+      new MessageSender("c3", "grok", "Grok"));
+    const byPerson = new Message("m4", "c2", 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, at, null, at);
+    sending("send-1", "c2");
+    context.emit(EventName.MessageCreated, elsewhere.toJson());
+    context.emit(EventName.MessageCreated, byPerson.toJson());
+    const waiting = shown().filter(t => t.startsWith("send:"));
+    context.emit(EventName.MessageCreated, sent.toJson());
+
+    expect([waiting, shown().filter(t => t.startsWith("send:"))]).toEqual([["send:send-1 grok>opus Writing"], ["send:send-1 grok>opus Sent"]]);
+  });
+
+  it("ends a teammate's send nobody draws once its pulse and glow, or its fade, would have ended", () => {
+    sending("send-6", "c2");
+    sending("send-7", "c2");
+    context.emit(EventName.MessageCreated, sent.toJson());
+    context.emit(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload("send-7").toJson());
+    clock.advance(Resources.organizationFlowFadeDuration);
+    const faded = shown();
+    clock.advance(Resources.organizationFlowPulseDuration + Resources.organizationFlowGlowDuration);
+
+    expect([faded, shown()]).toEqual([["send:send-6 grok>opus Sent"], []]);
+  });
+
+  it("fades a send its teammate abandons, and shows none to a chat without a teammate, to the sender itself, for an unknown send or while hidden", () => {
+    sending("send-2", "c2");
+    context.emit(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload("send-2").toJson());
+    context.emit(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload("send-2").toJson());
+    context.emit(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload("never").toJson());
+    sending("send-3", "c9");
+    sending("send-4", "c3");
+    reduced.set(true);
+    sending("send-5", "c2");
+    reduced.set(false);
+
+    expect(shown()).toEqual(["send:send-2 grok>opus Abandoned"]);
+  });
+
   it("fades an answer its teammate stops writing, whether it failed, was cancelled or was interrupted", () => {
     const ended = [MessageStatus.Failed, MessageStatus.Cancelled, MessageStatus.Interrupted].map((t, i) => replyOf(`r${i}`, asked, "opus", t));
     send(asked, ...ended.map(t => replyOf(t.id, asked, "opus", MessageStatus.Running)), ...ended);
@@ -104,6 +158,21 @@ describe("OrganizationFlowService", () => {
 
     expect(before).toEqual(["r1:in person>opus Sent", "r1:out opus>person Writing", "r2:in person>grok Sent", "r2:out grok>person Writing"]);
     expect([after, faded, ended, clock.remaining]).toEqual([["r1:out opus>person Writing", "r2:out grok>person Writing"], ["r1:out opus>person Sent"], [], []]);
+  });
+
+  it("ends a flow that is sent again only after its later pulse and glow, cancelling its first ending", () => {
+    const sentFor = Resources.organizationFlowPulseDuration + Resources.organizationFlowGlowDuration;
+    send(asked, replyOf("r1", asked, "opus", MessageStatus.Running));
+    clock.advance(1000);
+    send(replyOf("r1", asked, "opus", MessageStatus.Completed));
+    clock.advance(1000);
+    send(replyOf("r1", asked, "opus", MessageStatus.Running), replyOf("r1", asked, "opus", MessageStatus.Completed));
+    clock.advance(sentFor - 1000);
+    const kept = shown();
+    const left = clock.remaining;
+    clock.advance(1000);
+
+    expect([kept, left, shown()]).toEqual([["r1:out opus>person Sent"], [1000], []]);
   });
 
   it("keeps at most its limit of flows, dropping the oldest", () => {
@@ -151,8 +220,8 @@ describe("OrganizationFlowService", () => {
   it("gives each window the same service until it is released", () => {
     const other = new FakeWindowPartContext();
 
-    expect(OrganizationFlowService.of(context, reduced, clock)).toBe(service);
-    expect(OrganizationFlowService.of(other, reduced, clock)).not.toBe(service);
+    expect(OrganizationFlowService.of(context, reduced, clock, receiverOf)).toBe(service);
+    expect(OrganizationFlowService.of(other, reduced, clock, receiverOf)).not.toBe(service);
     OrganizationFlowService.release(other);
   });
 
@@ -167,6 +236,6 @@ describe("OrganizationFlowService", () => {
 
     expect([remembered, watched, context.watchedSettings]).toEqual([["r1:in person>opus Sent", "r1:out opus>person Writing"],
       [Resources.organizationMessageFlowSetting], []]);
-    expect(OrganizationFlowService.of(context, reduced, clock)).not.toBe(service);
+    expect(OrganizationFlowService.of(context, reduced, clock, receiverOf)).not.toBe(service);
   });
 });

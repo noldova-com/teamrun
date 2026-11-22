@@ -77,21 +77,24 @@ import {
 import { Resources } from "../../../resources";
 import { ImageOpenMode } from "../../enums/image-open-mode";
 import { SendKey } from "../../enums/send-key";
+import { DraftUnreadableException } from "../../exceptions/draft-unreadable.exception";
 import type { IComposerDrafts } from "../../interfaces/i-composer-drafts";
 import { AbilityRefusal } from "../../models/ability-refusal";
+import { AccessWidths } from "../../models/access-widths";
 import { CatalogReads } from "../../models/catalog-reads";
 import { CatalogSource } from "../../models/catalog-source";
-import { ChatThread } from "../../models/chat-thread";
-import { ProviderChoice } from "../../models/provider-choice";
 import type { ChatContext } from "../../models/chat-context";
+import { ChatThread } from "../../models/chat-thread";
 import { ComposerAttachment } from "../../models/composer-attachment";
 import { ComposerBar } from "../../models/composer-bar";
 import { ComposerDraft } from "../../models/composer-draft";
 import type { ComposerFanOut } from "../../models/composer-fan-out";
 import { ComposerSettings } from "../../models/composer-settings";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { FoldWidths } from "../../models/fold-widths";
 import { ImageViewerData } from "../../models/image-viewer-data";
 import { ModelCatalog } from "../../models/model-catalog";
+import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
 import type { RewoundDraft } from "../../models/rewound-draft";
 import { ViewedImage } from "../../models/viewed-image";
@@ -101,8 +104,8 @@ import { ComposerChoicesService } from "../../services/composer-choices.service"
 import { ComposerDefaultService } from "../../services/composer-default.service";
 import { ComposerDraftService } from "../../services/composer-draft.service";
 import { EngineResync } from "../../services/engine-resync";
-import { KeptComposerDraftService } from "../../services/kept-composer-draft.service";
 import { ImageViewerService } from "../../services/image-viewer.service";
+import { KeptComposerDraftService } from "../../services/kept-composer-draft.service";
 import { PlanUsageStatus } from "../../services/plan-usage-status";
 import { ProviderSignOut } from "../../services/provider-sign-out";
 import { TeammateCandidates } from "../../services/teammate-candidates";
@@ -167,9 +170,10 @@ export class ComposerComponent {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly injector: Injector = inject(Injector);
   private readonly fitObserver: ResizeObserver = new ResizeObserver(() => this.refold());
-  private readonly insets: [number, number | null] = [0, null];
+  private wideInset: number = 0;
+  private tightInset: number = 0;
   private accessMinimum: number = 0;
-  private accessNeeds: readonly [number, number, number] = [0, 0, 0];
+  private accessNeeds: AccessWidths = new AccessWidths(0, 0, 0);
   private readonly frameTooltips: Signal<readonly TooltipDirective[]> = viewChildren("frame", { read: TooltipDirective });
   private readonly teammateMentions: Signal<readonly TeammateMention[]>;
   private readonly choices: ComposerChoicesService = inject(ComposerChoicesService);
@@ -687,15 +691,16 @@ export class ComposerComponent {
   }
 
   public stopOnEscape(event: KeyboardEvent): void {
-    if (event.key === Resources.escapeKey && !event.defaultPrevented && !event.isComposing && !Object.isNull(this.editing()) && event.target instanceof Element
-      && this.card().nativeElement.contains(event.target) && !this.ownsEscape(event.target)) {
+    const target = event.target;
+    if (event.key !== Resources.escapeKey || event.defaultPrevented || event.isComposing || !(target instanceof Element) || this.ownsEscape(target))
+      return;
+    if (!Object.isNull(this.editing()) && this.card().nativeElement.contains(target)) {
       event.preventDefault();
       this.cancelEditing();
       return;
     }
     const reply = this.runningReply();
-    if (event.key !== Resources.escapeKey || event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
-      || Object.isNull(reply) || this.stopping() || this.ownsEscape(event.target as Element))
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || Object.isNull(reply) || this.stopping())
       return;
     event.preventDefault();
     void this.stop();
@@ -1099,7 +1104,10 @@ export class ComposerComponent {
     const picker = this.pickerButton().nativeElement;
     const style = getComputedStyle(form);
     const inset = (Number.parseFloat(style.paddingInlineStart) || 0) + (Number.parseFloat(style.paddingInlineEnd) || 0);
-    this.insets[this.fold() >= ComposerBar.tight ? 1 : 0] = inset;
+    if (this.fold() >= ComposerBar.tight)
+      this.tightInset = inset;
+    else
+      this.wideInset = inset;
     const width = (element: Element): number => element.getBoundingClientRect().width;
     const natural = (element: Element): number => {
       const text = document.createRange();
@@ -1117,14 +1125,14 @@ export class ComposerComponent {
     if (this.fold() < ComposerBar.accessIcon)
       this.accessMinimum = length(access, t => t.minWidth);
     if (this.fold() < ComposerBar.accessInMenu)
-      this.accessNeeds = [this.accessMinimum + natural(this.accessLabel().nativeElement), this.accessMinimum,
+      this.accessNeeds = new AccessWidths(this.accessMinimum + natural(this.accessLabel().nativeElement), this.accessMinimum,
         length(access, t => t.paddingInlineStart) + length(access, t => t.paddingInlineEnd) + length(access, t => t.borderInlineStartWidth)
-        + length(access, t => t.borderInlineEndWidth) + width(this.accessMark().nativeElement)];
+        + length(access, t => t.borderInlineEndWidth) + width(this.accessMark().nativeElement));
     const line = this.line()?.nativeElement;
-    const fold = new ComposerBar(width(this.host), [this.insets[0], this.insets[1] ?? 0], length(card, t => t.maxWidth, Infinity), width(card) - width(bar),
+    const fold = new ComposerBar(width(this.host), new FoldWidths(this.wideInset, this.tightInset), length(card, t => t.maxWidth, Infinity), width(card) - width(bar),
       length(bar, t => t.columnGap), width(this.addButton().nativeElement) + width(this.barEnd().nativeElement), this.accessNeeds,
-      Object.isUndefined(gauge) ? null : [gauge.fullWidth(), gauge.trackWidth()],
-      [chrome + natural(this.pickerLabel().nativeElement), chrome + natural(this.pickerShort().nativeElement)],
+      Object.isUndefined(gauge) ? null : new FoldWidths(gauge.fullWidth(), gauge.trackWidth()),
+      new FoldWidths(chrome + natural(this.pickerLabel().nativeElement), chrome + natural(this.pickerShort().nativeElement)),
       Object.isUndefined(line) ? null : width(line)).fold();
     if (fold >= ComposerBar.accessInMenu && this.accessMenu().isOpen())
       this.accessMenu().close();
@@ -1158,7 +1166,9 @@ export class ComposerComponent {
         draft = await this.drafts.restore(conversationId);
       }
       catch (error) {
-        failure = Resources.formatDraftUnreadable(error instanceof Error ? error.message : String(error));
+        if (!(error instanceof DraftUnreadableException))
+          throw error;
+        failure = error.message;
       }
       if (restoration !== this.restorations)
         return;

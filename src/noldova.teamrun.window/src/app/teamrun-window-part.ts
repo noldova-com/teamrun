@@ -99,8 +99,7 @@ export class TeamRunWindowPart implements IWindowPart {
       () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
     context.registerCommand(new CommandContribution(Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon, null, async () => {
       const organization = await OrganizationCatalog.of(context).firstAsync();
-      if (!Object.isNull(organization))
-        context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
+      context.openDocument(Resources.organizationDocumentName, organization?.id ?? Resources.organizationDocumentInstance, organization?.name ?? Resources.organizationTitle);
       return null;
     }));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,

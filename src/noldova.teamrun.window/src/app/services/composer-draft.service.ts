@@ -9,10 +9,13 @@
 import { InjectionToken, Injectable, inject } from "@angular/core";
 
 import "@noldova/context.core";
+import { JsonException } from "@noldova/context.json";
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import { AttachmentInput, type Draft, type MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { DraftNotSavedException } from "../exceptions/draft-not-saved.exception";
+import { DraftUnreadableException } from "../exceptions/draft-unreadable.exception";
 import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import type { IComposerDrafts } from "../interfaces/i-composer-drafts";
 import type { ComposerDraft } from "../models/composer-draft";
@@ -42,8 +45,10 @@ export class ComposerDraftService implements IComposerDrafts {
     try {
       await this.flush();
       draft = await this.store.readDraft(conversationId).catch((error: unknown) => {
+        if (!ComposerDraftService.isReadFailure(error))
+          throw error;
         this.unreadable.add(conversationId);
-        throw error;
+        throw new DraftUnreadableException(conversationId, error);
       });
     }
     finally {
@@ -113,7 +118,9 @@ export class ComposerDraftService implements IComposerDrafts {
       try {
         kept = await this.store.readDraft(draft.conversationId);
       }
-      catch {
+      catch (error) {
+        if (!ComposerDraftService.isReadFailure(error))
+          throw error;
         if (this.store.isDeleted(draft.conversationId)) {
           this.unreadable.delete(draft.conversationId);
           return true;
@@ -180,5 +187,9 @@ export class ComposerDraftService implements IComposerDrafts {
 
   private arrive(conversationId: string): void {
     this.arrivals.set(conversationId, this.arrivalsOf(conversationId) + 1);
+  }
+
+  private static isReadFailure(error: unknown): error is RuntimeRequestException | JsonException {
+    return error instanceof RuntimeRequestException || error instanceof JsonException;
   }
 }

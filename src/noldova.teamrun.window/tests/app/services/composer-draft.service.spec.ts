@@ -9,9 +9,13 @@
 import { TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
+import { JsonException } from "@noldova/context.json";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import { AttachmentInput, ConversationIdParams, Draft, DraftSaveParams, ErrorCode, EventName, MessageAttachment, MethodName } from "@noldova/teamrun.protocol";
 
 import { DraftNotSavedException } from "../../../src/app/exceptions/draft-not-saved.exception";
+import { DraftUnreadableException } from "../../../src/app/exceptions/draft-unreadable.exception";
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
 import { ComposerDraft } from "../../../src/app/models/composer-draft";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
@@ -94,7 +98,8 @@ describe("ComposerDraftService", () => {
     expect(prepared.map(t => [t.name, t.grant, t.data])).toEqual([["notes.txt", "grant-1", null], ["more.txt", "grant-2", null]]);
     expect(context.grantedFiles).toEqual(chosen);
     expect(context.count(MethodName.AttachmentDiscard)).toBe(2);
-    const [first, second] = saved();
+    const first = saved()[0];
+    const second = saved()[1];
     expect(first?.attachments.map(t => [t.data, t.path])).toEqual([[null, "D:/data/attachments/drafts/notes.txt"], [null, "D:/data/attachments/drafts/more.txt"]]);
     expect(second?.attachments.map(t => [t.data, t.path]))
       .toEqual([[null, "D:/data/attachments/drafts/c1/notes.txt"], [null, "D:/data/attachments/drafts/c1/more.txt"]]);
@@ -356,9 +361,9 @@ describe("ComposerDraftService", () => {
     answerSaves();
     const refusedOver: string[] = [];
     drafts.onStale(t => refusedOver.push(t));
-    context.fail(MethodName.DraftRead, "unreadable");
+    context.disconnect(MethodName.DraftRead, "unreadable");
 
-    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    await expect(drafts.restore("c1")).rejects.toStrictEqual(new DraftUnreadableException("c1", new RuntimeRequestException(FailureCode.Disconnected, "unreadable")));
     drafts.schedule(draft("hello"));
     await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
     expect([context.noticeText(), saved(), context.count(MethodName.DraftRead), refusedOver]).toEqual([null, [], 2, []]);
@@ -374,10 +379,43 @@ describe("ComposerDraftService", () => {
     expect([saved().map(t => [t.conversationId, t.text, t.revision]), context.count(MethodName.DraftRead)]).toEqual([[["c1", "ok again", 4]], 4]);
   });
 
+  it("rejects with an unreadable draft when the stored draft isn't one", async () => {
+    context.answer(MethodName.DraftRead, () => ({}));
+
+    const failure = await drafts.restore("c1").catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(DraftUnreadableException);
+    expect(failure).toMatchObject({ conversationId: "c1", cause: expect.any(JsonException) });
+  });
+
+  it("lets a draft read failure other than a request's or the draft's own through, and saves what is typed next", async () => {
+    answerSaves();
+    const broken = new TypeError("broken");
+    context.answer(MethodName.DraftRead, () => Promise.reject(broken));
+
+    await expect(drafts.restore("c1")).rejects.toBe(broken);
+    drafts.schedule(draft("hello"));
+    await drafts.save();
+
+    expect([saved().map(t => t.text), context.count(MethodName.DraftRead)]).toEqual([["hello"], 1]);
+  });
+
+  it("lets a save's read failure other than a request's or the draft's own through", async () => {
+    answerSaves();
+    context.disconnect(MethodName.DraftRead, "unreadable");
+    await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
+    const broken = new TypeError("broken");
+    context.answer(MethodName.DraftRead, () => Promise.reject(broken));
+    drafts.schedule(draft("hello"));
+
+    await expect(drafts.save()).rejects.toBe(broken);
+    expect(saved()).toEqual([]);
+  });
+
   it("keeps nothing for a chat deleted while a save's read after a failed one is under way, so later saves go on", async () => {
     answerSaves();
     await store.initialize();
-    context.fail(MethodName.DraftRead, "unreadable");
+    context.disconnect(MethodName.DraftRead, "unreadable");
     await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     const response = new DeferredResponse();
     context.answer(MethodName.DraftRead, () => response.promise);
@@ -386,7 +424,7 @@ describe("ComposerDraftService", () => {
     await Wait.until(() => expect(context.count(MethodName.DraftRead)).toBe(2));
 
     context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
-    response.reject(new Error("The chat was not found."));
+    response.reject(new RuntimeRequestException(ErrorCode.NotFound, "The chat was not found."));
     await saving;
     drafts.schedule(draft("other", "c2"));
     await drafts.save();
@@ -396,7 +434,7 @@ describe("ComposerDraftService", () => {
 
   it("keeps a chat's draft pending while its read keeps failing and another chat's draft is typed and saved, and saves it once its read answers", async () => {
     answerSaves();
-    context.fail(MethodName.DraftRead, "unreadable");
+    context.disconnect(MethodName.DraftRead, "unreadable");
     await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     drafts.schedule(draft("first"));
     await expect(drafts.save()).rejects.toThrow(DraftNotSavedException);
@@ -412,12 +450,12 @@ describe("ComposerDraftService", () => {
 
   it("saves on no revision when a save's read after a failed one finds no draft, and reads nothing more once a restore has answered", async () => {
     answerSaves();
-    context.fail(MethodName.DraftRead, "unreadable");
+    context.disconnect(MethodName.DraftRead, "unreadable");
     await expect(drafts.restore("c1")).rejects.toThrow("unreadable");
     context.answer(MethodName.DraftRead, () => null);
     drafts.schedule(draft("hello"));
     await drafts.save();
-    context.fail(MethodName.DraftRead, "unreadable");
+    context.disconnect(MethodName.DraftRead, "unreadable");
     await expect(drafts.restore("c2")).rejects.toThrow("unreadable");
     context.answer(MethodName.DraftRead, () => stored(2).toJson());
     await drafts.restore("c2");

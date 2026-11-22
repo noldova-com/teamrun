@@ -37,5 +37,7 @@ export enum EventName {
   WaitingMessagesChanged = "WaitingMessagesChanged",
   OrganizationChanged = "OrganizationChanged",
   OrganizationRemoved = "OrganizationRemoved",
-  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
+  MessageSending = "MessageSending",
+  MessageSendAbandoned = "MessageSendAbandoned"
 }

@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Exception } from "@noldova/context.exceptions";
+import "@noldova/context.core";
+import { Exception, ExceptionOptions } from "@noldova/context.exceptions";
 
 export abstract class WindowException extends Exception {
-  protected constructor(message: string) {
-    super(message);
+  protected constructor(message: string, cause?: unknown) {
+    super(message, Object.isUndefined(cause) ? undefined : new ExceptionOptions(cause));
   }
 }

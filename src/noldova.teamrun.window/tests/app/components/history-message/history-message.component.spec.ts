@@ -77,12 +77,14 @@ import { AppearanceFixture, type ClipboardWriterFixture, FixtureTheme } from "@n
 import { page, userEvent } from "vitest/browser";
 
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { CodedError } from "../../../fixtures/coded-error.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeInlineTerminals, FakeRunStarter } from "../../../fixtures/fake-inline-terminals.fixture";
 import { MarkdownWait } from "../../../fixtures/markdown-wait.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { ShownText } from "../../../fixtures/shown-text.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -1016,15 +1018,18 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(stop.height, finished.height);
     });
 
-    it("shows a reply stopped at a usage limit as one 13 px stopped line in the error colour, the message's column gap under the answer from its start edge, with no glyph and no used-up line", async () => {
+    it("shows a reply stopped at a usage limit as one 13 px stopped line in the error colour, space-1 under the answer from its start edge and space-2 above the part after it, with no glyph and no used-up line", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, mode);
       const stopped = "Stopped: Claude · Work reached its usage limit. It resets at 18:00.";
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Failed, [detail(0, DetailKind.Text, "Reading upload-client.ts first."),
-        detail(1, DetailKind.Error, stopped, { usedUp: true, usedUpUntil: new Date(clock.now() + 7_200_000).toISOString(), stopped: true })]));
+        detail(1, DetailKind.Error, stopped, { usedUp: true, usedUpUntil: new Date(clock.now() + 7_200_000).toISOString(), stopped: true }),
+        detail(2, DetailKind.Text, "Picking up where it stopped.")]));
       await Wait.until(() => expect(textOf(".reply-stopped")).toBe(stopped));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view").length).toBe(2), MarkdownWait.coldImport);
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       const line = box(".reply-stopped");
       const answer = box(".nol-markdown-view");
+      const after = [...element().querySelectorAll(".nol-markdown-view")].at(1)?.getBoundingClientRect() ?? new DOMRect();
       const style = getComputedStyle(one(".reply-stopped"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-error)";
@@ -1035,7 +1040,8 @@ describe("HistoryMessageComponent", () => {
         .toEqual([null, null, null]);
       expect([style.color, style.fontSize, style.lineHeight]).toEqual([getComputedStyle(probe).color, "13px", getComputedStyle(probe).lineHeight]);
       AppearanceFixture.expectPixels(line.left, answer.left);
-      AppearanceFixture.expectPixels(line.top - answer.bottom, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(line.top - answer.bottom, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(after.top - line.bottom, AppearanceFixture.measureLook("space-2"));
       probe.remove();
     });
 
@@ -2641,7 +2647,7 @@ describe("HistoryMessageComponent", () => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
       if (data === undefined)
-        throw Object.assign(new Error("The image file is gone or changed."), { code: ErrorCode.NotFound });
+        throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("\\") + 1), "image/png", 4, data).toJson();
     });
     context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
@@ -2774,7 +2780,7 @@ describe("HistoryMessageComponent", () => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
       if (data === undefined)
-        throw Object.assign(new Error("The image file is gone or changed."), { code: ErrorCode.NotFound });
+        throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("/") + 1), "image/png", 4, data).toJson();
     });
     context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
@@ -2974,7 +2980,7 @@ describe("HistoryMessageComponent", () => {
     context.answer(MethodName.AttachmentExists, () => {
       asked++;
       context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
-      throw Object.assign(new Error("No chat c1."), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: ["c1"] } });
+      throw new RefusedError("No chat c1.", ErrorCode.NotFound, "c1");
     });
     const button = await attached("notes.txt", stored);
     const decided = vi.spyOn(store(), "isDeleted");

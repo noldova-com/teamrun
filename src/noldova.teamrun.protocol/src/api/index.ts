@@ -40,6 +40,8 @@ export { BackgroundTaskListParams } from "../models/methods/background-task-list
 export { BackgroundTaskPage } from "../models/methods/background-task-page.js";
 export { BackgroundTaskOutputPayload } from "../models/events/background-task-output-payload.js";
 export { BackgroundTasksClearedPayload } from "../models/events/background-tasks-cleared-payload.js";
+export { MessageSendAbandonedPayload } from "../models/events/message-send-abandoned-payload.js";
+export { MessageSendingPayload } from "../models/events/message-sending-payload.js";
 export { WaitingMessagesPayload } from "../models/events/waiting-messages-payload.js";
 export { ContextUsage } from "../models/context-usage.js";
 export { Chat, Chat as Conversation } from "../models/chat.js";

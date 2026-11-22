@@ -1378,7 +1378,18 @@ export declare enum EventName {
   /**
    * An Organization view's layout was saved. Payload: `OrganizationLayoutSaveParams`, the organization's id and the layout.
    */
-  OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
+  OrganizationLayoutUpdated = "OrganizationLayoutUpdated",
+  /**
+   * A teammate started sending a message to another chat with its send tool, once the send is allowed and before the message
+   * exists. Payload: `MessageSendingPayload`. The message's `MessageCreated` follows, or `MessageSendAbandoned` when the send
+   * is refused, cancelled or fails.
+   */
+  MessageSending = "MessageSending",
+  /**
+   * A send that `MessageSending` announced ended without a message: it was refused, cancelled or failed.
+   * Payload: `MessageSendAbandonedPayload`.
+   */
+  MessageSendAbandoned = "MessageSendAbandoned"
 }
 
 /**
@@ -2383,6 +2394,14 @@ export declare class Resources {
    * Name of the field referencing a chat: `chatId`.
    */
   public static readonly chatIdField: string;
+  /**
+   * Name of the field naming the chat a message goes to: `toChatId`.
+   */
+  public static readonly toChatIdField: string;
+  /**
+   * Name of the field naming one send of a teammate's message: `sendId`.
+   */
+  public static readonly sendIdField: string;
   /**
    * The field referencing a chat, under its earlier constant name; its value is `chatId`.
    *
@@ -9582,6 +9601,91 @@ export declare class BackgroundTaskOutputPayload {
   /**
    * Renders the JSON object `fromJson` accepts.
    * @returns The object with `conversationId`, `taskId`, `text`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `MessageSending`: a teammate's send to another chat, from the chat it works in.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class MessageSendingPayload {
+  /**
+   * The send's own id, which its `MessageSendAbandoned` names.
+   */
+  public readonly sendId: string;
+  /**
+   * The `Chat` id of the chat the sending teammate works in.
+   */
+  public readonly chatId: string;
+  /**
+   * The sending `Teammate`'s id.
+   */
+  public readonly teammateId: string;
+  /**
+   * The `Chat` id of the chat the message goes to.
+   */
+  public readonly toChatId: string;
+
+  /**
+   * Initializes the payload.
+   * @param sendId The send's own id.
+   * @param chatId The chat the sending teammate works in.
+   * @param teammateId The sending teammate.
+   * @param toChatId The chat the message goes to.
+   * @throws ArgumentException when any of them is blank.
+   */
+  public constructor(sendId: string, chatId: string, teammateId: string, toChatId: string);
+
+  /**
+   * Reads the payload from untrusted JSON.
+   * @param value The untrusted value, expected to carry `sendId`, `chatId`, `teammateId`, `toChatId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The payload.
+   * @throws JsonException when a field is missing or blank; the exception names the field's path.
+   */
+  public static fromJson(value: unknown, path?: string): MessageSendingPayload;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `sendId`, `chatId`, `teammateId`, `toChatId`.
+   */
+  public toJson(): JsonObject;
+}
+
+/**
+ * The payload of `MessageSendAbandoned`: a send that ended without a message, by its id.
+ * @remarks
+ * Instances are immutable. `fromJson` validates untrusted input and reports the offending field's
+ * path; `toJson` renders the canonical wire shape.
+ */
+export declare class MessageSendAbandonedPayload {
+  /**
+   * The id its `MessageSending` gave the send.
+   */
+  public readonly sendId: string;
+
+  /**
+   * Initializes the payload.
+   * @param sendId The send's id.
+   * @throws ArgumentException when it is blank.
+   */
+  public constructor(sendId: string);
+
+  /**
+   * Reads the payload from untrusted JSON.
+   * @param value The untrusted value, expected to carry `sendId`.
+   * @param path Path to report for the value; the root path `$` by default.
+   * @returns The payload.
+   * @throws JsonException when `sendId` is missing or blank; the exception names its path.
+   */
+  public static fromJson(value: unknown, path?: string): MessageSendAbandonedPayload;
+
+  /**
+   * Renders the JSON object `fromJson` accepts.
+   * @returns The object with `sendId`.
    */
   public toJson(): JsonObject;
 }

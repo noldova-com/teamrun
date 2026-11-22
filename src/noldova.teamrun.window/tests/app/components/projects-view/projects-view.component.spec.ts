@@ -73,6 +73,7 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -350,7 +351,7 @@ describe("ProjectsViewComponent", () => {
     context.answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)]);
     context.answer(MethodName.ConversationListMembers, t => {
       if (ConversationIdParams.fromJson(t).conversationId === second.id)
-        throw Object.assign(new Error(`Conversation ${second.id} was not found.`), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: [second.id] } });
+        throw new RefusedError(`Conversation ${second.id} was not found.`, ErrorCode.NotFound, second.id);
       return [];
     });
 
@@ -2702,7 +2703,7 @@ describe("ProjectsViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
       await settle();
 
-      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("Error: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("Error: No chat.")]]);
+      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat.")]]);
     });
 
     it("lists a teammate placed in two organizations under each, and opens from each row that organization's own Organization chat for it", async () => {
@@ -2958,7 +2959,7 @@ describe("ProjectsViewComponent", () => {
 
       await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
 
-      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("Error: Taken.")));
+      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("RuntimeRequestException: Taken.")));
     });
 
     const teammateMenu = async (name: string): Promise<string[]> => {

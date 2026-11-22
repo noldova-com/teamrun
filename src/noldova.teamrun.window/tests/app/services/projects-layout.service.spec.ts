@@ -215,7 +215,7 @@ describe("ProjectsLayoutService", () => {
     const layout = ProjectsLayoutService.of(context);
 
     layout.togglePin("c1");
-    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error"), Resources.formatProjectsLayoutNotRead("Error")]));
+    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("RuntimeRequestException"), Resources.formatProjectsLayoutNotRead("RuntimeRequestException")]));
     await settle();
     expect([layout.pinnedConversations(), saves, context.count(MethodName.ProjectsLayoutRead)]).toEqual([["c9", "c1"], [], 2]);
     context.answer(MethodName.ProjectsLayoutRead, () => kept(["c5"]));
@@ -259,7 +259,7 @@ describe("ProjectsLayoutService", () => {
 
     context.emit(EventName.StateResyncRequested, null);
 
-    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("Error")]));
+    await Wait.until(() => expect(context.lines).toEqual([Resources.formatProjectsLayoutNotRead("RuntimeRequestException")]));
     expect([layout.pinnedConversations(), context.count(MethodName.ProjectsLayoutSave)]).toEqual([before, 0]);
   });
 
@@ -300,7 +300,7 @@ describe("ProjectsLayoutService", () => {
     await Wait.until(() => expect(context.count(MethodName.ProjectsLayoutSave)).toBe(1));
     await settle();
 
-    expect([layout.pinnedConversations(), context.lines]).toEqual([["c1"], [Resources.formatProjectsLayoutNotSaved("Error")]]);
+    expect([layout.pinnedConversations(), context.lines]).toEqual([["c1"], [Resources.formatProjectsLayoutNotSaved("RuntimeRequestException")]]);
   });
 
   it("follows a layout another window keeps, but not while a save of its own is under way", async () => {
