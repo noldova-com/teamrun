@@ -13,6 +13,13 @@ LICENSE file in the root directory of this source tree.
       <button type="button" nol-button class="nol-teamrun-dismiss" [variant]="text" (click)="error.set(null)">{{ resources.dismissLabel }}</button>
     </div>
   }
+  @if (readError(); as message) {
+    <div class="nol-teamrun-error nol-teamrun-read-failed" role="alert">
+      <span class="nol-teamrun-error-text">{{ message }}</span>
+      <button type="button" nol-button class="nol-teamrun-dismiss nol-teamrun-retry-read" [variant]="text" [attr.aria-disabled]="reading()"
+        (click)="retry()">{{ resources.retryLabel }}</button>
+    </div>
+  }
   <nol-configuration-table class="nol-teamrun-computer-use-grants" [heading]="resources.computerUseGrantsTableTitle" [explanation]="resources.computerUseGrantsHint">
     <table nolConfigurationTable>
       <thead>
@@ -46,7 +53,9 @@ LICENSE file in the root directory of this source tree.
             </td>
           </tr>
         } @empty {
-          <tr><td colspan="4" class="nol-teamrun-muted nol-teamrun-no-grants" role="status">{{ grants() === null ? resources.readingComputerUseGrants : resources.noComputerUseGrants }}</td></tr>
+          @if (readError() === null) {
+            <tr><td colspan="4" class="nol-teamrun-muted nol-teamrun-no-grants" role="status">{{ grants() === null ? resources.readingComputerUseGrants : resources.noComputerUseGrants }}</td></tr>
+          }
         }
       </tbody>
     </table>
