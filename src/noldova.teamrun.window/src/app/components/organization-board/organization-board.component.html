@@ -52,8 +52,9 @@ LICENSE file in the root directory of this source tree.
       <nol-teamrun-organization-card class="leader" nolCanvasItem [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row"
         [editing]="editing()" (message)="chosen.emit(teammateTarget(leader))" />
     }
-    @for (report of directReports(); track report.id) {
+    @for (report of reports(); track report.id) {
       <nol-teamrun-organization-card class="leader report" nolCanvasItem [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row"
+        [reportsTo]="reportsToOf(report)"
         [editing]="editing()" (message)="chosen.emit(teammateTarget(report))" />
     }
   </div>

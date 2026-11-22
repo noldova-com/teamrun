@@ -253,6 +253,7 @@ export { AcpAgentIdParams } from "../models/methods/acp-agent-id-params.js";
 export { AcpLocalCommandAddParams } from "../models/methods/acp-local-command-add-params.js";
 export { TeammateName } from "../services/teammate-name.js";
 export { NameOrder } from "../services/name-order.js";
+export { TextCut } from "../services/text-cut.js";
 export { ProfileFolderName } from "../services/profile-folder-name.js";
 export { ProfileFolderPath } from "../services/profile-folder-path.js";
 export { SenderEnvironment } from "../services/sender-environment.js";

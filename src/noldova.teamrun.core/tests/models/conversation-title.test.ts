@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ArgumentException } from "@noldova/context.exceptions";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { ConversationTitle, TitleModel } from "@noldova/teamrun.core";
 
@@ -14,7 +15,11 @@ export class ConversationTitleTests {
   @TestMethod
   public takesTheFirstLineWithTextTrimmed(): void {
     Assert.areEqual("Fix the login bug", new ConversationTitle("\n \n  Fix the login bug  \nand more").text);
-    Assert.areEqual(String.empty, new ConversationTitle(" \n ").text);
+  }
+
+  @TestMethod
+  public refusesAMessageWithNoLineThatIsntBlank(): void {
+    Assert.areEqual("message", Assert.throws(() => new ConversationTitle(" \n "), ArgumentException).parameterName);
   }
 
   @TestMethod
@@ -30,6 +35,16 @@ export class ConversationTitleTests {
     Assert.areEqual(emoji.repeat(60), new ConversationTitle(emoji.repeat(60)).text);
     Assert.areEqual(`${emoji.repeat(59)}…`, new ConversationTitle(emoji.repeat(80)).text);
     Assert.areEqual(`${"x".repeat(58)}${emoji}…`, new ConversationTitle(`${"x".repeat(58)}${emoji.repeat(5)}`).text);
+  }
+
+  @TestMethod
+  @TestData("\u{1F469}\u200D\u{1F4BB}")
+  @TestData("\u{1F1EB}\u{1F1F7}")
+  @TestData("\u{1F44D}\u{1F3FD}")
+  @TestData("1\uFE0F\u20E3")
+  @TestData("e\u0301")
+  public endsACutTitleBeforeACharacterTheCutWouldSplit(character: string): void {
+    Assert.areEqual(`${"x".repeat(58)}…`, new ConversationTitle(`${"x".repeat(58)}${character}${"y".repeat(10)}`).text);
   }
 
   @TestMethod

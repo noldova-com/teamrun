@@ -866,6 +866,24 @@ describe("OrganizationViewComponent", () => {
         [["Chat with UI"], "UI (Department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
     });
 
+    it("offers a teammate who reports to your direct report outside a department after your direct reports, at any depth", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0),
+          new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0), new TeammatePlacement("offline", OrganizationParent.teammate("bob"), 0)]);
+      });
+
+      expect([await pickAsync("Offline"), heading()]).toEqual([["All leaders and your direct reports", "Everyone", "Alice", "Bob", "Offline"], ["Chat with Offline"]]);
+    });
+
+    it("offers your direct reports by name, then the teammates under them by name", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([], [new TeammatePlacement("offline", OrganizationParent.person, 0),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 1), new TeammatePlacement("alice", OrganizationParent.teammate("reviewer"), 0)]);
+      });
+
+      expect(await pickAsync("Alice")).toEqual(["All leaders and your direct reports", "Everyone", "Code Reviewer", "Offline", "Alice"]);
+    });
+
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
       await create();
       await pickAsync("Bob");

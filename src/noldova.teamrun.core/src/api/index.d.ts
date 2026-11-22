@@ -1675,7 +1675,8 @@ export interface IBackgroundTasksService {
 
   /**
    * Adds output to a running task, keeping the latest `Resources.maximumBackgroundTaskOutput`
-   * characters, and publishes it; nothing for an unknown or ended task or empty text.
+   * characters, and publishes it, the output gathered since the last publish cut to its latest that many characters too;
+   * nothing for an unknown or ended task or empty text.
    * @param messageId The id of the reply that started the task.
    * @param taskId The provider's id of the task.
    * @param text The new output.
@@ -9194,14 +9195,15 @@ export declare class ToolWindows {
  */
 export declare class ConversationTitle {
   /**
-   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis, so a character
-   * outside the Basic Multilingual Plane, such as an emoji, is never split.
+   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis. The cut ends on a
+   * grapheme boundary, so a character a person sees as one, such as 👩‍💻, a flag or a keycap, is never split.
    */
   public readonly text: string;
 
   /**
    * Initializes the title from a chat's first message.
-   * @param message The message.
+   * @param message The message, with at least one line that isn't blank.
+   * @throws {ArgumentException} The message has no line that isn't blank.
    */
   public constructor(message: string);
 

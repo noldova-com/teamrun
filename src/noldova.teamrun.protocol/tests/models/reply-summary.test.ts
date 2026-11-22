@@ -8,7 +8,7 @@
 
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { DetailKind, FileChangeSummary, Message, MessageAuthor, MessageDetail, MessageStatus, ObservedSettings, Provenance,
   ReplyPage, ReplyPanel, ReplyPlan, ReplySummary, RequestedSettings, SubAgent, SubAgentStatus } from "@noldova/teamrun.protocol";
 
@@ -38,15 +38,32 @@ export class ReplySummaryTests {
     Assert.areEqual("{\"tool\":\"Bash\",\"toolUseId\":\"t1\",\"isError\":false,\"status\":\"declined\",\"denied\":true}",
       JSON.stringify(summary.preview.details[0]?.payload));
     Assert.areEqual(512, summary.preview.details[3]?.text.length);
-    Assert.areEqual(2, summary.files[0]?.additions);
-    Assert.areEqual(1, summary.files[0]?.deletions);
-    Assert.isTrue(summary.files[0]?.hasDiff ?? false);
+    const file = summary.files[0];
+    Assert.isDefined(file);
+    Assert.areEqual(2, file.additions);
+    Assert.areEqual(1, file.deletions);
+    Assert.isTrue(file.hasDiff);
     Assert.areEqual(json, JSON.stringify(restored.toJson()));
     Assert.isTrue(restored.hasEarlier);
     Assert.isFalse(restored.hasLater);
     Assert.isTrue(summary.matches(ReplyPanel.Activity));
     Assert.isTrue(summary.matches(ReplyPanel.Changes));
     Assert.areEqual(large, message.details[0]?.text);
+  }
+
+  @TestMethod
+  @TestData("\u{1F600}")
+  @TestData("\u{1F469}\u200D\u{1F4BB}")
+  @TestData("\u{1F1EB}\u{1F1F7}")
+  @TestData("1\uFE0F\u20E3")
+  public endsAPreviewTitleAndPayloadTextBeforeACharacterTheCutWouldSplit(character: string): void {
+    const kept = "x".repeat(511);
+    const message = ReplySummaryTests.message([new MessageDetail(0, DetailKind.Command, `${kept}${character}`, { source: `${kept}${character}` }, "t")]);
+
+    const detail = ReplySummary.fromMessage(message).preview.details[0];
+
+    Assert.areEqual(kept, detail?.text);
+    Assert.areEqual(JSON.stringify({ source: kept }), JSON.stringify(detail?.payload));
   }
 
   @TestMethod
