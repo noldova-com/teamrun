@@ -12,6 +12,7 @@ import { ProviderMode, ProviderModel, ProviderModelList } from "@noldova/teamrun
 
 import { ModelCatalogCache } from "../../../src/app/services/model-catalog-cache";
 import { Resources } from "../../../src/resources";
+import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 
 describe("ModelCatalogCache", () => {
   const clock = (): number => 0;
@@ -192,8 +193,11 @@ describe("ModelCatalogCache", () => {
   });
 
   it("coalesces requests and bounds pending requests and kept catalogs", async () => {
-    const { promise: pending, resolve: complete } = Promise.withResolvers<ProviderModelList>();
-    const fetchModels = vi.fn((): Promise<ProviderModelList> => pending);
+    const held = new DeferredResponse();
+    const fetchModels = vi.fn(async (): Promise<ProviderModelList> => {
+      await held.promise;
+      return new ProviderModelList([], null);
+    });
     const cache = new ModelCatalogCache(fetchModels, clock);
     const first = cache.load("codex", "0");
     expect(cache.load("codex", "0", true)).toBe(first);
@@ -203,7 +207,7 @@ describe("ModelCatalogCache", () => {
 
     expect((await cache.load("codex", "overflow")).failed).toBe(true);
     expect(fetchModels).toHaveBeenCalledTimes(Resources.maximumModelCatalogs);
-    complete(new ProviderModelList([], null));
+    held.resolve(null);
     await Promise.all(requests);
     await cache.load("codex", "overflow");
     await cache.load("codex", "0");
