@@ -25,6 +25,14 @@ export class ConversationTitleTests {
   }
 
   @TestMethod
+  public cutsByCodePointSoAnEmojiIsNeverSplit(): void {
+    const emoji = String.fromCodePoint(0x1F600);
+    Assert.areEqual(emoji.repeat(60), new ConversationTitle(emoji.repeat(60)).text);
+    Assert.areEqual(`${emoji.repeat(59)}…`, new ConversationTitle(emoji.repeat(80)).text);
+    Assert.areEqual(`${"x".repeat(58)}${emoji}…`, new ConversationTitle(`${"x".repeat(58)}${emoji.repeat(5)}`).text);
+  }
+
+  @TestMethod
   @TestData("Fix the login page", "Fix the login page")
   @TestData("\n\n  Fix the login page\nBecause it is broken", "Fix the login page")
   @TestData("\"Fix the login page.\"", "Fix the login page")
