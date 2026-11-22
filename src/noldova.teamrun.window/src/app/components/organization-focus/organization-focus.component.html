@@ -11,6 +11,12 @@ LICENSE file in the root directory of this source tree.
     <span class="title">{{ resources.organizationFocusStructure }}</span>
     <span class="spacer"></span>
     @if (editing()) {
+      <button #search="nolPopoverTrigger" type="button" nol-icon-button class="add-member add-report" [icon]="resources.organizationAddMemberIcon"
+        [label]="resources.organizationAddTeammate" [nolPopoverTrigger]="teammateSearch" [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below"
+        [nolPopoverAlignment]="end"></button>
+      <ng-template #teammateSearch>
+        <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
+      </ng-template>
       <button type="button" nol-icon-button class="add-department" [icon]="resources.organizationAddDepartmentIcon" [label]="resources.organizationAddDepartment"
         (click)="addDepartment()"></button>
     }
@@ -41,14 +47,11 @@ LICENSE file in the root directory of this source tree.
         }
         <nol-chip>{{ row.node.headcount }}</nol-chip></button>
       @if (editing()) {
-        <button type="button" nol-icon-button class="add-member" [icon]="resources.organizationAddMemberIcon"
-          [label]="resources.formatOrganizationFocusAddMember(row.node.name)" [disabled]="addable(row).length === 0" [nolMenuTriggerFor]="addMenu"></button>
-        <ng-template #addMenu>
-          <nol-menu>
-            @for (teammate of addable(row); track teammate.id) {
-              <button nol-menu-item [label]="teammate.name" (triggered)="addMember(row, teammate)"></button>
-            }
-          </nol-menu>
+        <button #search="nolPopoverTrigger" type="button" nol-icon-button class="add-member" [icon]="resources.organizationAddMemberIcon"
+          [label]="resources.formatOrganizationFocusAddMember(row.node.name)" [nolPopoverTrigger]="teammateSearch" [nolPopoverOpenOn]="clickOpening"
+          [nolPopoverSide]="below" [nolPopoverAlignment]="end"></button>
+        <ng-template #teammateSearch>
+          <nol-teamrun-organization-teammate-search [label]="resources.formatOrganizationFocusAddMember(row.node.name)" [parent]="row.node.key" (done)="search.close()" />
         </ng-template>
       }
     </div>
@@ -85,6 +88,10 @@ LICENSE file in the root directory of this source tree.
               class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.formatOrganizationRemoveUnit(unit()?.type ?? null) }}</button>
           </div>
           <nol-teamrun-organization-type-choice class="unit-type" [department]="department" />
+          @if (unit(); as node) {
+            <nol-select class="leader-choice" [label]="resources.organizationLeaderLabel" [options]="leaderOptions(node)" [value]="node.leader?.id ?? ''"
+              (valueChange)="setLeader(node, $event)" />
+          }
         } @else {
           <h2 class="unit-name"><nol-teamrun-organization-type-icon [type]="unit()?.type ?? null" />{{ unitName() }}</h2>
         }

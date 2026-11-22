@@ -58,6 +58,14 @@ LICENSE file in the root directory of this source tree.
         [editing]="editing()" (message)="chosen.emit(teammateTarget(report))" />
     }
   </div>
+  @if (editing()) {
+    <button #search="nolPopoverTrigger" type="button" nol-button class="add-member add-report" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
+      [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+      aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
+    <ng-template #teammateSearch>
+      <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
+    </ng-template>
+  }
 </section>
 <section class="section departments-section" aria-labelledby="organization-board-departments">
   <div class="section-head">
@@ -84,6 +92,8 @@ LICENSE file in the root directory of this source tree.
         </div>
         @if (editing() && node.department; as department) {
           <nol-teamrun-organization-type-choice class="lane-type" [department]="department" />
+          <nol-select class="leader-choice" [label]="resources.organizationLeaderLabel" [options]="leaderOptions(node)" [value]="node.leader?.id ?? ''"
+            (valueChange)="setLeader(node, $event)" />
         }
         @if (summaryOf(node); as summary) {
           <span class="note lane-summary">{{ summary }}</span>
@@ -99,14 +109,11 @@ LICENSE file in the root directory of this source tree.
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
         }
         @if (editing()) {
-          <button type="button" nol-button class="add-member" [variant]="outlined" [disabled]="addable(node).length === 0" [nolMenuTriggerFor]="addMenu"><span nolButtonIcon
-            class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddMember }}</button>
-          <ng-template #addMenu>
-            <nol-menu>
-              @for (teammate of addable(node); track teammate.id) {
-                <button nol-menu-item [label]="teammate.name" (triggered)="addMember(node, teammate)"></button>
-              }
-            </nol-menu>
+          <button #search="nolPopoverTrigger" type="button" nol-button class="add-member" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
+            [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+            aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
+          <ng-template #teammateSearch>
+            <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="node.key" (done)="search.close()" />
           </ng-template>
         }
       </div>

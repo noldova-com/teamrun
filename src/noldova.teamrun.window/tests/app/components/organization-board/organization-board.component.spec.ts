@@ -26,6 +26,7 @@ import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
+import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -81,7 +82,7 @@ describe("OrganizationBoardComponent", () => {
     context = SampleData.createContext().answer(MethodName.MessageListOpen, () => [reply(MessageStatus.AwaitingApproval).toJson()])
       .answer(MethodName.TeammateLastReplyList, () => [new TeammateLastReply("bob", "c9", "r1", "Ship the header now?", started).toJson()]);
     clock = new FakeClock(Date.parse(started) + 5 * 60_000);
-    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete, MethodName.TeammatePlace])
       context.answer(method, () => null);
     context.answer(MethodName.OrganizationList, () => [sample.toJson()]);
     const data = new TeammateFixture(context);
@@ -238,8 +239,8 @@ describe("OrganizationBoardComponent", () => {
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
-    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
-    const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department") || t.method === "teamrun.teammatePlace").map(t => [t.method, t.parameters]);
+    const offered = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-teammate-search .nol-quick-input-option")];
     await create();
     expect([all(".lane-rename").length, all("nol-teamrun-organization-card .move-choice").length, all(".add-member").length, all(".add-department").length])
       .toEqual([0, 0, 0, 0]);
@@ -259,10 +260,11 @@ describe("OrganizationBoardComponent", () => {
       field.value = value;
       field.dispatchEvent(new Event("change"));
     }
-    one(".lane:nth-child(1) .add-member").click();
-    await settle();
-    await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
-    at(menuItems(), 0).click();
+    await userEvent.click(one(".lane:nth-child(1) .add-member"));
+    await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search .nol-quick-input-field")).not.toBeNull());
+    await userEvent.type(one("nol-teamrun-organization-teammate-search .nol-quick-input-field", document), "car");
+    await Wait.until(() => expect(offered().map(t => t.querySelector(".nol-quick-input-title")?.textContent?.trim())).toEqual(["Carol"]));
+    await userEvent.click(at(offered(), 0));
     one(".add-department").click();
     await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
     const name = one("nol-dialog .nol-teamrun-department-name", document.body);
@@ -275,7 +277,7 @@ describe("OrganizationBoardComponent", () => {
 
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
+      ["teamrun.teammatePlace", { organizationId: "my-organization", teammateId: "carol", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }],
       ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", typeId: "department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);

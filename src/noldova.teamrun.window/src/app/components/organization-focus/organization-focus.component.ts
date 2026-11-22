@@ -10,8 +10,8 @@ import { Component, computed, inject, type InputSignal, input, type Signal } fro
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
-  MenuTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
+import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide,
+  PopoverOpening, PopoverTriggerDirective, SelectComponent, type SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
@@ -32,13 +32,14 @@ import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.compone
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
-  imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationChatComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, TextFieldComponent],
+  imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, OrganizationCardComponent, OrganizationChatComponent,
+    OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -57,6 +58,10 @@ export class OrganizationFocusComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
+  protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly end: OverlayAlignment = OverlayAlignment.End;
+  protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
@@ -110,12 +115,12 @@ export class OrganizationFocusComponent {
     return Object.isUndefined(manager) ? null : Resources.formatOrganizationReportsTo(manager.name);
   }
 
-  protected addable(row: OrganizationOutlineRow): readonly Teammate[] {
-    return OrganizationEdits.addable(row.node, this.chats.teammates());
+  protected leaderOptions(node: OrganizationNode): readonly SelectOption[] {
+    return OrganizationEdits.leaderOptions(node, this.chats.teammates());
   }
 
-  protected addMember(row: OrganizationOutlineRow, teammate: Teammate): void {
-    void this.organization.setMember(teammate.id, row.node.id);
+  protected setLeader(node: OrganizationNode, value: string): void {
+    void OrganizationEdits.setLeaderAsync(this.organization, node, value);
   }
 
   protected addDepartment(): void {

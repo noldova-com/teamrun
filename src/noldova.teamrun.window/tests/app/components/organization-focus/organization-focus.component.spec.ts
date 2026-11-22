@@ -26,6 +26,7 @@ import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
+import { Resources } from "../../../../src/resources";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -95,7 +96,7 @@ describe("OrganizationFocusComponent", () => {
         saves.push(OrganizationLayout.fromJson(OrganizationLayoutSaveParams.fromJson(t).layout));
         return null;
       });
-    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
+    for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete, MethodName.TeammatePlace])
       context.answer(method, () => null);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
@@ -263,8 +264,8 @@ describe("OrganizationFocusComponent", () => {
         throw new Error(`Nothing at ${index}.`);
       return found;
     };
-    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department")).map(t => [t.method, t.parameters]);
-    const menuItems = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>("button[nol-menu-item]")];
+    const edits = (): unknown[] => context.requests.filter(t => t.method.startsWith("teamrun.department") || t.method === "teamrun.teammatePlace").map(t => [t.method, t.parameters]);
+    const offered = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-teammate-search .nol-quick-input-option")];
     const cardEdits = (): unknown[] => all(".grid nol-teamrun-organization-card").map(t => [texts(".name", t), all(".head input", t).length, all(".move-choice, .remove", t).length]);
     await create("Department:design");
     expect([all(".unit-rename").length, all(".grid .move-choice").length, all(".add-member").length, all(".add-department").length]).toEqual([0, 0, 0, 0]);
@@ -272,7 +273,7 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
     expect([all(".add-member").map(t => t.getAttribute("aria-label")), texts(".unit-name"), one(".unit-rename").getAttribute("aria-label"), cardEdits()]).toEqual([
-      ["Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name", [[["Alice"], 0, 1], [["Bob"], 0, 2]]
+      ["Add teammate", "Add a member to Design", "Add a member to UI", "Add a member to Build"], [], "Department name", [[["Alice"], 0, 1], [["Bob"], 0, 2]]
     ]);
     const field = one(".unit-rename");
     if (!(field instanceof HTMLInputElement))
@@ -284,9 +285,11 @@ describe("OrganizationFocusComponent", () => {
       typed.push(field.value);
     }
     expect(typed).toEqual(["Design", "Design", "  Craft  "]);
-    await click(one(".add-member", row("Design")));
-    await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
-    at(menuItems(), 0).click();
+    await userEvent.click(one(".add-member", row("Design")));
+    await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search .nol-quick-input-field")).not.toBeNull());
+    await userEvent.type(one("nol-teamrun-organization-teammate-search .nol-quick-input-field", document), "car");
+    await Wait.until(() => expect(offered().map(t => t.querySelector(".nol-quick-input-title")?.textContent?.trim())).toEqual(["Carol"]));
+    await userEvent.click(at(offered(), 0));
     one(".add-department").click();
     await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
     const name = one("nol-dialog .nol-teamrun-department-name", document.body);
@@ -299,7 +302,7 @@ describe("OrganizationFocusComponent", () => {
 
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
+      ["teamrun.teammatePlace", { organizationId: "my-organization", teammateId: "carol", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }],
       ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", typeId: "department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
   });
