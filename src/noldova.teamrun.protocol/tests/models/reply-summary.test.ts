@@ -8,7 +8,7 @@
 
 import { ArgumentException, ArgumentOutOfRangeException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { DetailKind, FileChangeSummary, Message, MessageAuthor, MessageDetail, MessageStatus, ObservedSettings, Provenance,
   ReplyPage, ReplyPanel, ReplyPlan, ReplySummary, RequestedSettings, SubAgent, SubAgentStatus } from "@noldova/teamrun.protocol";
 
@@ -47,6 +47,21 @@ export class ReplySummaryTests {
     Assert.isTrue(summary.matches(ReplyPanel.Activity));
     Assert.isTrue(summary.matches(ReplyPanel.Changes));
     Assert.areEqual(large, message.details[0]?.text);
+  }
+
+  @TestMethod
+  @TestData("\u{1F600}")
+  @TestData("\u{1F469}\u200D\u{1F4BB}")
+  @TestData("\u{1F1EB}\u{1F1F7}")
+  @TestData("1\uFE0F\u20E3")
+  public endsAPreviewTitleAndPayloadTextBeforeACharacterTheCutWouldSplit(character: string): void {
+    const kept = "x".repeat(511);
+    const message = ReplySummaryTests.message([new MessageDetail(0, DetailKind.Command, `${kept}${character}`, { source: `${kept}${character}` }, "t")]);
+
+    const detail = ReplySummary.fromMessage(message).preview.details[0];
+
+    Assert.areEqual(kept, detail?.text);
+    Assert.areEqual(JSON.stringify({ source: kept }), JSON.stringify(detail?.payload));
   }
 
   @TestMethod

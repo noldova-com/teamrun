@@ -7,6 +7,7 @@
  */
 
 import "@noldova/context.core";
+import { TextCut } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../resources.js";
 
@@ -15,9 +16,8 @@ export class ConversationTitle {
 
   public constructor(message: string) {
     const line = (message.split(Resources.lineSeparator).find(t => !String.isNullOrWhitespace(t)) ?? message).trim();
-    const points = [...line];
-    this.text = points.length <= Resources.maximumTitleLength ? line
-      : `${points.slice(0, Resources.maximumTitleLength - 1).join(String.empty).trimEnd()}${Resources.ellipsis}`;
+    this.text = [...line].length <= Resources.maximumTitleLength ? line
+      : `${TextCut.toPoints(line, Resources.maximumTitleLength - 1).trimEnd()}${Resources.ellipsis}`;
   }
 
   public static ofAnswer(answer: string): string | null {

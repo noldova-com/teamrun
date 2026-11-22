@@ -9174,8 +9174,8 @@ export declare class ToolWindows {
  */
 export declare class ConversationTitle {
   /**
-   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis, so a character
-   * outside the Basic Multilingual Plane, such as an emoji, is never split.
+   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis. The cut ends on a
+   * grapheme boundary, so a character a person sees as one, such as 👩‍💻, a flag or a keycap, is never split.
    */
   public readonly text: string;
 

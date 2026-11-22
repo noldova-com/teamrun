@@ -14,6 +14,7 @@ import { MessageStatus } from "../enums/message-status.js";
 import { ReplyPanel } from "../enums/reply-panel.js";
 import { Resources } from "../resources.js";
 import { FileChangeReader } from "../services/file-change.reader.js";
+import { TextCut } from "../services/text-cut.js";
 import { FileChangeSummary } from "./file-change-summary.js";
 import { Message } from "./message.js";
 import { MessageDetail } from "./message-detail.js";
@@ -57,10 +58,10 @@ export class ReplySummary {
         for (const field of ReplySummary.previewFields) {
           const value = detail.payload[field];
           if (Object.isString(value) || Object.isBoolean(value))
-            payload[field] = Object.isString(value) ? value.slice(0, Resources.maximumPreviewTitleLength) : value;
+            payload[field] = Object.isString(value) ? TextCut.toUnits(value, Resources.maximumPreviewTitleLength) : value;
         }
       const end = detail.text.indexOf(Resources.lineSeparator);
-      const title = detail.text.slice(0, end < 0 ? Resources.maximumPreviewTitleLength : Math.min(end, Resources.maximumPreviewTitleLength));
+      const title = TextCut.toUnits(end < 0 ? detail.text : detail.text.slice(0, end), Resources.maximumPreviewTitleLength);
       return new MessageDetail(detail.sequence, detail.kind, title, payload, detail.createdAt);
     });
     return new ReplySummary(message.withDetails(details), new FileChangeReader().editsOf(message).map(t => FileChangeSummary.fromEdit(t)));

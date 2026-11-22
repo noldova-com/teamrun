@@ -33,6 +33,16 @@ export class ConversationTitleTests {
   }
 
   @TestMethod
+  @TestData("\u{1F469}\u200D\u{1F4BB}")
+  @TestData("\u{1F1EB}\u{1F1F7}")
+  @TestData("\u{1F44D}\u{1F3FD}")
+  @TestData("1\uFE0F\u20E3")
+  @TestData("e\u0301")
+  public endsACutTitleBeforeACharacterTheCutWouldSplit(character: string): void {
+    Assert.areEqual(`${"x".repeat(58)}…`, new ConversationTitle(`${"x".repeat(58)}${character}${"y".repeat(10)}`).text);
+  }
+
+  @TestMethod
   @TestData("Fix the login page", "Fix the login page")
   @TestData("\n\n  Fix the login page\nBecause it is broken", "Fix the login page")
   @TestData("\"Fix the login page.\"", "Fix the login page")
