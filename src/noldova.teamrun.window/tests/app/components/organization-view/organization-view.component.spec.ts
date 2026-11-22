@@ -1063,10 +1063,28 @@ describe("OrganizationViewComponent", () => {
 
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
-        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no unit.", "Remove"], "Remove Bob",
+        ["Remove member", "Remove Bob from Design? Bob will report to you.", "Remove"], "Remove Bob",
         ["You", "Design (Department)", "Alice", "UI (Department)", "Code Reviewer", "Build (Department)", "Offline"], 0]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }),
         new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
+    });
+
+    it("says a removed member will report to you, where the organization then places it, among your direct reports", async () => {
+      await editAsync();
+      const before = reports();
+
+      one(".remove", card("Bob")).click();
+      const asking = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+      organization = SampleData.organizationOf(sample.departments,
+        sample.placements.map(t => t.teammateId === "bob" ? new TeammatePlacement("bob", OrganizationParent.person, 0) : t));
+      context.emit(EventName.OrganizationChanged, organization.toJson());
+      await settle();
+      one(".top .edit").click();
+      await settle();
+
+      expect([before, asking[1], reports()]).toEqual([[], "Remove Bob from Design? Bob will report to you.", ["Bob"]]);
+      expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null })]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {

@@ -120,7 +120,7 @@ describe("Resources", () => {
       Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
       "Delete Design? Its units move up to report to you, and its members leave every unit.",
       "Delete Web? Its units and members move to Build.",
-      "Remove Alice from Design? Alice stays on the team, in no unit."
+      "Remove Alice from Design? Alice will report to you."
     ]);
   });
 
