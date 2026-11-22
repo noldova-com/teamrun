@@ -98,6 +98,30 @@ describe("OrganizationCatalog", () => {
     expect(namesOf(catalog)).toBe("my-organization:Newer");
   });
 
+  it("settles only once the newest listing lands, not one a later reading replaced", async () => {
+    let answer: () => Promise<JsonValue> = () => Promise.resolve([]);
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
+    const catalog = OrganizationCatalog.of(context);
+    await catalog.reload();
+    const [older, newer] = [new DeferredResponse(), new DeferredResponse()];
+    answer = () => older.promise;
+    const first = catalog.reload();
+    let settled = false;
+    const seen = catalog.settledAsync().then(() => {
+      settled = true;
+      return namesOf(catalog);
+    });
+    answer = () => newer.promise;
+    void catalog.reload();
+
+    older.resolve([organizationOf("Older").toJson()]);
+    await first;
+    const early = settled;
+    newer.resolve([organizationOf("Newer").toJson()]);
+
+    expect([early, await seen]).toEqual([false, "my-organization:Newer"]);
+  });
+
   it("keeps the rest of a listing on its way when another organization changes, is added or is removed meanwhile", async () => {
     let answer: () => Promise<JsonValue> = () => Promise.resolve([]);
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());

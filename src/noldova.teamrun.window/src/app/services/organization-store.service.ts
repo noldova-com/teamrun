@@ -28,6 +28,7 @@ export class OrganizationStoreService {
   private readonly context: IWindowPartContext;
   private readonly catalog: OrganizationCatalog;
   private readonly actionErrorSignal: WritableSignal<string | null> = signal(null);
+  private readonly madeTypes: Map<string, string> = new Map();
   private edits: Promise<boolean> = Promise.resolve(true);
 
   public readonly id: Signal<string>;
@@ -56,7 +57,8 @@ export class OrganizationStoreService {
 
   public async createDepartment(name: string, parent: OrganizationParent = OrganizationParent.person, leaderId: string | null = null): Promise<boolean> {
     const sent = this.edits.then(async () => {
-      const typeId = this.organization().nodeTypes.at(0)?.id ?? await this.createDefaultType();
+      await this.catalog.settledAsync();
+      const typeId = this.organization().nodeTypes.at(0)?.id ?? this.madeTypes.get(this.id()) ?? await this.createDefaultType();
       return !Object.isNull(typeId) && await this.send(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, typeId, parent, leaderId).toJson());
     });
     this.edits = sent;
@@ -132,15 +134,21 @@ export class OrganizationStoreService {
   }
 
   private async createDefaultType(): Promise<string | null> {
+    const organizationId = this.id();
     this.actionErrorSignal.set(null);
     try {
       const created = await this.context.requestAsync(Resources.formatQualifiedName(MethodName.NodeTypeCreate),
-        new NodeTypeCreateParams(this.id(), Resources.organizationDefaultTypeName).toJson());
-      return NodeType.fromJson(created).id;
+        new NodeTypeCreateParams(organizationId, Resources.organizationDefaultTypeName).toJson());
+      const typeId = NodeType.fromJson(created).id;
+      this.madeTypes.set(organizationId, typeId);
+      return typeId;
     }
     catch (error) {
-      this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
-      return null;
+      await this.catalog.reload();
+      const typeId = this.organization().nodeTypes.at(0)?.id ?? null;
+      if (Object.isNull(typeId))
+        this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
+      return typeId;
     }
   }
 

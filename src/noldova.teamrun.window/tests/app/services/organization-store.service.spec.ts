@@ -16,7 +16,9 @@ import { Chat, Department, DepartmentMoveParams, MethodName, NodeType, Organizat
 import { OrganizationScope } from "../../../src/app/services/organization-scope";
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
 import { Resources } from "../../../src/resources";
+import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../fixtures/required.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
@@ -128,6 +130,75 @@ describe("OrganizationStoreService", () => {
       `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
       `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
     ]);
+  });
+
+  it("makes the Department type once for two departments added before the organization's change arrives", async () => {
+    const asked: string[] = [];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [new Organization("o2", "o2", null, 0, "c", "u", [], [], []).toJson()])
+      .answer(MethodName.NodeTypeCreate, t => {
+        asked.push(`${MethodName.NodeTypeCreate} ${JSON.stringify(t)}`);
+        return new NodeType("t9", "Department", null, null, "c", "u").toJson();
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const made = await Promise.all([store.createDepartment("Design"), store.createDepartment("Build")]);
+
+    expect(made).toEqual([true, true]);
+    expect(asked).toEqual([
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Build","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
+    ]);
+  });
+
+  it("takes the type another window made when making its own is refused, reading the organization again", async () => {
+    const asked: string[] = [];
+    const listings = [new Organization("o2", "o2", null, 0, "c", "u", [], [], []),
+      new Organization("o2", "o2", null, 0, "c", "u", [new NodeType("d7", "Department", null, null, "c", "u")], [], [])];
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [Required.of(listings.shift()).toJson()])
+      .answer(MethodName.NodeTypeCreate, () => {
+        throw new RuntimeRequestException(FailureCode.Conflict, "A type named Department exists.");
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const made = await store.createDepartment("Design");
+
+    expect([made, store.actionError(), context.count(MethodName.OrganizationList)]).toEqual([true, null, 2]);
+    expect(asked).toEqual([`${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"d7","parent":{"kind":"Person","id":null},"leaderId":null}`]);
+  });
+
+  it("waits for the organization's listing before choosing a type for a department added while it is on its way", async () => {
+    const asked: string[] = [];
+    const listing = new DeferredResponse();
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => listing.promise)
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+
+    const making = store.createDepartment("Design");
+    listing.resolve([organizationOf("o2", "d1").toJson()]);
+
+    expect(await making).toBe(true);
+    expect([context.count(MethodName.NodeTypeCreate), asked]).toEqual([0,
+      [`${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"department","parent":{"kind":"Person","id":null},"leaderId":null}`]]);
   });
 
   it("sends each change only once the one before it is answered, so changes made within one round trip land in the order they were made", async () => {
