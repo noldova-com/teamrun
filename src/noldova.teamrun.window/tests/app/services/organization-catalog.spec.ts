@@ -20,9 +20,9 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationCatalog", () => {
   const organizationOf = (...names: readonly string[]): Organization =>
-    SampleData.organizationOf(names.map((t, i) => new Department(t, t, OrganizationParent.person, null, i, "c", "u")), []);
+    SampleData.organizationOf(names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const named = (id: string, order: number, createdAt: string): Organization =>
-    new Organization(id, id, null, order, createdAt, createdAt, [], []);
+    new Organization(id, id, null, order, createdAt, createdAt, [SampleData.departmentType], [], []);
   const namesOf = (catalog: OrganizationCatalog): string =>
     catalog.organizations().map(t => `${t.id}:${t.departments.map(u => u.name).join("+")}`).join(",");
   let context: FakeWindowPartContext;
@@ -96,6 +96,30 @@ describe("OrganizationCatalog", () => {
     await loading;
 
     expect(namesOf(catalog)).toBe("my-organization:Newer");
+  });
+
+  it("settles only once the newest listing lands, not one a later reading replaced", async () => {
+    let answer: () => Promise<JsonValue> = () => Promise.resolve([]);
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answer());
+    const catalog = OrganizationCatalog.of(context);
+    await catalog.reload();
+    const [older, newer] = [new DeferredResponse(), new DeferredResponse()];
+    answer = () => older.promise;
+    const first = catalog.reload();
+    let settled = false;
+    const seen = catalog.settledAsync().then(() => {
+      settled = true;
+      return namesOf(catalog);
+    });
+    answer = () => newer.promise;
+    void catalog.reload();
+
+    older.resolve([organizationOf("Older").toJson()]);
+    await first;
+    const early = settled;
+    newer.resolve([organizationOf("Newer").toJson()]);
+
+    expect([early, await seen]).toEqual([false, "my-organization:Newer"]);
   });
 
   it("keeps the rest of a listing on its way when another organization changes, is added or is removed meanwhile", async () => {

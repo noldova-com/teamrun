@@ -77,10 +77,12 @@ export class OrganizationChatFoldersTests {
   @TestMethod
   public async tellsATeammateItsPlaceInTheOrganizationItsChatBelongsTo(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const ada = await OrganizationChatFoldersTests.teammateAsync(host);
     const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
-    await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person, ada.id));
-    await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", OrganizationParent.person, ada.id));
+    const studioType = await host.typeAsync(studio.id);
+    await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", type, OrganizationParent.person, ada.id));
+    await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", studioType, OrganizationParent.person, ada.id));
 
     await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(studio.id, ada.id), "Status?");
     await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(Resources.defaultOrganizationId, ada.id), "Status?");

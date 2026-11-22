@@ -22,6 +22,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
   Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
   In the Tree it edits every place: it adds a teammate, found by a search over the team and moved from wherever it was, or a department, with its name and an optional leader, any teammate or a new one, under you, any teammate or any department, and moves either anywhere by its menu or by dragging it, refusing a move that would put it under itself before it is sent; a department's leader can be any teammate (#399).
   The view, the collapsed departments and the cards' fields are kept across a restart.
+- **Organization:** each organization keeps its own node types, such as Branch, Team or Department, each with a name and an optional icon and color; a new organization has none, and adding its first department adds a Department type, while today's departments become that type in their own organization; a type a department still has can't be deleted, and the views to choose, rename and delete types come in their own change (#442).
 - **Organization:** the Tree shows each message moving along its lines between you and your teammates and between teammates: a slow, faint flow of small pulses while it is written, a pulse when it is sent, then a glow on the receiver's card, and an answer that stops fades away (#444).
   A teammate's message to another teammate's Organization chat is written from the moment its send starts, and fades if the send is refused, cancelled or fails.
   Show messages moving in the organization, in TeamRun's settings, turns it off, and the Tree stays still while the system asks for reduced motion.
@@ -63,6 +64,8 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Ending a shared MCP server on Windows:** when the launcher of a shared MCP server ends, what the server started is ended even when the PowerShell that lists it stalls, within seconds, rather than left running (#383).
 - **Ending a process tree on Windows:** a process whose end failed is ended again while the tree's listing still shows it, in each of the stop's ten rounds, rather than left running after its first end, and each end waits for the process to exit, all of a round's within two seconds (#344).
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
+- **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
+- **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
 
 ### Changed
 

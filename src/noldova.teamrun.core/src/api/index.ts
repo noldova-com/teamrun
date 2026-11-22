@@ -198,6 +198,7 @@ export { OrganizationsMigration } from "../models/migrations/organizations-migra
 export { OrganizationMessagesMigration } from "../models/migrations/organization-messages-migration.js";
 export { OrganizationMessagesDropMigration } from "../models/migrations/organization-messages-drop-migration.js";
 export { UniqueIndexNamesMigration } from "../models/migrations/unique-index-names-migration.js";
+export { NodeTypesMigration } from "../models/migrations/node-types-migration.js";
 export { SharedMcpServersService } from "../services/shared-mcp-servers/shared-mcp-servers.service.js";
 export { AcpAgentsService } from "../services/acp-agents/acp-agents.service.js";
 export { ComputerUseGrantsService } from "../services/computer-use-grants/computer-use-grants.service.js";

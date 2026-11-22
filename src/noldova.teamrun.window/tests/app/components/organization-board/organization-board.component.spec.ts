@@ -40,9 +40,9 @@ describe("OrganizationBoardComponent", () => {
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
   const sample = SampleData.organizationOf([
-    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
-    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
-    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+    new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", "department", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", "department", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
   ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
     new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
     new TeammatePlacement("carol", OrganizationParent.department("build"), 1), new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
@@ -82,6 +82,7 @@ describe("OrganizationBoardComponent", () => {
     clock = new FakeClock(Date.parse(started) + 5 * 60_000);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
+    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
@@ -245,7 +246,7 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", typeId: "department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });

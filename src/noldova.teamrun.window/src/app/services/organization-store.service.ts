@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { Conversation, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, MethodName,
-  Organization, OrganizationChat, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
+  NodeType, NodeTypeCreateParams, Organization, OrganizationChat, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { OrganizationCatalog } from "./organization-catalog";
@@ -28,6 +28,7 @@ export class OrganizationStoreService {
   private readonly context: IWindowPartContext;
   private readonly catalog: OrganizationCatalog;
   private readonly actionErrorSignal: WritableSignal<string | null> = signal(null);
+  private readonly madeTypes: Map<string, string> = new Map();
   private edits: Promise<boolean> = Promise.resolve(true);
 
   public readonly id: Signal<string>;
@@ -55,7 +56,13 @@ export class OrganizationStoreService {
   }
 
   public async createDepartment(name: string, parent: OrganizationParent = OrganizationParent.person, leaderId: string | null = null): Promise<boolean> {
-    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, parent, leaderId).toJson());
+    const sent = this.edits.then(async () => {
+      await this.catalog.settledAsync();
+      const typeId = this.organization().nodeTypes.at(0)?.id ?? this.madeTypes.get(this.id()) ?? await this.createDefaultType();
+      return !Object.isNull(typeId) && await this.send(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, typeId, parent, leaderId).toJson());
+    });
+    this.edits = sent;
+    return sent;
   }
 
   public async renameDepartment(departmentId: string, name: string): Promise<boolean> {
@@ -126,8 +133,27 @@ export class OrganizationStoreService {
     }
   }
 
+  private async createDefaultType(): Promise<string | null> {
+    const organizationId = this.id();
+    this.actionErrorSignal.set(null);
+    try {
+      const created = await this.context.requestAsync(Resources.formatQualifiedName(MethodName.NodeTypeCreate),
+        new NodeTypeCreateParams(organizationId, Resources.organizationDefaultTypeName).toJson());
+      const typeId = NodeType.fromJson(created).id;
+      this.madeTypes.set(organizationId, typeId);
+      return typeId;
+    }
+    catch (error) {
+      await this.catalog.reload();
+      const typeId = this.organization().nodeTypes.at(0)?.id ?? null;
+      if (Object.isNull(typeId))
+        this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
+      return typeId;
+    }
+  }
+
   private static unloaded(id: string): Organization {
-    return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], []);
+    return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], [], []);
   }
 
   private static messageOf(error: unknown): string {

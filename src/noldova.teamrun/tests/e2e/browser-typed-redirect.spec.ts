@@ -64,7 +64,7 @@ test("an address the person types on a site Settings names lands on the second n
     await field.fill(`${first}/elsewhere`);
     await field.press("Enter");
 
-    await expect(page.getByRole("heading", { name: `Browser doesn't open ${unnamed}`, exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: `TeamRun's browser doesn't open ${unnamed}`, exact: true })).toBeVisible({ timeout: 60_000 });
     expect(requests).toContain(`${FIRST_SITE}:${port}/elsewhere`);
     expect(requests.filter(t => t.startsWith(`${UNNAMED_SITE}:`))).toEqual([]);
     await testInfo.attach("not-allowed", { body: await page.screenshot(), contentType: "image/png" });

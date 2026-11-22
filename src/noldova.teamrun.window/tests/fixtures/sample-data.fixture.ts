@@ -38,6 +38,7 @@ import {
   MessageStatus,
   MethodName,
   ObservedSettings,
+  NodeType,
   Organization,
   OrganizationLayoutSaveParams,
   Project,
@@ -93,8 +94,10 @@ export class SampleData {
     SampleData.timestamp,
     null);
 
+  public static readonly departmentType: NodeType = new NodeType("department", "Department", null, null, SampleData.timestamp, SampleData.timestamp);
+
   public static organizationOf(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
-    return new Organization(ProtocolResources.defaultOrganizationId, "My organization", null, 0, SampleData.timestamp, SampleData.timestamp, departments, placements);
+    return new Organization(ProtocolResources.defaultOrganizationId, "My organization", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], departments, placements);
   }
 
   public static abilities(overrides: Partial<Record<ProviderAbility, AbilityCell>> = {}): ProviderAbilities {

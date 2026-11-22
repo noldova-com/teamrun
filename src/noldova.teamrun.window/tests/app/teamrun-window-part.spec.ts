@@ -120,7 +120,7 @@ describe("TeamRun's window part", () => {
 
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {
     const organizationOf = (id: string, name: string, order: number): Organization =>
-      new Organization(id, name, null, order, SampleData.timestamp, SampleData.timestamp, [], []);
+      new Organization(id, name, null, order, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []);
     const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("labs", "Labs", 1).toJson(), organizationOf("team", "Team", 0).toJson()]);
     await createPart().activateAsync(context);
     const shows = context.commands.slice(0, 6);
@@ -159,13 +159,13 @@ describe("TeamRun's window part", () => {
 
   it("opens the organization the newest listing names when a resync reloads the list while Show organization waits for it", async () => {
     const first = new DeferredResponse();
-    const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [], []).toJson()])];
+    const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()])];
     const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answers.shift() ?? Promise.resolve([]));
     await createPart().activateAsync(context);
 
     const running = context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null);
     context.emit(EventName.StateResyncRequested, null);
-    first.resolve([new Organization("labs", "Labs", null, 0, SampleData.timestamp, SampleData.timestamp, [], []).toJson()]);
+    first.resolve([new Organization("labs", "Labs", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()]);
     await running;
 
     expect(context.openedDocuments).toEqual([{ name: "teamrun.organization", instance: "team", title: "Team", options: undefined }]);
