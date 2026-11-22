@@ -75,6 +75,8 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
 - **Deleting a chat:** once a chat is deleted, a failure in one of the cleanups after it, such as forgetting its runs, no longer skips the others or shows the delete as failed; and one part of TeamRun failing on an update no longer keeps the update from the parts after it, such as an approval's answer from its waiting run; each failure is logged (#85).
 - **Background tasks:** a task that writes a flood of output within a tenth of a second sends the window only its latest 65,536 characters, the most a task keeps, rather than all of it at once (#85).
+- **Chat folders:** a chat folder whose Git setup was cut short, such as by a full disk, is set up again on its next turn rather than left with a broken `HEAD` (#85).
+- **Waiting messages:** a waiting message whose sending or Send now fails after it was kept no longer shows the request as failed, so the window doesn't add it a second time; it waits and the failure is logged (#85).
 
 ### Changed
 
