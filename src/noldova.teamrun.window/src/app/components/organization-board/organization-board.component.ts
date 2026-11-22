@@ -51,7 +51,8 @@ export class OrganizationBoardComponent {
   private readonly time: WritableSignal<number> = signal(this.clock.now());
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
-  public readonly directReports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly reports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly managers: InputSignal<ReadonlyMap<string, Teammate>> = input<ReadonlyMap<string, Teammate>>(new Map<string, Teammate>());
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
   public readonly target: InputSignal<OrganizationTarget | null> = input<OrganizationTarget | null>(null);
   public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
@@ -66,7 +67,7 @@ export class OrganizationBoardComponent {
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
   protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus([
-    ...this.directReports().map(t => new OrganizationBoardAsk(t, Resources.organizationReportsToYou, this.status(t))),
+    ...this.reports().map(t => new OrganizationBoardAsk(t, this.reportsToOf(t) ?? Resources.organizationReportsToYou, this.status(t))),
     ...this.departments().flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))
   ].filter(t => OrganizationBoardAsk.needsYou(t.status)), t => t.status));
   protected readonly targetKey: Signal<string | null> = computed(() => {
@@ -101,6 +102,11 @@ export class OrganizationBoardComponent {
 
   protected askText(ask: OrganizationBoardAsk): string | null {
     return this.statuses.lastReplyOf(ask.teammate.id)()?.text ?? null;
+  }
+
+  protected reportsToOf(teammate: Teammate): string | null {
+    const manager = this.managers().get(teammate.id);
+    return Object.isUndefined(manager) ? null : Resources.formatOrganizationReportsTo(manager.name);
   }
 
   protected status(teammate: Teammate): TeammateStatus {
