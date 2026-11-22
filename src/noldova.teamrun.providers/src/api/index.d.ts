@@ -10985,19 +10985,21 @@ export declare class SharedMcpLaunch {
  * On Windows a `.cmd` or `.bat` command found through `PATH` and `PATHEXT` runs through `COMSPEC` with arguments it quotes itself and whose
  * metacharacters it escapes twice, as cross-spawn does for npm's shims, since a batch file that passes `%*` on has cmd read them again.
  * So the server ends with it, it first starts a watch, its own script run as `--watch` apart from it and fed by a pipe from it, then the server,
- * and writes the watch, as soon as the server has started, a line of the server's process id and the times around its start. When the pipe
+ * and writes the watch, as soon as the server has started, a line of the server's process id, and `exited` once the server exits. When the pipe
  * ends, however the launcher ended, a watch with that line sends `SIGTERM` to the server's process group, and `SIGKILL` after
  * `graceMilliseconds` if it is still there. Outside Windows the server starts held: `/bin/sh` in a process group of its own waits for a line on
  * its fourth descriptor, which the launcher writes only after the watch's line, and then runs the command in its own place, without the
  * `PWD` and `SHLVL` it sets unless the server names them, or answers on it that the command isn't found, which the launcher reports as Node
  * does; a launcher killed before the watch's line closes that descriptor and the command never starts. On Windows, where ending the launcher
- * ends only the server and leaves what the server started, the watch ends, through a PowerShell run comparing times in UTC, the server if
- * it still runs and each process under it that started no earlier than its parent; when another process holds the server's id, one that started
- * outside those times, it ends nothing. A watch on Windows whose pipe ends without that line ends, the same way, each process its launcher
- * started after it, other than itself and before any later process took the launcher's id, with what those started, and none while the launcher
+ * ends only the server and leaves what the server started, the watch ends, through a PowerShell run comparing only the times Windows gives the
+ * processes, the server if it started after the watch, from the launcher, and hasn't exited, and each process under it that started no earlier
+ * than its parent; otherwise each process the server's id started after the watch and before the process that now holds the id, if any. A
+ * watch on Windows whose pipe ends without that line ends, the same way, each process its launcher started after it, other than itself and
+ * before any later process took the launcher's id, with what those started, and none while the launcher
  * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one with the
  * rest of `windowsEndMilliseconds`, which is ended too if it hasn't ended by then. The watch on Windows gets the launcher's errors and writes there a
- * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end or can't start, and nothing otherwise.
+ * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end, can't start or exits with an error, a line when a launcher
+ * ended before its server left nothing of the server to end, and nothing otherwise.
  */
 export declare class SharedMcpLauncher {
   /**

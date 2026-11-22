@@ -22,6 +22,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **A shared MCP server on Windows:** the server and what it started now end with TeamRun however TeamRun ends, rather than now and then running on after TeamRun was ended at once; when they can't be ended, TeamRun's MCP watch says so in the provider's log (#443).
 - **A Pi teammate switched back to Default:** its next reply runs on Pi's current default model and thinking level, not the ones it ran with before, also after its Pi closed, TeamRun restarted or the default changed (#138).
 - **Organization messages:** a message from Organization is now your own message in the teammate's Organization chat, `Organization · <name>`, not one from outside TeamRun, and tells the teammate its department, whether it leads it, and who it reports to (#397).
 - **Model lists after the engine restarts:** the composer's model picker, the Teammates view and a chat's members list ask each provider for its models again, rather than showing the lists they had before the engine went away (#387).
