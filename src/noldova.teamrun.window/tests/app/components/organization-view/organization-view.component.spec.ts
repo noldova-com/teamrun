@@ -1134,14 +1134,14 @@ describe("OrganizationViewComponent", () => {
     };
     const lastDialog = (): ParentNode => [...document.querySelectorAll("nol-dialog")].at(-1) ?? document;
 
-    it("adds a teammate under a department from a search of the team that lists no one until a name is typed, moving one already placed", async () => {
+    it("adds a teammate under a department from a search of the team that lists no one until a name is typed, then the matches and a new teammate, moving one already placed", async () => {
       await editAsync();
 
       const before = await searchAsync(one(":scope > .adds > .add-member", department("Build")), "");
       const hint = searchTexts(".nol-quick-input-empty");
       await userEvent.type(searchField(), "zz");
       await settle();
-      const none = searchTexts(".nol-quick-input-empty");
+      const none = [searchTexts(".nol-quick-input-option .nol-quick-input-title"), searchTexts(".nol-quick-input-option .nol-quick-input-detail")];
       await userEvent.clear(searchField());
       await userEvent.type(searchField(), "al");
       await settle();
@@ -1149,7 +1149,7 @@ describe("OrganizationViewComponent", () => {
       await pickAsync("Alice");
       await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
 
-      expect([before, hint, none, found, asked]).toEqual([[], ["Type a teammate's name."], ["No teammate has that name."], ["Alice"],
+      expect([before, hint, none, found, asked]).toEqual([[], ["Type a teammate's name."], [["New teammate…"], ["zz"]], ["Alice", "New teammate…"],
         [new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]]);
     });
 
@@ -1169,6 +1169,60 @@ describe("OrganizationViewComponent", () => {
 
       expect([offered.includes("Bob"), refused, asked]).toEqual([false, ["A teammate or department can't be under itself."],
         [new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })]]);
+    });
+
+    it("creates a teammate with the typed name from the search, in this organization only, under a department, under a teammate and under you", async () => {
+      await editAsync();
+      const store = ChatStoreService.of(context);
+      const createAsync = async (trigger: HTMLElement, name: string): Promise<string | undefined> => {
+        const placed = asked.length;
+        await searchAsync(trigger, name);
+        await pickAsync("New teammate…");
+        await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+        const shown = document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")?.value;
+        one("button[form='nol-teamrun-teammate-form']", document).click();
+        await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+        await fadedAsync();
+        await Wait.until(() => expect(asked).toHaveLength(placed + 1));
+        return shown;
+      };
+
+      const shown = [await createAsync(one(":scope > .adds > .add-member", department("Build")), "Dana"),
+        await createAsync(one(":scope > .adds > .add-member", nodeOf("Bob")), "Eve"),
+        await createAsync(one(".chart .kids .adds .add-member"), "Finn")];
+      const id = (name: string): string => Required.of(store.teammates().find(t => t.name === name)).id;
+
+      expect([shown, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([["Dana", "Eve", "Finn"], null, [
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Dana"), parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Eve"), parent: { kind: "Teammate", id: "bob" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Finn"), parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })]]);
+    });
+
+    it("creates and places no teammate when the new teammate's dialog is closed", async () => {
+      await editAsync();
+      const before = ChatStoreService.of(context).teammates().length;
+
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "Dana");
+      await pickAsync("New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      one(".nol-teamrun-cancel", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await fadedAsync();
+      await settle();
+
+      expect([ChatStoreService.of(context).teammates().length, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([before, null, []]);
+    });
+
+    it("says why in the organization when a teammate made from the search can't be placed", async () => {
+      await editAsync(() => Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is busy.")));
+
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "Dana");
+      await pickAsync("New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      one("button[form='nol-teamrun-teammate-form']", document).click();
+      await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
+
+      expect(asked.map(t => t.method)).toEqual([MethodName.TeammatePlace]);
     });
 
     it("creates a department under a teammate from a dialog asking its name and a leader among the whole team, and nothing for a blank name", async () => {

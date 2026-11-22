@@ -1287,7 +1287,6 @@ export class Resources {
   public static readonly organizationAddTeammateSearch: string = "Find a teammate";
   public static readonly organizationAddTeammateSearchIcon: string = "search";
   public static readonly organizationAddTeammateEmpty: string = "Type a teammate's name.";
-  public static readonly organizationAddTeammateNone: string = "No teammate has that name.";
   public static readonly organizationDeleteIcon: string = "delete";
   public static readonly organizationRemoveIcon: string = "person_remove";
   public static readonly organizationNowRunningIcon: string = "progress_activity";
