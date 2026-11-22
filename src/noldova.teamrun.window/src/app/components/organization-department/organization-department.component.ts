@@ -14,6 +14,7 @@ import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, Ico
   from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { FlowLineShape } from "../../enums/flow-line-shape";
 import { OrganizationEdits } from "../../models/organization-edits";
 import { OrganizationPlaceChoice } from "../../models/organization-place-choice";
 import { OrganizationNode } from "../../models/organization.node";
@@ -48,10 +49,14 @@ export class OrganizationDepartmentComponent {
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
+  public readonly flowParent: InputSignal<string> = input(Resources.organizationFlowPersonKey);
 
   public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly lines: typeof FlowLineShape = FlowLineShape;
+  protected readonly flowKey: Signal<string> = computed(() => Resources.formatOrganizationFlowDepartmentKey(this.node().id));
+  protected readonly flowHead: Signal<string> = computed(() => this.node().teammate?.id ?? this.node().leader?.id ?? this.flowKey());
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly textVariant: ButtonVariant = ButtonVariant.Text;
   protected readonly target: typeof OrganizationTarget = OrganizationTarget;

@@ -27,6 +27,7 @@ import { Resources } from "../resources";
 import { PagesViewComponent } from "./components/pages/pages-view/pages-view.component";
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
+import { OrganizationFlowService } from "./services/organization-flow.service";
 import { OrganizationLayoutService } from "./services/organization-layout.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
 import { BrowserAvailability } from "./services/browser-availability";
@@ -176,6 +177,7 @@ export class TeamRunWindowPart implements IWindowPart {
       BackgroundTaskStoreService.release(this.activeContext);
       OrganizationStoreService.release(this.activeContext);
       OrganizationLayoutService.release(this.activeContext);
+      OrganizationFlowService.release(this.activeContext);
       TeammateStatusStoreService.release(this.activeContext);
       ProjectsLayoutService.release(this.activeContext);
       ComposerDefaultService.release(this.activeContext);

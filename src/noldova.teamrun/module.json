@@ -51,7 +51,7 @@
     "menus": ["teamrun.chats"],
     "documents": ["teamrun.conversation", "teamrun.image", "teamrun.organization", "teamrun.teammates", "teamrun.providers", "teamrun.mcpServers", "teamrun.computerUseGrants", "teamrun.outsideConnection", "teamrun.page"],
     "placeholders": ["teamrun.noChat"],
-    "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
+    "settings": ["teamrun.chainHopLimit", "teamrun.titleModel", "teamrun.sendKey", "teamrun.whileReplying", "teamrun.imageOpenMode", "teamrun.organizationMessageFlow", "teamrun.newTerminals", "teamrun.runOpensIn", "teamrun.defaultTeammate", "teamrun.manageTeammates", "teamrun.manageProviders", "teamrun.manageMcpServers", "teamrun.manageComputerUse", "teamrun.idleCompaction", "teamrun.outsideSessions", "teamrun.outsidePort", "teamrun.connectOutsideAgents", "teamrun.dataFolder"],
     "settingsPages": ["teamrun.abilities"],
     "tools": [
       "teamrun_list_projects", "teamrun_list_chats", "teamrun_list_messages", "teamrun_list_approvals", "teamrun_list_providers",

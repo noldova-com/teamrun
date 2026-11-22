@@ -13,16 +13,20 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
-  OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
+  Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageSender, MessageStatus, MethodName, Organization,
+  OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate, TeammateIdParams, TeammateLastReply,
+  TeammatePlacement, TeammateWork
 } from "@noldova/teamrun.protocol";
-import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
+import { DefaultTheme, SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
+import { FlowPoint } from "../../../../src/app/models/flow-point";
+import { TreeFlowLines } from "../../../../src/app/models/tree-flow-lines";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
+import { OrganizationFlowService } from "../../../../src/app/services/organization-flow.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
@@ -133,14 +137,39 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationLayoutRead)).toBe(1));
     await settle();
   };
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const asked = new Message("q1", "c9", 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, SampleData.timestamp, null, SampleData.timestamp);
+  const forwarded = new Message("q2", "c9", 0, MessageAuthor.User, null, MessageStatus.Completed, [], null, SampleData.timestamp, null, SampleData.timestamp, [],
+    null, null, [], new MessageSender("c8", "reviewer", "Code Reviewer"));
+  const answer = (id: string, to: Message, teammateId: string, status: MessageStatus): Message => {
+    const at = SampleData.timestamp;
+    const open = [MessageStatus.Pending, MessageStatus.Running, MessageStatus.AwaitingApproval].includes(status);
+    return new Message(id, "c9", 1, MessageAuthor.Provider, to.id, status, [], SampleData.provenance, at, status === MessageStatus.Pending ? null : at,
+      open ? null : at, [], teammateId, teammateId);
+  };
+  const flow = async (...messages: readonly Message[]): Promise<void> => {
+    for (const message of messages)
+      context.emit(EventName.MessageUpdated, message.toJson());
+    await settle();
+  };
+  const routes = (): string[] => all(".nol-teamrun-flow-overlay path").map(t => t.getAttribute("class") ?? "");
+  const pickView = async (label: string): Promise<void> => {
+    all(".top .views [role=radio]").find(t => t.textContent?.trim() === label)?.click();
+    await settle();
+  };
+  const end = async (selector: string): Promise<void> => {
+    one(`.nol-teamrun-flow-overlay ${selector}`).dispatchEvent(new AnimationEvent("animationend"));
+    await settle();
+  };
 
   beforeEach(() => page.viewport(1600, 1300));
 
   afterEach(async () => {
-    await page.viewport(viewport.width, viewport.height);
+    await page.viewport(viewportWidth, viewportHeight);
     AppearanceFixture.reset();
     TeammateStatusStoreService.release(context);
+    OrganizationFlowService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -546,6 +575,97 @@ describe("OrganizationViewComponent", () => {
 
     expect([before, editing, looks(), saves]).toEqual([["account_treeEdit structure", true, "false"], ["account_treeDone editing", false, "true"],
       ["account_treeEdit structure", true, "false"], []]);
+  });
+
+  it("draws a message on the Tree while it is written, a pulse once sent, then a glow on its receiver, and fades an answer that stops", async () => {
+    await create();
+    await flow(asked, answer("r0", asked, "nobody", MessageStatus.Pending), answer("r1", asked, "bob", MessageStatus.Pending));
+    const writing = routes();
+    const faint = getComputedStyle(one(".nol-teamrun-flow-overlay path"));
+    const look = [Number.parseFloat(faint.opacity) < 1, faint.strokeLinecap, faint.animationIterationCount];
+    await flow(answer("r1", asked, "bob", MessageStatus.Running));
+    const sent = [routes(), all(".nol-teamrun-flow-overlay .pulse").length];
+    await end(".pulse");
+    const arrived = [routes(), all(".nol-teamrun-flow-overlay .glow").length];
+    await end(".glow");
+    await flow(answer("r1", asked, "bob", MessageStatus.Failed));
+    const faded = routes();
+    await end("path.abandoned");
+
+    expect([writing, sent, arrived, faded]).toEqual([["route writing"], [["route sent", "route writing"], 1], [["route writing"], 1], ["route abandoned"]]);
+    expect(look).toEqual([true, "round", "infinite"]);
+    expect([routes(), all(".nol-teamrun-flow-overlay span")]).toEqual([[], []]);
+  });
+
+  it.each([ThemeMode.Light, ThemeMode.Dark])("draws a message being written in the default theme's %s mode at 3:1 or more against the Tree's background", async mode => {
+    AppearanceFixture.apply(DefaultTheme.theme, mode);
+    await create();
+    await flow(asked, answer("r1", asked, "bob", MessageStatus.Pending));
+    const dots = getComputedStyle(one(".nol-teamrun-flow-overlay .writing"));
+    const opaque = (view: Element | null): string => {
+      const paint = Object.isNull(view) ? "rgb(0, 0, 0)" : getComputedStyle(view).backgroundColor;
+      return Object.isNull(view) || !/^rgba\(.*, 0\)$|^transparent$/u.test(paint) ? paint : opaque(view.parentElement);
+    };
+    const background = opaque(one(".chart .tree"));
+    const channels = (color: string): number[] => (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(t => Number(t));
+    const opacity = Number.parseFloat(dots.opacity);
+    const seen = channels(dots.stroke).map((t, i) => Math.round(t * opacity + (channels(background).at(i) ?? 0) * (1 - opacity)));
+
+    expect(dots.stroke).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "accent"));
+    expect(AppearanceFixture.contrast(`rgb(${seen.join(", ")})`, background)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("draws no message on the Board, none while its setting is off, and none while motion is reduced", async () => {
+    await create(t => t.changeSetting(Resources.organizationMessageFlowSetting, false));
+    await flow(asked, answer("r1", asked, "bob", MessageStatus.Running));
+    const off = routes();
+    context.changeSetting(Resources.organizationMessageFlowSetting, true);
+    await flow(answer("r2", asked, "alice", MessageStatus.Running));
+    const on = routes();
+    await pickView("Board");
+    const board = all(".nol-teamrun-flow-overlay").length;
+    await pickView("Tree");
+    let reduced: string[] = [];
+    try {
+      await EmulatedMediaFixture.emulateAsync("prefers-reduced-motion", "reduce");
+      await flow(answer("r3", asked, "bob", MessageStatus.Running));
+      reduced = routes();
+    }
+    finally {
+      await EmulatedMediaFixture.resetAsync();
+    }
+
+    expect([off, on, board, reduced]).toEqual([[], ["route sent", "route writing"], 0, []]);
+  });
+
+  it("ends the messages it can't draw, sent on the Board, in Focus or to a collapsed department's member, so the Tree shows none of them later", async () => {
+    const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
+    TestBed.overrideProvider(ClockService, { useValue: clock });
+    await create();
+    const flows = OrganizationFlowService.of(context, signal(false), clock);
+    const drawn = (): number => all(".nol-teamrun-flow-overlay path, .nol-teamrun-flow-overlay span").length;
+    const sendAndEnd = async (id: string): Promise<number[]> => {
+      await flow(asked, answer(id, asked, "bob", MessageStatus.Running), answer(id, asked, "bob", MessageStatus.Completed));
+      const shown = [drawn(), flows.flows().length];
+      clock.advance(Resources.organizationFlowPulseDuration + Resources.organizationFlowGlowDuration);
+      await settle();
+      return [...shown, flows.flows().length];
+    };
+    const toggle = (): HTMLElement => one(":scope > .department .department-toggle", department("Design"));
+    toggle().click();
+    await Wait.until(() => expect(saves).toHaveLength(1));
+    await pickView("Board");
+    await flow(asked, answer("r1", asked, "bob", MessageStatus.Running), answer("r1", asked, "bob", MessageStatus.Completed));
+    await pickView("Focus");
+    const focus = await sendAndEnd("r2");
+    await pickView("Tree");
+    const back = drawn();
+    const collapsed = await sendAndEnd("r3");
+    toggle().click();
+    await Wait.until(() => expect(toggle().getAttribute("aria-expanded")).toBe("true"));
+    await settle();
+
+    expect([focus, back, collapsed, card("Bob").isConnected, drawn()]).toEqual([[0, 4, 0], 0, [0, 2, 0], true, 0]);
   });
 
   describe("with its messages beside the tree", () => {
@@ -1228,6 +1348,91 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
+    it("routes a message along the lines from you down the bar, a department's stem and its report grid's bus to a member, and from a nested leader to that member past one side of the grid, a space-2 gap from the cards, into the head over it, with the pulse drawn over the cards", async () => {
+      await create();
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const tree = one(".chart .tree");
+      const scale = box(tree).width / TreeFlowLines.layoutWidthOf(tree);
+      const at = (x: number, y: number): FlowPoint => new FlowPoint(x, y);
+      const points = (): FlowPoint[] => (one(".nol-teamrun-flow-overlay path:last-of-type").getAttribute("d") ?? "").split(/[ML]/u).filter(t => t.trim().length > 0)
+        .map(t => t.trim().split(" ").map(u => Number.parseFloat(u)))
+        .map(t => at(box(tree).left + (t.at(0) ?? Number.NaN) * scale, box(tree).top + (t.at(1) ?? Number.NaN) * scale));
+      const expectRoute = (shown: readonly FlowPoint[], listed: readonly FlowPoint[]): void => {
+        const expected = listed.filter((point, i) => i === 0 || Math.hypot(point.x - (listed.at(i - 1)?.x ?? 0), point.y - (listed.at(i - 1)?.y ?? 0)) > 0.01);
+        expect(shown.length).toBe(expected.length);
+        expected.forEach((point, i) => {
+          AppearanceFixture.expectPixels(shown.at(i)?.x ?? Number.NaN, point.x);
+          AppearanceFixture.expectPixels(shown.at(i)?.y ?? Number.NaN, point.y);
+        });
+      };
+      const middle = (view: Element): number => box(view).left + box(view).width / 2;
+      const design = department("Design");
+      const ui = department("UI");
+      const kids = one(".chart .tree > .kids");
+      const stem = one(":scope > .stem", design);
+      const uiStem = one(":scope > .stem", ui);
+      const reports = one(":scope > .reports", design);
+      const bob = card("Bob");
+      const bus = box(reports).top + Number.parseFloat(getComputedStyle(reports, "::after").top) * scale;
+      const uiCard = one(":scope > .department", ui);
+      const alice = card("Alice");
+      const gap = AppearanceFixture.measureLook("space-2");
+      const cards = all(".chart nol-teamrun-organization-card, .chart .department").filter(t => t !== uiCard && t !== alice);
+      const crosses = (from: FlowPoint, to: FlowPoint, view: Element): boolean => {
+        const inside = box(view);
+        const across = Math.max(Math.min(from.x, to.x), inside.left + 1) < Math.min(Math.max(from.x, to.x), inside.right - 1)
+          || (from.x === to.x && from.x > inside.left + 1 && from.x < inside.right - 1);
+        const down = Math.max(Math.min(from.y, to.y), inside.top + 1) < Math.min(Math.max(from.y, to.y), inside.bottom - 1)
+          || (from.y === to.y && from.y > inside.top + 1 && from.y < inside.bottom - 1);
+        return across && down;
+      };
+      const toBob = [at(middle(reports), box(reports).top), at(middle(reports), bus), at(middle(bob), bus), at(middle(bob), box(bob).top)];
+
+      await flow(asked, answer("r1", asked, "bob", MessageStatus.Pending));
+      const fromYou = points();
+      await flow(forwarded, answer("r2", forwarded, "bob", MessageStatus.Pending));
+      const fromReviewer = points();
+      const pulse = one(".nol-teamrun-flow-overlay .pulse");
+      const motion = pulse.getAnimations().at(0);
+      if (Object.isUndefined(motion))
+        throw new Error("The pulse doesn't move.");
+      motion.pause();
+      const layers = [".lines", ".pulse"].map(t => getComputedStyle(one(`.nol-teamrun-flow-overlay ${t}`)).zIndex);
+      const centreAt = (time: number): FlowPoint => {
+        motion.currentTime = time;
+        return at(box(pulse).left + box(pulse).width / 2, box(pulse).top + box(pulse).height / 2);
+      };
+      const pulseEnds = [centreAt(0), centreAt(Resources.organizationFlowPulseDuration)];
+      await end(".pulse");
+      const overlay = getComputedStyle(one(".nol-teamrun-flow-overlay"));
+
+      expectRoute(fromYou, [at(middle(kids), box(kids).top), at(middle(kids), box(design).top), at(middle(design), box(design).top),
+        at(middle(design), box(one(":scope > .department", design)).top), at(middle(stem), box(stem).top), at(middle(stem), box(card("Alice")).top), ...toBob]);
+      expectRoute(pulseEnds, [fromReviewer.at(0) ?? at(Number.NaN, Number.NaN), fromReviewer.at(-1) ?? at(Number.NaN, Number.NaN)]);
+      expectRoute(fromReviewer, [at(middle(uiStem), box(card("Code Reviewer")).top), at(middle(uiStem), box(uiStem).top),
+        at(middle(uiCard), box(uiCard).top + gap), at(box(bob).left - gap, box(uiCard).top + gap), at(box(bob).left - gap, box(reports).top - gap),
+        at(middle(reports), box(reports).top - gap), ...toBob]);
+      const head = box(alice);
+      const joins = [box(bob).left - gap, middle(reports)];
+      expect([box(bob).left - gap > box(uiCard).left, box(reports).top - gap > head.top, box(reports).top - gap < head.bottom,
+        joins.every(t => t > head.left && t < head.right)]).toEqual([true, true, true, true]);
+      expect(fromReviewer.slice(1).flatMap((point, i) => cards.filter(t => crosses(fromReviewer.at(i) ?? point, point, t)).map(t => (t.textContent ?? "").trim().slice(0, 12))))
+        .toEqual([]);
+      await Wait.until(() => {
+        const glow = box(one(".nol-teamrun-flow-overlay .glow"));
+        AppearanceFixture.expectPixels(glow.left, box(bob).left);
+        AppearanceFixture.expectPixels(glow.top, box(bob).top);
+        AppearanceFixture.expectPixels(glow.width, box(bob).width);
+        AppearanceFixture.expectPixels(glow.height, box(bob).height);
+      });
+      expect([overlay.pointerEvents, getComputedStyle(tree).isolation, layers]).toEqual(["none", "isolate", ["-1", "1"]]);
+    });
+
     it("lays your direct reports in a grid centred under you, above the departments, each card in a column of a member's width", async () => {
       await create(() => {
         organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
@@ -1422,6 +1627,46 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(fay.left, bea.left);
       AppearanceFixture.expectPixels(eve.top - ada.bottom, space(3));
       AppearanceFixture.expectPixels(dee.right - ada.left, box(reports).width);
+    });
+
+    it("routes a message to a report below the grid's first row along the bus and down the column gap beside it, a space-2 gap from the cards on either side", async () => {
+      const named = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
+      const team = [named("fay", "Fay"), named("ada", "Ada"), named("eve", "Eve"), named("bea", "Bea"), named("dee", "Dee"), named("cy", "Cy")];
+      await create(t => {
+        organization = SampleData.organizationOf([], team.map((u, i) => new TeammatePlacement(u.id, OrganizationParent.person, i)));
+        t.answer(MethodName.TeammateList, () => team.map(u => u.toJson()));
+      });
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const tree = one(".chart .tree");
+      const scale = box(tree).width / TreeFlowLines.layoutWidthOf(tree);
+      const reports = one(".chart .tree > .reports");
+      const middle = box(reports).left + box(reports).width / 2;
+      const bus = box(reports).top + Number.parseFloat(getComputedStyle(reports, "::after").top) * scale;
+      const gap = AppearanceFixture.measureLook("space-2");
+      const eve = box(card("Eve"));
+      const fay = box(card("Fay"));
+      const bea = box(card("Bea"));
+
+      await flow(asked, answer("r1", asked, "fay", MessageStatus.Pending));
+      const shown = (one(".nol-teamrun-flow-overlay path").getAttribute("d") ?? "").split(/[ML]/u).filter(t => t.trim().length > 0)
+        .map(t => t.trim().split(" ").map(u => Number.parseFloat(u)))
+        .map(t => new FlowPoint(box(tree).left + (t.at(0) ?? Number.NaN) * scale, box(tree).top + (t.at(1) ?? Number.NaN) * scale));
+      const expected = [new FlowPoint(middle, box(reports).top), new FlowPoint(middle, bus), new FlowPoint(bea.left - gap, bus),
+        new FlowPoint(bea.left - gap, fay.top + gap), new FlowPoint(fay.left + fay.width / 2, fay.top + gap)];
+
+      expect(shown.length).toBe(expected.length);
+      expected.forEach((point, i) => {
+        AppearanceFixture.expectPixels(shown.at(i)?.x ?? Number.NaN, point.x);
+        AppearanceFixture.expectPixels(shown.at(i)?.y ?? Number.NaN, point.y);
+      });
+      AppearanceFixture.expectPixels(fay.left - (bea.left - gap), gap);
+      AppearanceFixture.expectPixels(bea.left - gap - eve.right, gap);
     });
 
     it("hangs a teammate's reports and departments under its card at any depth, each card centred over its own, a department in a row below", async () => {

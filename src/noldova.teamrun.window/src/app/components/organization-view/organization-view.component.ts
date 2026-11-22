@@ -16,6 +16,7 @@ import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, Canva
   SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { FlowLineShape } from "../../enums/flow-line-shape";
 import { OrganizationViewMode } from "../../enums/organization-view-mode";
 import { OrganizationTargetKey } from "../../models/organization-target-key";
 import { OrganizationFocus } from "../../models/organization-focus";
@@ -23,9 +24,11 @@ import { OrganizationLayout } from "../../models/organization-layout";
 import { OrganizationTargetChoice } from "../../models/organization-target-choice";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { OrganizationFlowService } from "../../services/organization-flow.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationScope } from "../../services/organization-scope";
 import { OrganizationStoreService } from "../../services/organization-store.service";
+import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
 import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
@@ -38,11 +41,12 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 
 @Component({
   selector: "nol-teamrun-organization-view",
-  imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, MenuComponent, MenuGroupComponent, MenuItemComponent,
-    MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationBoardComponent, OrganizationChatComponent, OrganizationChatsComponent,
-    OrganizationDepartmentComponent, OrganizationDropDirective, OrganizationFocusComponent, OrganizationTeammateSearchComponent, PopoverTriggerDirective, SelectComponent,
-    TeammateStatusComponent],
-  providers: [ChatStoreService.provider, OrganizationScope.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
+  imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, FlowOverlayComponent, MenuComponent, MenuGroupComponent,
+    MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationBoardComponent, OrganizationChatComponent,
+    OrganizationChatsComponent, OrganizationDepartmentComponent, OrganizationDropDirective, OrganizationFocusComponent, OrganizationTeammateSearchComponent,
+    PopoverTriggerDirective, SelectComponent, TeammateStatusComponent],
+  providers: [ChatStoreService.provider, OrganizationScope.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider,
+    OrganizationFlowService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
   styleUrls: ["../organization-tree.css", "./organization-view.component.css"]
@@ -54,6 +58,8 @@ export class OrganizationViewComponent {
   public readonly instance: InputSignal<string> = input<string>(Resources.organizationDocumentInstance);
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly lines: typeof FlowLineShape = FlowLineShape;
+  protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
   protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly below: OverlaySide = OverlaySide.below;

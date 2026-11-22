@@ -60,8 +60,10 @@ LICENSE file in the root directory of this source tree.
         @if (mode() === modes.Board) {
           <nol-teamrun-organization-board [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
         } @else {
-          <div class="tree">
-            <div class="owner" nolCanvasItem [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
+          <div class="tree" #flowArea>
+            <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
+            <div class="owner" nolCanvasItem [attr.data-flow-node]="resources.organizationFlowPersonKey" [attr.data-flow-shape]="lines.Root"
+              [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
               <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
               <div class="who">
                 <span class="name">{{ resources.organizationOwnerName }}</span>

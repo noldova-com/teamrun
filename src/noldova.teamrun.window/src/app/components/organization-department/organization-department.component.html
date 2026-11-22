@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 
 @if (node().teammate; as teammate) {
   <nol-teamrun-organization-card class="self" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="teammate.name" [teammate]="teammate" [editing]="editing()"
+    [attr.data-flow-node]="teammate.id" [attr.data-flow-parent]="flowParent()" [attr.data-flow-shape]="lines.Grid"
     [nolTeamrunOrganizationDrop]="node().key" [nolTeamrunOrganizationDropEditing]="editing()"
     [department]="department()" [nolPopoverTrigger]="selfDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
     [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(teammate.id))" />
@@ -15,7 +16,8 @@ LICENSE file in the root directory of this source tree.
   @if (node().reports.length > 0) {
     <div class="reports" [style.--nol-teamrun-organization-columns]="node().columns">
       @for (report of node().reports; track report.id) {
-        <nol-teamrun-organization-department class="report" [node]="report" [department]="department()" [editing]="editing()" (chosen)="chosen.emit($event)" />
+        <nol-teamrun-organization-department class="report" [node]="report" [department]="department()" [flowParent]="flowHead()" [editing]="editing()"
+          (chosen)="chosen.emit($event)" />
       }
     </div>
   }
@@ -25,12 +27,13 @@ LICENSE file in the root directory of this source tree.
   @if (node().departments.length > 0) {
     <div class="kids">
       @for (child of node().departments; track child.id) {
-        <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" (chosen)="chosen.emit($event)" />
+        <nol-teamrun-organization-department class="kid" [node]="child" [flowParent]="flowHead()" [editing]="editing()" (chosen)="chosen.emit($event)" />
       }
     </div>
   }
 } @else {
-  <div class="department" nolCanvasItem [nolTeamrunOrganizationDrop]="node().key" [nolTeamrunOrganizationDropEditing]="editing()">
+  <div class="department" nolCanvasItem [attr.data-flow-node]="flowKey()" [attr.data-flow-parent]="flowParent()" [attr.data-flow-shape]="lines.Bus"
+    [nolTeamrunOrganizationDrop]="node().key" [nolTeamrunOrganizationDropEditing]="editing()">
     @if (editing() && node().department; as department) {
       <div class="department-row">
         <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().name"
@@ -60,6 +63,7 @@ LICENSE file in the root directory of this source tree.
   @if (node().leader; as leader) {
     <div class="stem"></div>
     <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [teammate]="leader"
+      [attr.data-flow-node]="leader.id" [attr.data-flow-parent]="flowKey()" [attr.data-flow-shape]="lines.Stem"
       [nolTeamrunOrganizationDrop]="keyOf(leader)" [nolTeamrunOrganizationDropEditing]="editing()"
       [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
       [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(leader.id))" />
@@ -69,7 +73,8 @@ LICENSE file in the root directory of this source tree.
     @if (node().reports.length > 0) {
       <div class="reports" [style.--nol-teamrun-organization-columns]="node().columns">
         @for (report of node().reports; track report.id) {
-          <nol-teamrun-organization-department class="report" [node]="report" [department]="node().department" [editing]="editing()" (chosen)="chosen.emit($event)" />
+          <nol-teamrun-organization-department class="report" [node]="report" [department]="node().department" [flowParent]="flowHead()" [editing]="editing()"
+            (chosen)="chosen.emit($event)" />
         }
       </div>
     }
@@ -79,7 +84,7 @@ LICENSE file in the root directory of this source tree.
     @if (node().departments.length > 0) {
       <div class="kids">
         @for (child of node().departments; track child.id) {
-          <nol-teamrun-organization-department class="kid" [node]="child" [editing]="editing()" (chosen)="chosen.emit($event)" />
+          <nol-teamrun-organization-department class="kid" [node]="child" [flowParent]="flowHead()" [editing]="editing()" (chosen)="chosen.emit($event)" />
         }
       </div>
     }

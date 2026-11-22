@@ -161,6 +161,7 @@ export class Resources {
   public static readonly imageDocumentName: string = "teamrun.image";
   public static readonly noChatPlaceholderName: string = "teamrun.noChat";
   public static readonly imageOpenModeSetting: string = "teamrun.imageOpenMode";
+  public static readonly organizationMessageFlowSetting: string = "teamrun.organizationMessageFlow";
   public static readonly timeFormatSetting: string = "desktop.timeFormat";
   public static readonly dateTimeFormatSetting: string = "desktop.dateTimeFormat";
   public static readonly defaultTimeFormat: string = "h:mm a";
@@ -1225,6 +1226,21 @@ export class Resources {
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationPersonId: string = "person";
+  public static readonly organizationFlowPersonKey: string = "person";
+  public static readonly organizationFlowRemembered: number = 256;
+  public static readonly organizationFlowWritingDuration: number = 1200;
+  public static readonly organizationFlowPulseDuration: number = 900;
+  public static readonly organizationFlowGlowDuration: number = 1200;
+  public static readonly organizationFlowFadeDuration: number = 600;
+  public static readonly flowNodeSelector: string = "[data-flow-node]";
+  public static readonly flowKidSelector: string = ".kid";
+  public static readonly flowKidsSelector: string = ".kids";
+  public static readonly flowReportsSelector: string = ".reports";
+  public static readonly flowNodeData: string = "flowNode";
+  public static readonly flowParentData: string = "flowParent";
+  public static readonly flowShapeData: string = "flowShape";
+  public static readonly afterPseudo: string = "::after";
+  public static readonly borderBox: string = "border-box";
   public static readonly organizationEmpty: string = "No departments yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";
   public static readonly organizationCardsShowLabel: string = "Cards show";
@@ -2086,6 +2102,14 @@ export class Resources {
 
   public static formatNoticeNotPosted(kind: string, failure: string): string {
     return `TeamRun could not post a ${kind} notification: ${failure}.`;
+  }
+
+  public static formatOrganizationFlowDepartmentKey(departmentId: string): string {
+    return `department:${departmentId}`;
+  }
+
+  public static formatOrganizationFlowId(messageId: string, outbound: boolean): string {
+    return `${messageId}:${outbound ? "out" : "in"}`;
   }
 
   public static formatQualifiedName(name: string): string {
