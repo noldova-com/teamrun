@@ -113,6 +113,8 @@ export class ProtocolApiTests {
     Assert.isDefined(api.BackgroundTaskPage);
     Assert.isDefined(api.BackgroundTaskOutputPayload);
     Assert.isDefined(api.BackgroundTasksClearedPayload);
+    Assert.isDefined(api.MessageSendingPayload);
+    Assert.isDefined(api.MessageSendAbandonedPayload);
     Assert.isDefined(api.BackgroundTaskStatus);
     Assert.isDefined(api.MessageDelivery);
     Assert.isDefined(api.WaitingMessage);

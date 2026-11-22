@@ -38,6 +38,8 @@ import {
   MessageAuthor,
   MessageDetail,
   MessageIdParams,
+  MessageSendAbandonedPayload,
+  MessageSendingPayload,
   MessageSendParams,
   MessageSendResult,
   MessageSender,
@@ -423,6 +425,21 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
 
   public async sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult> {
     return this.sendMessageAsync(params, null, new SendAllowance(starts), undefined);
+  }
+
+  public announceSend(params: MessageSendParams): string | null {
+    const turn = Object.isNull(params.senderToken) ? undefined : this.state.turns.get(params.senderToken);
+    const teammateId = turn?.message.teammateId ?? null;
+    if (Object.isUndefined(turn) || Object.isNull(teammateId))
+      return null;
+    const sendId = Guid.createVersion7().toString();
+    this.events.publish(new Event(EventName.MessageSending,
+      new MessageSendingPayload(sendId, turn.message.conversationId, teammateId, params.conversationId).toJson()));
+    return sendId;
+  }
+
+  public abandonSend(sendId: string): void {
+    this.events.publish(new Event(EventName.MessageSendAbandoned, new MessageSendAbandonedPayload(sendId).toJson()));
   }
 
   public sendOutsideAsync(teammateId: string | null, text: string, label: string, chatId: string | null = null): Promise<string> {

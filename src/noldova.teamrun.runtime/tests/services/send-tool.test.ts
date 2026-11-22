@@ -35,6 +35,8 @@ export class SendToolTests {
       JSON.stringify(sends.sent.map(([t, starts]) => [t.chatId, t.text, t.mentionedTeammateIds, t.senderToken, t.requested, t.responderTeammateId,
         t.wakeWhenDone, starts])));
     Assert.areEqual(2, sends.described.length);
+    Assert.areEqual("c2 token-1", sends.announced.map(t => `${t.chatId} ${t.senderToken}`).join(","));
+    Assert.areEqual(0, sends.abandoned.length);
     Assert.isTrue(call.hasMarkedSending);
     Assert.areEqual(JSON.stringify(sends.result.toJson()), result.content[0]!.value);
     Assert.areEqual("teamrun:teamrun_send_message", result.content[0]!.origin);
@@ -58,6 +60,18 @@ export class SendToolTests {
     }
 
     Assert.areEqual(0, sends.sent.length);
+    Assert.areEqual("send-1,send-2,send-3", sends.abandoned.join(","));
+  }
+
+  @TestMethod
+  public async abandonsNothingForASendCoreAnnouncedNothingFor(): Promise<void> {
+    const sends = new ScriptedSends(SendToolTests.askOf("Bo"));
+    sends.isAnnouncing = false;
+    const call = SendToolTests.callOf("s1", { chat_id: "c2", text: "Check this" }, new ScriptedPermissions(() => PermissionDecision.Denied));
+
+    await Assert.throwsAsync(() => SendToolTests.toolOf(sends).handleAsync(call), ToolFailureException);
+
+    Assert.areEqual("1 0", `${sends.announced.length} ${sends.abandoned.length}`);
   }
 
   @TestMethod
@@ -104,6 +118,7 @@ export class SendToolTests {
     Assert.areEqual("OutcomeUncertain teamrun.notFound No such chat.", `${missing.failure.code} ${missing.failure.moduleCode} ${missing.failure.message}`);
     Assert.areEqual(JSON.stringify([["c99", null]]), JSON.stringify(sends.sent.map(([t, starts]) => [t.chatId, starts])));
     Assert.areEqual(0, permissions.requests.length);
+    Assert.areEqual("c99:send-1", `${sends.announced.map(t => t.chatId).join(",")}:${sends.abandoned.join(",")}`);
   }
 
   private static askOf(starts: string): SendAsk {
@@ -134,7 +149,10 @@ class ScriptedSends implements ISenderSends {
   public readonly sent: [MessageSendParams, string | null][] = [];
   public readonly result: MessageSendResult = new MessageSendResult(new Message("m1", "c2", 0, MessageAuthor.User, null, MessageStatus.Completed, [], null,
     "2026-11-02T10:00:00.000Z", null, "2026-11-02T10:00:00.000Z"), []);
+  public readonly announced: MessageSendParams[] = [];
+  public readonly abandoned: string[] = [];
   public failure: unknown = null;
+  public isAnnouncing: boolean = true;
   private readonly asks: readonly (SendAsk | null)[];
 
   public constructor(...asks: (SendAsk | null)[]) {
@@ -149,5 +167,14 @@ class ScriptedSends implements ISenderSends {
   public sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult> {
     this.sent.push([params, starts]);
     return Object.isNull(this.failure) ? Promise.resolve(this.result) : Promise.reject(this.failure);
+  }
+
+  public announceSend(params: MessageSendParams): string | null {
+    this.announced.push(params);
+    return this.isAnnouncing ? `send-${this.announced.length}` : null;
+  }
+
+  public abandonSend(sendId: string): void {
+    this.abandoned.push(sendId);
   }
 }

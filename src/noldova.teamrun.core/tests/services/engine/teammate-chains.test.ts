@@ -44,6 +44,16 @@ import {
 import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 
+class SentTurn {
+  public readonly token: string | null;
+  public readonly replies: readonly string[];
+
+  public constructor(token: string | null, replies: readonly string[]) {
+    this.token = token;
+    this.replies = replies;
+  }
+}
+
 @TestClass
 export class TeammateChainsTests {
   private static readonly accept: ApprovalOption = new ApprovalOption("accept", "Allow", ApprovalOutcome.Approved, ApprovalScope.Once);
@@ -700,6 +710,39 @@ export class TeammateChainsTests {
     Assert.isTrue(lists.planned);
     Assert.areEqual(0, (await TeammateChainsTests.chatAsync(host, second.id)).length);
     Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
+  public async announcesATeammatesSendFromItsTurnByItsTokenAndAbandonsItByItsId(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const project = await host.openProjectAsync();
+    const first = await host.createConversationAsync(project);
+    const second = await host.createConversationAsync(project);
+    const third = await host.createConversationAsync(project);
+    const [alice] = await TeammateChainsTests.teamAsync(host, "Alice");
+    host.adapter.holdUntilAbort = true;
+    const tokenAfterAsync = async (send: MessageSendParams): Promise<SentTurn> => {
+      const before = host.adapter.requests.length;
+      const sent = await host.engine.sendAsync(send);
+      await host.adapter.requested(before + 1);
+      return new SentTurn(SenderEnvironment.read(host.adapter.requests.at(-1)?.environment ?? {}), sent.replies.map(t => t.id));
+    };
+    const alicesTurn = await tokenAfterAsync(new MessageSendParams(first.id, "@Alice start", null, null, [], [alice?.id ?? ""]));
+    const defaultTurn = await tokenAfterAsync(new MessageSendParams(third.id, "Tidy", new RequestedSettings("fake", null, null),
+      (await host.providerOfAsync()).id));
+    const sendTo = (senderToken: string | null): MessageSendParams => new MessageSendParams(second.id, "Done", null, null, [], [alice?.id ?? ""], null, senderToken);
+
+    const sendId = host.engine.announceSend(sendTo(alicesTurn.token));
+    host.engine.abandonSend("send-1");
+    const quiet = [host.engine.announceSend(sendTo(null)), host.engine.announceSend(sendTo("ended")), host.engine.announceSend(sendTo(defaultTurn.token))];
+    for (const reply of [...alicesTurn.replies, ...defaultTurn.replies])
+      await host.engine.cancelAsync(new MessageIdParams(reply));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(JSON.stringify([[EventName.MessageSending, { sendId, chatId: first.id, teammateId: alice?.id, toChatId: second.id }],
+      [EventName.MessageSendAbandoned, { sendId: "send-1" }]]),
+    JSON.stringify(host.listener.events.filter(t => t.name === EventName.MessageSending || t.name === EventName.MessageSendAbandoned).map(t => [t.name, t.payload])));
+    Assert.areEqual("null,null,null", quiet.map(String).join(","));
   }
 
   private static async teamAsync(host: CoreHost, ...names: string[]): Promise<Teammate[]> {
