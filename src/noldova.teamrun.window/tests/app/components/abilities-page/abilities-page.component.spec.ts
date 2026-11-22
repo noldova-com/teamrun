@@ -38,6 +38,7 @@ describe("AbilitiesPageComponent", () => {
   const untabled = new ProviderKind("old", "Old", true);
   let context: FakeWindowPartContext;
   let listed: readonly ProviderKind[] | null;
+  let reads: number;
   let fixture: ComponentFixture<AbilitiesPageComponent>;
 
   const element = (): HTMLElement => {
@@ -55,7 +56,9 @@ describe("AbilitiesPageComponent", () => {
   };
   const create = async (kinds: readonly ProviderKind[] | null, rows: boolean = false): Promise<void> => {
     listed = kinds;
+    reads = 0;
     context = SampleData.createContext().answer(MethodName.ProviderKindList, () => {
+      reads++;
       if (Object.isNull(listed))
         throw new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting.");
       return listed.map(t => t.toJson());
@@ -148,7 +151,7 @@ describe("AbilitiesPageComponent", () => {
     expect(element().querySelectorAll(".nol-teamrun-ability")).toHaveLength(0);
   });
 
-  it("says when the provider types failed to load, with Retry at the end of the provider row, and shows the abilities once a retry reads them", async () => {
+  it("says when the provider types failed to load, with Retry at the end of the provider row, and shows the abilities once a retry reads them, reading once for a second click", async () => {
     await create(null);
 
     await Wait.until(() => expect(texts(".nol-teamrun-kinds-failed .nol-teamrun-error-text")).toEqual([Resources.kindsUnavailableForAbilities]));
@@ -165,8 +168,11 @@ describe("AbilitiesPageComponent", () => {
     expect(message.right).toBeLessThanOrEqual(button.left + 0.5);
 
     listed = [cursor, pi];
+    const before = reads;
+    retry.click();
     retry.click();
     await Wait.until(() => expect(element().querySelectorAll(".nol-teamrun-ability")).toHaveLength(Object.values(ProviderAbility).length));
+    expect(reads).toBe(before + 1);
     expect(element().querySelector(".nol-teamrun-kinds-failed")).toBeNull();
     expect(texts("nol-select.nol-teamrun-abilities-kind .nol-select-button")[0]).toContain("Cursor");
   });
