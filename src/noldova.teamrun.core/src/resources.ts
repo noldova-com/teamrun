@@ -313,6 +313,7 @@ export class Resources {
   public static readonly gitObjectsDirectoryName: string = "objects";
   public static readonly gitBranchesPath: string = "refs/heads";
   public static readonly chatGitHead: string = "ref: refs/heads/main\n";
+  public static readonly chatGitHeadDraftFileName: string = "HEAD.teamrun";
   public static readonly chatGitConfig: string = "[core]\n\trepositoryformatversion = 0\n\tbare = false\n";
   public static readonly removeRetries: number = 3;
   public static readonly checkpointsDeleted: string = "Deleted";

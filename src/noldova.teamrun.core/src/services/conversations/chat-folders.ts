@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { access, cp, lstat, mkdir, readdir, readlink, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
@@ -14,6 +14,7 @@ import "@noldova/context.core";
 import { ErrorCode } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
+import { ChatFolderEntry } from "../../models/chat-folder-entry.js";
 import { Resources } from "../../resources.js";
 
 export class ChatFolders {
@@ -34,11 +35,14 @@ export class ChatFolders {
   public prepare(conversationId: string): string {
     const folder = this.pathOf(conversationId);
     const git = join(folder, Resources.gitDirectoryName);
-    if (!existsSync(join(git, Resources.gitHeadFileName))) {
+    const head = join(git, Resources.gitHeadFileName);
+    if (!existsSync(head)) {
       mkdirSync(join(git, Resources.gitObjectsDirectoryName), { recursive: true });
       mkdirSync(join(git, Resources.gitBranchesPath), { recursive: true });
       writeFileSync(join(git, Resources.gitConfigFileName), Resources.chatGitConfig);
-      writeFileSync(join(git, Resources.gitHeadFileName), Resources.chatGitHead);
+      const written = join(git, Resources.chatGitHeadDraftFileName);
+      writeFileSync(written, Resources.chatGitHead);
+      renameSync(written, head);
     }
     return folder;
   }
@@ -95,15 +99,15 @@ export class ChatFolders {
     rmSync(this.pathOf(conversationId), { recursive: true, force: true, maxRetries: Resources.removeRetries });
   }
 
-  private async entriesOfAsync(conversationId: string): Promise<readonly { readonly path: string; readonly isDirectory: boolean; readonly isLink: boolean }[]> {
+  private async entriesOfAsync(conversationId: string): Promise<readonly ChatFolderEntry[]> {
     const folder = this.pathOf(conversationId);
-    const entries: { readonly path: string; readonly isDirectory: boolean; readonly isLink: boolean }[] = [];
+    const entries: ChatFolderEntry[] = [];
     for (const name of await ChatFolders.namesOfAsync(folder)) {
       const top = await lstat(join(folder, name));
-      entries.push({ path: name, isDirectory: top.isDirectory(), isLink: top.isSymbolicLink() });
+      entries.push(new ChatFolderEntry(name, top.isDirectory(), top.isSymbolicLink()));
       if (top.isDirectory())
         for (const t of await readdir(join(folder, name), { recursive: true, withFileTypes: true }))
-          entries.push({ path: relative(folder, join(t.parentPath, t.name)), isDirectory: t.isDirectory(), isLink: t.isSymbolicLink() });
+          entries.push(new ChatFolderEntry(relative(folder, join(t.parentPath, t.name)), t.isDirectory(), t.isSymbolicLink()));
     }
     return entries;
   }
