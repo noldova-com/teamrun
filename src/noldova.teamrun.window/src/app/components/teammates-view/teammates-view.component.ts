@@ -50,7 +50,7 @@ import { TeammateDialogComponent } from "../teammate-dialog/teammate-dialog.comp
     ConfigurationTableFillDirective, ConfigurationTableRowActionsDirective, ConfigurationTableShareDirective, IconButtonComponent, TooltipDirective],
   providers: [ChatStoreService.provider, ComposerDefaultService.provider],
   templateUrl: "./teammates-view.component.html",
-  styleUrl: "../settings-view.css"
+  styleUrls: ["../settings-view.css", "../failure-row.css"]
 })
 export class TeammatesViewComponent {
   protected readonly resources: typeof Resources = Resources;

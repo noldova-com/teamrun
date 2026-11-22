@@ -31,7 +31,7 @@ import { ClockService } from "../../services/clock.service";
   imports: [ButtonComponent, ConfigurationTableActionDirective, ConfigurationTableComponent, ConfigurationTableDirective, ConfigurationTableFillDirective, ConfigurationTableRowActionsDirective],
   providers: [ChatStoreService.provider],
   templateUrl: "./outside-connection-view.component.html",
-  styleUrls: ["../settings-view.css", "./outside-connection-view.component.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css", "./outside-connection-view.component.css"]
 })
 export class OutsideConnectionViewComponent {
   protected readonly resources: typeof Resources = Resources;
