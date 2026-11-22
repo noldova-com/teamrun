@@ -612,7 +612,7 @@ describe("ProviderDialogComponent", () => {
     await settle();
 
     expect(hint()).toBe(Resources.profileHintFor("cursor", false, platform === "Win32"));
-    expect(hint()).toContain(`in your ${file}, outside the profile.`);
+    expect(hint()).toContain(`in your ${file}, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.`);
   });
 
   it("says in fx's hint that fx in TeamRun is the person's own, one provider per computer, signed in with fx login", async () => {

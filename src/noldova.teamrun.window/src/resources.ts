@@ -1701,7 +1701,7 @@ export class Resources {
       "OpenCode signs in in a terminal: after adding the provider, choose Sign in in its menu to run opencode auth login."],
     ["cursor", "Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder; your own Cursor setup stays separate. " +
       "Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile."],
+      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them."],
     ["fx", "Choose your own fx folder (the .fx folder in your home directory); fx in TeamRun uses your own fx, with its sign-in, settings, sessions and " +
       "MCP servers, whatever folder you choose, so TeamRun takes one fx provider per computer. fx signs in in a terminal: after adding the provider, choose " +
       "Sign in in its menu to run fx login, which signs in your own fx."],
@@ -1716,11 +1716,11 @@ export class Resources {
     ["cursor", "Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder. On this Mac, Cursor keeps its sign-in in " +
       "the keychain, shared with your own Cursor CLI: signing in here replaces your Cursor CLI's sign-in, and signing out signs it out too. Cursor signs " +
       "in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. Cursor in TeamRun also starts the " +
-      "MCP servers in your ~/.cursor/mcp.json, outside the profile."]]);
+      "MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them."]]);
   public static readonly windowsProfileHints: ReadonlyMap<string, string> = new Map([
     ["cursor", "Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder; your own Cursor setup stays separate. " +
       "Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile."]]);
+      "Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them."]]);
   public static readonly planChangeHints: ReadonlyMap<string, (profileDir: string | null) => string> = new Map([
     ["copilot", (profileDir: string | null) => Resources.formatCopilotPlanChange(profileDir)]
   ]);

@@ -290,14 +290,14 @@ describe("Resources", () => {
       "Choose an empty folder for this Antigravity profile, such as a new folder under profiles/antigravity in TeamRun's data folder. TeamRun installs Antigravity and signs it in with Google: choose Install here, then, after adding the provider, Sign in in its menu.");
     expect(Resources.profileHintFor("cursor")).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder; your own " +
       "Cursor setup stays separate. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile.");
+      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("cursor", true)).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data folder. " +
       "On this Mac, Cursor keeps its sign-in in the keychain, shared with your own Cursor CLI: signing in here replaces your Cursor CLI's sign-in, and signing " +
       "out signs it out too. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login for this profile. " +
-      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile.");
+      "Cursor in TeamRun also starts the MCP servers in your ~/.cursor/mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("cursor", false, true)).toBe("Choose an empty folder for this Cursor profile, such as profiles/cursor/default in TeamRun's data " +
       "folder; your own Cursor setup stays separate. Cursor signs in in a terminal: after adding the provider, choose Sign in in its menu to run cursor-agent login " +
-      "for this profile. Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile.");
+      "for this profile. Cursor in TeamRun also starts the MCP servers in your %USERPROFILE%\\.cursor\\mcp.json, outside the profile; Cursor CLI 2026.11.22 has no setting to skip them.");
     expect(Resources.profileHintFor("grok", true)).toBe(Resources.profileHintFor("grok"));
     expect(Resources.profileHintFor("grok", false, true)).toBe(Resources.profileHintFor("grok"));
     expect(Resources.profileHintFor("other")).toBe("Use the full path to the profile folder. Sign-in is managed by the provider's own application.");
