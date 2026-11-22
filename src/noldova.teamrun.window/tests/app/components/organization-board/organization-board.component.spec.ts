@@ -82,7 +82,7 @@ describe("OrganizationBoardComponent", () => {
     clock = new FakeClock(Date.parse(started) + 5 * 60_000);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
-    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
+    context.answer(MethodName.OrganizationList, () => [sample.toJson()]);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,

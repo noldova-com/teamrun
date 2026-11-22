@@ -66,7 +66,7 @@ describe("OrganizationStoreService", () => {
     const asked: string[] = [];
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("o2", "d1", "d2").toJson()]);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMove, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet,
-      MethodName.TeammatePlace])
+      MethodName.TeammatePlace, MethodName.NodeTypeUpdate, MethodName.NodeTypeDelete])
       context.answer(method, t => {
         asked.push(`${method} ${JSON.stringify(t)}`);
         return null;
@@ -76,12 +76,14 @@ describe("OrganizationStoreService", () => {
     const store = new OrganizationStoreService(context, scope);
     await Wait.until(() => expect(namesOf(store)).toBe("d1,d2"));
 
-    const done = [await store.createDepartment("Design"), await store.createDepartment("UI", OrganizationParent.teammate("t1"), "t2"),
+    const done = [await store.createDepartment("Design", "department"), await store.createDepartment("UI", "department", OrganizationParent.teammate("t1"), "t2"),
       await store.renameDepartment("d1", "Craft"), await store.setLeader("d1", "t1"), await store.setLeader("d1", null),
       await store.moveDepartment("d1", OrganizationParent.department("d2")), await store.placeTeammate("t1", OrganizationParent.department("d2")),
-      await store.placeTeammate("t1", null), await store.deleteDepartment("d1"), await store.setMember("t1", "d2"), await store.setMember("t1", null)];
+      await store.placeTeammate("t1", null), await store.deleteDepartment("d1"), await store.setMember("t1", "d2"), await store.setMember("t1", null),
+      await store.setDepartmentType("d2", "department"), await store.updateNodeType("department", "Team", undefined, "#1F8582"),
+      await store.updateNodeType("department", undefined, "groups", null), await store.deleteNodeType("department")];
 
-    expect([done, store.actionError()]).toEqual([new Array<boolean>(11).fill(true), null]);
+    expect([done, store.actionError()]).toEqual([new Array<boolean>(15).fill(true), null]);
     expect(asked).toEqual([
       `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"department","parent":{"kind":"Person","id":null},"leaderId":null}`,
       `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"UI","typeId":"department","parent":{"kind":"Teammate","id":"t1"},"leaderId":"t2"}`,
@@ -93,40 +95,38 @@ describe("OrganizationStoreService", () => {
       `${MethodName.TeammatePlace} {"organizationId":"o2","teammateId":"t1","parent":null,"order":9007199254740991}`,
       `${MethodName.DepartmentDelete} {"organizationId":"o2","departmentId":"d1"}`,
       `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":"d2"}`,
-      `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":null}`
+      `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":null}`,
+      `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d2","typeId":"department"}`,
+      `${MethodName.NodeTypeUpdate} {"organizationId":"o2","typeId":"department","name":"Team","color":"#1f8582"}`,
+      `${MethodName.NodeTypeUpdate} {"organizationId":"o2","typeId":"department","icon":"groups","color":null}`,
+      `${MethodName.NodeTypeDelete} {"organizationId":"o2","typeId":"department"}`
     ]);
   });
 
-  it("makes a Department type first when the organization has no node type, and makes no department when that fails", async () => {
+  it("makes a node type with its custom color in lowercase and returns it, or says why it failed and returns none", async () => {
     const asked: string[] = [];
-    const untyped = new Organization("o2", "o2", null, 0, "c", "u", [], [], []);
     let created: () => JsonValue = () => {
       throw new RuntimeRequestException(FailureCode.Internal, "The disk is full.");
     };
-    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [untyped.toJson()])
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("o2", "d1").toJson()])
       .answer(MethodName.NodeTypeCreate, t => {
         asked.push(`${MethodName.NodeTypeCreate} ${JSON.stringify(t)}`);
         return created();
-      })
-      .answer(MethodName.DepartmentCreate, t => {
-        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
-        return null;
       });
     const scope = new OrganizationScope();
     scope.follow(signal("o2"));
     const store = new OrganizationStoreService(context, scope);
-    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+    await Wait.until(() => expect(namesOf(store)).toBe("d1"));
 
-    const failed = await store.createDepartment("Design");
+    const failed = await store.createNodeType("Team", "groups", "#1F8582");
     const said = store.actionError();
-    created = () => new NodeType("t9", "Department", null, null, "c", "u").toJson();
-    const made = await store.createDepartment("Design");
+    created = () => new NodeType("t9", "Team", "groups", "#1f8582", "c", "u").toJson();
+    const made = await store.createNodeType("Team", null, null);
 
-    expect([failed, said, made, store.actionError()]).toEqual([false, "The disk is full.", true, null]);
+    expect([failed, said, made?.id, store.actionError()]).toEqual([null, "The disk is full.", "t9", null]);
     expect(asked).toEqual([
-      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
-      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
-      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Team","icon":"groups","color":"#1f8582"}`,
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Team","icon":null,"color":null}`
     ]);
   });
 

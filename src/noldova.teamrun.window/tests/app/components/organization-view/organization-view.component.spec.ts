@@ -838,7 +838,7 @@ describe("OrganizationViewComponent", () => {
       await create();
       const shown = [one("aside.messages .to-label").textContent?.trim(), select().querySelector(".nol-select-button")?.getAttribute("aria-label"), chosenLabel()];
 
-      const offered = await pickAsync("UI (department)");
+      const offered = await pickAsync("UI (Department)");
       const ui = [heading(), chosenLabel()];
       await pickAsync("All leaders and your direct reports");
       const leaders = [heading(), chosenLabel()];
@@ -847,9 +847,9 @@ describe("OrganizationViewComponent", () => {
       await userEvent.click(one(".name", card("Offline")));
       await settle();
 
-      expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
-        ["All leaders and your direct reports", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
-        [["Chat with UI"], "UI (department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
+      expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (Department)", "Design (Department)"],
+        ["All leaders and your direct reports", "Everyone", "Design (Department)", "Alice (leads Design)", "Bob", "UI (Department)", "Code Reviewer (leads UI)", "Build (Department)", "Offline"],
+        [["Chat with UI"], "UI (Department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
     });
 
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
@@ -1038,7 +1038,7 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-confirm");
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
       await closeOptionsAsync();
-      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       const label = one(".remove", card("Bob")).getAttribute("aria-label");
       one(".top .edit").click();
       await settle();
@@ -1046,7 +1046,7 @@ describe("OrganizationViewComponent", () => {
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
         ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob",
-        ["You", "Design (department)", "Alice", "UI (department)", "Code Reviewer", "Build (department)", "Offline"], 0]);
+        ["You", "Design (Department)", "Alice", "UI (Department)", "Code Reviewer", "Build (Department)", "Offline"], 0]);
       expect(asked).toEqual([[MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }],
         [MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }]]);
     });
@@ -1219,10 +1219,10 @@ describe("OrganizationViewComponent", () => {
       const offered = await optionsAsync(one(":scope > .department .place-choice", department("UI")));
       await closeOptionsAsync();
       await chooseAsync(one(":scope > .department .place-choice", department("UI")), "Offline");
-      await chooseAsync(one(":scope > .department .place-choice", department("Design")), "UI (department)");
+      await chooseAsync(one(":scope > .department .place-choice", department("Design")), "UI (Department)");
       const refused = texts(".action-error");
 
-      expect([offered, refused, asked]).toEqual([["You", "Design (department)", "Alice", "Code Reviewer", "Bob", "Build (department)", "Offline"],
+      expect([offered, refused, asked]).toEqual([["You", "Design (Department)", "Alice", "Code Reviewer", "Bob", "Build (Department)", "Offline"],
         ["A teammate or department can't be under itself."],
         [[MethodName.DepartmentMove, { organizationId: "my-organization", departmentId: "ui", parent: { kind: "Teammate", id: "offline" }, order: Resources.organizationLastOrder }]]]);
     });
@@ -1293,7 +1293,7 @@ describe("OrganizationViewComponent", () => {
     it("says why a change failed until it is dismissed", async () => {
       await editAsync(() => Promise.reject(new Error("The runtime is busy.")));
 
-      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
       const role = one(".action-error").getAttribute("role");
       one(".dismiss").click();

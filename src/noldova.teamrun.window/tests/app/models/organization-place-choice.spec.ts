@@ -21,7 +21,7 @@ describe("OrganizationPlaceChoice", () => {
   it("lists you, then every place in the tree in its drawn order, a department's leader after it, but the node moved", () => {
     expect([OrganizationPlaceChoice.of(root, OrganizationParent.teammate("bea")).map(t => [t.key, t.label]),
       OrganizationPlaceChoice.of(root, OrganizationParent.department("design")).map(t => t.label)]).toEqual([
-      [["Person:", "You"], ["Department:design", "Design (department)"], ["Teammate:ada", "Ada"], ["Teammate:cy", "Cy"]],
+      [["Person:", "You"], ["Department:design", "Design (Department)"], ["Teammate:ada", "Ada"], ["Teammate:cy", "Cy"]],
       ["You", "Ada", "Bea", "Cy"]
     ]);
   });
