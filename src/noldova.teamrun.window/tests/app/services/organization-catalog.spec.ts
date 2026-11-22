@@ -9,7 +9,7 @@
 import type { JsonValue } from "@noldova/context.json";
 import { FailureCode } from "@noldova/desktop.protocol";
 import { RuntimeRequestException } from "@noldova/desktop.window";
-import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 import { OrganizationCatalog } from "../../../src/app/services/organization-catalog";
 import { Resources } from "../../../src/resources";
@@ -117,13 +117,17 @@ describe("OrganizationCatalog", () => {
     expect(catalog.organizations().find(t => t.id === "second")?.order).toBe(1);
   });
 
-  it("says why the listing failed, the runtime's request or an organization it can't read, and clears the failure once a listing succeeds", async () => {
+  it("says why the listing failed, the runtime's request, an organization it can't read or one that fails its own checks, and clears the failure once a listing succeeds", async () => {
     context = new FakeWindowPartContext().fail(MethodName.OrganizationList, "The runtime is gone.");
     const catalog = OrganizationCatalog.of(context);
     await Wait.until(() => expect(catalog.loadError()).toBe("The runtime is gone."));
     context.answer(MethodName.OrganizationList, () => [{ id: "broken" }]);
     await catalog.reload();
     const unreadable = catalog.loadError();
+    const invalid = { ...organizationOf("Design").toJson(), placements: [new TeammatePlacement("alice", OrganizationParent.department("gone"), 0).toJson()] };
+    context.answer(MethodName.OrganizationList, () => [invalid]);
+    await catalog.reload();
+    const unchecked = catalog.loadError();
     context.answer(MethodName.OrganizationList, () => [organizationOf("Design").toJson()]);
 
     context.emit(EventName.StateResyncRequested, null);
@@ -131,6 +135,8 @@ describe("OrganizationCatalog", () => {
     await Wait.until(() => expect(catalog.loadError()).toBeNull());
     expect(unreadable).toEqual(expect.any(String));
     expect(() => Organization.fromJson({ id: "broken" })).toThrow(unreadable ?? "no message");
+    expect(unchecked).toEqual(expect.any(String));
+    expect(() => Organization.fromJson(invalid)).toThrow(unchecked ?? "no message");
     expect(namesOf(catalog)).toBe("my-organization:Design");
   });
 
