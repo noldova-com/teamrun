@@ -21,7 +21,7 @@ export class NodeTypeTests {
 
     Assert.areEqual(JSON.stringify(json), JSON.stringify(NodeType.fromJson(json).toJson()));
     Assert.areEqual("n1,Team,groups,#1a2b3c,c,u", [value.id, value.name, value.icon, value.color, value.createdAt, value.updatedAt].join(","));
-    Assert.areEqual("Squad,,teal", [plain.name, plain.icon ?? "", plain.color].join(","));
+    Assert.areEqual(JSON.stringify(["Squad", null, "teal"]), JSON.stringify([plain.name, plain.icon, plain.color]));
     Assert.areEqual("$.input.name", Assert.throws(() => NodeType.fromJson({ ...json, name: " " }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.icon", Assert.throws(() => NodeType.fromJson({ ...json, icon: "Groups" }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.color", Assert.throws(() => NodeType.fromJson({ ...json, color: "#ABCDEF" }, "$.input"), JsonException).path);
@@ -82,6 +82,8 @@ export class NodeTypeTests {
     NodeType.validateIcon(null);
     NodeType.validateColor(null);
 
-    Assert.areEqual(",", [new NodeType("n1", "Team", null, null, "c", "u").icon ?? "", new NodeType("n1", "Team", null, null, "c", "u").color ?? ""].join(","));
+    const bare = new NodeType("n1", "Team", null, null, "c", "u");
+    Assert.isNull(bare.icon);
+    Assert.isNull(bare.color);
   }
 }
