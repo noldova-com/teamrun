@@ -35,6 +35,7 @@ import {
   MessagePageParams,
   MessageStatus,
   MethodName,
+  NodeType,
   Organization,
   OrganizationChat,
   OrganizationCreateParams,
@@ -2670,6 +2671,25 @@ describe("ProjectsViewComponent", () => {
       await createOrganization(t => t.answer(MethodName.ProjectsLayoutRead, () => ({ [Resources.collapsedProjectsField]: ["infra"] })));
 
       expect([names().includes("Mia"), organizationRow(infra).getAttribute("aria-expanded")]).toEqual([false, "false"]);
+    });
+
+    it("shows a department's type icon in its color before its name, centred on it, and no icon for a type without one", async () => {
+      await createOrganization();
+      const lab = new NodeType("lab", "Lab", "science", "teal", SampleData.timestamp, SampleData.timestamp);
+      context.emit(EventName.OrganizationChanged, new Organization(labs.id, labs.name, null, labs.order, SampleData.timestamp, SampleData.timestamp,
+        [SampleData.departmentType, lab], [new Department("research", "Research", lab.id, OrganizationParent.person, null, 0, "c", "u")], labs.placements).toJson());
+      await Wait.until(() => expect(organizationRow("Research").querySelector("nol-teamrun-organization-type-icon .material-symbols-rounded")?.textContent).toBe("science"));
+      const icon = part(organizationRow("Research"), "nol-teamrun-organization-type-icon .material-symbols-rounded");
+      const name = part(organizationRow("Research"), ".nol-teamrun-organization-name");
+      const probe = document.createElement("span");
+      probe.style.color = "var(--nol-swatch-teal)";
+      organizationRow("Research").append(probe);
+      const middle = (target: Element): number => (target.getBoundingClientRect().top + target.getBoundingClientRect().bottom) / 2;
+
+      expect(icon.getBoundingClientRect().right).toBeLessThanOrEqual(name.getBoundingClientRect().left);
+      AppearanceFixture.expectPixels(middle(icon), middle(name));
+      expect([getComputedStyle(icon).color, organizationRow("Marketing").querySelector("nol-teamrun-organization-type-icon .material-symbols-rounded")]).toEqual([getComputedStyle(probe).color, null]);
+      probe.remove();
     });
 
     it("collapses the group from its title, saving it", async () => {

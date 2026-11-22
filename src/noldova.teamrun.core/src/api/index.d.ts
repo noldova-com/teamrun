@@ -5327,6 +5327,16 @@ export declare class Resources {
   public static formatDraftFilesNotRemoved(conversationId: string, reason: string): string;
 
   /**
+   * Composes the log line for an event listener that threw; the hub goes on with the next listener.
+   */
+  public static formatEventListenerFailed(eventName: string, reason: string): string;
+
+  /**
+   * Composes the log line for a cleanup step after a chat's deletion that failed; the deletion stands and the next step runs.
+   */
+  public static formatDeleteCleanupFailed(reason: string): string;
+
+  /**
    * Composes the log line for a draft the start-up sweep could not read, naming the conversation by its id's last
    * `loggedIdLength` characters.
    */
@@ -8531,9 +8541,15 @@ export declare class ProvidersService implements IProvidersService {
 
 /**
  * The in-process event bus: the core publishes, the runtime subscribes. Listeners are called in
- * registration order, synchronously.
+ * registration order, synchronously; a listener that throws is logged and the next one still receives the event.
  */
 export declare class EventHub implements IEventSink {
+  /**
+   * Initializes the hub.
+   * @param log Where a listener's failure is written; the other listeners still receive the event.
+   */
+  public constructor(log?: ILog | null);
+
   /**
    * The number of active subscriptions.
    */
@@ -9885,7 +9901,8 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
  * `ArgumentException`, `ErrorCode.UnknownMethod` for a method outside the catalog, and
  * `ErrorCode.Internal` for anything else, with the error's message. A deleted conversation, on its
  * own or with its project, publishes `ConversationDeleted` for each, then a catalog change publishes
- * `StateInvalidated`. A teammate created with a context window, or updated so that its provider, model or window changes while it has one,
+ * `StateInvalidated`; once the deletion is committed, each cleanup step after it runs on its own, and a step that fails is
+ * logged rather than failing the request. A teammate created with a context window, or updated so that its provider, model or window changes while it has one,
  * is first checked against the windows its provider's model catalog offers for the model, and refused with `ErrorCode.InvalidParams`
  * when the model offers none or the size is outside them.
  */
@@ -9908,6 +9925,7 @@ export declare class RequestDispatcher {
    * @param sharedServers The shared MCP server methods; without them the `SharedMcp` methods are unknown.
    * @param acpAgents The added ACP agents' methods; without them the `AcpAgent` and `AcpLocalCommand` methods are unknown.
    * @param organization The organization's methods; without them `OrganizationList` and the `Department` methods are unknown.
+   * @param log Where a failed cleanup step after a chat's deletion is written; the deletion still succeeds.
    */
   public constructor(
     kinds: IProviderKindsService,
@@ -9928,7 +9946,8 @@ export declare class RequestDispatcher {
     sharedServers?: ISharedMcpServersService | null,
     computerUseGrants?: IComputerUseGrantsService | null,
     acpAgents?: IAcpAgentsService | null,
-    organization?: IOrganizationService | null);
+    organization?: IOrganizationService | null,
+    log?: ILog | null);
 
   /**
    * Answers one request; never throws.
