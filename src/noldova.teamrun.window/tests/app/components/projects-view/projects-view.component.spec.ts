@@ -1069,10 +1069,10 @@ describe("ProjectsViewComponent", () => {
     expect(texts(".nol-teamrun-action .nol-teamrun-label")).toEqual([Resources.newConversationLabel, Resources.openProjectLabel, Resources.openBrowserLabel]);
   });
 
-  it("opens a new empty Browser tab in the links profile from Open browser, by mouse and by Enter and Space, one tab for each", async () => {
+  it("opens a new empty Browser tab in the person's own browsing from Open browser, by mouse and by Enter and Space, one tab for each", async () => {
     await create(withBrowser);
     const openBrowser = action(Resources.openBrowserLabel);
-    const opened = { name: Resources.browserOpenPageCommand, commandArguments: { profileKey: "links" } };
+    const opened = { name: Resources.browserOpenPageCommand, commandArguments: {} };
 
     await userEvent.click(openBrowser);
     expect(context.ranCommands).toEqual([opened]);

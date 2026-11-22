@@ -277,7 +277,7 @@ Product names and trademarks, such as the providers' names above, belong to thei
   A chat in the group drags, or moves with Move row up and down, to a new place in the group and not out of it.
   Each group's heading is a kit section header with its own icon, a pin for Pinned, folders for Projects and the chat icon for Chats.
   A heading's rows start their text at the heading label's edge, and their fill one row padding before it, running to the row's end; a project's chats start one step further in, and a project's twistie sits in the gutter, centred on the headings' icons.
-  Open browser, after Open folder and drawn as it is with the Browser's globe, runs `browser.openPage` with the profile `links` and no page, so each choice opens one more Browser tab on an empty page, whose address field the Browser focuses; the command `teamrun.openBrowser`, "Open browser", does the same from the window's one search, with no key.
+  Open browser, after Open folder and drawn as it is with the Browser's globe, runs `browser.openPage` with no profile and no page, so each choice opens one more Browser tab on an empty page in the person's own browsing, whose address field the Browser focuses; the command `teamrun.openBrowser`, "Open browser", does the same from the window's one search, with no key.
   Both are there only while the Browser module is on: the window part reads whether it is on as it starts, with `isDependencyActive`, then they go when Noldova Desktop says it went off or failed, and come back when it says it is on again.
   Chat titles are muted, and the marked or hovered one is in the full text colour; New chat, Open folder and Open browser keep their look.
   The headings use the kit section header's uppercase, smaller text, as `[uppercase]="true"` sets it.
@@ -1550,7 +1550,7 @@ This section is the design for TeamRun's MCP server: the server, the member toke
   So a tool's schema, deadline, limits, failures and permission requests are Noldova Desktop's, and MCP is only how a teammate reaches them.
 - Every teammate on every provider gets the server, the default teammate included; no switch turns it off.
 - A session lists TeamRun's own tools, Terminal's seven agent tools, computer use's thirteen, the Browser's eight, the Git module's eleven, `git_status`, `git_diff`, `git_log`, `git_branches`, `git_stage`, `git_unstage`, `git_create_branch`, `git_switch_branch`, `git_commit`, `git_push` and `git_pull`, and the GitHub module's three, `git_github_read`, `git_github_pr_checks` and `git_github_pr_create`, by their exact names, beside the provider's own shell tool, and refuses every other module's, one named like Terminal's or computer use's included.
-  The Browser's names are the ones browser 0.0.3 declares, and Git's the ones git 0.0.6 and git-github 0.0.6 declare, listed in `Resources.browserTools` and `Resources.gitTools`.
+  The Browser's names are the ones browser 0.0.6 declares, and Git's the ones git 0.0.6 and git-github 0.0.6 declare, listed in `Resources.browserTools` and `Resources.gitTools`.
   Computer use's names are the ones computer-use 0.0.2 declares; its runtime package exports no list of them, so `Resources.computerUseTools` lists them and a spec runs computer use's own runtime part to check that it registers exactly those.
   Computer use registers them only while its preview setting is on, and Noldova Desktop activates it only on the platforms its `module.json` declares, Windows and macOS, so with the setting off, or on Linux, a session lists none and refuses a call of one as not registered.
   Every Codex thread's config turns off Codex's own `features.computer_use` and `features.browser_use`, so the computer and browser-use tools a Codex teammate has are TeamRun's: Codex's own computer use needs the Codex desktop app, and on Windows it answered that its native pipe was unavailable.
@@ -1854,6 +1854,7 @@ Antigravity's ACP server 1.3.0 names it in `_meta.mcp` as `server` and `tool`, b
 - A question is an approval of the kind `ApprovalKind.Question`: its `questions` hold each question's id, header, text, options with their descriptions, and whether it takes several choices, the person's own text, or a secret.
   Its options are Answer and Skip, and `teamrun.approvalDecide` takes the answers with Answer: each question's choices and its own text.
 - The turn gets every answer, and the stored approval keeps the answers to the questions that aren't secret, so a secret answer never reaches the database, an event or `list-approvals`.
+  A question a turn posts, whose answer goes back as the chat's next message, keeps and sends only the answers that aren't secret, and an answer of secrets alone sends nothing.
 - A sub-agent's questions name it: the provider passes the sub-agent's description in the `QuestionAsk`, as Claude Code's and Codex's sub-agents do, and the approval's payload keeps it as `subAgent`, as an approval's does.
   The question card then says "<sub-agent> asks" under its heading, and the sub-agent's row shows it waits, as for an approval.
 - A Codex MCP tool call that needs approval reaches the person as a `Tool` approval.

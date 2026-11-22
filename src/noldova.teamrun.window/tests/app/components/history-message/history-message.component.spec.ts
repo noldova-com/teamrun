@@ -92,6 +92,7 @@ import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeInlineTerminals, FakeRunStarter } from "../../../fixtures/fake-inline-terminals.fixture";
 import { FlashCase } from "../../../fixtures/flash-case.fixture";
+import { FrameWait } from "../../../fixtures/frame-wait.fixture";
 import { ImageSize } from "../../../fixtures/image-size.fixture";
 import { LinkedFileCase } from "../../../fixtures/linked-file-case.fixture";
 import { MarkdownWait } from "../../../fixtures/markdown-wait.fixture";
@@ -786,22 +787,18 @@ describe("HistoryMessageComponent", () => {
 
       try {
         const waitStart = performance.now();
-        try {
-          await Wait.until(() => expect(frames.filter(t => t.shown === t.arrived).length).toBeGreaterThanOrEqual(2), { timeout: 1_000 + 2 * paced.loadedFrame });
-        }
-        catch (error) {
-          throw new PartReadError(`After ${Math.round(performance.now() - waitStart)} ms, ${frames.length} sampled frames, fewer than two showing all ${arrivedOf(40)} arrived characters; `
-            + `text ${JSON.stringify(visibleOf(view))}; highlights ${JSON.stringify([...CSS.highlights.keys()].map(name => [name, [...Required.of(CSS.highlights.get(name))].map(t => t.toString())]))}; `
-            + `frames as [ms from the wait, shown, arrived] ${JSON.stringify(frames.map(t => [Math.round(t.time - waitStart), t.shown, t.arrived]))}`, { cause: error });
-        }
+        await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(2), { timeout: FrameWait.hangGuard });
+        expect(frames.slice(0, 2).map(t => t.shown), `The first two sampled frames show all ${arrivedOf(40)} arrived characters, as the kit shows a working reply's first text at once; `
+          + `text ${JSON.stringify(visibleOf(view))}; highlights ${JSON.stringify([...CSS.highlights.keys()].map(name => [name, [...Required.of(CSS.highlights.get(name))].map(t => t.toString())]))}; `
+          + `frames as [ms from the wait, shown, arrived] ${JSON.stringify(frames.map(t => [Math.round(t.time - waitStart), t.shown, t.arrived]))}`).toEqual([arrivedOf(40), arrivedOf(40)]);
         for (const length of [140, 240, 340]) {
           rendered = undefined;
           await show(reply(length));
           rendered = arrivedOf(length);
           const sampled = frames.length;
-          await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(sampled + 6), { timeout: 1_000 + 6 * paced.loadedFrame });
+          await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(sampled + 6), { timeout: FrameWait.hangGuard });
         }
-        await Wait.until(() => expect(frames.at(-1)?.shown).toBe(frames.at(-1)?.arrived), { timeout: 5_000 });
+        await Wait.until(() => expect(frames.at(-1)?.shown).toBe(frames.at(-1)?.arrived), { timeout: FrameWait.hangGuard });
       }
       finally {
         cancelAnimationFrame(frame);

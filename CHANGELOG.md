@@ -64,6 +64,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Ending a shared MCP server on Windows:** when the launcher of a shared MCP server ends, what the server started is ended even when the PowerShell that lists it stalls, within seconds, rather than left running (#383).
 - **Ending a process tree on Windows:** a process whose end failed is ended again while the tree's listing still shows it, in each of the stop's ten rounds, rather than left running after its first end, and each end waits for the process to exit, all of a round's within two seconds (#344).
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
+- **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
 - **Chat folders:** a chat folder whose Git setup was cut short, such as by a full disk, is set up again on its next turn rather than left with a broken `HEAD` (#229).
 
 ### Changed
