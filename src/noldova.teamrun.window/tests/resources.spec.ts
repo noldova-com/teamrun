@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, NodeType, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
 import { TeammateStatus } from "../src/app/enums/teammate-status";
@@ -99,6 +99,13 @@ describe("Resources", () => {
   it("joins a teammate's role and department, leaving out what is missing, and gives nothing when both are", () => {
     expect([Resources.formatOrganizationRoleIn("Review", "Design"), Resources.formatOrganizationRoleIn("", "Design"), Resources.formatOrganizationRoleIn("Review", null),
       Resources.formatOrganizationRoleIn(null, null)]).toEqual(["Review · Design", "Design", "Review", null]);
+  });
+
+  it("names a unit with its type in a choice, or alone when it has none, and labels a type's edit button with its name", () => {
+    const team = new NodeType("team", "Team", null, null, "c", "u");
+
+    expect([Resources.formatOrganizationDepartmentOption("Design", team), Resources.formatOrganizationDepartmentOption("Design", null),
+      Resources.formatOrganizationEditType("Team")]).toEqual(["Design (Team)", "Design", "Edit Team"]);
   });
 
   it("asks before deleting a department or removing a member, saying where what it held goes", () => {

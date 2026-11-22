@@ -87,6 +87,14 @@ describe("OrganizationNode", () => {
       [["ui", "cy", ["eve"], 2, 2, 1, []]], 5, "You", "person"]);
   });
 
+  it("carries each department's type, none for a type the organization doesn't have, and none for the person", () => {
+    const organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("build", "Build", "gone", OrganizationParent.person, null, 1, "c", "u")], []);
+    const root = OrganizationNode.treeOf(organization, []);
+
+    expect([root.type, ...root.departments.map(t => t.type?.name ?? null)]).toEqual([null, "Department", null]);
+  });
+
   it("lifts the reports of a teammate it doesn't know to that teammate's place", () => {
     const organization = SampleData.organizationOf([], [new TeammatePlacement("gone", OrganizationParent.person, 0), new TeammatePlacement("ada", OrganizationParent.teammate("gone"), 0)]);
 
