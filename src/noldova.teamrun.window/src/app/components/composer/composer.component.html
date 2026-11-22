@@ -79,9 +79,12 @@ LICENSE file in the root directory of this source tree.
         <nol-field-message class="nol-teamrun-composer-files-refused">{{ resources.editingFilesRefused }}</nol-field-message>
       }
     }
+    @if (fanOut(); as shared) {
+      <p class="nol-teamrun-composer-note nol-teamrun-composer-reach" [id]="reachId">{{ shared.reach() }}</p>
+    }
     <textarea #box class="nol-teamrun-composer-text" name="text" rows="1" [nolMentionField]="candidates()"
       [nolMentionFieldLabel]="resources.mentionListLabel" [nolMentionValue]="value()" [placeholder]="resources.composerPlaceholder"
-      [attr.aria-label]="resources.composerLabel" [readonly]="!canCompose()" (nolMentionValueChange)="edit($event)" (keydown)="onKeyDown($event)"></textarea>
+      [attr.aria-label]="resources.composerLabel" [attr.aria-describedby]="isFanOut() ? reachId : null" [readonly]="!canCompose()" (nolMentionValueChange)="edit($event)" (keydown)="onKeyDown($event)"></textarea>
     <div #bar class="nol-teamrun-composer-bar">
       <button #add type="button" nol-icon-button class="nol-teamrun-composer-add" [icon]="resources.addGlyph" [label]="resources.addFilesLabel" [nolTooltip]="resources.addFilesLabel"
         [disabled]="!canCompose() || editing() !== null" (click)="filePicker.click()"></button>

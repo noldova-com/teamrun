@@ -74,7 +74,8 @@ export class OrganizationChatComponent {
   protected readonly recipients: Signal<readonly string[]> = computed(() =>
     this.organizations.organization().recipientsOf(this.target(), this.store.teammates().map(t => t.id)));
   protected readonly fanOutKey: Signal<string> = computed(() => Resources.formatOrganizationFanOutKey(this.organizations.id(), [...this.recipients()].sort()));
-  protected readonly fanOut: ComposerFanOut = new ComposerFanOut((text, settings, attachments, sources) => this.sendToEach(text, settings, attachments, sources));
+  protected readonly fanOut: ComposerFanOut = new ComposerFanOut((text, settings, attachments, sources) => this.sendToEach(text, settings, attachments, sources),
+    computed(() => Resources.formatOrganizationReach(this.recipients().length)));
   protected readonly rows: Signal<readonly OrganizationRecipientRow[]> = computed(() => this.recipients()
     .flatMap(id => this.store.teammates().filter(t => t.id === id)).map(teammate => {
     const chatId = this.chatOf(teammate.id);
