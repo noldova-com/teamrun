@@ -1997,9 +1997,11 @@ describe("OrganizationViewComponent", () => {
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const centre = (view: Element): number => box(view).left + box(view).width / 2;
       const nodeOf = (name: string): HTMLElement => Required.of(card(name).closest<HTMLElement>("nol-teamrun-organization-department"));
-      const editAsync = async (shown: Organization): Promise<void> => {
-        await create(() => {
+      const editAsync = async (shown: Organization, team: readonly Teammate[] = []): Promise<void> => {
+        await create(t => {
           organization = shown;
+          if (team.length > 0)
+            t.answer(MethodName.TeammateList, () => team.map(u => u.toJson()));
         });
         element().style.width = "72rem";
         element().style.height = "60rem";
@@ -2048,26 +2050,41 @@ describe("OrganizationViewComponent", () => {
           AppearanceFixture.expectPixels(box(view).left + Number.parseFloat(getComputedStyle(view, "::before").left), centre(one(":scope > .report > .self", view)));
       });
 
+      const bar = (view: Element): CSSStyleDeclaration => getComputedStyle(view, "::after");
+      const barStart = (view: Element): number => box(view).left + Number.parseFloat(bar(view).left);
+      const barEnd = (view: Element): number => box(view).right - Number.parseFloat(bar(view).right);
+      const barTop = (view: Element): number => box(view).top + Number.parseFloat(bar(view).top);
+
       it("draws a wide tree's bar from its first report's middle to its last's, each report drawing its own part without a break", async () => {
         await editAsync(wide);
         const reports = one(":scope > .reports", nodeOf("Alice"));
-        const [first, last] = all(":scope > .report", reports);
-        const part = (view: HTMLElement | undefined): [number, number, number] => {
-          const shown = Required.of(view);
-          const bar = getComputedStyle(shown, "::after");
-          return [box(shown).left + Number.parseFloat(bar.left), box(shown).right - Number.parseFloat(bar.right), box(shown).top + Number.parseFloat(bar.top)];
-        };
-        const [firstStart, firstEnd, firstTop] = part(first);
-        const [lastStart, lastEnd, lastTop] = part(last);
+        const first = one(":scope > .report:first-child", reports);
+        const last = one(":scope > .report:last-child", reports);
 
-        expect([first?.classList.contains("row-start"), last?.classList.contains("row-end"), getComputedStyle(Required.of(first), "::after").borderTopStyle])
-          .toEqual([true, true, "solid"]);
-        AppearanceFixture.expectPixels(firstStart, centre(card("Bob")));
-        AppearanceFixture.expectPixels(lastStart, firstEnd);
-        AppearanceFixture.expectPixels(lastEnd, centre(card("Code Reviewer")));
-        AppearanceFixture.expectPixels(firstTop, box(reports).top + AppearanceFixture.measureLook("space-3"));
-        AppearanceFixture.expectPixels(lastTop, firstTop);
+        expect([first.classList.contains("row-start"), last.classList.contains("row-end"), bar(first).borderTopStyle]).toEqual([true, true, "solid"]);
+        AppearanceFixture.expectPixels(barStart(first), centre(card("Bob")));
+        AppearanceFixture.expectPixels(barStart(last), barEnd(first));
+        AppearanceFixture.expectPixels(barEnd(last), centre(card("Code Reviewer")));
+        AppearanceFixture.expectPixels(barTop(first), box(reports).top + AppearanceFixture.measureLook("space-3"));
+        AppearanceFixture.expectPixels(barTop(last), barTop(first));
         expectAddsUnder(card("Alice"), one(":scope > .adds", nodeOf("Alice")));
+      });
+
+      it("joins only a grid's first row to the bar, drawing no line from the reports below it into the row gap", async () => {
+        const named = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
+        const team = [named("ada", "Ada"), named("bea", "Bea"), named("cy", "Cy"), named("dee", "Dee"), named("eve", "Eve"), named("fay", "Fay")];
+        await editAsync(SampleData.organizationOf([], team.map((t, i) => new TeammatePlacement(t.id, OrganizationParent.person, i))), team);
+        const reports = one(".chart .tree > .reports");
+        const shown = all(":scope > .report", reports);
+        const parts = shown.slice(0, 4);
+        const drawn = (line: CSSStyleDeclaration): boolean => line.display !== "none" && line.content !== "none";
+
+        expect(shown.map(t => `${drawn(getComputedStyle(t, "::before"))} ${drawn(bar(t))}`))
+          .toEqual(["true true", "true true", "true true", "true true", "false false", "false false"]);
+        expect(box(card("Eve")).top).toBeGreaterThan(box(card("Ada")).bottom);
+        AppearanceFixture.expectPixels(barStart(Required.of(parts.at(0))), centre(card("Ada")));
+        AppearanceFixture.expectPixels(barEnd(Required.of(parts.at(-1))), centre(card("Dee")));
+        parts.slice(1).forEach((view, i) => AppearanceFixture.expectPixels(barStart(view), barEnd(Required.of(parts.at(i)))));
       });
 
       it("puts a department's add row under its leader and yours above the departments, each joined to the line below", async () => {
