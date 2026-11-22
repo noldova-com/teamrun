@@ -11,8 +11,8 @@ import { TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { CommandRun, NotificationAction, QualifiedName } from "@noldova/desktop.protocol";
-import { LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
+import { CommandRun, FailureCode, NotificationAction, QualifiedName } from "@noldova/desktop.protocol";
+import { LinkPlace, RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AcpAgentEntry,
   AcpAgentIdParams,
@@ -179,6 +179,16 @@ describe("ChatStoreService", () => {
   const messages = (): readonly Message[] => store.history()?.held ?? [];
   const ids = (): string[] => messages().map(t => t.id);
   const heldOf = (conversationId: string): readonly Message[] => store.historyOf(conversationId)?.held ?? [];
+  const unhandled = (): unknown[] => {
+    const failures: unknown[] = [];
+    const record = (event: PromiseRejectionEvent): void => {
+      failures.push(event.reason);
+      event.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", record);
+    onTestFinished(() => window.removeEventListener("unhandledrejection", record));
+    return failures;
+  };
   const marks = (...instances: string[]): DocumentMark[] => instances.map(t => new DocumentMark(Resources.conversationDocumentName, t));
   const gone = (...conversationIds: string[]): void => void context.answer(MethodName.ConversationListMembers, t => {
     const conversationId = ConversationIdParams.fromJson(t).conversationId;
@@ -2751,6 +2761,19 @@ describe("ChatStoreService", () => {
     expect([store.isAwaitingApproval("c1"), store.isAwaitingAnswer("c1"), store.pendingApprovals().length]).toEqual([false, false, 0]);
   });
 
+  it("lets a reply summary's failure other than the runtime's or the answer's propagate", async () => {
+    const failures = unhandled();
+    const broken = new Error("broken");
+    context.answer(MethodName.ApprovalListPending, () => [new Approval("ap1", "m1", ApprovalKind.Command, "Bash", "Run", null, SampleData.approval.options,
+      ApprovalStatus.Pending, null, SampleData.timestamp, null).toJson()])
+      .answer(MethodName.MessageSummary, () => {
+        throw broken;
+      });
+    await store.initialize();
+
+    await Wait.until(() => expect(failures).toEqual([broken]));
+  });
+
   it("marks the chat of a reply it never saw running, as after a reload, from that reply's summary, asked once per reply, and none for a reply gone or a failed summary", async () => {
     const card = (id: string, messageId: string): Approval => new Approval(id, messageId, ApprovalKind.Command, "Bash", "Run", null, SampleData.approval.options,
       ApprovalStatus.Pending, null, SampleData.timestamp, null);
@@ -2760,7 +2783,7 @@ describe("ChatStoreService", () => {
       .answer(MethodName.MessageSummary, t => {
         const messageId = MessageIdParams.fromJson(t).messageId;
         if (messageId === "broken")
-          throw new Error("Summary failed");
+          throw new RuntimeRequestException(FailureCode.Internal, "Summary failed");
         return messageId === "gone" ? null : ReplySummary.fromMessage(ended(messageId, messageId === "m9" ? "c2" : "c3")).toJson();
       });
     await store.initialize();
@@ -3388,7 +3411,7 @@ describe("ChatStoreService", () => {
       await store.signInProvider("d1");
       expect(context.count(MethodName.ProviderSignIn)).toBe(1);
 
-      context.fail(MethodName.ProviderSignInCommand, "The runtime is older.");
+      context.disconnect(MethodName.ProviderSignInCommand, "The runtime is older.");
       await store.signInProvider("d1");
       expect(context.count(MethodName.ProviderSignIn)).toBe(2);
       expect(terminals.launches).toHaveLength(1);
@@ -3502,7 +3525,7 @@ describe("ChatStoreService", () => {
     });
 
     it("runs the kind's own sign-in command, with no notice, when the runtime can't name the copy, as an older runtime can't", async () => {
-      context.fail(MethodName.ProviderSignInCommand, "The runtime is older.");
+      context.disconnect(MethodName.ProviderSignInCommand, "The runtime is older.");
       await store.initialize();
 
       const signIn = store.signInProvider("c1");
@@ -3513,6 +3536,19 @@ describe("ChatStoreService", () => {
       expect([terminals.launches[0]?.request.environment, terminals.launches[0]?.request.command]).toEqual([
         { CLAUDE_CONFIG_DIR: "D:\\profiles\\claude\\Work" }, "claude auth login"]);
       expect(context.noticeText()).toBeNull();
+    });
+
+    it("reports a sign-in command read's failure other than the runtime's or the answer's, opening no terminal", async () => {
+      const broken = new Error("broken");
+      context.answer(MethodName.ProviderSignInCommand, () => {
+        throw broken;
+      });
+      await store.initialize();
+      const reported: string[] = [];
+
+      await store.signInProvider("c1", t => reported.push(t));
+
+      expect([reported, terminals.launches]).toEqual([["broken"], []]);
     });
 
     it("sets a kind's other sign-in variables to their folders inside the provider's folder, with the folder's own separator, and its sign-in values", async () => {
@@ -3575,13 +3611,42 @@ describe("ChatStoreService", () => {
         new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"])).toJson()]);
       context.answer(MethodName.ProviderList, () => [provider("c1", "claude", "/person/.claude").toJson()]);
       await store.initialize();
-      context.fail(MethodName.ProviderKindList, "The runtime is restarting.");
+      context.disconnect(MethodName.ProviderKindList, "The runtime is restarting.");
       const reported: string[] = [];
 
       await store.signInProvider("c1", t => reported.push(t));
 
       expect(reported).toEqual([Resources.signInKindsNotRead]);
       expect(terminals.launches).toHaveLength(0);
+    });
+
+    it("lets a sign-in's read of the provider types fail other than by the runtime or the answer, opening no terminal", async () => {
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("claude", "Claude Code", true, false, null,
+        new ProviderProfile("CLAUDE_CONFIG_DIR", "claude auth login", "/person/.claude", null, {}, {}, ["/person/.claude"])).toJson()]);
+      context.answer(MethodName.ProviderList, () => [provider("c1", "claude", "/person/.claude").toJson()]);
+      await store.initialize();
+      const broken = new Error("broken");
+      context.answer(MethodName.ProviderKindList, () => {
+        throw broken;
+      });
+
+      await expect(store.signInProvider("c1", () => undefined)).rejects.toBe(broken);
+
+      expect(terminals.launches).toHaveLength(0);
+    });
+
+    it("lets an added agent's sign-in command read fail other than by the runtime or the answer, signing nothing in", async () => {
+      context.answer(MethodName.ProviderKindList, () => [new ProviderKind("droid", "Droid", true, true).toJson()]);
+      context.answer(MethodName.ProviderList, () => [provider("d1", "droid", "D:\\profiles\\droid\\Work", AuthStatus.Unknown).toJson()]);
+      const broken = new Error("broken");
+      context.answer(MethodName.ProviderSignInCommand, () => {
+        throw broken;
+      });
+      await store.initialize();
+
+      await expect(store.signInProvider("d1", () => undefined, false)).rejects.toBe(broken);
+
+      expect([terminals.launches, context.count(MethodName.ProviderSignIn), store.signingIn().size]).toEqual([[], 0, 0]);
     });
 
     it("signs Claude Code in its usual folder in with the person's own environment, and one with its own folder with its folder named", async () => {
@@ -4256,6 +4321,16 @@ describe("ChatStoreService", () => {
     expect(store.isInstalled("antigravity")).toBe(true);
   });
 
+  it("lets an installations read's failure other than the runtime's or the answer's propagate", async () => {
+    await store.initialize();
+    const broken = new Error("broken");
+    context.answer(MethodName.ProviderKindInstallationList, () => {
+      throw broken;
+    });
+
+    await expect(store.refreshInstallations()).rejects.toBe(broken);
+  });
+
   it("lists the installations again on request and keeps the ones it has when that fails", async () => {
     let listed = 0;
     context.answer(MethodName.ProviderKindInstallationList, () =>
@@ -4264,7 +4339,7 @@ describe("ChatStoreService", () => {
     await store.refreshInstallations();
 
     expect(store.installations().get("antigravity")?.state).toBe(ProviderKindInstallState.Installed);
-    context.fail(MethodName.ProviderKindInstallationList, "The service stopped.");
+    context.disconnect(MethodName.ProviderKindInstallationList, "The service stopped.");
     await store.refreshInstallations();
     expect(store.installations().get("antigravity")?.state).toBe(ProviderKindInstallState.Installed);
   });
@@ -4516,12 +4591,50 @@ describe("ChatStoreService", () => {
     expect((await store.modelCatalogs.load("codex", null)).models.map(t => t.id)).toEqual(["gpt-5", "gpt-5-mini"]);
   });
 
+  it("lets a discard's failure other than the runtime's propagate", async () => {
+    const broken = new Error("broken");
+    context.answer(MethodName.AttachmentDiscard, () => {
+      throw broken;
+    });
+
+    await expect(store.discardAttachment(new MessageAttachment("lost.txt", "text/plain", 0, "D:/lost.txt"))).rejects.toBe(broken);
+  });
+
+  it("reads GitHub as signed out when the runtime can't say or its answer has no state, and lets any other failure propagate", async () => {
+    context.answerModule(Resources.gitHubReadSignInMethod, () => Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "No GitHub.")));
+    expect(await store.readGitHubSignedIn()).toBe(false);
+    const answers: JsonValue[] = [null, { [Resources.gitHubStateField]: "" }, { [Resources.gitHubStateField]: null }, { [Resources.gitHubStateField]: 3 }];
+    const signedIn: boolean[] = [];
+    for (const answer of answers) {
+      context.answerModule(Resources.gitHubReadSignInMethod, () => answer);
+      signedIn.push(await store.readGitHubSignedIn());
+    }
+    expect(signedIn).toEqual([false, false, false, false]);
+    const broken = new Error("broken");
+    context.answerModule(Resources.gitHubReadSignInMethod, () => {
+      throw broken;
+    });
+
+    await expect(store.readGitHubSignedIn()).rejects.toBe(broken);
+  });
+
+  it("reports a saved shared MCP secret's removal failure other than the runtime's in place of the refusal", async () => {
+    context.fail(MethodName.SharedMcpSecretSet, "The server doesn't name KEY.");
+    const broken = new Error("broken");
+    vi.spyOn(context.secrets, "removeAsync").mockRejectedValue(broken);
+    const reported: string[] = [];
+
+    expect(await store.saveSharedMcpSecret("docs", "KEY", "one", t => reported.push(t))).toBe(false);
+
+    expect(reported).toEqual(["broken"]);
+  });
+
   it("prepares and discards attachments through the runtime part", async () => {
     const prepared = await store.prepareAttachment(new AttachmentInput("notes.txt", "text/plain", "AA==", null));
     expect(prepared.path).toBe("D:/data/attachments/drafts/notes.txt");
     await store.discardAttachment(prepared);
     expect(context.parametersOf(MethodName.AttachmentDiscard)).toEqual(prepared.toJson());
-    context.fail(MethodName.AttachmentDiscard, "gone");
+    context.disconnect(MethodName.AttachmentDiscard, "gone");
     await expect(store.discardAttachment(new MessageAttachment("lost.txt", "text/plain", 0, "D:/lost.txt"))).resolves.toBeUndefined();
     expect(context.noticeText()).toBeNull();
   });
@@ -4747,17 +4860,43 @@ describe("ChatStoreService", () => {
 
     it("keeps a position whose save failed for the next save, and starts with none when the list can't be read", async () => {
       await store.initialize();
-      context.fail(MethodName.ReadingPositionSave, "offline");
+      context.disconnect(MethodName.ReadingPositionSave, "offline");
       store.rememberPosition("c1", new ReadingPosition("m2", 2, 8));
       await store.savePositions();
       keep(context);
       await store.savePositions();
       expect(stored.get("c1")?.messageId).toBe("m2");
 
-      context.fail(MethodName.ReadingPositionList, "offline");
+      context.disconnect(MethodName.ReadingPositionList, "offline");
       await restart();
       await store.selectConversation("c1");
       expect(store.pendingPosition()).toBeNull();
+    });
+
+    it("lets a position save's failure other than the runtime's propagate, keeping the position for the next save", async () => {
+      await store.initialize();
+      const broken = new Error("broken");
+      context.answer(MethodName.ReadingPositionSave, () => {
+        throw broken;
+      });
+      store.rememberPosition("c1", new ReadingPosition("m2", 2, 8));
+
+      await expect(store.savePositions()).rejects.toBe(broken);
+
+      keep(context);
+      await store.savePositions();
+      expect(stored.get("c1")?.messageId).toBe("m2");
+    });
+
+    it("shows the load's failure when the positions' list fails other than by the runtime or the answer", async () => {
+      const broken = new Error("broken");
+      context.answer(MethodName.ReadingPositionList, () => {
+        throw broken;
+      });
+
+      await store.initialize();
+
+      expect(context.shownNotices(Resources.loadFailedNotice).map(t => [t.title, t.text])).toEqual([[Resources.kindsNotLoaded, "broken"]]);
     });
 
     it("keeps a gone message's drop whose save failed for the next save, alongside a drop the window made meanwhile", async () => {
@@ -4765,7 +4904,7 @@ describe("ChatStoreService", () => {
       stored.set("c2", new ConversationPosition("c2", "x9", 9, 0));
       let release: () => void = () => undefined;
       context.answer(MethodName.ReadingPositionSave, () => new Promise((_, reject) => {
-        release = () => reject(new Error("offline"));
+        release = () => reject(new RuntimeRequestException(FailureCode.Disconnected, "offline"));
       }));
       await store.initialize();
       await store.selectConversation("c2");
@@ -4784,7 +4923,7 @@ describe("ChatStoreService", () => {
     it("puts back after a failed write only the chats the window didn't forget or drop meanwhile, so no delete follows a rewind or a gone message", async () => {
       let release: () => void = () => undefined;
       context.answer(MethodName.ReadingPositionSave, () => new Promise((_, reject) => {
-        release = () => reject(new Error("offline"));
+        release = () => reject(new RuntimeRequestException(FailureCode.Disconnected, "offline"));
       }));
       await store.initialize();
       store.rememberPosition("c1", new ReadingPosition("m3", 3, 5));
@@ -4805,7 +4944,7 @@ describe("ChatStoreService", () => {
     it("lets the save step wait for a write already under way, and write again what that write couldn't", async () => {
       let release: (failed: boolean) => void = () => undefined;
       context.answer(MethodName.ReadingPositionSave, () => new Promise((resolve, reject) => {
-        release = failed => failed ? reject(new Error("offline")) : resolve(null);
+        release = failed => failed ? reject(new RuntimeRequestException(FailureCode.Disconnected, "offline")) : resolve(null);
       }));
       await store.initialize();
       store.rememberPosition("c1", new ReadingPosition("m2", 2, 8));
@@ -4976,8 +5115,18 @@ describe("ChatStoreService", () => {
       expect(AcpAgentIdParams.fromJson(context.parametersOf(MethodName.AcpAgentIcon)).id).toBe("droid");
       context.answer(MethodName.AcpAgentIcon, () => null);
       expect(await store.readAcpAgentIcon("droid")).toBeNull();
-      context.fail(MethodName.AcpAgentIcon, "No icon.");
+      context.disconnect(MethodName.AcpAgentIcon, "No icon.");
       expect(await store.readAcpAgentIcon("droid")).toBeNull();
+    });
+
+    it("lets an icon read's failure other than the runtime's or the answer's propagate", async () => {
+      await store.initialize();
+      const broken = new Error("broken");
+      context.answer(MethodName.AcpAgentIcon, () => {
+        throw broken;
+      });
+
+      await expect(store.readAcpAgentIcon("droid")).rejects.toBe(broken);
     });
 
     it("adds an agent, reads the kinds again and starts its install", async () => {
@@ -5040,6 +5189,17 @@ describe("ChatStoreService", () => {
       expect(reported).toEqual(["The command can't be added.", "The command can't be added."]);
     });
 
+    it("reports a saved value's removal failure other than the runtime's in place of the refusal", async () => {
+      context.fail(MethodName.AcpLocalCommandAdd, "The command can't be added.");
+      await store.initialize();
+      const broken = new Error("broken");
+      vi.spyOn(context.secrets, "removeAsync").mockRejectedValue(broken);
+
+      expect(await store.addLocalAcpCommand("Tool", "tool", [], [new AcpLocalVariable("KEY", "one")], report)).toBe(false);
+
+      expect(reported).toEqual(["broken"]);
+    });
+
     it("forgets the values already saved when a later one can't be saved, and sends nothing", async () => {
       await store.initialize();
       const save = context.secrets.saveAsync.bind(context.secrets);
@@ -5077,11 +5237,24 @@ describe("ChatStoreService", () => {
       await Wait.until(() => expect([context.count(MethodName.ProviderKindList), context.count(MethodName.ProviderKindInstallationList)]).toEqual([kinds + 1, installs + 1]));
     });
 
+    it("lets a kinds read's failure other than the runtime's or the answer's propagate when the kinds change", async () => {
+      const failures = unhandled();
+      await store.initialize();
+      const broken = new Error("broken");
+      context.answer(MethodName.ProviderKindList, () => {
+        throw broken;
+      });
+
+      context.emit(EventName.ProviderKindsChanged, null);
+
+      await Wait.until(() => expect(failures).toEqual([broken]));
+    });
+
     it("keeps the kinds it has and still reads the installs when reading the kinds again fails", async () => {
       await store.initialize();
       const kinds = store.kinds();
       const installs = context.count(MethodName.ProviderKindInstallationList);
-      context.fail(MethodName.ProviderKindList, "The list failed.");
+      context.disconnect(MethodName.ProviderKindList, "The list failed.");
 
       context.emit(EventName.ProviderKindsChanged, null);
 
@@ -5113,7 +5286,7 @@ describe("ChatStoreService", () => {
 
     it("keeps the kinds a later read gave, and doesn't call them failed, when an earlier read fails after it", async () => {
       const race = await addDuringRead();
-      race.earlier.reject(new Error("The list failed."));
+      race.earlier.reject(new RuntimeRequestException(FailureCode.Internal, "The list failed."));
 
       expect(await race.added).toBe(true);
       expect([store.kindsFailed(), store.kinds().map(t => t.id)]).toEqual([false, ["codex", "acp:tool"]]);
@@ -5132,7 +5305,7 @@ describe("ChatStoreService", () => {
       await Wait.until(() => expect(context.count(MethodName.ProviderKindList)).toBe(reads + 2));
 
       later.resolve([SampleData.codex.toJson(), new ProviderKind("acp:tool", "Tool", true, true).toJson()]);
-      own.reject(new Error("The list failed."));
+      own.reject(new RuntimeRequestException(FailureCode.Internal, "The list failed."));
 
       expect(await added).toBe(true);
       expect([store.kindsFailed(), store.kinds().map(t => t.id), reported]).toEqual([false, ["codex", "acp:tool"], []]);
@@ -5318,7 +5491,7 @@ describe("ChatStoreService", () => {
     });
 
     it("keeps the window working when Core can't list usage", async () => {
-      context.fail(MethodName.PlanUsageList, "Not supported");
+      context.disconnect(MethodName.PlanUsageList, "Not supported");
       await store.initialize();
 
       await Wait.until(() => expect(context.count(MethodName.PlanUsageList)).toBe(1));
@@ -5327,13 +5500,38 @@ describe("ChatStoreService", () => {
       expect(store.conversations().map(t => t.id)).toEqual(["c1"]);
     });
 
+    it("lets a usage list's failure other than the runtime's or the answer's propagate", async () => {
+      const failures = unhandled();
+      const broken = new Error("broken");
+      context.answer(MethodName.PlanUsageList, () => {
+        throw broken;
+      });
+
+      await store.initialize();
+
+      await Wait.until(() => expect(failures).toEqual([broken]));
+    });
+
+    it("lets a plan read's failure other than the runtime's or the answer's propagate, and reads again after it", async () => {
+      await store.initialize();
+      const broken = new Error("broken");
+      context.answer(MethodName.PlanUsageRead, () => {
+        throw broken;
+      });
+
+      await expect(store.readPlanUsage("grok", null)).rejects.toBe(broken);
+      await expect(store.readPlanUsage("grok", null)).rejects.toBe(broken);
+
+      expect(context.count(MethodName.PlanUsageRead)).toBe(2);
+    });
+
     it("reads a reported plan once, reads again after nothing or a failure, and keeps quiet when the read fails", async () => {
       const reads: PlanUsageParams[] = [];
       context.answer(MethodName.PlanUsageRead, t => {
         const params = PlanUsageParams.fromJson(t);
         reads.push(params);
         if (params.kind === "grok")
-          throw new Error("offline");
+          throw new RuntimeRequestException(FailureCode.Disconnected, "offline");
         return params.kind === "codex" ? null : plan(12, "2026-10-22T09:00:00.000Z", params.providerId).toJson();
       });
       await store.initialize();
@@ -5737,7 +5935,7 @@ describe("ChatStoreService", () => {
     });
 
     it("posts providers that failed to load, at the start and on a resync, and loads them again from Try again", async () => {
-      context.fail(MethodName.ProviderKindList, "offline");
+      context.disconnect(MethodName.ProviderKindList, "offline");
       await store.initialize();
       expect(context.shownNotices(Resources.loadFailedNotice).map(t => [local(t.key), t.title, t.text])).toEqual([[Resources.kindsLoad, Resources.kindsNotLoaded, "offline"]]);
       expect(store.loaded()).toBe(false);

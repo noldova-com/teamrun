@@ -9,7 +9,7 @@
 import { type FactoryProvider, InjectionToken, type Signal, type WritableSignal, computed, inject, signal, untracked } from "@angular/core";
 
 import "@noldova/context.core";
-import { JsonReader, type JsonValue } from "@noldova/context.json";
+import { JsonException, JsonReader, type JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, NotificationSeverity, QualifiedName } from "@noldova/desktop.protocol";
 import { type IWindowPartContext, LinkPlace, RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import { type LaunchedTerminal, TerminalLaunch, TerminalLauncher, type TerminalShellKind } from "@noldova/terminal.window";
@@ -497,7 +497,8 @@ export class ChatStoreService {
     try {
       await this.request(MethodName.AttachmentDiscard, attachment.toJson());
     }
-    catch {
+    catch (error) {
+      ChatStoreService.rethrowUnlessRequest(error);
     }
   }
 
@@ -960,8 +961,9 @@ export class ChatStoreService {
       else
         this.upsertPlanUsage(PlanUsage.fromJson(read));
     }
-    catch {
+    catch (error) {
       this.planReads.delete(key);
+      ChatStoreService.rethrowUnlessRead(error);
     }
   }
 
@@ -1537,7 +1539,8 @@ export class ChatStoreService {
     try {
       return ChatStoreService.isGitHubSignedIn(await this.context.requestAsync(Resources.gitHubReadSignInMethod, null));
     }
-    catch {
+    catch (error) {
+      ChatStoreService.rethrowUnlessRead(error);
       return false;
     }
   }
@@ -1564,7 +1567,7 @@ export class ChatStoreService {
         await this.request(MethodName.SharedMcpSecretSet, new SharedMcpSecretSetParams(serverId, variable, reference).toJson());
       }
       catch (error) {
-        await this.context.secrets.removeAsync(reference).catch(() => undefined);
+        await this.context.secrets.removeAsync(reference).catch((cleanup: unknown) => ChatStoreService.rethrowUnlessRequest(cleanup));
         throw error;
       }
     }, report);
@@ -1583,7 +1586,7 @@ export class ChatStoreService {
     await this.attempt(async () => {
       const answer = await this.request(MethodName.AcpAgentIcon, new AcpAgentIdParams(id).toJson());
       icon = Object.isString(answer) ? answer : null;
-    }, () => undefined);
+    }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
     return icon;
   }
 
@@ -1611,7 +1614,7 @@ export class ChatStoreService {
         await this.request(MethodName.AcpLocalCommandAdd, new AcpLocalCommandAddParams(name, command, args, secrets).toJson());
       }
       catch (error) {
-        await Promise.all(saved.map(t => this.context.secrets.removeAsync(t).catch(() => undefined)));
+        await Promise.all(saved.map(t => this.context.secrets.removeAsync(t).catch((cleanup: unknown) => ChatStoreService.rethrowUnlessRequest(cleanup))));
         throw error;
       }
       await this.loadKinds(true);
@@ -1771,7 +1774,10 @@ export class ChatStoreService {
     opensTab: boolean = true): Promise<void> {
     const provider = this.providersSignal().find(t => t.id === providerId);
     const refreshing = Object.isUndefined(provider) ? null : this.refreshProfileOf(provider);
-    if (!Object.isNull(refreshing) && !await refreshing.then(() => true, () => false)) {
+    if (!Object.isNull(refreshing) && !await refreshing.then(() => true, (error: unknown) => {
+      ChatStoreService.rethrowUnlessRead(error);
+      return false;
+    })) {
       report(Resources.signInKindsNotRead);
       return;
     }
@@ -1913,7 +1919,7 @@ export class ChatStoreService {
     await this.attempt(async () => {
       const installations = ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson);
       this.installationsSignal.set(ChatStoreService.keyed(installations, t => t.kind));
-    }, () => undefined);
+    }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
   }
 
   public async cancelInstall(kind: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelInstall, kind)): Promise<void> {
@@ -1987,8 +1993,8 @@ export class ChatStoreService {
         if (!this.positions.has(stored.conversationId))
           this.positions.set(stored.conversationId, new ReadingPosition(stored.messageId, stored.sequence, stored.distance));
     }
-    catch {
-      return;
+    catch (error) {
+      ChatStoreService.rethrowUnlessRead(error);
     }
   }
 
@@ -2012,12 +2018,13 @@ export class ChatStoreService {
     try {
       await this.request(MethodName.ReadingPositionSave, new ReadingPositionSaveParams(positions, cleared, droppedPositions).toJson());
     }
-    catch {
+    catch (error) {
       for (const id of ids.filter(t => !this.forgottenPositions.has(t)))
         this.unsavedPositions.add(id);
       const newer = new Map(this.droppedPositions);
       dropped.forEach((position, id) => this.droppedPositions.set(id, position));
       newer.forEach((position, id) => this.droppedPositions.set(id, position));
+      ChatStoreService.rethrowUnlessRequest(error);
     }
   }
 
@@ -2150,7 +2157,7 @@ export class ChatStoreService {
       }
       case EventName.ProviderKindsChanged: {
         this.captureEvent(event, JSON.stringify([EventName.ProviderKindsChanged]));
-        void this.loadKinds(true).catch(() => undefined);
+        void this.loadKinds(true).catch((error: unknown) => ChatStoreService.rethrowUnlessRead(error));
         void this.refreshInstallations();
         break;
       }
@@ -2208,8 +2215,8 @@ export class ChatStoreService {
       this.chatContextsSignal.update(t => teammates.reduce((all, usage) =>
         ChatContext.merge(all, ChatContext.ofTeammate(usage, this.teammate(usage.teammateId)?.providerId ?? null)), t));
     }
-    catch {
-      return;
+    catch (error) {
+      ChatStoreService.rethrowUnlessRead(error);
     }
   }
 
@@ -2547,7 +2554,7 @@ export class ChatStoreService {
         const preview = ReplySummary.fromJson(value).preview;
         this.learnChats(new Map<string, string>().set(messageId, preview.conversationId));
         this.learnTeammates([preview]);
-      }, () => undefined)
+      }, (error: unknown) => ChatStoreService.rethrowUnlessRead(error))
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
@@ -3009,16 +3016,18 @@ export class ChatStoreService {
     const earlier = stops.get(key);
     const open = (): Promise<LaunchedTerminal> => launch instanceof Promise ? launch.then(t => this.terminals.openAsync(this.context, t)) :
       this.terminals.openAsync(this.context, launch);
-    const opening = Object.isUndefined(earlier) ? open() : earlier().then(open);
     let session: string | null = null;
-    void opening.then(t => {
+    const opening = (Object.isUndefined(earlier) ? open() : earlier().then(open)).then(t => {
       session = t.sessionId;
       this.terminalSessionsSignal.update(u => new Map(u).set(key, t.sessionId));
-    }, () => undefined);
+      return t;
+    });
     const stopped = new Promise<TerminalStep>(resolve => stops.set(key, async () => {
       resolve(TerminalStep.Stopped);
       await this.attempt(async () => {
-        await (await opening.catch(() => null))?.closeAsync();
+        for (const settled of await Promise.allSettled([opening]))
+          if (settled.status === "fulfilled")
+            await settled.value.closeAsync();
       }, report);
     }));
     const stop = stops.get(key);
@@ -3098,7 +3107,7 @@ export class ChatStoreService {
         resolved = new TerminalLaunch(launch.folder, { ...launch.environment, ...command.environment }, launch.notice, launch.title, command.command, launch.opensTab,
           launch.minimumRows, launch.shellKinds);
       }
-    }, () => undefined);
+    }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
     return resolved;
   }
 
@@ -3111,7 +3120,7 @@ export class ChatStoreService {
         launch = new TerminalLaunch(provider.profileDir, command.environment, Resources.terminalSignInNotice, Resources.formatTerminalSignInTitle(provider.label),
           command.command, opensTab, ChatStoreService.minimumRowsOf(opensTab), ChatStoreService.providerShellKinds());
       }
-    }, () => undefined);
+    }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
     return launch;
   }
 
@@ -3274,6 +3283,16 @@ export class ChatStoreService {
 
   private static messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private static rethrowUnlessRequest(error: unknown): void {
+    if (!(error instanceof RuntimeRequestException))
+      throw error;
+  }
+
+  private static rethrowUnlessRead(error: unknown): void {
+    if (!(error instanceof RuntimeRequestException || error instanceof JsonException || error instanceof ListNotArrayException))
+      throw error;
   }
 
   private static async unlessRefused(action: () => Promise<void>): Promise<void> {
