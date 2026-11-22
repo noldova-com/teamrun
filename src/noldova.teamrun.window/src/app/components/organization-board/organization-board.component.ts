@@ -29,6 +29,7 @@ import { TeammateStatusStoreService } from "../../services/teammate-status-store
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
@@ -37,8 +38,9 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, OrganizationCardComponent, OrganizationTeammateSearchComponent,
-    OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, OrganizationCardComponent, OrganizationDetailsComponent,
+    OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TeammateAvatarComponent,
+    TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
@@ -70,7 +72,10 @@ export class OrganizationBoardComponent {
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
-  protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
+  protected readonly led: Signal<readonly OrganizationNode[]> = computed(() => this.departments().filter(t => !Object.isNull(t.leader)));
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus([
     ...this.reports().map(t => new OrganizationBoardAsk(t, this.reportsToOf(t) ?? Resources.organizationReportsToYou, this.status(t))),
     ...this.departments().flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))

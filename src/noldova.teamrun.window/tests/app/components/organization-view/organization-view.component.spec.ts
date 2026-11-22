@@ -779,6 +779,19 @@ describe("OrganizationViewComponent", () => {
     };
     const chosenLabel = (): string => one(".nol-select-value", select()).textContent?.trim() ?? "";
 
+    it("says why a send failed once, in the panel, and not in the view's header", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create(context => context.answer(MethodName.OrganizationChatOpen, () => Promise.reject(new Error("The runtime is busy."))));
+
+      await userEvent.fill(one("aside.messages nol-teamrun-composer textarea"), "Status?");
+      await settle();
+      await userEvent.click(one("aside.messages .nol-teamrun-composer-send"));
+      await Wait.until(() => expect(texts("aside.messages nol-teamrun-organization-chat [role=alert]")).toEqual(["The runtime is busy."]));
+      await settle();
+
+      expect([texts("[role=alert]"), texts(".action-error")]).toEqual([["The runtime is busy."], []]);
+    });
+
     it("talks to the first department until a teammate's name or a department's Message is chosen, also while editing, but not by the rest of a card, Enter on it or its own buttons", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
@@ -1552,11 +1565,12 @@ describe("OrganizationViewComponent", () => {
 
       await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
-      const role = one(".action-error").getAttribute("role");
+      await settle();
+      const alerts = all("[role=alert]").map(t => t.matches(".action-error"));
       one(".dismiss").click();
       await settle();
 
-      expect([role, texts(".action-error")]).toEqual(["alert", []]);
+      expect([alerts, texts("[role=alert]")]).toEqual([[true], []]);
     });
   });
 

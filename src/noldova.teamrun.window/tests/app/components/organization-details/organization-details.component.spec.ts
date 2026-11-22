@@ -75,8 +75,10 @@ describe("OrganizationDetailsComponent", () => {
       throw new PartReadError(`${open.length} details are open.`);
     return found;
   };
-  const facts = (): DetailFact[] => all("dt", popover()).map(t => new DetailFact(t.textContent?.trim() ?? "",
-    t.nextElementSibling instanceof HTMLElement ? t.nextElementSibling.innerText.replace(/\s+/gu, " ").trim() : ""));
+  const facts = (): DetailFact[] => {
+    const values = all("dt + dd", popover());
+    return all("dt", popover()).map((t, index) => new DetailFact(t.textContent?.trim() ?? "", values[index]?.innerText.replace(/\s+/gu, " ").trim() ?? ""));
+  };
   const fact = (term: string): string | undefined => facts().find(t => t.term === term)?.value;
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
@@ -294,6 +296,37 @@ describe("OrganizationDetailsComponent", () => {
     expect(closed).toEqual([]);
   });
 
+  describe.each(["Board", "Focus"])("on the %s", view => {
+    const createIn = async (): Promise<void> => {
+      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
+      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
+    };
+
+    it("opens a card's details, the same as the Tree's, when the card takes the keyboard focus, and closes them when it loses it", async () => {
+      await createIn();
+
+      const details = await focus("Alice");
+      const opened = [details.getAttribute("role"), details.getAttribute("aria-label"), card("Alice").getAttribute("role"), card("Alice").getAttribute("aria-label"),
+        card("Alice").getAttribute("aria-expanded"), texts(".head .name", details), fact("Reports to")];
+      await blur();
+      await Wait.until(() => expect(card("Alice").getAttribute("aria-expanded")).toBe("false"));
+
+      expect(opened).toEqual(["dialog", "Alice's details", "group", "Alice", "true", ["Alice"], "You"]);
+    });
+
+    it("opens a card's details once the pointer rests on it, and closes them when it leaves the card and them", async () => {
+      await createIn();
+
+      await userEvent.hover(card("Code Reviewer"));
+      await Wait.until(() => expect(popovers()).toHaveLength(1));
+      const opened = [popover().getAttribute("aria-label"), document.activeElement === card("Code Reviewer")];
+      await userEvent.hover(one(".top"));
+      await Wait.until(() => expect(popovers()).toEqual([]));
+
+      expect(opened).toEqual(["Code Reviewer's details", false]);
+    });
+  });
+
   describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
@@ -302,6 +335,24 @@ describe("OrganizationDetailsComponent", () => {
     afterEach(() => AppearanceFixture.reset());
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
+
+    it.each(["Board", "Focus"])("keeps every card's details on the %s inside the window", async view => {
+      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
+      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
+      const outside: string[] = [];
+
+      for (const shown of all("nol-teamrun-organization-card")) {
+        TestBed.inject(FocusMonitor).focusVia(shown, "keyboard");
+        await settle();
+        await Wait.until(() => expect(popovers()).toHaveLength(1));
+        const box = popover().getBoundingClientRect();
+        if (box.left < 0 || box.top < 0 || box.right > window.innerWidth || box.bottom > window.innerHeight)
+          outside.push(popover().getAttribute("aria-label") ?? "");
+        await blur();
+      }
+
+      expect([all("nol-teamrun-organization-card").length > 1, outside]).toEqual([true, []]);
+    });
 
     it("hangs the details under the card at its start, and lays the head, the facts in two columns and what runs now inside its padding", async () => {
       await create(context => context
@@ -413,8 +464,9 @@ describe("OrganizationDetailsComponent", () => {
       expect(box(ago).bottom).toBeLessThanOrEqual(box(details).bottom);
     });
 
-    it("rings a card the keyboard reached in the accent's colour, inside its edge", async () => {
-      await create();
+    it.each(["Tree", "Board", "Focus"])("rings a card the keyboard reached on the %s in the accent's colour, inside its edge", async view => {
+      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
+      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
       const alice = card("Alice");
       alice.setAttribute("data-nol-state", "Focus");
       await settle();

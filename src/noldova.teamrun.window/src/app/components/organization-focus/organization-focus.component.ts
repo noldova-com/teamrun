@@ -32,6 +32,7 @@ import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.compone
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
@@ -39,7 +40,8 @@ import { OrganizationTypeIconComponent } from "../organization-type-icon/organiz
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, OrganizationCardComponent, OrganizationChatComponent,
-    OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
+    OrganizationDetailsComponent, OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent,
+    TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -63,6 +65,9 @@ export class OrganizationFocusComponent {
   protected readonly end: OverlayAlignment = OverlayAlignment.End;
   protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));

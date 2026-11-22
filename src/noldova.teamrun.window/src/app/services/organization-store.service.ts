@@ -50,6 +50,10 @@ export class OrganizationStoreService {
     OrganizationCatalog.release(context);
   }
 
+  public static messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
   public reload(): Promise<void> {
     return this.catalog.reload();
   }
@@ -117,13 +121,17 @@ export class OrganizationStoreService {
   public async openOrganizationChat(teammateId: string): Promise<Conversation | null> {
     this.actionErrorSignal.set(null);
     try {
-      return Conversation.fromJson(await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationChatOpen),
-        new OrganizationChat(this.id(), teammateId).toJson()));
+      return await this.requestOrganizationChat(teammateId);
     }
     catch (error) {
       this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
       return null;
     }
+  }
+
+  public async requestOrganizationChat(teammateId: string): Promise<Conversation> {
+    return Conversation.fromJson(await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationChatOpen),
+      new OrganizationChat(this.id(), teammateId).toJson()));
   }
 
   public clearActionError(): void {
@@ -156,9 +164,5 @@ export class OrganizationStoreService {
 
   private static unloaded(id: string): Organization {
     return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], [], []);
-  }
-
-  private static messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
   }
 }
