@@ -160,6 +160,11 @@ export class Chat {
       this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);
   }
 
+  public withoutOrganizationChat(): Chat {
+    return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, this.edited,
+      this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder);
+  }
+
   public asEdited(): Chat {
     return new Chat(this.id, this.projectId, this.title, this.createdAt, this.updatedAt, this.sessionReset, this.forkedSession, this.responder, true,
       this.folder, this.planFirst, this.approvedPlanTeammates, this.approvedResponderPlan, this.titleChosen, this.attachedFolder, this.organizationChat);

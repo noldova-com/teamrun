@@ -10,7 +10,7 @@ import { type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
 import type { IWindowPartContext } from "@noldova/desktop.window";
-import { EventName, MethodName, Organization, OrganizationIdParams } from "@noldova/teamrun.protocol";
+import { EventName, MethodName, Organization, OrganizationIdParams, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
@@ -79,6 +79,9 @@ export class OrganizationCatalog {
   private remove(organizationId: string): void {
     this.changes.set(organizationId, null);
     this.set(this.organizationsSignal().filter(t => t.id !== organizationId));
+    this.context.closeDocument(Resources.organizationDocumentName, organizationId);
+    if (organizationId === ProtocolResources.defaultOrganizationId)
+      this.context.closeDocument(Resources.organizationDocumentName, Resources.organizationOldDocumentInstance);
   }
 
   private set(organizations: readonly Organization[]): void {

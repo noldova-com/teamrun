@@ -14,7 +14,7 @@ import { ServiceException } from "@noldova/teamrun.services";
 import {
   Department, type DepartmentCreateParams, type DepartmentIdParams, type DepartmentMemberSetParams, type DepartmentMoveParams,
   type DepartmentUpdateParams, ErrorCode, Organization, type OrganizationCreateParams, OrganizationIdParams, type OrganizationLayoutSaveParams, OrganizationNodeKind,
-  OrganizationParent, type OrganizationUpdateParams, Teammate,
+  Chat, OrganizationParent, type OrganizationUpdateParams, Teammate,
   TeammatePlacement, type TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 
@@ -82,6 +82,12 @@ export class OrganizationService implements IOrganizationService {
       await transaction.executeAsync(new SqlQuery(Resources.deleteOrganizationDepartments, [organization.id]));
       for (const department of organization.departments)
         await feed.appendAsync(ChangeEntity.Department, department.id, ChangeOperation.Delete, JSON.stringify(department.toJson()), transaction);
+      for (const record of await transaction.queryAsync(new SqlQuery(Resources.selectOrganizationChats, [organization.id]))) {
+        const chat = Chat.fromJson(JsonReader.parse(record.readString(Resources.jsonColumn)).toJson()).withoutOrganizationChat();
+        const json = JSON.stringify(chat.toJson());
+        await transaction.executeAsync(new SqlQuery(Resources.updateConversation, [json, chat.updatedAt, chat.id]));
+        await feed.appendAsync(ChangeEntity.Chat, chat.id, ChangeOperation.Update, json, transaction);
+      }
       const layout = Resources.formatOrganizationLayoutPreference(organization.id);
       const previous = await this.readLayoutAsync(params, transaction);
       if (!Object.isNull(previous)) {

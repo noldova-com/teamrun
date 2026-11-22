@@ -7,7 +7,7 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
-import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent } from "@noldova/teamrun.protocol";
+import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { OrganizationCatalog } from "../../../src/app/services/organization-catalog";
 import { Resources } from "../../../src/resources";
@@ -51,6 +51,20 @@ describe("OrganizationCatalog", () => {
     context.emit(EventName.OrganizationRemoved, new OrganizationIdParams("never").toJson());
 
     expect([changed, namesOf(catalog)]).toEqual(["my-organization:Design+Web,second:,third:", "my-organization:Design+Web,third:"]);
+  });
+
+  it("closes a removed organization's view, and for the default organization its view under the old instance too", async () => {
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("Design").toJson(), named("second", 1, "c").toJson()]);
+    const catalog = OrganizationCatalog.of(context);
+    await Wait.until(() => expect(catalog.organizations().length).toBe(2));
+
+    context.emit(EventName.OrganizationRemoved, new OrganizationIdParams("second").toJson());
+    const second = [...context.closedDocuments];
+    context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(ProtocolResources.defaultOrganizationId).toJson());
+
+    expect(second).toEqual([{ name: Resources.organizationDocumentName, instance: "second" }]);
+    expect(context.closedDocuments.slice(1)).toEqual([{ name: Resources.organizationDocumentName, instance: ProtocolResources.defaultOrganizationId },
+      { name: Resources.organizationDocumentName, instance: Resources.organizationOldDocumentInstance }]);
   });
 
   it("reads the organizations again after a resync rather than trusting the events it may have missed", async () => {

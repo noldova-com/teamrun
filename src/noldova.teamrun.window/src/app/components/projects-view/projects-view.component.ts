@@ -25,6 +25,7 @@ import {
   MenuSeparatorComponent,
   MenuTriggerDirective,
   OverlaySide,
+  SectionHeaderActionDirective,
   SectionHeaderComponent,
   SpinnerComponent,
   TooltipDirective
@@ -41,17 +42,19 @@ import { ChatPlacement } from "../../services/chat-placement";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ConversationActions } from "../../services/conversation-actions";
+import { OrganizationActions } from "../../services/organization-actions";
 import { OrganizationCatalog } from "../../services/organization-catalog";
 import { ProjectsLayoutService } from "../../services/projects-layout.service";
 import { TimeFormatService } from "../../services/time-format.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { RenameDialogComponent } from "../rename-dialog/rename-dialog.component";
+import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 import { TreeItemDirective } from "./tree-item.directive";
 
 @Component({
   selector: "nol-teamrun-projects-view",
   imports: [CdkDrag, CdkDragHandle, CdkDropList, ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent,
-    MenuTriggerDirective, NgTemplateOutlet, SectionHeaderComponent, SpinnerComponent, TooltipDirective, TreeItemDirective],
+    MenuTriggerDirective, NgTemplateOutlet, SectionHeaderActionDirective, SectionHeaderComponent, SpinnerComponent, TeammateStatusComponent, TooltipDirective, TreeItemDirective],
   providers: [ChatStoreService.provider, ProjectsLayoutService.provider],
   templateUrl: "./projects-view.component.html",
   styleUrl: "./projects-view.component.css"
@@ -96,8 +99,7 @@ export class ProjectsViewComponent {
   protected readonly organizations: Signal<readonly OrganizationExplorer[]> = computed(() =>
     this.catalog.organizations().map(t => OrganizationExplorer.of(t, this.store.teammates())));
 
-  protected readonly hasOrganization: Signal<boolean> = computed(() =>
-    this.organizations().some(t => !t.isEmpty));
+  protected readonly hasOrganization: Signal<boolean> = computed(() => this.organizations().length > 0);
 
   private readonly organizationChats: Signal<ReadonlyMap<string, Conversation>> = computed(() => {
     const chats = new Map<string, Conversation>();
@@ -126,12 +128,43 @@ export class ProjectsViewComponent {
     return this.organizationChats().get(Resources.formatOrganizationChatKey(organizationId, teammate.id)) ?? null;
   }
 
-  protected async openTeammate(organizationId: string, teammate: Teammate): Promise<void> {
+  protected openTeammate(organizationId: string, teammate: Teammate): Promise<void> {
+    return this.withOrganizationChat(organizationId, teammate, t => this.open(t));
+  }
+
+  protected placeOf(organizationId: string, teammate: Teammate): string {
     const chat = this.chatOf(organizationId, teammate);
-    if (Object.isNull(chat))
-      await this.openOrganizationChat(organizationId, teammate.id);
-    else
-      this.open(chat);
+    const project = this.store.projects().find(t => t.id === chat?.projectId);
+    return chat?.attachedFolder ?? project?.rootPath ?? this.organizations().find(t => t.id === organizationId)?.folder ?? teammate.name;
+  }
+
+  protected teammateProjectOf(organizationId: string, teammate: Teammate): string | null {
+    return this.chatOf(organizationId, teammate)?.projectId ?? null;
+  }
+
+  protected teammateFolderOf(organizationId: string, teammate: Teammate): string | null {
+    return this.chatOf(organizationId, teammate)?.attachedFolder ?? null;
+  }
+
+  protected teammateProjectsOf(organizationId: string, teammate: Teammate): readonly Project[] {
+    const chat = this.chatOf(organizationId, teammate);
+    return Object.isNull(chat) ? this.orderedProjects() : this.otherProjectsOf(chat);
+  }
+
+  protected moveTeammateToProject(organizationId: string, teammate: Teammate, project: Project): Promise<void> {
+    return this.withOrganizationChat(organizationId, teammate, t => this.placement.moveToProject(t, project));
+  }
+
+  protected moveTeammateToFolder(organizationId: string, teammate: Teammate): Promise<void> {
+    return this.withOrganizationChat(organizationId, teammate, t => this.placement.moveToFolder(t));
+  }
+
+  protected attachTeammateFolder(organizationId: string, teammate: Teammate): Promise<void> {
+    return this.withOrganizationChat(organizationId, teammate, t => this.placement.attachFolder(t));
+  }
+
+  protected detachTeammateFolder(organizationId: string, teammate: Teammate): Promise<void> {
+    return this.withOrganizationChat(organizationId, teammate, t => this.placement.detachFolder(t));
   }
 
   protected isChatMarked(organizationId: string, teammate: Teammate): boolean {
@@ -143,17 +176,65 @@ export class ProjectsViewComponent {
     this.context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
   }
 
-  private async openOrganizationChat(organizationId: string, teammateId: string): Promise<void> {
+  protected createOrganization(): void {
+    const dialog = this.dialogs.open(RenameDialogComponent, ".nol-teamrun-rename-title");
+    dialog.componentRef?.setInput("initialTitle", String.empty);
+    dialog.componentRef?.setInput("heading", Resources.newOrganizationTitle);
+    dialog.componentRef?.setInput("fieldLabel", Resources.organizationNameFieldLabel);
+    dialog.componentRef?.setInput("maxLength", Resources.organizationNameMaxLength);
+    dialog.componentRef?.setInput("oneLine", true);
+    dialog.componentInstance?.answered.subscribe(name => {
+      dialog.close();
+      if (!Object.isNull(name))
+        void OrganizationActions.create(this.context, name);
+    });
+  }
+
+  protected renameOrganization(organization: OrganizationExplorer): void {
+    const dialog = this.dialogs.open(RenameDialogComponent, ".nol-teamrun-rename-title");
+    dialog.componentRef?.setInput("initialTitle", organization.name);
+    dialog.componentRef?.setInput("heading", Resources.renameOrganizationTitle);
+    dialog.componentRef?.setInput("fieldLabel", Resources.organizationNameFieldLabel);
+    dialog.componentRef?.setInput("maxLength", Resources.organizationNameMaxLength);
+    dialog.componentRef?.setInput("oneLine", true);
+    dialog.componentInstance?.answered.subscribe(name => {
+      dialog.close();
+      if (!Object.isNull(name))
+        void OrganizationActions.rename(this.context, organization.id, name);
+    });
+  }
+
+  protected async chooseOrganizationFolder(organization: OrganizationExplorer): Promise<void> {
+    const folder = await this.context.chooseFolderAsync();
+    if (!Object.isNull(folder))
+      await OrganizationActions.setFolder(this.context, organization.id, folder);
+  }
+
+  protected clearOrganizationFolder(organization: OrganizationExplorer): Promise<void> {
+    return OrganizationActions.setFolder(this.context, organization.id, null);
+  }
+
+  protected removeOrganization(organization: OrganizationExplorer): void {
+    this.confirm(new ConfirmRequest(Resources.deleteOrganizationTitle, Resources.formatDeleteOrganizationText(organization.name), Resources.organizationDeleteLabel, null, true),
+      () => OrganizationActions.remove(this.context, organization.id));
+  }
+
+  private async withOrganizationChat(organizationId: string, teammate: Teammate, use: (chat: Conversation) => void | Promise<void>): Promise<void> {
+    const known = this.chatOf(organizationId, teammate);
+    if (!Object.isNull(known)) {
+      await use(known);
+      return;
+    }
     let chat: Conversation;
     try {
       chat = Conversation.fromJson(await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationChatOpen),
-        new OrganizationChat(organizationId, teammateId).toJson()));
+        new OrganizationChat(organizationId, teammate.id).toJson()));
     }
     catch (error) {
       this.context.log(Resources.formatOrganizationChatNotOpened(String(error)));
       return;
     }
-    this.open(chat);
+    await use(chat);
   }
 
   protected isMarked(projectId: string): boolean {

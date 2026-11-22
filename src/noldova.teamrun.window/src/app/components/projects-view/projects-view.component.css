@@ -109,8 +109,15 @@ nol-section-header + p.nol-teamrun-row,
 }
 
 .nol-teamrun-project-row .nol-teamrun-twistie,
-.nol-teamrun-organization-row .nol-teamrun-twistie {
+.nol-teamrun-organization-row .nol-teamrun-twistie,
+.nol-teamrun-teammate-row .nol-teamrun-twistie {
   margin-inline: calc(-1 * var(--nol-teamrun-group-indent)) calc(var(--nol-space-2) - var(--nol-space-1));
+}
+
+.nol-teamrun-teammate-row .nol-teamrun-twistie {
+  justify-content: center;
+  inline-size: var(--nol-icon);
+  cursor: auto;
 }
 
 .nol-teamrun-muted {

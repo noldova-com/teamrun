@@ -2238,6 +2238,7 @@ export declare class Resources {
   /** Why a department naming itself as its parent is refused. */
   public static readonly departmentOwnParent: string;
   /** Why a department update that changes nothing is refused. */
+  public static readonly emptyOrganizationUpdate: string;
   public static readonly emptyDepartmentUpdate: string;
   /** Why an organization with two departments of one id is refused. */
   public static readonly duplicateDepartment: string;
@@ -4685,6 +4686,12 @@ export declare class Chat {
    * @throws ArgumentException when the attached folder or the timestamp is blank.
    */
   public withAttachedFolder(attachedFolder: string | null, updatedAt: string): Chat;
+
+  /**
+   * A copy that is no longer an organization's chat, keeping everything else, for a chat whose organization is deleted.
+   * @returns The copy.
+   */
+  public withoutOrganizationChat(): Chat;
 
   /**
    * Returns a copy with the session-reset mark changed.
@@ -12374,19 +12381,19 @@ export declare class OrganizationCreateParams {
 export declare class OrganizationUpdateParams {
   /** The organization's id. */
   public readonly organizationId: string;
-  /** The new name. */
-  public readonly name: string;
-  /** The new default folder, or null for each chat's own folder. */
-  public readonly folder: string | null;
+  /** The new name, or undefined to keep the name. */
+  public readonly name: string | undefined;
+  /** The new default folder, null for each chat's own folder, or undefined to keep the folder. */
+  public readonly folder: string | null | undefined;
   /**
-   * Creates a validated immutable value.
-   * @throws ArgumentException when the id or the folder is blank, or the name is invalid.
+   * Creates a validated immutable value that changes only the fields it is given.
+   * @throws ArgumentException when the id or the folder is blank, the name is invalid, or neither field is given.
    */
-  public constructor(organizationId: string, name: string, folder: string | null);
+  public constructor(organizationId: string, name: string | undefined, folder: string | null | undefined);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): OrganizationUpdateParams;
   /**
-   * Returns the organization with this update's name and folder.
+   * Returns the organization with this update's name and folder, keeping each one it doesn't give.
    * @param organization The organization as it is.
    * @param updatedAt The change's time, as ISO 8601 text.
    * @returns The changed organization.

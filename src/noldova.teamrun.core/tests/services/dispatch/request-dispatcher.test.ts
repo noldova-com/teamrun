@@ -263,7 +263,9 @@ export class RequestDispatcherTests {
       new OrganizationChat(RequestDispatcherTests.mine, ada.id).toJson()));
     const other = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
     const again = Conversation.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
+    const invalidated = host.listener.count(EventName.StateInvalidated);
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.OrganizationDelete, new OrganizationIdParams(studio.id).toJson()));
+    const invalidatedByDelete = host.listener.count(EventName.StateInvalidated) - invalidated;
     const unknown = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
     const last = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationDelete, new OrganizationIdParams(RequestDispatcherTests.mine).toJson()));
 
@@ -274,7 +276,9 @@ export class RequestDispatcherTests {
       JSON.stringify(host.listener.events.filter(t => t.name === EventName.OrganizationRemoved).map(t => t.payload)));
     Assert.areNotEqual(mine.id, other.id);
     Assert.areEqual(other.id, again.id);
-    Assert.isNotNull(await host.conversations.findAsync(other.id));
+    Assert.isNull((await host.conversations.findAsync(other.id))?.organizationChat);
+    Assert.areEqual(RequestDispatcherTests.mine, (await host.conversations.findAsync(mine.id))?.organizationChat?.organizationId);
+    Assert.areEqual(1, invalidatedByDelete);
     Assert.areEqual(ErrorCode.NotFound, unknown.info?.name);
     Assert.areEqual(ErrorCode.Conflict, last.info?.name);
   }

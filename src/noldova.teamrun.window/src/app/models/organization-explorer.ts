@@ -15,6 +15,7 @@ import { OrganizationExplorerDepartment } from "./organization-explorer-departme
 export class OrganizationExplorer {
   public readonly id: string;
   public readonly name: string;
+  public readonly folder: string | null;
   public readonly key: string;
   public readonly teammates: readonly Teammate[];
   public readonly departments: readonly OrganizationExplorerDepartment[];
@@ -22,13 +23,10 @@ export class OrganizationExplorer {
   private constructor(organization: Organization, teammates: readonly Teammate[], departments: readonly OrganizationExplorerDepartment[]) {
     this.id = organization.id;
     this.name = organization.name;
+    this.folder = organization.folder;
     this.key = Resources.formatOrganizationExplorerKey(organization.id);
     this.teammates = teammates;
     this.departments = departments;
-  }
-
-  public get isEmpty(): boolean {
-    return this.teammates.length === 0 && this.departments.length === 0;
   }
 
   public static of(organization: Organization, teammates: readonly Teammate[]): OrganizationExplorer {

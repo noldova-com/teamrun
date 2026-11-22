@@ -61,6 +61,9 @@ export class ChatTests {
     Assert.areEqual(JSON.stringify(copies.map(() => "org-1 grok")),
       JSON.stringify(copies.map(t => Chat.fromJson(t.toJson()).organizationChat).map(t => `${t?.organizationId} ${t?.teammateId}`)));
     Assert.isNull(Chat.fromJson({ ...ChatTests.json, organizationChat: null }).organizationChat);
+    const cleared = keyed.withAttachedFolder("E:/site", "t4").withoutOrganizationChat();
+    Assert.isNull(cleared.organizationChat);
+    Assert.areEqual(JSON.stringify({ ...keyed.withAttachedFolder("E:/site", "t4").toJson(), organizationChat: undefined }), JSON.stringify(cleared.toJson()));
     Assert.throws(() => new OrganizationChat(" ", "grok"), ArgumentException);
     Assert.throws(() => new OrganizationChat("org-1", " "), ArgumentException);
     Assert.areEqual("$.organizationChat.teammateId",

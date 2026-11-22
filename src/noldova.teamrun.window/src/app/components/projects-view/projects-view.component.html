@@ -118,12 +118,15 @@ LICENSE file in the root directory of this source tree.
 
   @if (hasOrganization()) {
     <nol-section-header [uppercase]="true" [label]="resources.organizationsTitle" [icon]="resources.organizationsIcon" [collapsible]="true"
-      [controls]="resources.organizationsGroupId" [expanded]="isGroupOpen(groups.Organizations)" (expandedChange)="openGroup(groups.Organizations, $event)" />
+      [controls]="resources.organizationsGroupId" [expanded]="isGroupOpen(groups.Organizations)" (expandedChange)="openGroup(groups.Organizations, $event)">
+      <button type="button" nol-icon-button nolSectionHeaderAction class="nol-teamrun-new-organization" [icon]="resources.addIcon" [label]="resources.newOrganizationTitle"
+        (click)="createOrganization()"></button>
+    </nol-section-header>
     <div class="nol-teamrun-organization-list" role="tree" [id]="resources.organizationsGroupId" [attr.aria-label]="resources.organizationsTitle">
       @if (isGroupOpen(groups.Organizations)) {
         @for (organization of organizations(); track organization.id) {
           <div class="nol-teamrun-row nol-teamrun-organization-row" [nolTeamrunTreeItem]="organizationsTree" [treeKey]="organization.key"
-            [treeLabel]="organization.name" [treeExpanded]="!isCollapsed(organization.key)"
+            [treeLabel]="organization.name" [treeExpanded]="!isCollapsed(organization.key)" [nolTooltip]="organization.folder ?? organization.name" [nolTooltipSide]="beside"
             [attr.aria-owns]="isCollapsed(organization.key) ? null : listIdOf(organization.key)" [nolContextMenuTriggerFor]="organizationMenu"
             (toggled)="layout.toggleProject(organization.key)" (activated)="openOrganization(organization)">
             <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(organization.key)">
@@ -135,6 +138,16 @@ LICENSE file in the root directory of this source tree.
             <ng-template #organizationMenu>
               <nol-menu>
                 <button nol-menu-item [icon]="resources.organizationViewIcon" [label]="resources.openOrganizationLabel" (triggered)="openOrganization(organization)"></button>
+                <button nol-menu-item [icon]="resources.editIcon" [label]="resources.renameConversationLabel" (triggered)="renameOrganization(organization)"></button>
+                <button nol-menu-item [icon]="resources.attachFolderIcon"
+                  [label]="organization.folder === null ? resources.setOrganizationFolderLabel : resources.changeOrganizationFolderLabel"
+                  (triggered)="chooseOrganizationFolder(organization)"></button>
+                @if (organization.folder !== null) {
+                  <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.clearOrganizationFolderLabel" (triggered)="clearOrganizationFolder(organization)"></button>
+                }
+                @if (organizations().length > 1) {
+                  <button nol-menu-item [icon]="resources.organizationDeleteIcon" [label]="resources.organizationDeleteLabel" (triggered)="removeOrganization(organization)"></button>
+                }
               </nol-menu>
             </ng-template>
           </div>
@@ -173,11 +186,40 @@ LICENSE file in the root directory of this source tree.
   <div class="nol-teamrun-row nol-teamrun-teammate-row" [class.nol-teamrun-nested]="!deep" [class.nol-teamrun-nested-twice]="deep"
     [class.nol-teamrun-selected]="isChatMarked(organizationId, teammate)" [attr.aria-selected]="isChatMarked(organizationId, teammate)" [nolTeamrunTreeItem]="organizationsTree"
     [treeKey]="parentKey + resources.imageKeySeparator + teammate.id" [treeLabel]="teammate.name" [treeParent]="parentKey" [treeLevel]="deep ? 3 : 2"
-    (activated)="openTeammate(organizationId, teammate)">
+    [nolTooltip]="placeOf(organizationId, teammate)" [nolTooltipSide]="beside" [nolContextMenuTriggerFor]="teammateMenu" (activated)="openTeammate(organizationId, teammate)">
+    <span class="nol-teamrun-twistie"><nol-teamrun-teammate-status [teammateId]="teammate.id" [labelled]="false" /></span>
     <span class="nol-teamrun-label nol-teamrun-teammate-name" (click)="openTeammate(organizationId, teammate)">{{ teammate.name }}</span>
     @if (chatOf(organizationId, teammate); as chat) {
       <ng-container [ngTemplateOutlet]="indicator" [ngTemplateOutletContext]="{ $implicit: chat.id }" />
     }
+    <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon"
+      [label]="resources.rowMenuLabel" [nolMenuTriggerFor]="teammateMenu"></button>
+    <ng-template #teammateMenu>
+      @let projectId = teammateProjectOf(organizationId, teammate);
+      @let folder = teammateFolderOf(organizationId, teammate);
+      <nol-menu>
+        <button nol-menu-item [icon]="resources.moveToProjectIcon"
+          [label]="projectId === null ? resources.moveToProjectLabel : resources.moveToAnotherProjectLabel" [nolMenuTriggerFor]="teammateMoveMenu"></button>
+        @if (projectId === null) {
+          <button nol-menu-item [icon]="resources.attachFolderIcon" [label]="folder === null ? resources.attachFolderLabel : resources.replaceFolderLabel"
+            (triggered)="attachTeammateFolder(organizationId, teammate)"></button>
+          @if (folder !== null) {
+            <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.detachFolderLabel" (triggered)="detachTeammateFolder(organizationId, teammate)"></button>
+          }
+        }
+      </nol-menu>
+    </ng-template>
+    <ng-template #teammateMoveMenu>
+      <nol-menu>
+        @for (project of teammateProjectsOf(organizationId, teammate); track project.id) {
+          <button nol-menu-item [label]="project.name" (triggered)="moveTeammateToProject(organizationId, teammate, project)"></button>
+        }
+        @if (teammateProjectsOf(organizationId, teammate).length > 0) {
+          <nol-menu-separator />
+        }
+        <button nol-menu-item [label]="resources.moveToFolderLabel" (triggered)="moveTeammateToFolder(organizationId, teammate)"></button>
+      </nol-menu>
+    </ng-template>
   </div>
 </ng-template>
 

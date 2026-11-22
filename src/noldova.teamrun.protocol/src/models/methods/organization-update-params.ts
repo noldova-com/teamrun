@@ -15,13 +15,17 @@ import { Organization } from "../organization.js";
 
 export class OrganizationUpdateParams {
   public readonly organizationId: string;
-  public readonly name: string;
-  public readonly folder: string | null;
+  public readonly name: string | undefined;
+  public readonly folder: string | null | undefined;
 
-  public constructor(organizationId: string, name: string, folder: string | null) {
+  public constructor(organizationId: string, name: string | undefined, folder: string | null | undefined) {
     ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
-    Organization.validateName(name);
-    Organization.validateFolder(folder);
+    if (Object.isUndefined(name) && Object.isUndefined(folder))
+      throw new ArgumentException(Resources.emptyOrganizationUpdate, Resources.organizationIdField);
+    if (!Object.isUndefined(name))
+      Organization.validateName(name);
+    if (!Object.isUndefined(folder))
+      Organization.validateFolder(folder);
 
     this.organizationId = organizationId;
     this.name = name;
@@ -30,19 +34,22 @@ export class OrganizationUpdateParams {
 
   public static fromJson(value: unknown, path?: string): OrganizationUpdateParams {
     const reader = JsonReader.fromValue(value, path);
-    return new OrganizationUpdateParams(reader.readNonBlankString(Resources.organizationIdField), Organization.readName(reader), Organization.readFolder(reader));
+    return new OrganizationUpdateParams(reader.readNonBlankString(Resources.organizationIdField),
+      reader.hasField(Resources.nameField) ? Organization.readName(reader) : undefined,
+      reader.hasField(Resources.folderField) ? Organization.readFolder(reader) : undefined);
   }
 
   public applyTo(organization: Organization, updatedAt: string): Organization {
-    return new Organization(organization.id, this.name, this.folder, organization.order, organization.createdAt, updatedAt,
+    return new Organization(organization.id, this.name ?? organization.name, Object.isUndefined(this.folder) ? organization.folder : this.folder,
+      organization.order, organization.createdAt, updatedAt,
       organization.departments, organization.placements);
   }
 
   public toJson(): JsonObject {
     return {
       [Resources.organizationIdField]: this.organizationId,
-      [Resources.nameField]: this.name,
-      [Resources.folderField]: this.folder
+      ...Object.isUndefined(this.name) ? {} : { [Resources.nameField]: this.name },
+      ...Object.isUndefined(this.folder) ? {} : { [Resources.folderField]: this.folder }
     };
   }
 }

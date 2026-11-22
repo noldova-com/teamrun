@@ -11,8 +11,8 @@ import { ChangeOperation } from "@noldova/context.data";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity } from "@noldova/teamrun.core";
 import {
-  type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
-  type Organization, OrganizationCreateParams, OrganizationIdParams, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent,
+  ConversationCreateParams, type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
+  type Organization, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent,
   OrganizationUpdateParams, Resources, type Teammate, TeammateCreateParams, TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
@@ -397,6 +397,9 @@ export class OrganizationServiceTests {
     const art = await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", OrganizationParent.person, ada.id));
     await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(studio.id, { collapsed: [art.id] }));
     await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(OrganizationServiceTests.mine, { collapsed: [] }));
+    const chat = await host.conversations.createAsync(new ConversationCreateParams(null, "Organization · Ada", ada.id), undefined, new OrganizationChat(studio.id, ada.id));
+    const kept = await host.conversations.createAsync(new ConversationCreateParams(null, "Organization · Ada", ada.id), undefined,
+      new OrganizationChat(OrganizationServiceTests.mine, ada.id));
 
     await host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id));
 
@@ -405,6 +408,10 @@ export class OrganizationServiceTests {
     Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Department));
     Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement));
     Assert.areEqual("Insert,Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
+    Assert.areEqual("Insert,Insert,Update", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Chat));
+    Assert.isNull((await host.conversations.findAsync(chat.id))?.organizationChat);
+    Assert.areEqual("Organization · Ada", (await host.conversations.findAsync(chat.id))?.title);
+    Assert.areEqual(OrganizationServiceTests.mine, (await host.conversations.findAsync(kept.id))?.organizationChat?.organizationId);
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.readLayoutAsync(new OrganizationIdParams(studio.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(studio.id, {})));
   }

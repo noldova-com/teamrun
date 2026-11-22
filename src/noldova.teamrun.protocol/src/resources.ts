@@ -563,6 +563,7 @@ export class Resources {
   public static readonly invalidDepartmentName: string = "A department name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
   public static readonly invalidDepartmentOrder: string = "A department's order among its siblings is a whole number from 0.";
   public static readonly departmentOwnParent: string = "A department can't be its own parent.";
+  public static readonly emptyOrganizationUpdate: string = "An organization update must change its name, its folder or both.";
   public static readonly emptyDepartmentUpdate: string = "A department update must change its name, its leader or both.";
   public static readonly duplicateDepartment: string = "Each department of an organization has its own id.";
   public static readonly organizationParentIdRequired: string = "A teammate or department parent names its id; the person names none.";

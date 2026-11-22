@@ -37,7 +37,10 @@ import {
   MethodName,
   Organization,
   OrganizationChat,
+  OrganizationCreateParams,
+  OrganizationIdParams,
   OrganizationParent,
+  OrganizationUpdateParams,
   Project,
   ProjectFolderChange,
   ProjectIdParams,
@@ -56,11 +59,13 @@ import { ConversationComponent } from "../../../../src/app/components/conversati
 import { ProjectsViewComponent } from "../../../../src/app/components/projects-view/projects-view.component";
 import { ChatAction } from "../../../../src/app/enums/chat-action";
 import { ProjectsGroup } from "../../../../src/app/enums/projects-group";
+import { TeammateStatus } from "../../../../src/app/enums/teammate-status";
 import { BrowserAvailability } from "../../../../src/app/services/browser-availability";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { CommandTargetsService } from "../../../../src/app/services/command-targets.service";
 import { OrganizationCatalog } from "../../../../src/app/services/organization-catalog";
 import { ProjectsLayoutService } from "../../../../src/app/services/projects-layout.service";
+import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { TimeFormatService } from "../../../../src/app/services/time-format.service";
 import { TeamRunCommands } from "../../../../src/app/teamrun-commands";
 import { Resources } from "../../../../src/resources";
@@ -252,6 +257,7 @@ describe("ProjectsViewComponent", () => {
     ProjectsLayoutService.release(context);
     ChatStoreService.release(context);
     OrganizationCatalog.release(context);
+    TeammateStatusStoreService.release(context);
     localStorage.removeItem(Resources.projectsLayoutStorageKey);
     vi.restoreAllMocks();
   });
@@ -2074,6 +2080,17 @@ describe("ProjectsViewComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
+    it("centres a teammate's status dot in the twistie's column and starts its name where a department's name starts", async () => {
+      await createOrganization();
+      const centre = (target: Element): number => (box(target).left + box(target).right) / 2;
+      const department = organizationRow("Marketing");
+      const teammate = teammateRow("Grok");
+
+      AppearanceFixture.expectPixels(box(part(teammate, ".nol-teamrun-teammate-name")).left, box(part(department, ".nol-teamrun-organization-name")).left);
+      AppearanceFixture.expectPixels(centre(part(teammate, "nol-teamrun-teammate-status .dot")), centre(part(department, ".nol-teamrun-twistie")));
+      AppearanceFixture.expectPixels(box(part(teammate, ".nol-teamrun-twistie")).width, box(part(department, ".nol-teamrun-twistie")).width);
+    });
+
     it("puts a missing folder's glyph after the project's name, within the row's inset, keeps the row's height and mutes only that name", async () => {
       await create(withMissingFolder);
       const missing = projectRow(SampleData.otherProject.name);
@@ -2749,13 +2766,270 @@ describe("ProjectsViewComponent", () => {
       expect(levels).toEqual(["1", "2", "2", "2", "3", "3", "2", "3", "1"]);
     });
 
-    it("shows no Organizations group while no organization places a teammate or holds a department", async () => {
+    it("shows the Organizations group for an organization with no teammate and no department, and none while there is no organization", async () => {
       await create(t => t.answer(MethodName.TeammateList, () => [grok].map(u => u.toJson()))
         .answer(MethodName.OrganizationList, () => [SampleData.organizationOf([], []).toJson()]));
-      await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
+      await Wait.until(() => expect(names()).toEqual([organization.name]));
+      const shown = headers();
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
       await settle();
 
+      expect(shown).toEqual([Resources.projectsViewTitle, Resources.organizationsTitle]);
       expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
+    });
+
+    it("creates an organization from \"+\" on the group's header with the name the person saves, and leaves it when they close the dialog", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationCreate, u => new Organization("studio", OrganizationCreateParams.fromJson(u).name, null, 2,
+        SampleData.timestamp, SampleData.timestamp, [], []).toJson()));
+      const header = find<HTMLElement>("nol-section-header", Resources.organizationsTitle);
+      const add = part(header, "button.nol-teamrun-new-organization");
+      const creates = (): OrganizationCreateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationCreate))
+        .map(t => OrganizationCreateParams.fromJson(t.parameters));
+
+      add.click();
+      await settle();
+      const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      const shown = [document.querySelector("nol-teamrun-rename-dialog .nol-dialog-title")?.textContent, field?.value, field?.getAttribute("aria-label"),
+        document.querySelector<HTMLButtonElement>("nol-teamrun-rename-dialog .nol-teamrun-save")?.disabled];
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+      const closed = creates().length;
+      add.click();
+      await settle();
+      const again = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      if (Object.isNull(again))
+        throw new Error("The new organization dialog shows no name field.");
+      again.value = " Studio ";
+      again.dispatchEvent(new Event("input"));
+      await settle();
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-save");
+      await Wait.until(() => expect(creates()).toEqual([new OrganizationCreateParams("Studio", null)]));
+      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 2, SampleData.timestamp, SampleData.timestamp, [], []).toJson());
+      await settle();
+
+      expect([add.getAttribute("aria-label"), add.hasAttribute("nolsectionheaderaction")]).toEqual([Resources.newOrganizationTitle, true]);
+      expect([shown, closed]).toEqual([[Resources.newOrganizationTitle, "", Resources.organizationNameFieldLabel, true], 0]);
+      expect(names().at(-1)).toBe("Studio");
+    });
+
+    const organizationMenu = async (name: string): Promise<string[]> => {
+      organizationRow(name).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const updates = (): OrganizationUpdateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationUpdate))
+      .map(t => OrganizationUpdateParams.fromJson(t.parameters));
+    const withFolder = (folder: string | null): Organization => new Organization(organization.id, organization.name, folder, organization.order,
+      SampleData.timestamp, SampleData.timestamp, organization.departments, organization.placements);
+
+    it("renames an organization with the name the person saves, under the organization's own heading, and leaves it when they close the dialog", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationUpdate, () => null));
+
+      await choose(organizationRow(organization.name), Resources.renameConversationLabel);
+      const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      const shown = [document.querySelector("nol-teamrun-rename-dialog .nol-dialog-title")?.textContent, field?.value, field?.getAttribute("aria-label")];
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+      const closed = updates().length;
+      await choose(organizationRow(organization.name), Resources.renameConversationLabel);
+      const again = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+      if (Object.isNull(again))
+        throw new Error("The rename dialog shows no name field.");
+      again.value = " Studio ";
+      again.dispatchEvent(new Event("input"));
+      await settle();
+      await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-save");
+
+      expect([shown, closed]).toEqual([[Resources.renameOrganizationTitle, organization.name, Resources.organizationNameFieldLabel], 0]);
+      await Wait.until(() => expect(updates()).toEqual([new OrganizationUpdateParams(organization.id, "Studio", undefined)]));
+      expect(document.querySelector("nol-teamrun-rename-dialog")).toBeNull();
+    });
+
+    it("limits a new or renamed organization's name to the engine's limit in the dialog, saying the limit", async () => {
+      await createOrganization();
+      const limitOf = async (open: () => Promise<void>): Promise<unknown[]> => {
+        await open();
+        const field = document.querySelector<HTMLInputElement>("nol-teamrun-rename-dialog .nol-teamrun-rename-title");
+        if (Object.isNull(field))
+          throw new Error("The dialog shows no name field.");
+        const saveAt = async (length: number): Promise<unknown[]> => {
+          field.value = "a".repeat(length);
+          field.dispatchEvent(new Event("input"));
+          await settle();
+          return [document.querySelector<HTMLButtonElement>("nol-teamrun-rename-dialog .nol-teamrun-save")?.disabled,
+            document.querySelector("nol-teamrun-rename-dialog .nol-teamrun-dialog-error")?.textContent?.trim() ?? null];
+        };
+        const shown = [await saveAt(Resources.organizationNameMaxLength + 1), await saveAt(Resources.organizationNameMaxLength)];
+        await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-cancel");
+        return shown;
+      };
+
+      const created = await limitOf(async () => {
+        part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), "button.nol-teamrun-new-organization").click();
+        await settle();
+      });
+      const renamed = await limitOf(() => choose(organizationRow(organization.name), Resources.renameConversationLabel));
+
+      const expected = [[true, Resources.formatNameTooLong(Resources.organizationNameMaxLength)], [false, null]];
+      expect([created, renamed]).toEqual([expected, expected]);
+      expect(new OrganizationCreateParams("a".repeat(Resources.organizationNameMaxLength), null).name).toHaveLength(Resources.organizationNameMaxLength);
+      expect(() => new OrganizationCreateParams("a".repeat(Resources.organizationNameMaxLength + 1), null)).toThrow();
+    });
+
+    it("sets, changes and clears an organization's default folder from its row menu, showing the folder as the row's tooltip", async () => {
+      await createOrganization(t => t.answer(MethodName.OrganizationUpdate, () => null));
+      const tooltip = (): string => {
+        const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-organization-row")).find(t => t.nativeElement === organizationRow(organization.name));
+        if (Object.isUndefined(found))
+          throw new Error("The organization's row is not shown.");
+        return found.injector.get(TooltipDirective).text();
+      };
+      const before = [await organizationMenu(organization.name), tooltip()];
+
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+      const unchosen = [context.folderChoices, updates().length];
+      context.chosenFolder = "D:/studio";
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+      await Wait.until(() => expect(updates()).toHaveLength(1));
+      context.emit(EventName.OrganizationChanged, withFolder("D:/studio").toJson());
+      await settle();
+      const after = [await organizationMenu(organization.name), tooltip()];
+      context.chosenFolder = "E:/other";
+      await choose(organizationRow(organization.name), Resources.changeOrganizationFolderLabel);
+      await choose(organizationRow(organization.name), Resources.clearOrganizationFolderLabel);
+      await Wait.until(() => expect(updates()).toHaveLength(3));
+
+      expect(before).toEqual([[Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel, Resources.organizationDeleteLabel],
+        organization.name]);
+      expect(unchosen).toEqual([1, 0]);
+      expect(after).toEqual([[Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.changeOrganizationFolderLabel, Resources.clearOrganizationFolderLabel,
+        Resources.organizationDeleteLabel], "D:/studio"]);
+      expect(updates()).toEqual([new OrganizationUpdateParams(organization.id, undefined, "D:/studio"),
+        new OrganizationUpdateParams(organization.id, undefined, "E:/other"), new OrganizationUpdateParams(organization.id, undefined, null)]);
+    });
+
+    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and offers no delete for the last one", async () => {
+      const novaChat = organizationChatOf("o9", nova, labs.id);
+      conversations = [novaChat];
+      await createOrganization(t => t.answer(MethodName.OrganizationDelete, () => null));
+      const before = chats();
+      const deletes = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationDelete))
+        .map(t => OrganizationIdParams.fromJson(t.parameters).organizationId);
+
+      await choose(organizationRow(labs.name), Resources.organizationDeleteLabel);
+      const asked = [document.querySelector("nol-teamrun-confirm-dialog .nol-dialog-title")?.textContent, dialogText()];
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
+      const cancelled = deletes().length;
+      await choose(organizationRow(labs.name), Resources.organizationDeleteLabel);
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+      await Wait.until(() => expect(deletes()).toEqual([labs.id]));
+      conversations = [novaChat.withoutOrganizationChat()];
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(labs.id).toJson());
+      context.emit(EventName.StateInvalidated, null);
+      await Wait.until(() => expect(chats()).toEqual([nova.name]));
+
+      expect(before).toEqual([]);
+      expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: labs.id });
+      expect([asked, cancelled]).toEqual([[Resources.deleteOrganizationTitle, Resources.formatDeleteOrganizationText(labs.name)], 0]);
+      expect([names().includes(labs.name), await organizationMenu(organization.name)])
+        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel]]);
+    });
+
+    it("logs an organization change the engine refuses", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationUpdate, "Taken."));
+      context.chosenFolder = "D:/studio";
+
+      await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
+
+      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("Error: Taken.")));
+    });
+
+    const teammateMenu = async (name: string): Promise<string[]> => {
+      teammateRow(name).querySelector<HTMLButtonElement>(".nol-teamrun-row-actions")?.click();
+      await settle();
+      const labels = texts("button[nol-menu-item] .nol-menu-item-label", itemAt([...document.querySelectorAll("nol-menu")], 0));
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const teammateMoveMenu = async (name: string): Promise<string[]> => {
+      await choose(teammateRow(name), Resources.moveToProjectLabel);
+      const labels = menuLabels();
+      await userEvent.keyboard("{Escape}");
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      return labels;
+    };
+    const teammateTooltip = (name: string): string => {
+      const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-teammate-row")).find(t => t.nativeElement === teammateRow(name));
+      if (Object.isUndefined(found))
+        throw new Error("The teammate's row is not shown.");
+      return found.injector.get(TooltipDirective).text();
+    };
+    const grokInFolder = grokChat.withAttachedFolder("D:/grok", at);
+    const opusInProject = organizationChatOf("o6", opus).withProjectId(SampleData.project.id, at);
+
+    it("shows where each teammate's Organization chat works on hover: its folder, its project's folder, the organization's folder or the teammate's name", async () => {
+      conversations = [SampleData.conversation, grokInFolder, opusInProject];
+      await createOrganization();
+      const before = [teammateTooltip("Grok"), teammateTooltip("Opus 1"), teammateTooltip("Agy")];
+      context.emit(EventName.OrganizationChanged, withFolder("D:/org").toJson());
+      await settle();
+
+      expect([before, teammateTooltip("Agy")]).toEqual([["D:/grok", SampleData.project.rootPath, "Agy"], "D:/org"]);
+    });
+
+    it("offers a teammate's row the chat's folder actions, opening its Organization chat first when it has none", async () => {
+      conversations = [SampleData.conversation, grokInFolder, opusInProject];
+      await createOrganization(t => t.answer(MethodName.OrganizationChatOpen, () => organizationChatOf("o7", agy).toJson())
+        .answer(MethodName.ChatFolderAttach, u => organizationChatOf("o7", agy).withAttachedFolder(ChatFolderAttachParams.fromJson(u).folder, at).toJson())
+        .answer(MethodName.ChatFolderDetach, () => grokChat.toJson())
+        .answer(MethodName.ConversationMove, u => opusInProject.withProjectId(ConversationMoveParams.fromJson(u).projectId, at).toJson()));
+      const menus = [await teammateMenu("Agy"), await teammateMenu("Grok"), await teammateMenu("Opus 1")];
+      const moves = [await teammateMoveMenu("Agy"), await teammateMoveMenu("Grok")];
+      await choose(teammateRow("Opus 1"), Resources.moveToAnotherProjectLabel);
+      const opusMoves = menuLabels();
+      await pick(SampleData.otherProject.name);
+      await Wait.until(() => expect(context.count(MethodName.ConversationMove)).toBe(1));
+      await choose(teammateRow("Grok"), Resources.moveToProjectLabel);
+      await pick(Resources.moveToFolderLabel);
+      const unchosen = context.folderChoices;
+      await choose(teammateRow("Grok"), Resources.detachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.ChatFolderDetach)).toBe(1));
+      context.chosenFolder = "D:/agy";
+      await choose(teammateRow("Agy"), Resources.attachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.ChatFolderAttach)).toBe(1));
+      const attached = ChatFolderAttachParams.fromJson(requestOf(MethodName.ChatFolderAttach));
+
+      expect(menus).toEqual([[Resources.moveToProjectLabel, Resources.attachFolderLabel],
+        [Resources.moveToProjectLabel, Resources.replaceFolderLabel, Resources.detachFolderLabel], [Resources.moveToAnotherProjectLabel]]);
+      expect(moves).toEqual([[SampleData.project.name, SampleData.otherProject.name, Resources.moveToFolderLabel],
+        [SampleData.project.name, SampleData.otherProject.name, Resources.moveToFolderLabel]]);
+      expect(opusMoves).toEqual([SampleData.otherProject.name, Resources.moveToFolderLabel]);
+      expect([ConversationMoveParams.fromJson(requestOf(MethodName.ConversationMove)).projectId, unchosen]).toEqual([SampleData.otherProject.id, 1]);
+      expect([ConversationIdParams.fromJson(requestOf(MethodName.ChatFolderDetach)).conversationId, context.count(MethodName.OrganizationChatOpen)])
+        .toEqual([grokChat.id, 1]);
+      expect([attached.chatId, attached.folder]).toEqual(["o7", "D:/agy"]);
+    });
+
+    it("leaves a teammate's folder alone when the engine opens it no Organization chat", async () => {
+      await createOrganization(t => t.fail(MethodName.OrganizationChatOpen, "No chat."));
+      context.chosenFolder = "D:/agy";
+
+      await choose(teammateRow("Agy"), Resources.attachFolderLabel);
+      await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
+      await settle();
+
+      expect([context.folderChoices, context.count(MethodName.ChatFolderAttach)]).toEqual([0, 0]);
+    });
+
+    it("shows each teammate's status as a dot alone before its name, named for a screen reader", async () => {
+      await createOrganization();
+      const dot = part(teammateRow("Grok"), "nol-teamrun-teammate-status .dot");
+
+      expect([dot.getAttribute("role"), dot.getAttribute("aria-label"), teammateRow("Grok").querySelector("nol-teamrun-teammate-status .label")])
+        .toEqual(["img", Resources.teammateStatusLabels[TeammateStatus.Idle], null]);
     });
   });
 

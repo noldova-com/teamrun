@@ -76,6 +76,17 @@ describe("TeammateStatusComponent", () => {
     expect(dot().getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("shows the dot alone when unlabelled, naming the status on it for a screen reader, and follows each change", async () => {
+    await render("alice");
+    fixture.componentRef.setInput("labelled", false);
+    await fixture.whenStable();
+    const idle = [dot().getAttribute("role"), dot().getAttribute("aria-label"), dot().getAttribute("aria-hidden"), element().querySelector(".label")];
+    context.emit(EventName.MessageCreated, reply("r1", MessageStatus.Running).toJson());
+    await fixture.whenStable();
+
+    expect([idle, dot().getAttribute("aria-label"), getComputedStyle(dot()).borderTopColor]).toEqual([["img", "Idle", null, null], "Working", colour("--nol-status-ok")]);
+  });
+
   it("marks a teammate whose provider can't serve as stopped", async () => {
     await render("offline");
     await Wait.until(() => expect(label()).toBe("Stopped"));

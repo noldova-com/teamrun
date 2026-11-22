@@ -644,6 +644,7 @@ export class Resources {
   public static readonly deleteConversation: string = "DELETE FROM chats WHERE id = ?";
   public static readonly insertConversation: string = "INSERT INTO chats (id, projectId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
   public static readonly selectConversationById: string = "SELECT json FROM chats WHERE id = ?";
+  public static readonly selectOrganizationChats: string = "SELECT json FROM chats WHERE json_extract(json, '$.organizationChat.organizationId') = ?";
   public static readonly selectOrganizationChat: string = "SELECT json FROM chats WHERE json_extract(json, '$.organizationChat.organizationId') = ? "
     + "AND json_extract(json, '$.organizationChat.teammateId') = ? ORDER BY createdAt, rowid LIMIT 1";
   public static readonly selectConversationsByProject: string = "SELECT json FROM chats WHERE projectId IS ? ORDER BY createdAt, rowid";

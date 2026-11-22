@@ -24,6 +24,7 @@ export class TeammateStatusComponent {
 
   public readonly teammateId: InputSignal<string> = input<string>(String.empty);
   public readonly status: InputSignal<TeammateStatus | null> = input<TeammateStatus | null>(null);
+  public readonly labelled: InputSignal<boolean> = input<boolean>(true);
 
   protected readonly shown: Signal<TeammateStatus> = computed(() => this.status() ?? this.statuses.statusOf(this.teammateId())());
   protected readonly label: Signal<string> = computed(() => Resources.teammateStatusLabels[this.shown()]);

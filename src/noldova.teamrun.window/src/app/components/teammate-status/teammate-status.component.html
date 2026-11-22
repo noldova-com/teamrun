@@ -6,4 +6,8 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<span [class]="dot()" aria-hidden="true"></span><span class="label">{{ label() }}</span>
+@if (labelled()) {
+  <span [class]="dot()" aria-hidden="true"></span><span class="label">{{ label() }}</span>
+} @else {
+  <span [class]="dot()" role="img" [attr.aria-label]="label()"></span>
+}

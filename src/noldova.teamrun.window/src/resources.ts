@@ -416,6 +416,16 @@ export class Resources {
   public static readonly organizationsIcon: string = "corporate_fare";
   public static readonly departmentPathSeparator: string = " › ";
   public static readonly openOrganizationLabel: string = "Open organization";
+  public static readonly renameOrganizationTitle: string = "Rename organization";
+  public static readonly newOrganizationTitle: string = "New organization";
+  public static readonly organizationNameFieldLabel: string = "Name";
+  public static readonly organizationNameMaxLength: number = 100;
+  public static readonly controlCharacterPattern: RegExp = /[\p{Cc}\p{Zl}\p{Zp}]/u;
+  public static readonly nameHasControlCharacter: string = "A name can't hold a tab, a line break or another control character.";
+  public static readonly setOrganizationFolderLabel: string = "Set the default folder…";
+  public static readonly changeOrganizationFolderLabel: string = "Change the default folder…";
+  public static readonly clearOrganizationFolderLabel: string = "Clear the default folder";
+  public static readonly deleteOrganizationTitle: string = "Delete organization";
   public static readonly noProjects: string = "Open a folder to start.";
   public static readonly noConversations: string = "No chats yet.";
   public static readonly untitledConversation: string = "Untitled";
@@ -2128,6 +2138,18 @@ export class Resources {
 
   public static formatOrganizationChatNotOpened(message: string): string {
     return `The Explorer couldn't open the Organization chat: ${message}`;
+  }
+
+  public static formatNameTooLong(limit: number): string {
+    return `A name can have at most ${limit} characters.`;
+  }
+
+  public static formatOrganizationActionFailed(message: string): string {
+    return `The Explorer couldn't change the organization: ${message}`;
+  }
+
+  public static formatDeleteOrganizationText(name: string): string {
+    return `Delete ${name}? Its departments go, and its teammates leave it. The teammates themselves and their chats stay.`;
   }
 
   public static formatOrganizationFanOutRetry(key: string, text: string, sources: readonly string[]): string {

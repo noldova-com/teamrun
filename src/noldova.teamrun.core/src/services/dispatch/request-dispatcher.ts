@@ -134,7 +134,7 @@ export class RequestDispatcher {
     MethodName.ProviderCreate, MethodName.ProviderUpdate,
     MethodName.ProviderSetEnabled, MethodName.ProviderDelete, MethodName.SharedMcpServerCreate, MethodName.SharedMcpServerUpdate,
     MethodName.SharedMcpServerDelete, MethodName.SharedMcpProviderSet, MethodName.SharedMcpTeammateSet, MethodName.SharedMcpSecretSet,
-    MethodName.SharedMcpSignOut
+    MethodName.SharedMcpSignOut, MethodName.OrganizationDelete
   ]);
   private readonly events: IEventSink | null;
   private readonly kinds: IProviderKindsService;
