@@ -104,14 +104,15 @@
 
 .act {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--nol-space-2);
+  column-gap: var(--nol-space-2);
 }
 
 .act-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  flex: 1 1 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .act-for {

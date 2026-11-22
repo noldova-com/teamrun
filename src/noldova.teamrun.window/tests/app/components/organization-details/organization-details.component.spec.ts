@@ -30,6 +30,7 @@ import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
+import { ThemeCase } from "../../../fixtures/theme-case.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationDetailsComponent", () => {
@@ -269,11 +270,7 @@ describe("OrganizationDetailsComponent", () => {
     expect(closed).toEqual([]);
   });
 
-  describe.each([
-    { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
-    { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
-    { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
-  ])("in $look", ({ mode, forcedColors }) => {
+  describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
     beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, mode));
@@ -321,6 +318,34 @@ describe("OrganizationDetailsComponent", () => {
         AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(view).fontSize), AppearanceFixture.measureLook("text-small"));
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(lasted).fontSize), AppearanceFixture.measureLook("text-code"));
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(firstValue).overflowWrap]).toEqual(["nowrap", "anywhere"]);
+    });
+
+    it("keeps a running reply's word whole beside a long time, moving the time to its own line under the word, and breaks a word longer than the line at its edge", async () => {
+      const word = "Electroencephalographically";
+      await create(context => context.answer(MethodName.ConversationList, t => ConversationListParams.fromJson(t).projectId === SampleData.project.id
+        ? [new Conversation("c1", SampleData.project.id, word, SampleData.timestamp, SampleData.timestamp).toJson()] : []));
+      context.emit(EventName.MessageCreated, reply("r1", "c1", new Date(clock.now() - (1750 * 3600 + 20 * 60) * 1000).toISOString(), MessageStatus.Running).toJson());
+      await settle();
+      const details = await focus("Alice");
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const lines = (view: Element): number => {
+        const range = document.createRange();
+        range.selectNodeContents(view);
+        return new Set([...range.getClientRects()].filter(t => t.width > 0).map(t => Math.round(t.top))).size;
+      };
+      const style = getComputedStyle(details);
+      const right = box(details).right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth);
+      const text = one(".act-text", details);
+      const lasted = one(".act-for", details);
+
+      expect([text.textContent, lasted.textContent, lines(text), lines(lasted)]).toEqual([word, "1750 h 20 min", 1, 1]);
+      AppearanceFixture.expectPixels(box(lasted).left, box(text).left);
+      expect(box(lasted).top).toBeGreaterThanOrEqual(box(text).bottom - 1);
+      expect(box(lasted).right).toBeLessThanOrEqual(right);
+
+      text.textContent = word.repeat(3);
+      AppearanceFixture.expectPixels(box(text).right, right);
+      expect(lines(text)).toBeGreaterThan(1);
     });
 
     it("draws the details as a hover card: 18rem wide, on the hover surface in its border, in the text's colour", async () => {
