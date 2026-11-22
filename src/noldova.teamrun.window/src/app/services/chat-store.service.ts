@@ -9,9 +9,9 @@
 import { type FactoryProvider, InjectionToken, type Signal, type WritableSignal, computed, inject, signal, untracked } from "@angular/core";
 
 import "@noldova/context.core";
-import type { JsonValue } from "@noldova/context.json";
+import { JsonReader, type JsonValue } from "@noldova/context.json";
 import { CommandRun, NotificationAction, NotificationSeverity, QualifiedName } from "@noldova/desktop.protocol";
-import { type IWindowPartContext, LinkPlace, WindowPartTokens } from "@noldova/desktop.window";
+import { type IWindowPartContext, LinkPlace, RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import { type LaunchedTerminal, TerminalLaunch, TerminalLauncher, type TerminalShellKind } from "@noldova/terminal.window";
 import {
   Approval,
@@ -147,6 +147,7 @@ import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../exceptions/model-catalog-unavailable.exception";
+import type { IIdentified } from "../interfaces/i-identified";
 import type { ITerminalLauncher } from "../interfaces/i-terminal-launcher";
 import type { AcpLocalVariable } from "../models/acp-local-variable";
 import { ApprovalAnswer } from "../models/approval-answer";
@@ -165,6 +166,8 @@ import type { ModelCatalog } from "../models/model-catalog";
 import type { ProviderChoice } from "../models/provider-choice";
 import { ReadingPosition } from "../models/reading-position";
 import { RewoundDraft } from "../models/rewound-draft";
+import { TeammateModelSettings } from "../models/teammate-model-settings";
+import { UnsentMessage } from "../models/unsent-message";
 import type { ProviderAction } from "../types/provider-action";
 import { ErrorNotices } from "./error-notices";
 import { FormatterService } from "./formatter.service";
@@ -186,7 +189,7 @@ export class ChatStoreService {
   private readonly terminals: ITerminalLauncher;
   private readonly notices: ErrorNotices;
   private readonly retries: Map<string, () => Promise<unknown>> = new Map();
-  private readonly unsent: Map<string, { readonly providerId: string | null; readonly teammateId: string | null }> = new Map();
+  private readonly unsent: Map<string, UnsentMessage> = new Map();
   private readonly actionChats: Map<string, string> = new Map();
   private readonly kindsSignal: WritableSignal<readonly ProviderKind[]> = signal([]);
   private readonly kindsFailedSignal: WritableSignal<boolean> = signal(false);
@@ -321,9 +324,9 @@ export class ChatStoreService {
   public readonly teammateMoves: Signal<ReadonlyMap<string, ProviderChoice>> = this.teammateMovesSignal.asReadonly();
   public readonly defaultTeammate: Signal<DefaultTeammate | null> = this.defaultTeammateSignal.asReadonly();
   public readonly onlyTeammateChoice: Signal<ComposerSettings | null> = computed(() => {
-    const [only, ...others] = this.teammates();
-    const provider = this.enabledProviders().find(t => t.id === only?.providerId);
-    return others.length > 0 || Object.isUndefined(provider) ? null : new ComposerSettings(provider.kind, null, null, provider.id);
+    const teammates = this.teammates();
+    const provider = this.enabledProviders().find(t => t.id === teammates.at(0)?.providerId);
+    return teammates.length > 1 || Object.isUndefined(provider) ? null : new ComposerSettings(provider.kind, null, null, provider.id);
   });
   public readonly defaultTeammateAsked: Signal<boolean> = this.defaultTeammateAskedSignal.asReadonly();
   public readonly projects: Signal<readonly Project[]> = this.projectsSignal.asReadonly();
@@ -1042,14 +1045,14 @@ export class ChatStoreService {
       ChatStoreService.refusesHandOffs(error)));
   }
 
-  public editTeammate(id: string, providerId: string, settings: (teammate: Teammate) => readonly [string | null, string | null, string | null]): Promise<boolean> {
+  public editTeammate(id: string, providerId: string, settings: (teammate: Teammate) => TeammateModelSettings): Promise<boolean> {
     const move = this.teammateMovesSignal().get(id);
     return this.chainTeammateSave(id, t => {
       if (Object.isNull(t))
         return null;
-      const [model, effort, speed] = settings(t);
+      const chosen = settings(t);
       const moved = !Object.isUndefined(move) && this.savedMoves.get(id) === move && t.providerId === move.providerId;
-      return TeammateUpdateParams.changing(t, { model, effort, speed }, moved ? t.providerId : providerId);
+      return TeammateUpdateParams.changing(t, { model: chosen.model, effort: chosen.effort, speed: chosen.speed }, moved ? t.providerId : providerId);
     });
   }
 
@@ -1066,8 +1069,8 @@ export class ChatStoreService {
       await this.chainTeammateSave(id, t => {
         if (Object.isNull(t) || this.teammateMovesSignal().get(id) !== choice || t.providerId === choice.providerId)
           return null;
-        const [model, effort, speed] = ChatStoreService.movedSettings(t, catalog);
-        return TeammateUpdateParams.changing(t, { providerId: choice.providerId, model, effort, speed, mode: null });
+        const moved = ChatStoreService.movedSettings(t, catalog);
+        return TeammateUpdateParams.changing(t, { providerId: choice.providerId, model: moved.model, effort: moved.effort, speed: moved.speed, mode: null });
       }, undefined, () => this.savedMoves.set(id, choice));
     }
     finally {
@@ -1579,7 +1582,7 @@ export class ChatStoreService {
     let icon: string | null = null;
     await this.attempt(async () => {
       const answer = await this.request(MethodName.AcpAgentIcon, new AcpAgentIdParams(id).toJson());
-      icon = typeof answer === "string" ? answer : null;
+      icon = Object.isString(answer) ? answer : null;
     }, () => undefined);
     return icon;
   }
@@ -1700,8 +1703,9 @@ export class ChatStoreService {
     const enabled = this.enabledProviders();
     const members = new Set(teammateIds);
     const teammate = this.teammates().find(t => members.has(t.id) && enabled.some(u => u.id === t.providerId));
-    if (!Object.isUndefined(teammate)) {
-      const kind = enabled.find(t => t.id === teammate.providerId)!.kind;
+    const provider = enabled.find(t => t.id === teammate?.providerId);
+    if (!Object.isUndefined(teammate) && !Object.isUndefined(provider)) {
+      const kind = provider.kind;
       return found?.kind === kind ? this.withEnabledProvider(found, teammate.providerId) : new ComposerSettings(kind, null, null, teammate.providerId);
     }
     if (!Object.isNull(found) && enabled.some(t => t.kind === found.kind))
@@ -1745,8 +1749,9 @@ export class ChatStoreService {
   }
 
   public async signOutInTerminal(providerId: string, report: (message: string) => void = this.providerFailed(ChatAction.SignOut, providerId)): Promise<boolean | null> {
-    if (this.terminalSignOutsSignal().has(providerId))
-      return await this.signOutRuns.get(providerId)!;
+    const running = this.signOutRuns.get(providerId);
+    if (this.terminalSignOutsSignal().has(providerId) && !Object.isUndefined(running))
+      return await running;
     const provider = this.providersSignal().find(t => t.id === providerId);
     const launch = Object.isUndefined(provider) ? null : this.signOutLaunchOf(provider);
     if (Object.isUndefined(provider) || Object.isNull(launch))
@@ -1784,7 +1789,7 @@ export class ChatStoreService {
     }
     finally {
       this.signingInSignal.update(t => new Set([...t].filter(u => u !== providerId)));
-      this.signInLinksSignal.update(t => new Map([...t].filter(([u]) => u !== providerId)));
+      this.signInLinksSignal.update(t => ChatStoreService.without(t, providerId));
     }
     if (!Object.isNull(agentLaunch))
       await this.followSignInTerminal(providerId, agentLaunch, report);
@@ -1871,7 +1876,7 @@ export class ChatStoreService {
     const isRead = await this.attempt(async () => {
       const tools = ChatStoreService.readArray(await this.request(MethodName.ProviderToolList, null), ProviderTool.fromJson);
       if (!this.disposed)
-        this.toolsSignal.set(new Map(tools.map(t => [t.kind, t])));
+        this.toolsSignal.set(ChatStoreService.keyed(tools, t => t.kind));
     }, report);
     if (isRead)
       this.markLoaded(Resources.toolsLoad);
@@ -1907,7 +1912,7 @@ export class ChatStoreService {
   public async refreshInstallations(): Promise<void> {
     await this.attempt(async () => {
       const installations = ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationList, null), ProviderKindInstallation.fromJson);
-      this.installationsSignal.set(new Map(installations.map(t => [t.kind, t])));
+      this.installationsSignal.set(ChatStoreService.keyed(installations, t => t.kind));
     }, () => undefined);
   }
 
@@ -1938,7 +1943,7 @@ export class ChatStoreService {
 
   public async listModels(kind: string, providerId: string | null, refresh: boolean = false, workingDirectory: string | null = null): Promise<ProviderModelList> {
     const payload = await this.request(MethodName.ProviderModelCatalog, new ProviderListModelsParams(kind, providerId, refresh, workingDirectory).toJson());
-    if (Object.isNull(payload) || typeof payload !== "object")
+    if (!Object.isObject(payload))
       throw new ModelCatalogUnavailableException(kind, providerId);
     return ProviderModelList.fromJson(payload);
   }
@@ -1989,7 +1994,9 @@ export class ChatStoreService {
 
   private async writePositions(): Promise<void> {
     const ids = [...this.unsavedPositions];
-    const dropped = [...this.droppedPositions].filter(([id]) => !this.unsavedPositions.has(id));
+    const dropped = ChatStoreService.where(this.droppedPositions, (_, id) => !this.unsavedPositions.has(id));
+    const droppedPositions: ConversationPosition[] = [];
+    dropped.forEach((position, id) => droppedPositions.push(new ConversationPosition(id, position.messageId, position.sequence, position.distance)));
     this.unsavedPositions.clear();
     this.droppedPositions.clear();
     this.forgottenPositions.clear();
@@ -2003,14 +2010,14 @@ export class ChatStoreService {
         positions.push(new ConversationPosition(id, position.messageId, position.sequence, position.distance));
     }
     try {
-      await this.request(MethodName.ReadingPositionSave, new ReadingPositionSaveParams(positions, cleared,
-        dropped.map(([id, position]) => new ConversationPosition(id, position.messageId, position.sequence, position.distance))).toJson());
+      await this.request(MethodName.ReadingPositionSave, new ReadingPositionSaveParams(positions, cleared, droppedPositions).toJson());
     }
     catch {
       for (const id of ids.filter(t => !this.forgottenPositions.has(t)))
         this.unsavedPositions.add(id);
-      for (const [id, position] of [...dropped, ...this.droppedPositions])
-        this.droppedPositions.set(id, position);
+      const newer = new Map(this.droppedPositions);
+      dropped.forEach((position, id) => this.droppedPositions.set(id, position));
+      newer.forEach((position, id) => this.droppedPositions.set(id, position));
     }
   }
 
@@ -2050,8 +2057,7 @@ export class ChatStoreService {
   }
 
   private static isGitHubSignedIn(signIn: JsonValue): boolean {
-    return typeof signIn === "object" && !Object.isNull(signIn)
-      && Object.entries(signIn).some(([key, value]) => key === Resources.gitHubStateField && value === Resources.gitHubSignedInState);
+    return Object.isPlainObject(signIn) && JsonReader.fromValue(signIn).readOptionalString(Resources.gitHubStateField) === Resources.gitHubSignedInState;
   }
 
   private request(method: MethodName, parameters: JsonValue): Promise<JsonValue> {
@@ -2215,7 +2221,7 @@ export class ChatStoreService {
   }
 
   private applyInstallation(installation: ProviderKindInstallation): void {
-    this.installationsSignal.update(t => new Map([...t, [installation.kind, installation]]));
+    this.installationsSignal.update(t => new Map(t).set(installation.kind, installation));
   }
 
   private chainTeammateSave(id: string, change: (teammate: Teammate | null) => TeammateUpdateParams | null,
@@ -2238,7 +2244,7 @@ export class ChatStoreService {
   }
 
   private forgetMove(id: string): void {
-    this.teammateMovesSignal.update(t => new Map([...t].filter(([u]) => u !== id)));
+    this.teammateMovesSignal.update(t => ChatStoreService.without(t, id));
   }
 
   private async loadWaiting(conversationId: string): Promise<void> {
@@ -2374,18 +2380,17 @@ export class ChatStoreService {
       this.setProviders(providers);
       this.runningSignInsSignal.set(new Set(signIns.providerIds));
       if (!Object.isNull(installations))
-        this.installationsSignal.set(new Map(installations.map(t => [t.kind, t])));
+        this.installationsSignal.set(ChatStoreService.keyed(installations, t => t.kind));
       this.setTeammates(teammates);
       this.defaultTeammateSignal.set(Object.isNull(preferred) ? null : DefaultTeammate.fromJson(preferred));
       this.projectsSignal.set(projects);
       this.missingFoldersSignal.set(new Set(listings.filter(t => t.folderMissing).map(t => t.project.id)));
       const existing = new Set([...conversations.values()].flat().map(t => t.id));
       const dropped = [...this.conversationsByProjectSignal().values()].flat().filter(t => !existing.has(t.id));
-      for (const [projectId, listed] of conversations)
-        conversations.set(projectId, [...listed, ...dropped.filter(t => t.projectId === projectId)]);
+      conversations.forEach((listed, projectId) => conversations.set(projectId, [...listed, ...dropped.filter(t => t.projectId === projectId)]));
       this.conversationsByProjectSignal.set(conversations);
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
-      this.setWorking(new Map(open.map(t => [t.id, t])));
+      this.setWorking(ChatStoreService.keyed(open, t => t.id));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
       this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
@@ -2510,16 +2515,25 @@ export class ChatStoreService {
     return this.waitingReplies().filter(t => chats.get(t) === conversationId);
   }
 
-  private learnChats(chats: readonly (readonly [string, string])[]): void {
-    const learned = chats.filter(([t]) => !this.replyChatsSignal().has(t));
-    if (learned.length > 0)
-      this.replyChatsSignal.update(t => new Map([...t, ...learned]));
+  private learnChats(chats: ReadonlyMap<string, string>): void {
+    const learned = ChatStoreService.where(chats, (_, t) => !this.replyChatsSignal().has(t));
+    if (learned.size > 0)
+      this.replyChatsSignal.update(t => {
+        const next = new Map(t);
+        learned.forEach((conversationId, messageId) => next.set(messageId, conversationId));
+        return next;
+      });
   }
 
   private learnTeammates(replies: readonly Message[]): void {
     const learned = replies.filter(t => !this.replyTeammatesSignal().has(t.id));
     if (learned.length > 0)
-      this.replyTeammatesSignal.update(t => new Map([...t, ...learned.map(u => [u.id, u.teammateId] as const)]));
+      this.replyTeammatesSignal.update(t => {
+        const next = new Map(t);
+        for (const reply of learned)
+          next.set(reply.id, reply.teammateId);
+        return next;
+      });
   }
 
   private resolveChat(messageId: string): void {
@@ -2531,23 +2545,23 @@ export class ChatStoreService {
         if (Object.isNull(value))
           return;
         const preview = ReplySummary.fromJson(value).preview;
-        this.learnChats([[messageId, preview.conversationId]]);
+        this.learnChats(new Map<string, string>().set(messageId, preview.conversationId));
         this.learnTeammates([preview]);
       }, () => undefined)
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
   private setWorking(working: ReadonlyMap<string, Message>): void {
-    this.learnChats([...working.values()].map(t => [t.id, t.conversationId] as const));
+    this.learnChats(ChatStoreService.mapped([...working.values()], t => t.id, t => t.conversationId));
     this.learnTeammates([...working.values()]);
     this.workingSignal.set(working);
     const conversationIds = new Set([...working.values()].map(t => t.conversationId));
-    for (const [conversationId, clear] of this.workingTabs) {
+    this.workingTabs.forEach((clear, conversationId) => {
       if (conversationIds.has(conversationId))
-        continue;
+        return;
       clear();
       this.workingTabs.delete(conversationId);
-    }
+    });
     for (const conversationId of conversationIds)
       if (!this.workingTabs.has(conversationId))
         this.workingTabs.set(conversationId, this.context.markWorking(Resources.conversationDocumentName, conversationId));
@@ -2565,7 +2579,7 @@ export class ChatStoreService {
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       if (this.watchedMessages !== seen || this.watchSubscriptions.length === 0)
         return;
-      this.setWorking(new Map(open.map(t => [t.id, t])));
+      this.setWorking(ChatStoreService.keyed(open, t => t.id));
       for (const message of seen.values())
         this.trackWorking(message);
     }, this.loadFailed(Resources.workingLoad, Resources.workingNotLoaded, null, () => this.readWorking())).then(t => {
@@ -2587,9 +2601,10 @@ export class ChatStoreService {
   private storeConversation(conversation: Conversation): void {
     this.conversationsByProjectSignal.update(t => {
       const next = new Map(t);
-      for (const [projectId, listed] of next)
+      next.forEach((listed, projectId) => {
         if (projectId !== conversation.projectId && listed.some(u => u.id === conversation.id))
           next.set(projectId, listed.filter(u => u.id !== conversation.id));
+      });
       next.set(conversation.projectId, ChatStoreService.upsert(next.get(conversation.projectId) ?? [], conversation));
       return next;
     });
@@ -2713,7 +2728,7 @@ export class ChatStoreService {
       window.isLoaded.set(true);
       this.markLoaded(Resources.formatNoticeKey(Resources.chatLoad, conversationId));
       const listed = ChatStoreService.readArray(listedApprovals, Approval.fromJson);
-      this.learnChats(listed.map(t => [t.messageId, conversationId] as const));
+      this.learnChats(ChatStoreService.mapped(listed, t => t.messageId, () => conversationId));
       this.learnTeammates(page.messages.filter(t => listed.some(u => u.messageId === t.id)));
       for (const approval of listed)
         this.upsertApproval(approval);
@@ -2826,14 +2841,13 @@ export class ChatStoreService {
     this.steersSignal.update(t => t.filter(u => u.conversationId !== conversationId));
     this.conversationsByProjectSignal.update(t => {
       const next = new Map(t);
-      for (const [projectId, conversations] of t)
-        next.set(projectId, conversations.filter(u => u.id !== conversationId));
+      t.forEach((conversations, projectId) => next.set(projectId, conversations.filter(u => u.id !== conversationId)));
       return next;
     });
     if (this.selectedConversationId() === conversationId || this.requestedConversationId === conversationId)
       this.deselectConversation();
     this.dismissUnsent(t => t === conversationId);
-    const actions = [...this.actionChats].filter(([, t]) => t === conversationId).map(([t]) => t);
+    const actions = [...ChatStoreService.where(this.actionChats, t => t === conversationId).keys()];
     for (const key of actions)
       this.actionChats.delete(key);
     this.notices.dismiss(Resources.chatActionFailedNotice, t => actions.includes(t));
@@ -2957,10 +2971,10 @@ export class ChatStoreService {
   private async followSignInTerminal(providerId: string, launchOf: TerminalLaunch | (() => Promise<TerminalLaunch>), report: (message: string) => void): Promise<void> {
     if (this.terminalSignInsSignal().has(providerId))
       return;
-    this.unfinishedSignInsSignal.update(t => new Map([...t].filter(([u]) => u !== providerId)));
+    this.unfinishedSignInsSignal.update(t => ChatStoreService.without(t, providerId));
     this.forgetSignInCommand(providerId);
     this.openSignInTerminalsSignal.update(t => new Set([...t, providerId]));
-    const launch = (typeof launchOf === "function" ? launchOf() : Promise.resolve(launchOf)).then(t => {
+    const launch = (launchOf instanceof TerminalLaunch ? Promise.resolve(launchOf) : launchOf()).then(t => {
       this.signInCommandsSignal.update(u => new Map(u).set(providerId, t.command));
       return t;
     });
@@ -2968,19 +2982,19 @@ export class ChatStoreService {
     this.forgetSignInCommand(providerId);
     this.openSignInTerminalsSignal.update(t => this.terminalSignInsSignal().has(providerId) ? t : new Set([...t].filter(u => u !== providerId)));
     if (ended !== false && this.providersSignal().some(t => t.id === providerId && t.enabled && t.authStatus !== AuthStatus.LoggedIn)) {
-      const { command } = await launch;
+      const command = (await launch).command;
       this.unfinishedSignInsSignal.update(t => new Map(t).set(providerId, command));
     }
   }
 
   private forgetSignInCommand(providerId: string): void {
-    this.signInCommandsSignal.update(t => new Map([...t].filter(([u]) => u !== providerId)));
+    this.signInCommandsSignal.update(t => ChatStoreService.without(t, providerId));
   }
 
   private async followProviderTerminal(running: WritableSignal<ReadonlySet<string>>, stops: Map<string, () => Promise<void>>, providerId: string,
     launchOf: TerminalLaunch | (() => Promise<TerminalLaunch>), report: (message: string) => void, wanted: AuthStatus | null): Promise<boolean | null> {
     running.update(t => new Set([...t, providerId]));
-    const launch = typeof launchOf === "function" ? launchOf() : launchOf;
+    const launch = launchOf instanceof TerminalLaunch ? launchOf : launchOf();
     let waiting = true;
     const release = (): void => {
       if (waiting)
@@ -3031,7 +3045,7 @@ export class ChatStoreService {
     finally {
       if (stops.get(key) === stop)
         stops.delete(key);
-      this.terminalSessionsSignal.update(t => t.get(key) === session ? new Map([...t].filter(([u]) => u !== key)) : t);
+      this.terminalSessionsSignal.update(t => t.get(key) === session ? ChatStoreService.without(t, key) : t);
       release();
     }
     return ended;
@@ -3122,8 +3136,11 @@ export class ChatStoreService {
   private static profileEnvironment(profile: ProviderProfile, folder: string): Record<string, string> {
     const separator = folder.includes(Resources.backslash) ? Resources.backslash : Resources.slash;
     const root = folder.endsWith(separator) ? folder.slice(0, -separator.length) : folder;
-    return { ...profile.personFolders.some(t => ProfileFolderPath.isSame(t, folder)) ? {} : { [profile.variable]: folder }, ...Object.fromEntries(Object.entries(profile.signInVariables)
-      .map(([name, path]) => [name, [root, ...path.split(Resources.slash)].join(separator)])), ...profile.signInValues };
+    const variables = JsonReader.fromValue(profile.signInVariables);
+    const environment: Record<string, string> = profile.personFolders.some(t => ProfileFolderPath.isSame(t, folder)) ? {} : { [profile.variable]: folder };
+    for (const name of Object.keys(profile.signInVariables))
+      environment[name] = [root, ...variables.readString(name).split(Resources.slash)].join(separator);
+    return { ...environment, ...profile.signInValues };
   }
 
   private async perform(action: () => Promise<void>, report: (message: string, error: unknown) => void): Promise<boolean> {
@@ -3213,7 +3230,7 @@ export class ChatStoreService {
   private notSent(conversationId: string, message: string, error: unknown): void {
     const ids = ChatStoreService.refusedIds(error, ErrorCode.Unavailable);
     const providerId = ids.at(-1) ?? null;
-    this.unsent.set(conversationId, { providerId, teammateId: ids.slice(0, -1).at(0) ?? null });
+    this.unsent.set(conversationId, new UnsentMessage(providerId, ids.slice(0, -1).at(0) ?? null));
     const isDisabled = this.providersSignal().some(t => t.id === providerId && !t.enabled);
     const actions = Object.isNull(providerId) ? [] : [
       ...isDisabled ? [new NotificationAction(Resources.enableProviderTitle,
@@ -3224,7 +3241,7 @@ export class ChatStoreService {
   }
 
   private dismissUnsent(isDismissed: (conversationId: string, providerId: string | null, teammateId: string | null) => boolean): void {
-    const dismissed = [...this.unsent].filter(([id, t]) => isDismissed(id, t.providerId, t.teammateId)).map(([id]) => id);
+    const dismissed = [...ChatStoreService.where(this.unsent, (t, id) => isDismissed(id, t.providerId, t.teammateId)).keys()];
     for (const id of dismissed)
       this.unsent.delete(id);
     this.notices.dismiss(Resources.messageNotSentNotice, t => dismissed.includes(t));
@@ -3264,7 +3281,7 @@ export class ChatStoreService {
       await action();
     }
     catch (error) {
-      if (!(error instanceof Error) || Reflect.get(error, Resources.errorCodeField) !== ErrorCode.Conflict)
+      if (!(error instanceof RuntimeRequestException) || error.code !== ErrorCode.Conflict)
         throw error;
     }
   }
@@ -3278,28 +3295,28 @@ export class ChatStoreService {
   }
 
   private static refusedIds(error: unknown, code: ErrorCode): readonly string[] {
-    return Reflect.get(Object(error), Resources.errorCodeField) === code ? ChatStoreService.refusedArguments(error) : [];
+    return error instanceof RuntimeRequestException && error.code === code ? ChatStoreService.refusedArguments(error) : [];
   }
 
   private static refusesSustain(error: unknown): boolean {
-    return ChatStoreService.refusedArguments(error).some(t => ChatStoreService.sustainFields.includes(t));
+    return error instanceof RuntimeRequestException && ChatStoreService.refusedArguments(error).some(t => ChatStoreService.sustainFields.includes(t));
   }
 
   private static refusesHandOffs(error: unknown): boolean {
-    return ChatStoreService.refusedArguments(error).includes(ProtocolResources.usageHandOffsField);
+    return error instanceof RuntimeRequestException && ChatStoreService.refusedArguments(error).includes(ProtocolResources.usageHandOffsField);
   }
 
-  private static refusedArguments(error: unknown): readonly string[] {
-    const details: unknown = Reflect.get(Object(error), Resources.errorDetailsField);
-    const ids: unknown = Object.isObject(details) ? Reflect.get(details, Resources.errorArgumentsField) : null;
-    return Array.isArray(ids) ? ids.filter((t): t is string => typeof t === "string") : [];
+  private static refusedArguments(error: RuntimeRequestException): readonly string[] {
+    const ids = error.details?.[Resources.errorArgumentsField];
+    return Array.isArray(ids) ? ids.filter(t => Object.isString(t)) : [];
   }
 
-  private static movedSettings(teammate: Teammate, catalog: ModelCatalog): [string | null, string | null, string | null] {
+  private static movedSettings(teammate: Teammate, catalog: ModelCatalog): TeammateModelSettings {
     if (catalog.failed)
-      return [teammate.model, teammate.effort, teammate.speed];
+      return new TeammateModelSettings(teammate.model, teammate.effort, teammate.speed);
     const model = catalog.resolveModel(teammate.model);
-    return model === teammate.model ? [model, catalog.resolveEffort(model, teammate.effort), catalog.resolveSpeed(model, teammate.speed)] : [model, null, null];
+    return model === teammate.model ? new TeammateModelSettings(model, catalog.resolveEffort(model, teammate.effort), catalog.resolveSpeed(model, teammate.speed))
+      : new TeammateModelSettings(model, null, null);
   }
 
   private static byMessage(approvals: readonly Approval[]): ReadonlyMap<string, readonly Approval[]> {
@@ -3335,9 +3352,35 @@ export class ChatStoreService {
     return JSON.stringify([kind, providerId]);
   }
 
-  private static upsert<T extends { readonly id: string }>(items: readonly T[], item: T): readonly T[] {
+  private static upsert<T extends IIdentified>(items: readonly T[], item: T): readonly T[] {
     const index = items.findIndex(t => t.id === item.id);
     return index < 0 ? [...items, item] : items.map((t, i) => i === index ? item : t);
+  }
+
+  private static without<K, V>(map: ReadonlyMap<K, V>, key: K): ReadonlyMap<K, V> {
+    const next = new Map(map);
+    next.delete(key);
+    return next;
+  }
+
+  private static where<K, V>(map: ReadonlyMap<K, V>, test: (value: V, key: K) => boolean): ReadonlyMap<K, V> {
+    const kept = new Map<K, V>();
+    map.forEach((value, key) => {
+      if (test(value, key))
+        kept.set(key, value);
+    });
+    return kept;
+  }
+
+  private static keyed<K, V>(items: readonly V[], keyOf: (item: V) => K): ReadonlyMap<K, V> {
+    return ChatStoreService.mapped(items, keyOf, t => t);
+  }
+
+  private static mapped<T, K, V>(items: readonly T[], keyOf: (item: T) => K, valueOf: (item: T) => V): ReadonlyMap<K, V> {
+    const map = new Map<K, V>();
+    for (const item of items)
+      map.set(keyOf(item), valueOf(item));
+    return map;
   }
 
   private static readArray<T>(value: JsonValue, read: (item: unknown) => T): readonly T[] {

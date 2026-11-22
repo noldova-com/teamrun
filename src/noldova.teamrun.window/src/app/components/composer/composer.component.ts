@@ -97,6 +97,7 @@ import { ModelCatalog } from "../../models/model-catalog";
 import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
 import type { RewoundDraft } from "../../models/rewound-draft";
+import { TeammateModelSettings } from "../../models/teammate-model-settings";
 import { ViewedImage } from "../../models/viewed-image";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
@@ -988,7 +989,7 @@ export class ComposerComponent {
   protected async makeDefault(teammate: Teammate): Promise<void> {
     const settings = this.memberSettings();
     const conversationId = this.conversationId();
-    if (!Object.isNull(settings) && await this.store.editTeammate(teammate.id, teammate.providerId, () => [settings.model, settings.effort, settings.speed]))
+    if (!Object.isNull(settings) && await this.store.editTeammate(teammate.id, teammate.providerId, () => new TeammateModelSettings(settings.model, settings.effort, settings.speed)))
       await this.store.setMemberSettings(conversationId, teammate.id, null);
   }
 

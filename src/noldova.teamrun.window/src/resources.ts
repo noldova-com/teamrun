@@ -56,7 +56,6 @@ export class Resources {
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
   public static readonly errorCodeField: string = "code";
-  public static readonly errorDetailsField: string = "details";
   public static readonly errorArgumentsField: string = "arguments";
   public static readonly modelCatalogLifetime: number = 300_000;
   public static readonly draftSaveInterval: number = 500;
