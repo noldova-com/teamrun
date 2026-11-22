@@ -1191,7 +1191,7 @@ describe("OrganizationViewComponent", () => {
 
       const shown = [await createAsync(one(":scope > .adds > .add-member", department("Build")), "Dana"),
         await createAsync(one(":scope > .adds > .add-member", nodeOf("Bob")), "Eve"),
-        await createAsync(one(".chart .kids .adds .add-member"), "Finn")];
+        await createAsync(one(".chart .kid.adds > .add-member"), "Finn")];
       const id = (name: string): string => Required.of(ids.get(name));
 
       expect([shown, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([["Dana", "Eve", "Finn"], null, [
