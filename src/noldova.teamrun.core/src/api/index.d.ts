@@ -9181,7 +9181,8 @@ export declare class ConversationTitle {
 
   /**
    * Initializes the title from a chat's first message.
-   * @param message The message.
+   * @param message The message, with at least one line that isn't blank.
+   * @throws {ArgumentException} The message has no line that isn't blank.
    */
   public constructor(message: string);
 

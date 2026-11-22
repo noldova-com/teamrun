@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { ArgumentException } from "@noldova/context.exceptions";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { ConversationTitle, TitleModel } from "@noldova/teamrun.core";
 
@@ -14,7 +15,11 @@ export class ConversationTitleTests {
   @TestMethod
   public takesTheFirstLineWithTextTrimmed(): void {
     Assert.areEqual("Fix the login bug", new ConversationTitle("\n \n  Fix the login bug  \nand more").text);
-    Assert.areEqual(String.empty, new ConversationTitle(" \n ").text);
+  }
+
+  @TestMethod
+  public refusesAMessageWithNoLineThatIsntBlank(): void {
+    Assert.areEqual("message", Assert.throws(() => new ConversationTitle(" \n "), ArgumentException).parameterName);
   }
 
   @TestMethod

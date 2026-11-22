@@ -38,9 +38,11 @@ export class ReplySummaryTests {
     Assert.areEqual("{\"tool\":\"Bash\",\"toolUseId\":\"t1\",\"isError\":false,\"status\":\"declined\",\"denied\":true}",
       JSON.stringify(summary.preview.details[0]?.payload));
     Assert.areEqual(512, summary.preview.details[3]?.text.length);
-    Assert.areEqual(2, summary.files[0]?.additions);
-    Assert.areEqual(1, summary.files[0]?.deletions);
-    Assert.isTrue(summary.files[0]?.hasDiff ?? false);
+    const file = summary.files[0];
+    Assert.isDefined(file);
+    Assert.areEqual(2, file.additions);
+    Assert.areEqual(1, file.deletions);
+    Assert.isTrue(file.hasDiff);
     Assert.areEqual(json, JSON.stringify(restored.toJson()));
     Assert.isTrue(restored.hasEarlier);
     Assert.isFalse(restored.hasLater);
