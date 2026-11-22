@@ -2615,7 +2615,7 @@ export declare class Resources {
    * How many teammate hand-offs a chain takes when nothing sets the limit: 4.
    */
   public static readonly defaultHopLimit: number;
-  /** The longest title TeamRun makes, in characters. */
+  /** The longest title TeamRun makes, in code points. */
   public static readonly maximumTitleLength: number;
   /** How much of a chat's first message a model reads to make its title, in characters. */
   public static readonly titleOpeningLength: number;
@@ -9175,7 +9175,8 @@ export declare class ToolWindows {
  */
 export declare class ConversationTitle {
   /**
-   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` with an ellipsis.
+   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis, so a character
+   * outside the Basic Multilingual Plane, such as an emoji, is never split.
    */
   public readonly text: string;
 
