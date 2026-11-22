@@ -1675,7 +1675,8 @@ export interface IBackgroundTasksService {
 
   /**
    * Adds output to a running task, keeping the latest `Resources.maximumBackgroundTaskOutput`
-   * characters, and publishes it; nothing for an unknown or ended task or empty text.
+   * characters, and publishes it, the output gathered since the last publish cut to its latest that many characters too;
+   * nothing for an unknown or ended task or empty text.
    * @param messageId The id of the reply that started the task.
    * @param taskId The provider's id of the task.
    * @param text The new output.
