@@ -8,11 +8,12 @@
 
 import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
-import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
+import { JsonReader, type JsonObject } from "@noldova/context.json";
 
 import { ChatWakeKind } from "../enums/chat-wake-kind.js";
 import { ChatWakeState } from "../enums/chat-wake-state.js";
 import { Resources } from "../resources.js";
+import { JsonObjects } from "./json-objects.js";
 
 export class ChatWake {
   public readonly id: string;
@@ -21,7 +22,6 @@ export class ChatWake {
   public readonly sourceMessageId: string;
   public readonly watchedChatId: string;
   public readonly watchedIds: readonly string[];
-  /** The first of the watched replies, which names a reply wake's sender. */
   public readonly firstWatchedId: string;
   public readonly state: ChatWakeState;
   public readonly text: string | null;
@@ -67,7 +67,7 @@ export class ChatWake {
       reader.readNullableString(Resources.textField),
       reader.readNullableInteger(Resources.hopField),
       reader.readNonBlankString(Resources.createdAtField),
-      ChatWake.isJsonObject(view) ? view : null);
+      JsonObjects.is(view) ? view : null);
   }
 
   public settled(state: ChatWakeState, text: string, hop: number | null, view: JsonObject | null = this.view): ChatWake {
@@ -88,9 +88,5 @@ export class ChatWake {
       [Resources.createdAtField]: this.createdAt,
       ...Object.isNull(this.view) ? {} : { [Resources.viewField]: this.view }
     };
-  }
-
-  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 }

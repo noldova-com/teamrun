@@ -175,7 +175,6 @@ export class McpToolCalls {
     return JsonObjects.is(annotations) && annotations["readOnlyHint"] === true;
   }
 
-
   private static turnStopped(): JsonObject {
     return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.turnStoppedCode, Resources.mcpTurnStopped));
   }

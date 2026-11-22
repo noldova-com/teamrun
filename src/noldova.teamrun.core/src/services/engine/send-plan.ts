@@ -19,9 +19,7 @@ export class SendPlan {
   public readonly group: ReplyWork[] | null;
   public readonly mentions: readonly Teammate[];
   public readonly called: readonly Teammate[];
-  /** The teammates who reply. */
   public readonly participants: readonly Teammate[];
-  /** The default reply's settings, set exactly when the default teammate replies. */
   public readonly defaultReply: RequestedSettings | null;
   public readonly providerId: string | null;
   public readonly hop: number;
