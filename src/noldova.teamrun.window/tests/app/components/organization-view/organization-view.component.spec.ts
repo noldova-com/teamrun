@@ -1062,7 +1062,7 @@ describe("OrganizationViewComponent", () => {
         [new RecordedRequest(MethodName.DepartmentDelete, { organizationId: "my-organization", departmentId: "build" })]]);
     });
 
-    it("removes a member from its card once you confirm, moves it under any place in the tree, and shows neither once editing is done", async () => {
+    it("moves a member out of its unit from its card once you confirm, moves it under any place in the tree, and shows neither once editing is done", async () => {
       await editAsync();
 
       one(".remove", card("Bob")).click();
@@ -1081,7 +1081,7 @@ describe("OrganizationViewComponent", () => {
 
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
-        ["Remove member", "Remove Bob from Design? Bob will report to you.", "Remove"], "Remove Bob",
+        ["Move out of unit", "Move Bob out of Design? Bob will report to you.", "Move out"], "Move Bob out of Design",
         ["You", "Design (Department)", "Alice", "UI (Department)", "Code Reviewer", "Build (Department)", "Offline"], 0]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }),
         new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
@@ -1101,8 +1101,80 @@ describe("OrganizationViewComponent", () => {
       one(".top .edit").click();
       await settle();
 
-      expect([before, asking[1], reports()]).toEqual([[], "Remove Bob from Design? Bob will report to you.", ["Bob"]]);
+      expect([before, asking[1], reports()]).toEqual([[], "Move Bob out of Design? Bob will report to you.", ["Bob"]]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null })]);
+    });
+
+    it("takes a unit member, a unit leader, a teammate with reports and a direct report out of the organization from their cards once you confirm, saying where the reports go", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf(sample.departments, [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
+        new TeammatePlacement("bob", OrganizationParent.department("design"), 1), new TeammatePlacement("offline", OrganizationParent.person, 0),
+        new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 0)]).toJson());
+      await settle();
+      const removeAsync = async (name: string, answer: string): Promise<string[]> => {
+        one(".remove-from-organization", card(name)).click();
+        const asking = await dialogAsync();
+        await answerAsync(answer);
+        return asking;
+      };
+
+      const label = one(".remove-from-organization", card("Bob")).getAttribute("aria-label");
+      const cancelled = await removeAsync("Bob", ".nol-teamrun-cancel");
+      const asked0 = asked.length;
+      const member = await removeAsync("Bob", ".nol-teamrun-confirm");
+      const leader = await removeAsync("Alice", ".nol-teamrun-confirm");
+      const direct = await removeAsync("Offline", ".nol-teamrun-confirm");
+      const placed = (id: string): RecordedRequest => new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id, parent: null, order: Resources.organizationLastOrder });
+
+      expect([label, cancelled, asked0]).toEqual(["Remove Bob from the organization",
+        ["Remove teammate", "Remove Bob from My organization? Bob keeps its chats and can be added back.", "Remove"], 0]);
+      expect([member[1], leader[1], direct[1]]).toEqual(["Remove Bob from My organization? Bob keeps its chats and can be added back.",
+        "Remove Alice from My organization? Alice keeps its chats and can be added back. The teammates and units under Alice will report to Design.",
+        "Remove Offline from My organization? Offline keeps its chats and can be added back."]);
+      expect(asked).toEqual([placed("bob"), placed("alice"), placed("offline")]);
+    });
+
+    it("leaves a teammate taken out of the organization off the Tree, the Board, Focus and the To choices, and adds it back from Add teammate", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf(sample.departments,
+        sample.placements.filter(t => t.teammateId !== "bob")).toJson());
+      await settle();
+      const names = (): string[] => texts("nol-teamrun-organization-card .name");
+      const tree = names();
+      one(".top .edit").click();
+      await settle();
+      await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
+      await Wait.until(() => expect(document.querySelectorAll(".nol-select-option").length).toBeGreaterThan(0));
+      const offered = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      await pickView("Board");
+      const board = names();
+      await pickView("Focus");
+      const focused = names();
+      await pickView("Tree");
+      one(".top .edit").click();
+      await settle();
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "bo");
+      await pickAsync("Bob");
+
+      expect([tree.includes("Bob"), offered.some(t => t.includes("Bob")), board.includes("Bob"), focused.includes("Bob"), tree.includes("Alice")])
+        .toEqual([false, false, false, false, true]);
+      expect(asked).toEqual([new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
+    });
+
+    it.each(["Board", "Focus"])("offers Remove from the organization on every card on the %s while editing, and sends it once you confirm", async view => {
+      await editAsync();
+      await pickView(view);
+      const cards = all("nol-teamrun-organization-card");
+      const offered = cards.map(t => all(".remove-from-organization", t).length);
+
+      one(".remove-from-organization", Required.of(cards[0])).click();
+      await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+
+      expect([cards.length > 0, offered.every(t => t === 1)]).toEqual([true, true]);
+      expect(asked).toEqual([expect.objectContaining({ method: MethodName.TeammatePlace, parameters: expect.objectContaining({ organizationId: "my-organization", parent: null }) })]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {

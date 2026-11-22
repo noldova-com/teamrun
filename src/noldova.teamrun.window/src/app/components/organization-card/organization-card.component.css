@@ -74,7 +74,8 @@
   flex: none;
 }
 
-.remove {
+.remove,
+.remove-from-organization {
   flex: none;
 }
 
