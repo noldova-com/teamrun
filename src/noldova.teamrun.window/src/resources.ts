@@ -396,6 +396,7 @@ export class Resources {
   public static readonly pinnedGroupId: string = "teamrun-pinned-group";
   public static readonly projectsGroupId: string = "teamrun-projects-group";
   public static readonly chatsGroupId: string = "teamrun-chats-group";
+  public static readonly organizationsGroupId: string = "teamrun-organizations-group";
   public static readonly projectConversationCount: number = 10;
   public static readonly newConversationLabel: string = "New chat";
   public static readonly openProjectLabel: string = "Open folder";
@@ -411,6 +412,10 @@ export class Resources {
   public static readonly projectsIcon: string = "folder_copy";
   public static readonly chatsTitle: string = "Chats";
   public static readonly chatsIcon: string = "chat";
+  public static readonly organizationsTitle: string = "Organizations";
+  public static readonly organizationsIcon: string = "corporate_fare";
+  public static readonly departmentPathSeparator: string = " › ";
+  public static readonly openOrganizationLabel: string = "Open organization";
   public static readonly noProjects: string = "Open a folder to start.";
   public static readonly noConversations: string = "No chats yet.";
   public static readonly untitledConversation: string = "Untitled";
@@ -2104,6 +2109,15 @@ export class Resources {
   public static formatOrganizationChatKey(organizationId: string, teammateId: string): string {
     return `${organizationId}/${teammateId}`;
   }
+
+  public static formatOrganizationExplorerKey(organizationId: string): string {
+    return `organization:${organizationId}`;
+  }
+
+  public static formatOrganizationChatNotOpened(message: string): string {
+    return `The Explorer couldn't open the Organization chat: ${message}`;
+  }
+
   public static formatOrganizationFanOutRetry(key: string, text: string, sources: readonly string[]): string {
     return JSON.stringify([key, text, sources]);
   }

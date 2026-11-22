@@ -13,7 +13,7 @@ import { Component, DestroyRef, ElementRef, Injector, type Signal, type Writable
 
 import "@noldova/context.core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import type { Conversation, Project } from "@noldova/teamrun.protocol";
+import { Conversation, MethodName, OrganizationChat, type Project, type Teammate } from "@noldova/teamrun.protocol";
 import {
   AnnouncementPoliteness,
   Announcer,
@@ -34,12 +34,14 @@ import { Resources } from "../../../resources";
 import { ChatAction } from "../../enums/chat-action";
 import { ProjectsGroup } from "../../enums/projects-group";
 import { ConfirmRequest } from "../../models/confirm-request";
+import { OrganizationExplorer } from "../../models/organization-explorer";
 import { TreeFocus } from "../../models/tree-focus";
 import { BrowserAvailability } from "../../services/browser-availability";
 import { ChatPlacement } from "../../services/chat-placement";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ConversationActions } from "../../services/conversation-actions";
+import { OrganizationCatalog } from "../../services/organization-catalog";
 import { ProjectsLayoutService } from "../../services/projects-layout.service";
 import { TimeFormatService } from "../../services/time-format.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
@@ -72,12 +74,13 @@ export class ProjectsViewComponent {
   protected readonly pinsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly projectsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly chatsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
+  protected readonly organizationsTree: TreeFocus = new TreeFocus(this.treeItems, this.store.shownConversationId, this.injector);
   protected readonly moveShortcuts: string = navigator.platform.startsWith(Resources.macPlatformPrefix) ? Resources.macTreeMoveShortcuts : Resources.treeMoveShortcuts;
   protected readonly groups: typeof ProjectsGroup = ProjectsGroup;
   protected readonly rowShortcuts: string = `${this.moveShortcuts} ${Resources.renameKey}`;
 
   protected readonly pinnedConversations: Signal<readonly Conversation[]> = computed(() =>
-    this.layout.pinnedConversations().map(t => this.store.conversation(t)).filter((t): t is Conversation => !Object.isNull(t)));
+    this.layout.pinnedConversations().map(t => this.store.conversation(t)).filter((t): t is Conversation => !Object.isNull(t) && Object.isNull(t.organizationChat)));
 
   protected readonly orderedProjects: Signal<readonly Project[]> = computed(() => this.layout.ordered(this.store.projects()));
 
@@ -88,6 +91,22 @@ export class ProjectsViewComponent {
   protected readonly canOpenBrowser: Signal<boolean> = computed(() => BrowserAvailability.isActive(this.context));
 
   protected readonly chats: Signal<readonly Conversation[]> = computed(() => this.orderedConversationsOf(null));
+
+  private readonly catalog: OrganizationCatalog = OrganizationCatalog.of(this.context);
+  protected readonly organizations: Signal<readonly OrganizationExplorer[]> = computed(() =>
+    this.catalog.organizations().map(t => OrganizationExplorer.of(t, this.store.teammates())));
+
+  protected readonly hasOrganization: Signal<boolean> = computed(() =>
+    this.organizations().some(t => !t.isEmpty));
+
+  private readonly organizationChats: Signal<ReadonlyMap<string, Conversation>> = computed(() => {
+    const chats = new Map<string, Conversation>();
+    for (const projectId of [null, ...this.store.projects().map(t => t.id)])
+      for (const chat of this.store.newestConversationsOf(projectId))
+        if (!Object.isNull(chat.organizationChat))
+          chats.set(Resources.formatOrganizationChatKey(chat.organizationChat.organizationId, chat.organizationChat.teammateId), chat);
+    return chats;
+  });
 
   protected readonly shownChats: Signal<readonly Conversation[]> = computed(() =>
     this.areChatsUnfolded() ? this.chats() : this.chats().slice(0, Resources.projectConversationCount));
@@ -101,6 +120,40 @@ export class ProjectsViewComponent {
     ConversationActions.open(this.context, this.store, conversation);
     if (conversation.id === this.store.shownConversationId())
       void this.store.selectConversation(conversation.id);
+  }
+
+  protected chatOf(organizationId: string, teammate: Teammate): Conversation | null {
+    return this.organizationChats().get(Resources.formatOrganizationChatKey(organizationId, teammate.id)) ?? null;
+  }
+
+  protected async openTeammate(organizationId: string, teammate: Teammate): Promise<void> {
+    const chat = this.chatOf(organizationId, teammate);
+    if (Object.isNull(chat))
+      await this.openOrganizationChat(organizationId, teammate.id);
+    else
+      this.open(chat);
+  }
+
+  protected isChatMarked(organizationId: string, teammate: Teammate): boolean {
+    const chat = this.chatOf(organizationId, teammate);
+    return !Object.isNull(chat) && chat.id === this.store.markedConversationId();
+  }
+
+  protected openOrganization(organization: OrganizationExplorer): void {
+    this.context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
+  }
+
+  private async openOrganizationChat(organizationId: string, teammateId: string): Promise<void> {
+    let chat: Conversation;
+    try {
+      chat = Conversation.fromJson(await this.context.requestAsync(Resources.formatQualifiedName(MethodName.OrganizationChatOpen),
+        new OrganizationChat(organizationId, teammateId).toJson()));
+    }
+    catch (error) {
+      this.context.log(Resources.formatOrganizationChatNotOpened(String(error)));
+      return;
+    }
+    this.open(chat);
   }
 
   protected isMarked(projectId: string): boolean {
@@ -318,7 +371,7 @@ export class ProjectsViewComponent {
 
   private orderedConversationsOf(projectId: string | null): readonly Conversation[] {
     const pinned = this.layout.pinnedConversations();
-    const newest = this.store.newestConversationsOf(projectId).filter(t => !pinned.includes(t.id));
+    const newest = this.store.newestConversationsOf(projectId).filter(t => !pinned.includes(t.id) && Object.isNull(t.organizationChat));
     const order = this.layout.layout().conversationOrderOf(projectId ?? Resources.chatsOrderKey);
     const named = order.map(id => newest.find(t => t.id === id)).filter((t): t is Conversation => !Object.isUndefined(t));
     return [...named, ...newest.filter(t => !order.includes(t.id))];
