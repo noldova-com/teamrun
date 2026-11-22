@@ -25,11 +25,15 @@ import type { TestOptions } from "../test-options.ts";
 import { RunnerResult } from "../totals/runner-result.ts";
 import { TotalsException } from "../totals/totals.exception.ts";
 import { CheckSelection } from "./check-selection.ts";
+import { FailedTest } from "./failed-test.ts";
 import type { FlakyRecord } from "./flaky-record.ts";
 import { FlakyTest } from "./flaky-test.ts";
 import type { ISelectableCheck } from "./interfaces/i-selectable-check.ts";
+import { IsolatedTest } from "./isolated-test.ts";
 import { PackageCoverage } from "./package-coverage.ts";
 import { PackageTestEntry } from "./package-test-entry.ts";
+import { ShardProgress } from "./shard-progress.ts";
+import { ShardResults } from "./shard-results.ts";
 
 export class PackageTestCheck implements ISelectableCheck {
   public static readonly RUNNER: string = "package";
@@ -46,6 +50,8 @@ export class PackageTestCheck implements ISelectableCheck {
   private static readonly CLAIMS_SEGMENTS: readonly string[] = ["_build", "test-claims"];
   private static readonly SHARDS_VARIABLE: string = "NOLDOVA_TEST_SHARDS";
   private static readonly SHARD_LIMIT: number = 4;
+  private static readonly SOURCE_EXTENSION: RegExp = /\.ts$/u;
+  private static readonly COMPILED_EXTENSION: string = ".js";
   private static readonly NO_EXCLUSIONS: string = "[]";
   private static readonly TOTALS_TITLE: string = "Package tests";
   private static readonly RESULTS_SEGMENTS: readonly string[] = ["_build", "package-test-results.json"];
@@ -101,7 +107,7 @@ export class PackageTestCheck implements ISelectableCheck {
 `;
   }
 
-  public static formatPlace(progress: { test: string; isRunning: boolean } | null): string {
+  public static formatPlace(progress: ShardProgress | null): string {
     if (progress === null)
       return "before any test started";
     return progress.isRunning ? `while ${progress.test} was running` : `after ${progress.test} ended`;
@@ -123,10 +129,11 @@ export class PackageTestCheck implements ISelectableCheck {
       const coverage = path.join(this.root, ...PackageTestCheck.COVERAGE_SEGMENTS);
       const resultFile = path.join(this.root, ...PackageTestCheck.RESULT_SEGMENTS);
       const tests = tested.flatMap(t => [t.name, layout.locateCompiledTests(t)]);
+      const isolated = tested.flatMap(t => t.isolatedTests.map(u => `${t.name}/${u.replace(PackageTestCheck.SOURCE_EXTENSION, PackageTestCheck.COMPILED_EXTENSION)}`));
       await mkdir(path.dirname(resultFile), { recursive: true });
       await rm(resultFile, { force: true });
       let environment: NodeJS.ProcessEnv = { ...this.environment, [PackageTestEntry.FILTERS_VARIABLE]: JSON.stringify(filters), [PackageTestEntry.RESULT_VARIABLE]: resultFile,
-        [PackageTestEntry.SKIP_DETAILS_VARIABLE]: String(this.skipsTestDetails) };
+        [PackageTestEntry.SKIP_DETAILS_VARIABLE]: String(this.skipsTestDetails), [PackageTestEntry.ISOLATED_VARIABLE]: JSON.stringify(isolated) };
       if (!isFiltered) {
         await rm(coverage, { recursive: true, force: true });
         await mkdir(coverage, { recursive: true });
@@ -134,8 +141,8 @@ export class PackageTestCheck implements ISelectableCheck {
       }
       const commandArguments = [PackageTestCheck.SOURCE_MAPS_OPTION, path.join(this.root, ...PackageTestCheck.ENTRY_SEGMENTS), ...tests];
       const testsPassed = this.flaky === null || isFiltered
-        ? await this.runEntryAsync(commandArguments, environment, output)
-        : await this.runRerunningFailedAsync(commandArguments, environment, this.flaky, output);
+        ? await this.runEntryAsync(commandArguments, environment, isolated, output)
+        : await this.runRerunningFailedAsync(commandArguments, environment, isolated, this.flaky, output);
       const result = await RunnerResult.readAsync(this.root, resultFile);
       if (isFiltered) {
         if (result.discovered === 0)
@@ -161,11 +168,12 @@ export class PackageTestCheck implements ISelectableCheck {
     }
   }
 
-  private async runRerunningFailedAsync(commandArguments: readonly string[], environment: NodeJS.ProcessEnv, flaky: FlakyRecord, output: Writable): Promise<boolean> {
+  private async runRerunningFailedAsync(commandArguments: readonly string[], environment: NodeJS.ProcessEnv, isolated: readonly string[], flaky: FlakyRecord,
+    output: Writable): Promise<boolean> {
     const results = path.join(this.root, ...PackageTestCheck.RESULTS_SEGMENTS);
     const recording = { ...environment, [PackageTestEntry.RESULTS_VARIABLE]: results };
     await rm(results, { force: true });
-    if (await this.runEntryAsync(commandArguments, recording, output))
+    if (await this.runEntryAsync(commandArguments, recording, isolated, output))
       return true;
     const first = await this.readResultsAsync(results);
     if (first === null || !first.isComplete || first.failed.length === 0)
@@ -174,7 +182,7 @@ export class PackageTestCheck implements ISelectableCheck {
     await rm(results, { force: true });
     const rerunResult = path.join(this.root, ...PackageTestCheck.RERUN_RESULT_SEGMENTS);
     const rerun = { ...recording, [PackageTestEntry.FILTERS_VARIABLE]: JSON.stringify(first.failed.map(t => t.identity)), [PackageTestEntry.RESULT_VARIABLE]: rerunResult };
-    const isPassing = await this.runEntryAsync(commandArguments, rerun, output);
+    const isPassing = await this.runEntryAsync(commandArguments, rerun, isolated, output);
     const second = await this.readResultsAsync(results);
     if (second === null || !second.isComplete)
       return false;
@@ -188,8 +196,11 @@ export class PackageTestCheck implements ISelectableCheck {
     return new Set(covered.filter(t => t.dependencies.some(u => angular.has(u))).map(t => `${t.name}/${PackageTestCheck.WINDOW_ENTRY}`));
   }
 
-  private static formatShards(count: number): string {
-    return count === 1 ? "Running the package tests in one process.\n" : `Running the package tests in ${count} processes, each taking the next test file.\n`;
+  private static formatShards(count: number, isolated: number): string {
+    const shards = count === 1 ? "Running the package tests in one process" : `Running the package tests in ${count} processes, each taking the next test file`;
+    if (isolated === 0)
+      return `${shards}.\n`;
+    return `${shards}, after taking turns at ${isolated === 1 ? "1 test file that runs" : `${isolated} test files that run`} alone, each in a process of its own.\n`;
   }
 
   private static shardFile(file: string, index: number): string {
@@ -248,7 +259,7 @@ export class PackageTestCheck implements ISelectableCheck {
     return Number.isInteger(chosen) && chosen > 0 ? chosen : Math.min(PackageTestCheck.SHARD_LIMIT, availableParallelism());
   }
 
-  private async runEntryAsync(commandArguments: readonly string[], environment: NodeJS.ProcessEnv, output: Writable): Promise<boolean> {
+  private async runEntryAsync(commandArguments: readonly string[], environment: NodeJS.ProcessEnv, isolated: readonly string[], output: Writable): Promise<boolean> {
     const resultFile = environment[PackageTestEntry.RESULT_VARIABLE];
     const resultsFile = environment[PackageTestEntry.RESULTS_VARIABLE];
     const claims = path.join(this.root, ...PackageTestCheck.CLAIMS_SEGMENTS);
@@ -257,9 +268,11 @@ export class PackageTestCheck implements ISelectableCheck {
     await mkdir(claims, { recursive: true });
     if (resultFile !== undefined)
       await rm(resultFile, { force: true });
-    output.write(PackageTestCheck.formatShards(count));
-    const shards = Array.from({ length: count }, (_, t) => t);
-    const ends = await Promise.allSettled(shards.map(t => this.runShardAsync(t, count, commandArguments, { ...environment, [PackageTestEntry.CLAIMS_VARIABLE]: claims }, output)));
+    output.write(PackageTestCheck.formatShards(count, isolated.length));
+    const total = count + isolated.length;
+    const shards = Array.from({ length: total }, (_, t) => t);
+    const alone = isolated.map((t, u) => new IsolatedTest(count + u, t));
+    const ends = await Promise.allSettled(shards.slice(0, count).map(t => this.runLaneAsync(t, total, alone, commandArguments, environment, claims, output)));
     for (const end of ends)
       if (end.status === "rejected")
         throw end.reason;
@@ -268,6 +281,14 @@ export class PackageTestCheck implements ISelectableCheck {
     if (resultsFile !== undefined && resultFile !== undefined && existsSync(resultFile))
       await PackageTestCheck.mergeResultsAsync(shards.map(t => PackageTestCheck.shardFile(resultsFile, t)), resultsFile, (await RunnerResult.readAsync(this.root, resultFile)).unreached === 0);
     return ends.every(t => t.status === "fulfilled" && t.value);
+  }
+
+  private async runLaneAsync(index: number, total: number, alone: IsolatedTest[], commandArguments: readonly string[], environment: NodeJS.ProcessEnv,
+    claims: string, output: Writable): Promise<boolean> {
+    let isPassing = true;
+    for (let next = alone.shift(); next !== undefined; next = alone.shift())
+      isPassing = await this.runShardAsync(next.index, total, commandArguments, { ...environment, [PackageTestEntry.ALONE_VARIABLE]: next.file }, output) && isPassing;
+    return await this.runShardAsync(index, total, commandArguments, { ...environment, [PackageTestEntry.CLAIMS_VARIABLE]: claims }, output) && isPassing;
   }
 
   private async runShardAsync(index: number, count: number, commandArguments: readonly string[], environment: NodeJS.ProcessEnv, output: Writable): Promise<boolean> {
@@ -301,7 +322,7 @@ export class PackageTestCheck implements ISelectableCheck {
     return end.isSuccessful;
   }
 
-  private static async readProgressAsync(file: string): Promise<{ test: string; isRunning: boolean } | null> {
+  private static async readProgressAsync(file: string): Promise<ShardProgress | null> {
     let progress: unknown;
     try {
       progress = JSON.parse(await readFile(file, PackageTestCheck.RESULTS_ENCODING));
@@ -310,10 +331,10 @@ export class PackageTestCheck implements ISelectableCheck {
       return null;
     }
     const fields = typeof progress === "object" && progress !== null ? progress as Record<string, unknown> : {};
-    return typeof fields["test"] === "string" && typeof fields["isRunning"] === "boolean" ? { test: fields["test"], isRunning: fields["isRunning"] } : null;
+    return typeof fields["test"] === "string" && typeof fields["isRunning"] === "boolean" ? new ShardProgress(fields["test"], fields["isRunning"]) : null;
   }
 
-  private async readResultsAsync(file: string): Promise<{ isComplete: boolean; failed: readonly { identity: string; file: string; failure: string }[] } | null> {
+  private async readResultsAsync(file: string): Promise<ShardResults | null> {
     let results: unknown;
     try {
       results = JSON.parse(await readFile(file, PackageTestCheck.RESULTS_ENCODING));
@@ -325,6 +346,9 @@ export class PackageTestCheck implements ISelectableCheck {
     const failed = fields["failed"];
     if (typeof fields["isComplete"] !== "boolean" || !Array.isArray(failed) || failed.some(t => typeof t !== "object" || t === null || ["identity", "file", "failure"].some(u => typeof (t as Record<string, unknown>)[u] !== "string")))
       return null;
-    return { isComplete: fields["isComplete"], failed: failed as { identity: string; file: string; failure: string }[] };
+    return new ShardResults(fields["isComplete"], failed.map(t => {
+      const record = t as Record<string, unknown>;
+      return new FailedTest(String(record["identity"]), String(record["file"]), String(record["failure"]));
+    }));
   }
 }

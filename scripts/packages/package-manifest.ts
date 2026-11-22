@@ -26,8 +26,10 @@ export class PackageManifest {
   public readonly dependencies: readonly string[];
   public readonly coverageExclusions: string;
   public readonly peerDependencies: readonly string[];
+  public readonly isolatedTests: readonly string[];
 
-  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS, peerDependencies: readonly string[] = []) {
+  public constructor(directory: string, name: string, dependencies: readonly string[], coverageExclusions: string = PackageManifest.NO_EXCLUSIONS, peerDependencies: readonly string[] = [],
+    isolatedTests: readonly string[] = []) {
     const expected = PackageManifest.formatName(directory);
     if (name !== expected)
       throw new PackageException(`${directory}/${PackageManifest.FILE_NAME} must be named "${expected}", the name its folder gives.`);
@@ -37,6 +39,7 @@ export class PackageManifest {
     this.dependencies = [...dependencies].sort();
     this.coverageExclusions = coverageExclusions;
     this.peerDependencies = [...peerDependencies].sort();
+    this.isolatedTests = [...isolatedTests].sort();
   }
 
   public static async readAsync(root: string, directory: string): Promise<PackageManifest> {
@@ -77,7 +80,10 @@ export class PackageManifest {
     const exclusions = "coverageExclusions" in settings ? settings.coverageExclusions : [];
     if (!Array.isArray(exclusions))
       throw new PackageException(`${file} must list its coverage exclusions in an array.`);
-    return new PackageManifest(directory, manifest.name, [...new Set(own.map(([name]) => name))], JSON.stringify(exclusions), Object.keys(peers));
+    const isolated: unknown = "isolatedTests" in settings ? settings.isolatedTests : [];
+    if (!Array.isArray(isolated) || isolated.some(t => typeof t !== "string"))
+      throw new PackageException(`${file} must list its isolated tests as an array of paths under its tests folder.`);
+    return new PackageManifest(directory, manifest.name, [...new Set(own.map(([name]) => name))], JSON.stringify(exclusions), Object.keys(peers), isolated.map(String));
   }
 
   public static formatName(directory: string): string {

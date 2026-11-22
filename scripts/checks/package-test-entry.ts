@@ -12,6 +12,7 @@ import path from "node:path";
 
 import type { DiscoveredTestClass, DiscoveredTestMethod, TestClassResult, TestConsoleReporter, TestRunResult } from "@noldova/context.testing";
 
+import { PackageTestProject } from "./package-test-project.ts";
 import type { PackageTestProgress } from "./package-test-progress.ts";
 
 export class PackageTestEntry {
@@ -20,6 +21,8 @@ export class PackageTestEntry {
   public static readonly RESULTS_VARIABLE: string = "NOLDOVA_TEST_RESULTS_FILE";
   public static readonly PROGRESS_VARIABLE: string = "NOLDOVA_TEST_PROGRESS_FILE";
   public static readonly CLAIMS_VARIABLE: string = "NOLDOVA_TEST_CLAIMS";
+  public static readonly ISOLATED_VARIABLE: string = "NOLDOVA_TEST_ISOLATED";
+  public static readonly ALONE_VARIABLE: string = "NOLDOVA_TEST_ALONE";
   public static readonly COVERAGE_VARIABLE: string = "NODE_V8_COVERAGE";
   public static readonly BUDGET_VARIABLE: string = "NOLDOVA_TEST_BUDGET";
   public static readonly SKIP_DETAILS_VARIABLE: string = "NOLDOVA_TEST_SKIP_DETAILS";
@@ -28,6 +31,7 @@ export class PackageTestEntry {
 
   private static readonly TIMEOUT_MILLISECONDS: number = 30_000;
   private static readonly FILTERS_INVALID: string = `${PackageTestEntry.FILTERS_VARIABLE} must hold a JSON list of filter texts.`;
+  private static readonly ISOLATED_INVALID: string = `${PackageTestEntry.ISOLATED_VARIABLE} must hold a JSON list of test files.`;
   private static readonly PAIRS_INVALID: string = "The package test entry takes pairs of a package name and its compiled tests' folder.";
   private static readonly FAILURE_SEPARATOR: string = "\n";
   private static readonly SHUTDOWN_GRACE_MILLISECONDS: number = 1000;
@@ -63,10 +67,14 @@ export class PackageTestEntry {
     process.stdout.write("", () => process.exit(exitCode));
   }
 
+  private static fileOf(testClass: DiscoveredTestClass): string {
+    return `${testClass.packageName}/${testClass.filePath}`;
+  }
+
   private static groupByFile(testClasses: readonly DiscoveredTestClass[]): DiscoveredTestClass[][] {
     const groups = new Map<string, DiscoveredTestClass[]>();
     for (const testClass of testClasses) {
-      const file = `${testClass.packageName}/${testClass.filePath}`;
+      const file = PackageTestEntry.fileOf(testClass);
       groups.set(file, [...groups.get(file) ?? [], testClass]);
     }
     return [...groups].sort(([t, u], [v, w]) => PackageTestEntry.countMethods(w) - PackageTestEntry.countMethods(u) || t.localeCompare(v)).map(([, t]) => t);
@@ -116,23 +124,29 @@ export class PackageTestEntry {
     let result: TestRunResult;
     let wanted: number;
     try {
-      const filters = this.readFilters();
-      const projects = this.readProjects().map(([name, folder]) => new testing.TestProject(name, folder));
+      const filters = this.readList(PackageTestEntry.FILTERS_VARIABLE, PackageTestEntry.FILTERS_INVALID);
+      const projects = this.readProjects().map(t => new testing.TestProject(t.name, t.folder));
       const discovered = await new testing.TestDiscovery().discoverAsync(projects);
       const selected = new testing.TestRunner(new testing.TestDiscovery(), new testing.TestExecutor(PackageTestEntry.TIMEOUT_MILLISECONDS)).select(discovered, filters);
       wanted = PackageTestEntry.countMethods(selected);
       reporter.start();
       let ran: readonly DiscoveredTestClass[] = selected;
       let classResults: TestClassResult[];
-      if (claims === undefined)
+      const alone = this.environment[PackageTestEntry.ALONE_VARIABLE];
+      if (alone !== undefined) {
+        ran = selected.filter(t => PackageTestEntry.fileOf(t) === alone);
+        classResults = await PackageTestEntry.executeAsync(testing, ran, progress);
+      }
+      else if (claims === undefined)
         classResults = await PackageTestEntry.executeAsync(testing, selected, progress);
       else {
+        const isolated = new Set(this.readList(PackageTestEntry.ISOLATED_VARIABLE, PackageTestEntry.ISOLATED_INVALID));
         const claimed: DiscoveredTestClass[] = [];
         classResults = [];
         for (const [index, group] of PackageTestEntry.groupByFile(selected).entries()) {
           if (progress.isStopping)
             break;
-          if (!PackageTestEntry.claim(claims, index))
+          if (group.some(t => isolated.has(PackageTestEntry.fileOf(t))) || !PackageTestEntry.claim(claims, index))
             continue;
           claimed.push(...group);
           classResults.push(...await PackageTestEntry.executeAsync(testing, group, progress));
@@ -190,25 +204,25 @@ export class PackageTestEntry {
     }, PackageTestEntry.SHUTDOWN_GRACE_MILLISECONDS).unref();
   }
 
-  private readFilters(): readonly string[] {
-    let filters: unknown;
+  private readList(variable: string, invalid: string): readonly string[] {
+    let list: unknown;
     try {
-      filters = JSON.parse(this.environment[PackageTestEntry.FILTERS_VARIABLE] ?? "[]");
+      list = JSON.parse(this.environment[variable] ?? "[]");
     }
     catch (error) {
-      throw new TypeError(PackageTestEntry.FILTERS_INVALID, { cause: error });
+      throw new TypeError(invalid, { cause: error });
     }
-    if (!Array.isArray(filters) || filters.some(t => typeof t !== "string"))
-      throw new TypeError(PackageTestEntry.FILTERS_INVALID);
-    return filters as string[];
+    if (!Array.isArray(list) || list.some(t => typeof t !== "string"))
+      throw new TypeError(invalid);
+    return list.map(String);
   }
 
-  private readProjects(): readonly (readonly [string, string])[] {
+  private readProjects(): readonly PackageTestProject[] {
     if (this.commandArguments.length === 0 || this.commandArguments.length % 2 !== 0)
       throw new TypeError(PackageTestEntry.PAIRS_INVALID);
-    const projects: (readonly [string, string])[] = [];
+    const projects: PackageTestProject[] = [];
     for (let index = 0; index < this.commandArguments.length; index += 2)
-      projects.push([String(this.commandArguments[index]), String(this.commandArguments[index + 1])]);
+      projects.push(new PackageTestProject(String(this.commandArguments[index]), String(this.commandArguments[index + 1])));
     return projects;
   }
 }

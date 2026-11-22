@@ -373,7 +373,8 @@ So every target shows that a package built in a different order packs the same a
 Its Copy list check, after the Packages check, runs `npm run build --silent -- --list-copies` and fails unless the output ends with `end of copies` after at least one line, and every line before it holds three fields separated by tabs: a source that is in the repository, the name of a package under `src/`, and a path in the package, both paths relative with `/` between folders.
 Each listed file must also be in that package's archive in `_packages/`, byte for byte the same as its source.
 Its Package tests and coverage check fails when a package's build is missing or stale; otherwise it compiles each package's tests into `_build/tests/<folder name>`, reusing those that are current, and runs every package's tests through `scripts/checks/package-test-entry.ts`, which drives `@noldova/context.testing`'s test runner, in as many processes at once as the machine has cores, at most 4, or as `NOLDOVA_TEST_SHARDS` says.
-Each process takes the next test file not yet taken, those with the most tests first, by creating its marker in `_build/test-claims/`, so every file runs once, in one process; the check then merges the processes' totals, skipped tests and failed tests into `_build/`.
+Each process takes the next test file not yet taken, those with the most tests first, by creating its marker in `_build/test-claims/`, so every file runs once, in one process.
+A file its package lists in `noldova.isolatedTests` instead runs alone, in a process of its own, as [Global mocks](#global-mocks) says: before it takes test files, each of those processes' places runs the next listed file not yet run, until none is left, and the processes skip the listed files, so the listed files share the places' time rather than adding a place of their own; the check then merges the processes' totals, skipped tests and failed tests into `_build/`.
 The tests of a file run one at a time, each within 30 seconds, or 75 seconds for a test in the `ProcessListing` category, which waits on real process listings: two listings of up to 30 seconds each, as a stop on Windows runs, and its setup and grace.
 When one exceeds its limit, its process stops there, counts the tests it took and didn't start as unreached and fails.
 The entry gives a running test its limit in `NOLDOVA_TEST_BUDGET`, and a providers spec checks that the longer limit still covers two listings and the stop grace, so raising the listing timeout alone fails.
@@ -607,6 +608,10 @@ The Global mocks check refuses, outside strings, in every test file under `src/`
 The global objects it names are `globalThis`, `global`, `window`, `self`, `process`, `console`, `Date`, `Math`, `JSON`, `Reflect`, `Intl`, `performance`, `crypto`, `navigator`, `Buffer`, `Promise`, `Object`, `Array`, `Number`, `String`, `Symbol`, `Error`, `URL`, `AbortController`, `AbortSignal`, `EventTarget` and `WebAssembly`.
 The check reads names, not bindings, so a test's own variable named like a global, such as `const process = new FakeChildProcess()`, is refused too when the test mocks it; give it another name.
 The check fails, too, when it finds no test file.
+
+A spec that must replace a function of `node:fs` or `node:fs/promises`, for a path real files can't reach on every system, such as a copy held partway, a removal failing with `EBUSY` or a count of reads, runs in a process of its own instead.
+Its package lists it in its `package.json`, as a path under its `tests` folder, in `noldova.isolatedTests`, such as `"noldova": { "isolatedTests": ["services/engine/attachment-store.test.ts"] }`; the Package tests check then runs it alone, as [Checks](#checks) says, and the spec restores each mock in `finally`.
+The check allows `mock.method` on an export of `node:fs` or `node:fs/promises` in a listed file only, and fails on a listed file that is no test file or mocks no such function, so the list can't go stale.
 
 ## License
 

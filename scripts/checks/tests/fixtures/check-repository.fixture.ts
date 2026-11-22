@@ -16,6 +16,7 @@ import { Git } from "../../../repository/git.ts";
 import { RepositoryFiles } from "../../../repository/repository-files.ts";
 import { SyntaxTreeReader } from "../../../structure/syntax-tree.reader.ts";
 import type { ICheck } from "../../interfaces/i-check.ts";
+import { CheckRun } from "./check-run.fixture.ts";
 
 export class CheckRepository {
   private static readonly PREFIX: string = "syntax-check-";
@@ -42,12 +43,12 @@ export class CheckRepository {
     return new CheckRepository(root);
   }
 
-  public async runAsync(check: ICheck): Promise<{ passed: boolean; lines: readonly string[] }> {
+  public async runAsync(check: ICheck): Promise<CheckRun> {
     let text = "";
     const output = new Writable({ write: (chunk, _encoding, done): void => { text += String(chunk); done(); } });
     const passed = await check.runAsync(output);
     const lines = text.split(CheckRepository.NEW_LINE).filter(t => t.length > 0);
-    return { passed, lines: lines.map(t => t.includes(CheckRepository.RULE_START) ? t.slice(0, t.indexOf(CheckRepository.RULE_START)) : t) };
+    return new CheckRun(passed, lines.map(t => t.includes(CheckRepository.RULE_START) ? t.slice(0, t.indexOf(CheckRepository.RULE_START)) : t));
   }
 
   public async removeAsync(): Promise<void> {
