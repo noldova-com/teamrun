@@ -92,8 +92,7 @@ export class PermissionAsks {
         return await this.decidePostedAsync(approval, params, replyTo, transaction);
 
       this.requireDecision(approval);
-      const kept = params.answers?.filter(t => approval.questions.some(u => u.id === t.questionId && !u.secret)) ?? null;
-      const decision = approval.withDecision(params.optionId, new Date().toISOString(), kept);
+      const decision = approval.withDecision(params.optionId, new Date().toISOString(), PermissionAsks.keptAnswers(approval, params));
       await this.approvals.updateAsync(decision, transaction);
       return new DecidedApproval(decision, null);
     });
@@ -141,7 +140,7 @@ export class PermissionAsks {
     const answers = approval.answers;
     const provenance = reply.provenance;
     const replyTo = ReplyRun.replyToOf(approval);
-    if (Object.isNull(answers) || Object.isNull(provenance) || Object.isNull(replyTo))
+    if (Object.isNull(answers) || answers.length === 0 || Object.isNull(provenance) || Object.isNull(replyTo))
       return null;
     const replies = approval.questions.flatMap(question => answers.filter(t => t.questionId === question.id)
       .map(t => new QuestionReply(question.text, [...t.choices, ...Object.isNull(t.text) ? [] : [t.text]].join(Resources.listSeparator))));
@@ -221,7 +220,7 @@ export class PermissionAsks {
   private async decidePostedAsync(approval: Approval, params: ApprovalDecideParams, replyTo: string,
     transaction: SqlTransaction): Promise<DecidedApproval> {
     const reply = await this.requireMessageAsync(approval.messageId, transaction);
-    const answered = approval.withDecision(params.optionId, new Date().toISOString(), params.answers);
+    const answered = approval.withDecision(params.optionId, new Date().toISOString(), PermissionAsks.keptAnswers(approval, params));
     const queued = this.answerOf(PermissionAsks.withAnswerUnsent(answered, replyTo, true), reply);
     const decided = Object.isNull(queued) ? answered : queued.approval;
     await this.approvals.updateAsync(decided, transaction);
@@ -232,6 +231,10 @@ export class PermissionAsks {
     return new Approval(approval.id, approval.messageId, approval.kind, approval.nativeKind, approval.summary,
       { [Resources.replyToField]: replyTo, ...isUnsent ? { [Resources.answerUnsentField]: true } : {} }, approval.options, approval.status, approval.decision,
       approval.createdAt, approval.decidedAt, approval.questions, approval.answers);
+  }
+
+  private static keptAnswers(approval: Approval, params: ApprovalDecideParams): QuestionAnswer[] | null {
+    return params.answers?.filter(t => approval.questions.some(u => u.id === t.questionId && !u.secret)) ?? null;
   }
 
   private static checkAnswers(approval: Approval, params: ApprovalDecideParams): void {

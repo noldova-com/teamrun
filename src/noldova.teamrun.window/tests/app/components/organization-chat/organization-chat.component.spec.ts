@@ -31,7 +31,7 @@ import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationChatComponent", () => {
-  const design = new Department("d1", "Design", OrganizationParent.person, "alice", 0, "c", "u");
+  const design = new Department("d1", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u");
   const placed = (...ids: readonly string[]): TeammatePlacement[] => ids.map((t, i) => new TeammatePlacement(t, OrganizationParent.department("d1"), i));
   const pair = SampleData.organizationOf([design], placed("alice", "bob"));
   const chatOf = (teammateId: string): Conversation => new Conversation(`org-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp,

@@ -530,6 +530,17 @@ export class Resources {
   public static readonly organizationMessagesDropMigrationId: string = "20261124090000_OrganizationMessagesDrop";
   public static readonly dropOrganizationMessages: string = "DROP TABLE organizationMessages";
   public static readonly uniqueIndexNamesMigrationId: string = "20261125090000_UniqueIndexNames";
+  public static readonly nodeTypesMigrationId: string = "20261126090000_NodeTypes";
+  public static readonly addDefaultNodeTypes: readonly string[] = [
+    "UPDATE organizations SET json = json_set(json, '$.nodeTypes', json(CASE WHEN EXISTS (SELECT 1 FROM departments WHERE departments.organizationId = organizations.id) "
+      + "THEN json_array(json_object('id', 'department', 'name', 'Department', 'icon', NULL, 'color', NULL, 'createdAt', createdAt, 'updatedAt', createdAt)) "
+      + "ELSE json_array() END)) WHERE json_type(json, '$.nodeTypes') IS NULL",
+    "UPDATE departments SET json = json_set(json, '$.typeId', 'department') WHERE json_type(json, '$.typeId') IS NULL",
+    "UPDATE __changes SET payload = json_set(payload, '$.nodeTypes', json(CASE WHEN EXISTS (SELECT 1 FROM departments "
+      + "WHERE departments.organizationId = json_extract(payload, '$.id')) THEN json_array(json_object('id', 'department', 'name', 'Department', 'icon', NULL, 'color', NULL, "
+      + "'createdAt', json_extract(payload, '$.createdAt'), 'updatedAt', json_extract(payload, '$.createdAt'))) ELSE json_array() END)) "
+      + "WHERE entity = 'Organization' AND json_type(payload, '$.nodeTypes') IS NULL",
+    "UPDATE __changes SET payload = json_set(payload, '$.typeId', 'department') WHERE entity = 'Department' AND json_type(payload, '$.typeId') IS NULL"];
   public static readonly renameUniqueIndexes: readonly string[] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_projects_rootPath\" ON \"projects\" (\"rootPath\")", "DROP INDEX IF EXISTS IX_projects_rootPath",
     "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")", "DROP INDEX IF EXISTS IX_messages_chatId_sequence",
@@ -2054,6 +2065,19 @@ export class Resources {
 
   public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string {
     return `${organizationId}/${teammateId}`;
+  }
+
+  public static formatNodeTypeNotFound(id: string): string {
+    return `Node type not found: ${id}.`;
+  }
+
+  public static formatNodeTypeNameTaken(name: string): string {
+    return `This organization already has a node type named ${name}.`;
+  }
+
+  public static formatNodeTypeInUse(name: string, count: number): string {
+    return count === 1 ? `1 unit has the type ${name}; give it another type before deleting ${name}.`
+      : `${count} units have the type ${name}; give them another type before deleting ${name}.`;
   }
 
   public static formatDepartmentNotFound(id: string): string {

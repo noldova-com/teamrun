@@ -192,7 +192,6 @@ export class Resources {
   public static readonly browserProfileKeyField: string = "profileKey";
   public static readonly browserInstanceField: string = "instance";
   public static readonly browserModuleId: string = "browser";
-  public static readonly browserLinkProfile: string = "links";
   public static readonly computerUseModuleId: string = "computer-use";
   public static readonly computerUseBorderColorSetMethod: string = "computer-use.borderColorSet";
   public static readonly gitHubReferenceProtocol: string = "https:";
@@ -1234,6 +1233,7 @@ export class Resources {
   public static readonly teamRunTagPrefix: string = "nol-teamrun-";
   public static readonly escapeOwnersSelector: string = "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='menu'], [role='listbox'], [role='dialog'], dialog";
   public static readonly teammatesTitle: string = "Teammates";
+  public static readonly organizationDefaultTypeName: string = "Department";
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";

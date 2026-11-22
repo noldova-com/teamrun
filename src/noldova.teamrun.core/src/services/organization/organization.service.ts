@@ -13,7 +13,7 @@ import { JsonReader, type JsonObject } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
   Department, type DepartmentCreateParams, type DepartmentIdParams, type DepartmentMemberSetParams, type DepartmentMoveParams,
-  type DepartmentUpdateParams, ErrorCode, Organization, type OrganizationCreateParams, OrganizationIdParams, type OrganizationLayoutSaveParams, OrganizationNodeKind,
+  type DepartmentUpdateParams, ErrorCode, NodeType, type NodeTypeCreateParams, type NodeTypeIdParams, type NodeTypeUpdateParams, Organization, type OrganizationCreateParams, OrganizationIdParams, type OrganizationLayoutSaveParams, OrganizationNodeKind,
   Chat, OrganizationParent, type OrganizationUpdateParams, Teammate,
   TeammatePlacement, type TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
@@ -51,7 +51,7 @@ export class OrganizationService implements IOrganizationService {
     return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const orders = (await transaction.queryAsync(new SqlQuery(Resources.selectOrganizations))).map(t => OrganizationService.read(t).order);
       const now = new Date().toISOString();
-      const organization = new Organization(Guid.createVersion7().toString(), params.name, params.folder, Math.max(-1, ...orders) + 1, now, now, [], []);
+      const organization = new Organization(Guid.createVersion7().toString(), params.name, params.folder, Math.max(-1, ...orders) + 1, now, now, [], [], []);
       const json = JSON.stringify(organization.toJson());
       await transaction.executeAsync(new SqlQuery(Resources.insertOrganization, [organization.id, json, now, now]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Organization, organization.id, ChangeOperation.Insert, json, transaction);
@@ -103,11 +103,12 @@ export class OrganizationService implements IOrganizationService {
     return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const organization = await this.requireAsync(params.organizationId, transaction);
       OrganizationService.requireParent(organization, params.parent);
+      OrganizationService.requireType(organization, params.typeId);
       const leader = Object.isNull(params.leaderId) ? null : await this.requireTeammateAsync(params.leaderId, transaction);
       if (!Object.isNull(leader) && organization.pathOf(params.parent).some(t => t.equals(OrganizationParent.teammate(leader.id))))
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatDepartmentUnderLeader(leader.name, params.name), [leader.id]);
       const now = new Date().toISOString();
-      const department = new Department(Guid.createVersion7().toString(), params.name, params.parent, leader?.id ?? null,
+      const department = new Department(Guid.createVersion7().toString(), params.name, params.typeId, params.parent, leader?.id ?? null,
         organization.departmentsUnder(params.parent).length, now, now);
       const json = JSON.stringify(department.toJson());
       await transaction.executeAsync(new SqlQuery(Resources.insertDepartment, [department.id, organization.id, department.parentId, json, now, now]));
@@ -123,6 +124,8 @@ export class OrganizationService implements IOrganizationService {
       const organization = await this.requireAsync(params.organizationId, transaction);
       const department = OrganizationService.require(organization, params.departmentId);
       const node = OrganizationParent.department(department.id);
+      if (!Object.isUndefined(params.typeId))
+        OrganizationService.requireType(organization, params.typeId);
       if (!Object.isNullOrUndefined(params.leaderId)) {
         const leader = await this.requireTeammateAsync(params.leaderId, transaction);
         const teammate = OrganizationParent.teammate(leader.id);
@@ -145,7 +148,7 @@ export class OrganizationService implements IOrganizationService {
       const now = new Date().toISOString();
       const joined = organization.departmentsUnder(params.parent).filter(t => t.id !== department.id);
       const order = Math.min(params.order, joined.length);
-      const moved = new Department(department.id, department.name, params.parent, department.leaderId, order, department.createdAt, now);
+      const moved = new Department(department.id, department.name, department.typeId, params.parent, department.leaderId, order, department.createdAt, now);
       joined.splice(order, 0, moved);
       if (!department.parent.equals(params.parent))
         await this.arrangeDepartmentsAsync(organization.departmentsUnder(department.parent).filter(t => t.id !== department.id), now, transaction);
@@ -162,6 +165,39 @@ export class OrganizationService implements IOrganizationService {
       await transaction.executeAsync(new SqlQuery(Resources.deleteDepartment, [department.id]));
       await this.context.database.changeFeed.appendAsync(ChangeEntity.Department, department.id, ChangeOperation.Delete,
         JSON.stringify(department.toJson()), transaction);
+    });
+  }
+
+  public async createNodeTypeAsync(params: NodeTypeCreateParams): Promise<NodeType> {
+    return await this.context.database.connection.runInTransactionAsync(async transaction => {
+      const organization = await this.requireAsync(params.organizationId, transaction);
+      OrganizationService.requireFreeName(organization, params.name, null);
+      const now = new Date().toISOString();
+      const type = new NodeType(Guid.createVersion7().toString(), params.name, params.icon, params.color, now, now);
+      await this.saveTypesAsync(organization, [...organization.nodeTypes, type], now, transaction);
+      return type;
+    });
+  }
+
+  public async updateNodeTypeAsync(params: NodeTypeUpdateParams): Promise<NodeType> {
+    return await this.context.database.connection.runInTransactionAsync(async transaction => {
+      const organization = await this.requireAsync(params.organizationId, transaction);
+      const now = new Date().toISOString();
+      const type = params.applyTo(OrganizationService.requireType(organization, params.typeId), now);
+      OrganizationService.requireFreeName(organization, type.name, type.id);
+      await this.saveTypesAsync(organization, organization.nodeTypes.map(t => t.id === type.id ? type : t), now, transaction);
+      return type;
+    });
+  }
+
+  public async deleteNodeTypeAsync(params: NodeTypeIdParams): Promise<void> {
+    await this.context.database.connection.runInTransactionAsync(async transaction => {
+      const organization = await this.requireAsync(params.organizationId, transaction);
+      const type = OrganizationService.requireType(organization, params.typeId);
+      const users = organization.departments.filter(t => t.typeId === type.id);
+      if (users.length > 0)
+        throw new ServiceException(ErrorCode.Conflict, Resources.formatNodeTypeInUse(type.name, users.length), users.map(t => t.id));
+      await this.saveTypesAsync(organization, organization.nodeTypes.filter(t => t.id !== type.id), new Date().toISOString(), transaction);
     });
   }
 
@@ -254,7 +290,7 @@ export class OrganizationService implements IOrganizationService {
     const now = new Date().toISOString();
     const siblings = organization.departmentsUnder(parent).filter(t => node.kind !== OrganizationNodeKind.Department || t.id !== node.id);
     const index = node.kind === OrganizationNodeKind.Department ? organization.departmentsUnder(parent).findIndex(t => t.id === node.id) : siblings.length;
-    const children = organization.departmentsUnder(node).map(t => new Department(t.id, t.name, parent, t.leaderId, t.order, t.createdAt, now));
+    const children = organization.departmentsUnder(node).map(t => new Department(t.id, t.name, t.typeId, parent, t.leaderId, t.order, t.createdAt, now));
     siblings.splice(index, 0, ...children);
     await this.arrangeDepartmentsAsync(siblings, now, transaction, ...children.map(t => t.id));
     const teammates = organization.placementsUnder(node).map(t => t.teammateId);
@@ -267,13 +303,13 @@ export class OrganizationService implements IOrganizationService {
     transaction: SqlTransaction): Promise<void> {
     const now = new Date().toISOString();
     for (const led of organization.departments.filter(t => t.leaderId === teammateId && !(parent?.equals(OrganizationParent.department(t.id)) ?? false)))
-      await this.saveAsync(new Department(led.id, led.name, led.parent, null, led.order, led.createdAt, now), transaction);
+      await this.saveAsync(new Department(led.id, led.name, led.typeId, led.parent, null, led.order, led.createdAt, now), transaction);
   }
 
   private async arrangeDepartmentsAsync(siblings: readonly Department[], now: string, transaction: SqlTransaction, ...moved: readonly string[]): Promise<void> {
     for (const [order, sibling] of siblings.entries())
       if (sibling.order !== order || moved.includes(sibling.id))
-        await this.saveAsync(new Department(sibling.id, sibling.name, sibling.parent, sibling.leaderId, order, sibling.createdAt, now), transaction);
+        await this.saveAsync(new Department(sibling.id, sibling.name, sibling.typeId, sibling.parent, sibling.leaderId, order, sibling.createdAt, now), transaction);
   }
 
   private async arrangePlacementsAsync(organization: Organization, siblings: readonly TeammatePlacement[], transaction: SqlTransaction,
@@ -296,6 +332,26 @@ export class OrganizationService implements IOrganizationService {
     await transaction.executeAsync(new SqlQuery(Resources.updateDepartment, [department.parentId, json, department.updatedAt, department.id]));
     await this.context.database.changeFeed.appendAsync(ChangeEntity.Department, department.id, ChangeOperation.Update, json, transaction);
     return department;
+  }
+
+  private async saveTypesAsync(organization: Organization, nodeTypes: readonly NodeType[], now: string, transaction: SqlTransaction): Promise<void> {
+    const saved = new Organization(organization.id, organization.name, organization.folder, organization.order, organization.createdAt, now, nodeTypes, [], []);
+    const json = JSON.stringify(saved.toJson());
+    await transaction.executeAsync(new SqlQuery(Resources.updateOrganization, [json, now, saved.id]));
+    await this.context.database.changeFeed.appendAsync(ChangeEntity.Organization, saved.id, ChangeOperation.Update, json, transaction);
+  }
+
+  private static requireType(organization: Organization, typeId: string): NodeType {
+    const type = organization.nodeTypes.find(t => t.id === typeId);
+    if (Object.isUndefined(type))
+      throw new ServiceException(ErrorCode.NotFound, Resources.formatNodeTypeNotFound(typeId), [typeId]);
+    return type;
+  }
+
+  private static requireFreeName(organization: Organization, name: string, typeId: string | null): void {
+    const taken = organization.nodeTypes.find(t => t.id !== typeId && t.name.toLowerCase() === name.toLowerCase());
+    if (!Object.isUndefined(taken))
+      throw new ServiceException(ErrorCode.Conflict, Resources.formatNodeTypeNameTaken(taken.name), [taken.id]);
   }
 
   private async requireAsync(organizationId: string, transaction: SqlTransaction): Promise<Organization> {

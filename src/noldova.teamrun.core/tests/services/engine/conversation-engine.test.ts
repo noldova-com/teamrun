@@ -541,11 +541,12 @@ export class ConversationEngineTests {
   @TestMethod
   public async tellsADepartmentsLeaderAndMemberTheirPlaceAndWhomTheyReportToAndReopensATeammatesChat(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const leadProvider = await host.createProviderAsync("fake", "Lead");
     const memberProvider = await host.createProviderAsync("fake", "Member");
     const lead = await host.teammates.createAsync(new TeammateCreateParams("Lead", null, leadProvider.id, Harness.Provider, null, null));
     const member = await host.teammates.createAsync(new TeammateCreateParams("Member", null, memberProvider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", type, OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, lead.id, design.id));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, member.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, lead.id));
@@ -1058,6 +1059,37 @@ export class ConversationEngineTests {
     Assert.areEqual(ApprovalStatus.Approved, decided.status);
     Assert.areEqual(2, (await host.messages.listAsync(ConversationEngineTests.list(conversation.id))).length);
     Assert.areEqual(1, host.adapter.requests.length);
+  }
+
+  @TestMethod
+  public async neitherKeepsNorSendsTheAnswerToASecretPostedQuestion(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const turn = Promise.withResolvers<void>();
+    host.adapter.questionPosts = [ConversationEngineTests.postedSecret("msg-1"), ConversationEngineTests.postedSecret("msg-2")];
+    host.adapter.formatQuestionReply = (replyTo, question, answer) => `reply ${replyTo}: ${question} = ${answer}`;
+    host.adapter.holdTurn = () => turn.promise;
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(await ConversationEngineTests.paramsAsync(host, conversation.id, "Ask me"));
+    const posted = await ConversationEngineTests.postsAsync(host, conversation.id, 2);
+    const first = ConversationEngineTests.at(posted, 0);
+    const second = ConversationEngineTests.at(posted, 1);
+    const decided = await host.engine.decideAsync(new ApprovalDecideParams(first.id, Resources.answerOptionId,
+      [new QuestionAnswer("0", ["Web"], null), new QuestionAnswer("1", [], "hunter2")]));
+    const secretOnly = await host.engine.decideAsync(new ApprovalDecideParams(second.id, Resources.answerOptionId, [new QuestionAnswer("1", [], "hunter2")]));
+
+    host.adapter.questionPosts = [];
+    turn.resolve();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const messages = await host.messages.listAsync(ConversationEngineTests.list(conversation.id));
+
+    Assert.areEqual("0", decided.answers?.map(t => t.questionId).join(","));
+    Assert.areEqual("0", (await host.approvals.findAsync(first.id))?.answers?.map(t => t.questionId).join(","));
+    Assert.areEqual(0, secretOnly.answers?.length);
+    Assert.areEqual(JSON.stringify({ replyTo: "msg-2" }), JSON.stringify(secretOnly.payload));
+    Assert.areEqual(4, messages.length);
+    Assert.areEqual("> Which platform?\n> Pick one\n\nWeb", messages[2]?.details[0]?.text);
+    Assert.isFalse(host.adapter.requests.some(t => t.prompt.includes("hunter2")));
   }
 
   @TestMethod
@@ -2452,6 +2484,13 @@ export class ConversationEngineTests {
     return new QuestionAsk(id, "request_user_input_async", [
       new ApprovalQuestion("0", "", "Which platform?\nPick one", [new QuestionOption("Desktop app", ""), new QuestionOption("Web", "")], false, true, false),
       new ApprovalQuestion("1", "", "Anything else?", [], false, true, false)
+    ]);
+  }
+
+  private static postedSecret(id: string): QuestionAsk {
+    return new QuestionAsk(id, "request_user_input_async", [
+      new ApprovalQuestion("0", "", "Which platform?\nPick one", [new QuestionOption("Desktop app", ""), new QuestionOption("Web", "")], false, true, false),
+      new ApprovalQuestion("1", "", "Your token?", [], false, true, true)
     ]);
   }
 

@@ -52,7 +52,16 @@ import {
 import declaration from "@noldova/teamrun/module.json";
 
 import { Resources } from "../../src/resources";
+import { DocumentMark } from "./document-mark.fixture";
 import { FakeWindowSecrets } from "./fake-window-secrets.fixture";
+import { GrownViewDock } from "./grown-view-dock.fixture";
+import { OpenedDocument } from "./opened-document.fixture";
+import { PostedNotice } from "./posted-notice.fixture";
+import { RanCommand } from "./ran-command.fixture";
+import { ShownDialog } from "./shown-dialog.fixture";
+import { UpdatedDocument } from "./updated-document.fixture";
+import { ViewDockMark } from "./view-dock-mark.fixture";
+import { WorkingMark } from "./working-mark.fixture";
 
 export class RecordingWindowPartContext implements IWindowPartContext {
   public readonly settingOptions: Map<string, (values: JsonObject) => readonly SettingOption[] | null> = new Map();
@@ -65,23 +74,23 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   public refusesGrants: boolean = false;
   public readonly views: ViewContribution[] = [];
   public readonly commands: CommandContribution[] = [];
-  public readonly ranCommands: { readonly name: string; readonly commandArguments: JsonValue | undefined }[] = [];
+  public readonly ranCommands: RanCommand[] = [];
   public readonly topBarActions: TopBarActionContribution[] = [];
   public readonly registeredTopBarActions: TopBarAction[] = [];
   public readonly statusBarItems: StatusBarItem[] = [];
-  public readonly dialogs: { readonly name: string; readonly options: IViewDialogOptions | undefined }[] = [];
-  public readonly openedDocuments: { readonly name: string; readonly instance: string; readonly title: string; readonly options: IDocumentOptions | undefined }[] = [];
-  public readonly keptDocuments: { readonly name: string; readonly instance: string }[] = [];
-  public readonly closedDocuments: { readonly name: string; readonly instance: string }[] = [];
-  public readonly forgottenDocuments: { readonly name: string; readonly instance: string }[] = [];
+  public readonly dialogs: ShownDialog[] = [];
+  public readonly openedDocuments: OpenedDocument[] = [];
+  public readonly keptDocuments: DocumentMark[] = [];
+  public readonly closedDocuments: DocumentMark[] = [];
+  public readonly forgottenDocuments: DocumentMark[] = [];
   public readonly documents: DocumentContribution[] = [];
   public readonly placeholders: PlaceholderContribution[] = [];
   public readonly searchSources: SearchSourceContribution[] = [];
   public readonly settingsPages: SettingsPageContribution[] = [];
   public readonly settingsRows: Map<string, readonly SettingsRow[]> = new Map();
   public readonly inAppBrowsers: IInAppBrowser[] = [];
-  public readonly updates: { readonly name: string; readonly instance: string; readonly update: IDocumentUpdate }[] = [];
-  public readonly workingMarks: { readonly name: string; readonly instance: string | undefined }[] = [];
+  public readonly updates: UpdatedDocument[] = [];
+  public readonly workingMarks: WorkingMark[] = [];
   public readonly links: string[] = [];
   public readonly linkGestures: (LinkGesture | undefined)[] = [];
   public readonly linkPlaces: (LinkPlace | undefined)[] = [];
@@ -93,13 +102,13 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   public readonly saves: Set<() => Promise<void>> = new Set();
   public readonly palettes: Type<unknown>[] = [];
   public readonly shownViews: string[] = [];
-  public readonly hiddenViewDocks: { readonly name: string; readonly instance: string | null }[] = [];
-  public readonly grownViewDocks: { readonly name: string; readonly instance: string | null; readonly minimum: number }[] = [];
+  public readonly hiddenViewDocks: ViewDockMark[] = [];
+  public readonly grownViewDocks: GrownViewDock[] = [];
   public readonly badges: Map<string, ViewBadge | null> = new Map();
   public paletteHost: (<T>(type: Type<T>) => IWindowPalette<T> | null) | null = null;
   public chosenFolder: string | null = null;
   public folderChoices: number = 0;
-  public notifications: { readonly id: string; readonly post: NotificationPost; isShown: boolean }[] = [];
+  public notifications: PostedNotice[] = [];
   public notificationFailure: unknown = null;
   public notificationHold: Promise<void> | null = null;
   public readonly dependencyListeners: Set<(moduleId: string, isActive: boolean) => void> = new Set();
@@ -176,7 +185,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
     if (!declaration.contributes.settingsPages.includes(page))
       throw new Error(`TeamRun's module.json does not declare the Settings page ${page}.`);
     const repeated = rows.find((t, index) => rows.findIndex(other => other.id === t.id) !== index);
-    if (repeated !== undefined)
+    if (!Object.isUndefined(repeated))
       throw new Error(`The Settings page ${page} has the row ${repeated.id} twice.`);
     this.settingsRows.set(page, [...rows]);
   }
@@ -257,7 +266,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   }
 
   public markWorking(name: string, instance?: string): () => void {
-    const mark = { name, instance };
+    const mark = new WorkingMark(name, instance);
     this.workingMarks.push(mark);
     return () => {
       const index = this.workingMarks.indexOf(mark);
@@ -278,7 +287,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
     const owner = name.substring(0, name.indexOf("."));
     if (name !== Resources.desktopSearchCommand && ![declaration.id, ...Object.keys(declaration.dependencies), ...Object.keys(declaration.optionalDependencies)].includes(owner))
       throw new Error(`TeamRun's module.json names no module ${owner}, so Noldova Desktop refuses its command ${name}.`);
-    this.ranCommands.push({ name, commandArguments });
+    this.ranCommands.push(new RanCommand(name, commandArguments));
     return Promise.resolve(null);
   }
 
@@ -294,7 +303,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
     const replaced = this.notifications.filter(t => t.isShown && !Object.isNull(post.key) && t.post.kind.text === post.kind.text && t.post.key === post.key);
     for (const notice of replaced)
       notice.isShown = false;
-    const posted = { id: replaced.at(0)?.id ?? String(this.notifications.length + 1), post, isShown: true };
+    const posted = new PostedNotice(replaced.at(0)?.id ?? String(this.notifications.length + 1), post, true);
     this.notifications.push(posted);
     const handle = new NotificationHandle(posted.id, () => {
       for (const notice of this.notifications.filter(t => t.id === posted.id))
@@ -313,23 +322,23 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   }
 
   public openDocument(name: string, instance: string, title: string, options?: IDocumentOptions): void {
-    this.openedDocuments.push({ name, instance, title, options });
+    this.openedDocuments.push(new OpenedDocument(name, instance, title, options));
   }
 
   public keepDocument(name: string, instance: string): void {
-    this.keptDocuments.push({ name, instance });
+    this.keptDocuments.push(new DocumentMark(name, instance));
   }
 
   public closeDocument(name: string, instance: string): void {
-    this.closedDocuments.push({ name, instance });
+    this.closedDocuments.push(new DocumentMark(name, instance));
   }
 
   public forgetDocument(name: string, instance: string): void {
-    this.forgottenDocuments.push({ name, instance });
+    this.forgottenDocuments.push(new DocumentMark(name, instance));
   }
 
   public updateDocument(name: string, instance: string, update: IDocumentUpdate): void {
-    this.updates.push({ name, instance, update });
+    this.updates.push(new UpdatedDocument(name, instance, update));
   }
 
   public openView(_name: string, _instance: string, _title: string, _options?: IViewInstanceOptions): void {
@@ -353,11 +362,11 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   }
 
   public hideViewDock(name: string, instance?: string): void {
-    this.hiddenViewDocks.push({ name, instance: instance ?? null });
+    this.hiddenViewDocks.push(new ViewDockMark(name, instance ?? null));
   }
 
   public growViewDock(name: string, minimum: number, instance?: string): () => void {
-    this.grownViewDocks.push({ name, instance: instance ?? null, minimum });
+    this.grownViewDocks.push(new GrownViewDock(name, instance ?? null, minimum));
     return () => undefined;
   }
 
@@ -368,7 +377,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   }
 
   public showInDialogAsync(name: string, options?: IViewDialogOptions): Promise<void> {
-    this.dialogs.push({ name, options });
+    this.dialogs.push(new ShownDialog(name, options));
     return Promise.resolve();
   }
 

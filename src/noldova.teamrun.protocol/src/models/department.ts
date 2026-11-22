@@ -17,6 +17,7 @@ import { OrganizationParent } from "./organization-parent.js";
 export class Department {
   public readonly id: string;
   public readonly name: string;
+  public readonly typeId: string;
   public readonly parent: OrganizationParent;
   public readonly leaderId: string | null;
   public readonly order: number;
@@ -26,6 +27,7 @@ export class Department {
   public constructor(
     id: string,
     name: string,
+    typeId: string,
     parent: OrganizationParent,
     leaderId: string | null,
     order: number,
@@ -33,6 +35,7 @@ export class Department {
     updatedAt: string) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
     Department.validateName(name);
+    ArgumentException.throwIfNullOrWhitespace(typeId, Resources.typeIdField);
     if (parent.kind === OrganizationNodeKind.Department && parent.id === id)
       throw new ArgumentException(Resources.departmentOwnParent, Resources.parentField);
     if (!Object.isNull(leaderId))
@@ -43,6 +46,7 @@ export class Department {
 
     this.id = id;
     this.name = name;
+    this.typeId = typeId;
     this.parent = parent;
     this.leaderId = leaderId;
     this.order = order;
@@ -76,6 +80,7 @@ export class Department {
     return new Department(
       reader.readNonBlankString(Resources.idField),
       Department.readName(reader),
+      reader.readNonBlankString(Resources.typeIdField),
       Department.readParent(reader),
       reader.readNullableString(Resources.leaderIdField),
       reader.readInteger(Resources.orderField),
@@ -87,6 +92,7 @@ export class Department {
     return {
       [Resources.idField]: this.id,
       [Resources.nameField]: this.name,
+      [Resources.typeIdField]: this.typeId,
       [Resources.parentField]: this.parent.toJson(),
       [Resources.leaderIdField]: this.leaderId,
       [Resources.orderField]: this.order,

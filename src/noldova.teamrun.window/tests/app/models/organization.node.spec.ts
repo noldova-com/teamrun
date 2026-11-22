@@ -19,9 +19,9 @@ describe("OrganizationNode", () => {
 
   it("nests departments in their order, each with its leader apart from its members in name order, and counts what collapsing it hides, its nested departments' people too", () => {
     const organization = SampleData.organizationOf([
-      new Department("design", "Design", OrganizationParent.person, "dee", 1, "c", "u"),
-      new Department("build", "Build", OrganizationParent.person, null, 0, "c", "u"),
-      new Department("ui", "UI", OrganizationParent.department("design"), "bea", 0, "c", "u")
+      new Department("design", "Design", "department", OrganizationParent.person, "dee", 1, "c", "u"),
+      new Department("build", "Build", "department", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("ui", "UI", "department", OrganizationParent.department("design"), "bea", 0, "c", "u")
     ], [new TeammatePlacement("dee", OrganizationParent.department("design"), 0), new TeammatePlacement("cy", OrganizationParent.department("design"), 1),
       new TeammatePlacement("ada", OrganizationParent.department("design"), 2), new TeammatePlacement("bea", OrganizationParent.department("ui"), 0)]);
 
@@ -30,8 +30,8 @@ describe("OrganizationNode", () => {
   });
 
   it("counts a nested department's leader and members once each in what collapsing its parent hides", () => {
-    const organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "ada", 0, "c", "u"),
-      new Department("ui", "UI", OrganizationParent.department("design"), "bea", 0, "c", "u")],
+    const organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "ada", 0, "c", "u"),
+      new Department("ui", "UI", "department", OrganizationParent.department("design"), "bea", 0, "c", "u")],
       [new TeammatePlacement("ada", OrganizationParent.department("design"), 0), new TeammatePlacement("cy", OrganizationParent.department("design"), 1),
         new TeammatePlacement("bea", OrganizationParent.department("ui"), 0), new TeammatePlacement("dee", OrganizationParent.department("ui"), 1),
         new TeammatePlacement("eve", OrganizationParent.department("ui"), 2)]);
@@ -41,9 +41,9 @@ describe("OrganizationNode", () => {
   });
 
   it("counts the people of departments nested two levels down in what collapsing the top one hides", () => {
-    const organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "ada", 0, "c", "u"),
-      new Department("ui", "UI", OrganizationParent.department("design"), "bea", 0, "c", "u"),
-      new Department("icons", "Icons", OrganizationParent.department("ui"), "dee", 0, "c", "u")],
+    const organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "ada", 0, "c", "u"),
+      new Department("ui", "UI", "department", OrganizationParent.department("design"), "bea", 0, "c", "u"),
+      new Department("icons", "Icons", "department", OrganizationParent.department("ui"), "dee", 0, "c", "u")],
         [new TeammatePlacement("ada", OrganizationParent.department("design"), 0), new TeammatePlacement("bea", OrganizationParent.department("ui"), 0),
       new TeammatePlacement("cy", OrganizationParent.department("ui"), 1), new TeammatePlacement("dee", OrganizationParent.department("icons"), 0),
         new TeammatePlacement("eve", OrganizationParent.department("icons"), 1), new TeammatePlacement("fay", OrganizationParent.department("icons"), 2)]);
@@ -53,7 +53,7 @@ describe("OrganizationNode", () => {
   });
 
   it("leaves out a leader or member whose teammate it doesn't know", () => {
-    const organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "gone", 0, "c", "u")],
+    const organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "gone", 0, "c", "u")],
       [new TeammatePlacement("gone", OrganizationParent.department("design"), 0), new TeammatePlacement("lost", OrganizationParent.department("design"), 1),
         new TeammatePlacement("ada", OrganizationParent.department("design"), 2)]);
 
@@ -61,7 +61,7 @@ describe("OrganizationNode", () => {
   });
 
   it("puts the placed teammates in no department under the person as its direct reports in name order, a teammate's own reports under it, and leaves a teammate outside the organization out", () => {
-    const organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "ada", 0, "c", "u"), new Department("ui", "UI", OrganizationParent.department("design"), null, 0, "c", "u")],
+    const organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "ada", 0, "c", "u"), new Department("ui", "UI", "department", OrganizationParent.department("design"), null, 0, "c", "u")],
       [new TeammatePlacement("ada", OrganizationParent.department("design"), 1), new TeammatePlacement("bea", OrganizationParent.department("ui"), 0),
         new TeammatePlacement("fay", OrganizationParent.person, 0), new TeammatePlacement("cy", OrganizationParent.teammate("fay"), 0)]);
     const root = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
@@ -75,7 +75,7 @@ describe("OrganizationNode", () => {
   });
 
   it("nests teammates under the teammate they report to, and departments under a teammate, counting both in the person's total", () => {
-    const organization = SampleData.organizationOf([new Department("ui", "UI", OrganizationParent.teammate("bea"), "cy", 0, "c", "u")],
+    const organization = SampleData.organizationOf([new Department("ui", "UI", "department", OrganizationParent.teammate("bea"), "cy", 0, "c", "u")],
       [new TeammatePlacement("ada", OrganizationParent.person, 0), new TeammatePlacement("bea", OrganizationParent.teammate("ada"), 0),
         new TeammatePlacement("dee", OrganizationParent.teammate("ada"), 1), new TeammatePlacement("cy", OrganizationParent.department("ui"), 0),
         new TeammatePlacement("eve", OrganizationParent.department("ui"), 1)]);

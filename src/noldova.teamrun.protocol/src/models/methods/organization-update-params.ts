@@ -41,7 +41,7 @@ export class OrganizationUpdateParams {
 
   public applyTo(organization: Organization, updatedAt: string): Organization {
     return new Organization(organization.id, this.name ?? organization.name, Object.isUndefined(this.folder) ? organization.folder : this.folder,
-      organization.order, organization.createdAt, updatedAt,
+      organization.order, organization.createdAt, updatedAt, organization.nodeTypes,
       organization.departments, organization.placements);
   }
 
