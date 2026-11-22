@@ -52,8 +52,9 @@ LICENSE file in the root directory of this source tree.
       <nol-teamrun-organization-card class="leader" nolCanvasItem [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row"
         [editing]="editing()" (message)="chosen.emit(teammateTarget(leader))" />
     }
-    @for (report of directReports(); track report.id) {
+    @for (report of reports(); track report.id) {
       <nol-teamrun-organization-card class="leader report" nolCanvasItem [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row"
+        [reportsTo]="reportsToOf(report)"
         [editing]="editing()" (message)="chosen.emit(teammateTarget(report))" />
     }
   </div>
@@ -68,11 +69,12 @@ LICENSE file in the root directory of this source tree.
       <div class="lane" [class.selected]="isOpen(departmentTarget(node))">
         <div class="lane-head">
           @if (editing() && node.department; as department) {
-            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="department.name"
+            <input nol-text-field class="lane-rename" [attr.aria-label]="resources.formatOrganizationUnitNameLabel(node.type)" [value]="department.name"
               (change)="rename(department, $event)" />
             <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
               [label]="resources.formatOrganizationDeleteNamed(department.name)" (click)="deleteDepartment(department)"></button>
           } @else {
+            <nol-teamrun-organization-type-icon [type]="node.type" />
             <span class="title lane-name">{{ node.name }}</span>
             <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
             <span class="spacer"></span>
@@ -80,6 +82,9 @@ LICENSE file in the root directory of this source tree.
               [label]="resources.formatOrganizationBoardMessage(node.name)" (click)="chosen.emit(departmentTarget(node))"></button>
           }
         </div>
+        @if (editing() && node.department; as department) {
+          <nol-teamrun-organization-type-choice class="lane-type" [department]="department" />
+        }
         @if (summaryOf(node); as summary) {
           <span class="note lane-summary">{{ summary }}</span>
         }

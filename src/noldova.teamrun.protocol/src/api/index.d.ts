@@ -13648,6 +13648,26 @@ export declare class NameOrder {
 }
 
 /**
+ * Cuts text to a length without splitting a character a person sees as one: a cut ends on a grapheme boundary, so a surrogate pair,
+ * a joiner sequence such as 👩‍💻, a flag, a skin tone, a keycap and a decomposed accent stay whole or go whole.
+ */
+export declare class TextCut {
+  /**
+   * Returns the longest start of the text that ends on a grapheme boundary and is at most the limit in UTF-16 code units.
+   * @param text The text.
+   * @param limit The most UTF-16 code units the start may hold.
+   */
+  public static toUnits(text: string, limit: number): string;
+
+  /**
+   * Returns the longest start of the text that ends on a grapheme boundary and is at most the limit in code points.
+   * @param text The text.
+   * @param limit The most code points the start may hold.
+   */
+  public static toPoints(text: string, limit: number): string;
+}
+
+/**
  * TeamRun's MCP server: MCP's JSON-RPC with only `initialize`, `ping`, `tools/list`, `tools/call` and
  * `notifications/cancelled`, over any {@link IMcpTransport}.
  * @remarks

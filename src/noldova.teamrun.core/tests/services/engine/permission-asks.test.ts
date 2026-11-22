@@ -45,6 +45,7 @@ import { ServiceException } from "@noldova/teamrun.services";
 
 import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
@@ -822,7 +823,7 @@ export class PermissionAsksTests {
     const answered: Approval[] = [];
     let breaking = true;
     let answering = false;
-    using _breaker = host.events.subscribe({
+    using _breaker = FailingDelivery.on(host.events, {
       onEvent: event => {
         if (breaking && event.name === EventName.MessageCreated) {
           breaking = false;

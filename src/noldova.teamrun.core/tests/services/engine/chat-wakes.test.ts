@@ -38,6 +38,7 @@ import {
 
 import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 
 @TestClass
 export class ChatWakesTests {
@@ -692,7 +693,7 @@ export class ChatWakesTests {
     host.adapter.holdTurn = async request => {
       if (request !== host.adapter.requests[0])
         return;
-      const broken = host.events.subscribe({
+      const broken = FailingDelivery.on(host.events, {
         onEvent: event => {
           if (event.name === EventName.MessageCreated && Message.fromJson(event.payload).conversationId === second.id)
             throw new RangeError("The window is gone.");

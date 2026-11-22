@@ -112,10 +112,14 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 import { FakeProviderKindInstallation } from "../../fixtures/fake-provider-kind-installation.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 
 class RecordingEngine extends ConversationEngine {
   public readonly forgotten: string[] = [];
   public readonly planning: string[] = [];
+  public readonly released: string[] = [];
+  public forgetFailure: Error | null = null;
+  public releaseFailure: Error | null = null;
 
   public static of(host: CoreHost): RecordingEngine {
     return new RecordingEngine(host.context, host.projects, host.conversations, host.messages, host.approvals, host.providers, host.teammates, host.registry,
@@ -125,7 +129,16 @@ class RecordingEngine extends ConversationEngine {
 
   public override async forgetAsync(conversationIds: readonly string[]): Promise<void> {
     this.forgotten.push([...conversationIds].sort().join(","));
+    if (!Object.isNull(this.forgetFailure))
+      throw this.forgetFailure;
     await super.forgetAsync(conversationIds);
+  }
+
+  public override async releaseFolderAsync(conversationId: string): Promise<void> {
+    this.released.push(conversationId);
+    if (!Object.isNull(this.releaseFailure))
+      throw this.releaseFailure;
+    await super.releaseFolderAsync(conversationId);
   }
 
   public override async planFirstAsync(conversationId: string): Promise<void> {
@@ -1552,6 +1565,66 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
+  public async finishesTheCleanupAfterADeletedChatWhenTheEnginesForgetFailsAndLogsTheFailure(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const engine = RecordingEngine.of(host);
+    const log = new RecordingLog();
+    const dispatcher = RequestDispatcherTests.cleaningDispatcher(host, engine, log);
+    const conversation = await host.createConversationAsync();
+    host.rememberedGrants.grants = [new RememberedAppGrant("g1", "com.example.notes", Resources.formatToolScope(conversation.id, null),
+      new Date("2026-10-29T10:00:00.000Z"))];
+    engine.forgetFailure = new Error("forget failed");
+
+    const deletion = await dispatcher.dispatch(new Request("r1", MethodName.ConversationDelete, new ConversationIdParams(conversation.id).toJson()));
+
+    Assert.isFalse(deletion.hasErrors);
+    Assert.isNull(await host.conversations.findAsync(conversation.id));
+    Assert.areEqual(0, host.rememberedGrants.grants.length);
+    Assert.areEqual(conversation.id, engine.released.join(","));
+    Assert.areEqual(1, host.listener.count(EventName.ConversationDeleted));
+    Assert.areEqual(Resources.formatDeleteCleanupFailed("Error"), log.lines.join(" | "));
+  }
+
+  @TestMethod
+  public async finishesTheCleanupAfterADeletedChatWhenTheTasksForgetFailsAndLogsTheFailure(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const engine = RecordingEngine.of(host);
+    const log = new RecordingLog();
+    const dispatcher = RequestDispatcherTests.cleaningDispatcher(host, engine, log);
+    const conversation = await host.createConversationAsync();
+    host.rememberedGrants.grants = [new RememberedAppGrant("g1", "com.example.notes", Resources.formatToolScope(conversation.id, null),
+      new Date("2026-10-29T10:00:00.000Z"))];
+    host.tasks.forget = (): void => {
+      throw new RangeError("tasks failed");
+    };
+
+    const deletion = await dispatcher.dispatch(new Request("r1", MethodName.ConversationDelete, new ConversationIdParams(conversation.id).toJson()));
+
+    Assert.isFalse(deletion.hasErrors);
+    Assert.areEqual(conversation.id, engine.forgotten.join(","));
+    Assert.areEqual(0, host.rememberedGrants.grants.length);
+    Assert.areEqual(conversation.id, engine.released.join(","));
+    Assert.areEqual(1, host.listener.count(EventName.ConversationDeleted));
+    Assert.areEqual(Resources.formatDeleteCleanupFailed("RangeError"), log.lines.join(" | "));
+  }
+
+  @TestMethod
+  public async answersADeletedChatAsDoneWhenItsFolderIsNotReleasedAndNoLogIsGiven(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const engine = RecordingEngine.of(host);
+    const dispatcher = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
+      host.approvals, engine, host.teammates, host.events);
+    const conversation = await host.createConversationAsync();
+    engine.releaseFailure = new Error("release failed");
+
+    const deletion = await dispatcher.dispatch(new Request("r1", MethodName.ConversationDelete, new ConversationIdParams(conversation.id).toJson()));
+
+    Assert.isFalse(deletion.hasErrors);
+    Assert.areEqual(conversation.id, engine.released.join(","));
+    Assert.areEqual(1, host.listener.count(EventName.ConversationDeleted));
+  }
+
+  @TestMethod
   public async hasTheEngineTellTheProvidersOnlyWhenAChatsPlanFirstTurnsOn(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const engine = RecordingEngine.of(host);
@@ -1997,6 +2070,11 @@ export class RequestDispatcherTests {
 
   private static organizations(value: unknown): readonly Organization[] {
     return JsonReader.fromValue({ organizations: value }).readObjectArray("organizations").map(t => Organization.fromJson(t.toJson(), t.path));
+  }
+
+  private static cleaningDispatcher(host: CoreHost, engine: RecordingEngine, log: RecordingLog): RequestDispatcher {
+    return new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages, host.approvals, engine, host.teammates,
+      host.events, null, null, host.tasks, null, null, null, null, host.computerUseGrants, null, null, log);
   }
 
   private static async succeed(host: CoreHost, method: MethodName, payload: unknown): Promise<unknown> {

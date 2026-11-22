@@ -23,18 +23,18 @@ export class OrganizationTargetChoice {
     this.label = label;
   }
 
-  public static of(tree: readonly OrganizationNode[], directReports: readonly Teammate[]): readonly OrganizationTargetChoice[] {
+  public static of(tree: readonly OrganizationNode[], reports: readonly Teammate[]): readonly OrganizationTargetChoice[] {
     return [
       new OrganizationTargetChoice(OrganizationTarget.leaders, Resources.organizationLeadersTitle),
       new OrganizationTargetChoice(OrganizationTarget.everyone, Resources.organizationEveryoneTitle),
-      ...directReports.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
+      ...reports.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
       ...tree.flatMap(t => OrganizationTargetChoice.under(t))
     ];
   }
 
   private static under(node: OrganizationNode): readonly OrganizationTargetChoice[] {
     return [
-      new OrganizationTargetChoice(OrganizationTarget.department(node.id), Resources.formatOrganizationDepartmentOption(node.name)),
+      new OrganizationTargetChoice(OrganizationTarget.department(node.id), Resources.formatOrganizationDepartmentOption(node.name, node.type)),
       ...(Object.isNull(node.leader) ? []
         : [new OrganizationTargetChoice(OrganizationTarget.teammate(node.leader.id), Resources.formatOrganizationLeaderOption(node.leader.name, node.name))]),
       ...node.members.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),

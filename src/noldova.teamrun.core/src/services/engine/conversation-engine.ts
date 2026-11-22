@@ -9,7 +9,7 @@
 import { randomBytes } from "node:crypto";
 import { isAbsolute, join } from "node:path";
 import "@noldova/context.core";
-import type { JsonObject, JsonValue } from "@noldova/context.json";
+import type { JsonObject } from "@noldova/context.json";
 import type { SqlTransaction } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
@@ -134,6 +134,7 @@ import { WorkFolder } from "../../models/work-folder.js";
 import { ConversationTitle } from "../../models/conversation-title.js";
 import { CarriedSession } from "../../models/carried-session.js";
 import { HandOffResult } from "../../models/hand-off-result.js";
+import { JsonObjects } from "../../models/json-objects.js";
 import { LostWake } from "../../models/lost-wake.js";
 import { MovedSettings } from "../../models/moved-settings.js";
 import type { ReplyMode } from "../../models/reply-mode.js";
@@ -514,7 +515,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       if ((await this.askOfAsync(plan)).starts !== shown)
         throw new ServiceException(ErrorCode.Conflict, Resources.sendChangedBeforeAllowed, [plan.conversation.id]);
     }
-    const { conversation, folder, origin, sender, group, mentions, called, participants, requested, providerId, hop, limit, stopped } = plan;
+    const { conversation, folder, origin, sender, group, mentions, called, participants, defaultReply, providerId, hop, limit, stopped } = plan;
     const projectLease = this.context.projectActivity.enterTurn(folder.path);
     let attachments: readonly MessageAttachment[] = [];
     let sent: Message | null = null;
@@ -544,15 +545,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           MessageStatus.Completed, stopped ? [...details, note] : details, null, now, null, now, attachments,
           null, null, mentions.map(t => new TeammateMention(t.id, t.name)), sender ?? outside);
         const pending: ReplyWork[] = [];
-        const replying: readonly (Teammate | null)[] = stopped ? [] : participants;
-        for (const participant of replying.flatMap(t => Object.isNull(t) ? [] : [t])) {
+        for (const participant of stopped ? [] : participants) {
           const item = await this.prepareTeammateReplyAsync(participant, message, sequence + pending.length + 1, now, hop, null, null, transaction);
           if (!Object.isNull(item))
             pending.push(item);
         }
-        const defaults = replying.includes(null) ? requested : null;
-        if (!Object.isNull(defaults))
-          pending.push(await this.prepareDefaultReplyAsync(defaults, providerId, message, sequence + pending.length + 1, now, hop, transaction));
+        if (!stopped && !Object.isNull(defaultReply))
+          pending.push(await this.prepareDefaultReplyAsync(defaultReply, providerId, message, sequence + pending.length + 1, now, hop, transaction));
         const wake = params.wakeWhenDone && !Object.isNull(origin) && pending.length > 0
           ? new ChatWake(Guid.createVersion7().toString(), ChatWakeKind.Reply, origin.message.conversationId, origin.message.id, conversation.id,
             pending.map(t => t.message.id), ChatWakeState.Waiting, null, null, now)
@@ -579,7 +578,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       const into = Object.isNull(joining) ? null : this.findGroup(conversation.id);
       if (!Object.isNull(into))
         into.push(...pending);
-      origin?.recordSend([...mentions, ...participants].flatMap(t => Object.isNull(t) ? [] : [t.id]));
+      origin?.recordSend([...mentions, ...participants].map(t => t.id));
       if (Object.isNull(into) && pending.length > 0) {
         this.state.groups.set(message.id, pending);
         this.completions.set(message.id, completion.promise);
@@ -1071,28 +1070,33 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const byChoice = called.length === 0 && !Object.isNull(sender) && Object.isNull(responder) && Object.isNull(params.requested);
     const usable = byChoice ? await this.usableResponderOfAsync(conversation, sender) : null;
     const choice = usable?.responder ?? null;
-    const participants = called.length > 0 ? called : answersItself ? [] : !byChoice ? [responder] : Object.isNull(usable) ? [] : [usable.teammate];
-    const requested = choice?.requested ?? params.requested;
+    const replier = called.length > 0 || answersItself ? null : byChoice ? usable?.teammate ?? null : responder;
+    const participants: readonly Teammate[] = called.length > 0 ? called : Object.isNull(replier) ? [] : [replier];
+    const defaultReplies = called.length === 0 && !answersItself && (byChoice ? !Object.isNull(usable) && Object.isNull(usable.teammate) : Object.isNull(responder));
+    const defaultReply = defaultReplies ? choice?.requested ?? params.requested : null;
     const providerId = Object.isNull(choice) ? params.providerId : choice.providerId;
-    if (Object.isNull(sender) && Object.isNull(providerId) && !Object.isNull(requested) && participants.includes(null))
-      throw new ServiceException(ErrorCode.InvalidParams, Resources.formatProviderRequired(requested.kind), [requested.kind]);
+    if (Object.isNull(sender) && Object.isNull(providerId) && !Object.isNull(defaultReply))
+      throw new ServiceException(ErrorCode.InvalidParams, Resources.formatProviderRequired(defaultReply.kind), [defaultReply.kind]);
     if (Object.isNull(sender))
-      await this.refuseDisabledAsync(participants, providerId);
+      await this.refuseDisabledAsync(Object.isNull(defaultReply) ? participants : [...participants, null], providerId);
     const hop = Object.isNull(origin) ? 0 : origin.hop + 1;
     const limit = Object.isNull(sender) ? Number.POSITIVE_INFINITY : this.readHopLimit();
-    if (!Object.isNull(sender) && !Object.isNull(requested) && hop <= limit && participants.includes(null))
-      await this.resolveProviderAsync(requested, providerId);
-    return new SendPlan(conversation, folder, origin, sender, group, mentions, called, participants, requested, providerId, hop, limit);
+    if (!Object.isNull(sender) && !Object.isNull(defaultReply) && hop <= limit)
+      await this.resolveProviderAsync(defaultReply, providerId);
+    return new SendPlan(conversation, folder, origin, sender, group, mentions, called, participants, defaultReply, providerId, hop, limit);
   }
 
   private async askOfAsync(plan: SendPlan): Promise<SendAsk> {
     const starts: string[] = [];
     if (plan.stopped)
       starts.push(Resources.sendStopsAtLimit);
-    else
+    else {
+      if (!Object.isNull(plan.defaultReply))
+        starts.push(Resources.sendDefaultTeammate);
       for (const participant of plan.participants)
-        if (Object.isNull(participant) || this.canReply(await this.providers.findAsync(participant.providerId)))
-          starts.push(Object.isNull(participant) ? Resources.sendDefaultTeammate : participant.name);
+        if (this.canReply(await this.providers.findAsync(participant.providerId)))
+          starts.push(participant.name);
+    }
     const title = plan.conversation.title;
     return new SendAsk(plan.conversation.id, title, Resources.formatSendMessageRequest(title),
       starts.length === 0 ? Resources.sendStartsNoOne : starts.join(Resources.sendStartsSeparator));
@@ -1181,17 +1185,13 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async originOfAsync(message: Message, transaction?: SqlTransaction): Promise<Message> {
-    const woken = message.details.map(t => t.payload).filter(ConversationEngine.isJsonObject).map(t => t[Resources.wakeSourceMessageField]);
+    const woken = message.details.map(t => t.payload).filter(JsonObjects.is).map(t => t[Resources.wakeSourceMessageField]);
     for (const id of [message.inReplyTo, ...woken].filter(Object.isString)) {
       const trigger = await this.messages.findAsync(id, transaction);
       if (!Object.isNull(trigger))
         return this.originOfAsync(trigger, transaction);
     }
     return message;
-  }
-
-  private static isJsonObject(value: JsonValue): value is JsonObject {
-    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private async startedRequestedAsync(reply: Message, transaction?: SqlTransaction): Promise<RequestedSettings> {
@@ -2472,8 +2472,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private async wakeSenderOfAsync(wake: ChatWake, transaction?: SqlTransaction): Promise<MessageSender> {
-    const first = wake.watchedIds[0];
-    const from = wake.kind === ChatWakeKind.Reply && !Object.isUndefined(first) ? await this.messages.findAsync(first, transaction) : null;
+    const from = wake.kind === ChatWakeKind.Reply ? await this.messages.findAsync(wake.firstWatchedId, transaction) : null;
     return new MessageSender(wake.watchedChatId, from?.teammateId ?? null, Object.isNull(from) ? Resources.wakeSenderName : this.nameOf(from));
   }
 

@@ -21,6 +21,10 @@ LICENSE file in the root directory of this source tree.
     </div>
     <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
       aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
+    @if (editing()) {
+      <button type="button" nol-button class="types" [variant]="outlined" (click)="openTypes()"><span nolButtonIcon class="material-symbols-rounded"
+        aria-hidden="true">{{ resources.organizationTypesIcon }}</span>{{ resources.organizationTypesButton }}</button>
+    }
     <button type="button" nol-button class="edit" [variant]="editing() ? primary : secondary" [attr.aria-pressed]="editing()" (click)="toggleEditing()"><span
       nolButtonIcon class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationEditIcon }}</span>{{ editing() ? resources.organizationDoneEditing
       : resources.organizationEditStructure }}</button>
@@ -54,11 +58,11 @@ LICENSE file in the root directory of this source tree.
 <div class="body">
   <main class="chart" [class.focused]="mode() === modes.Focus">
     @if (mode() === modes.Focus) {
-      <nol-teamrun-organization-focus class="focus" [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" />
+      <nol-teamrun-organization-focus class="focus" [tree]="root().subDepartments" [reports]="reports()" [managers]="root().managers" [editing]="editing()" />
     } @else {
       <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
         @if (mode() === modes.Board) {
-          <nol-teamrun-organization-board [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
+          <nol-teamrun-organization-board [tree]="root().subDepartments" [reports]="reports()" [managers]="root().managers" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
         } @else {
           <div class="tree" #flowArea>
             <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />

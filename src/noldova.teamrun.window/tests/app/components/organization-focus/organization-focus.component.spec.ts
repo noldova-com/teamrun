@@ -11,11 +11,12 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent,
-  Teammate, TeammatePlacement
+  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, NodeType, Organization, OrganizationChat, OrganizationLayoutSaveParams,
+  OrganizationParent, Teammate, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationFocusComponent } from "../../../../src/app/components/organization-focus/organization-focus.component";
 import { OrganizationLayout } from "../../../../src/app/models/organization-layout";
@@ -96,7 +97,6 @@ describe("OrganizationFocusComponent", () => {
       });
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
-    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
@@ -137,7 +137,7 @@ describe("OrganizationFocusComponent", () => {
 
   it("outlines a teammate in no department as a top-level row of its own, first, counted under Organization, which focuses it under Organization alone", async () => {
     await create();
-    fixture.componentRef.setInput("directReports", [carol]);
+    fixture.componentRef.setInput("reports", [carol]);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()).subDepartments);
     await settle();
@@ -157,6 +157,46 @@ describe("OrganizationFocusComponent", () => {
 
     await click(one(".obtn", one(".orow.root")));
     expect([texts(".grid nol-teamrun-organization-card .name"), texts(".unit-summary")[0]?.startsWith("Your 3 direct reports")]).toEqual([["Alice", "Code Reviewer", "Carol"], true]);
+  });
+
+  it("outlines a teammate who reports to your direct report outside a department as a top-level row, saying whom it reports to there and when focused", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => t.teammateId !== "carol" && t.teammateId !== "offline"),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0)]),
+      ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 1 under them · ")])
+      .toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Carol", "Offline"], true]);
+    const button = one(".obtn", row("Offline")).getBoundingClientRect();
+    const note = one(".reports-to", row("Offline")).getBoundingClientRect();
+    const label = one(".label", row("Offline")).getBoundingClientRect();
+    expect([note.left >= label.right, note.right <= button.right, note.top >= button.top, note.bottom <= button.bottom]).toEqual([true, true, true, true]);
+
+    await click(one(".obtn", row("Offline")));
+    expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Carol")]).toEqual([["Offline"], true]);
+  });
+
+  it("outlines a three-level chain outside departments as top-level rows by name, each saying whom it reports to there and when focused", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => !["bob", "carol", "offline"].includes(t.teammateId)),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0)]), ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 2 under them · ")])
+      .toEqual([["Bob", "Carol", "Offline"], [["Reports to Offline"], [], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Bob", "Carol", "Offline"], true]);
+
+    await click(one(".obtn", row("Bob")));
+    expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Offline")]).toEqual([["Bob"], true]);
   });
 
   it("opens on the leaders when nothing is focused", async () => {
@@ -279,13 +319,13 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["deleteRemove department"], true]);
+    expect([texts(".edit-row .delete-department"), one(".delete-department").classList.contains("nol-button-outlined")]).toEqual([["deleteRemove Department"], true]);
     await click(one(".delete-department"));
-    expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
+    expect(dialog()).toEqual(["Delete Department", "Delete UI? Its units and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
     await click(one(".obtn", row("Design")));
     await click(one(".delete-department"));
-    expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
+    expect(dialog()).toContain("Delete Design? Its units move up to report to you, and its members leave every unit.");
     await answer(".nol-teamrun-confirm");
 
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { organizationId: "my-organization", departmentId: "design" }]]));
@@ -360,6 +400,28 @@ describe("OrganizationFocusComponent", () => {
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
 
+  it("chooses the focused unit's type under its name only while editing, among the organization's types, and sends the type chosen", async () => {
+    const team = new NodeType("team", "Team", null, null, SampleData.timestamp, SampleData.timestamp);
+    await create("Department:ui");
+    const hidden = all(".unit-type").length;
+    fixture.componentRef.setInput("editing", true);
+    context.emit(EventName.OrganizationChanged, new Organization(sample.id, sample.name, null, 0, SampleData.timestamp, SampleData.timestamp,
+      [SampleData.departmentType, team], sample.departments, sample.placements).toJson());
+    await settle();
+    const choice = one(".unit-type");
+    const shown = one(".nol-select-value", choice).textContent?.trim();
+    const geometry = [box(choice).left - box(one(".unit-rename")).left, box(choice).top >= box(one(".edit-row")).bottom];
+    one(".nol-select-button", choice).click();
+    await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+    const offered = [...document.querySelectorAll(".nol-select-option")].map(t => t.textContent?.trim());
+    await userEvent.click(one(".nol-select-option[data-value='team']", document));
+    await Wait.until(() => expect(context.count(MethodName.DepartmentUpdate)).toBe(1));
+
+    expect([hidden, shown, offered, geometry]).toEqual([0, "Department", ["Department", "Team", "New type…"], [0, true]]);
+    expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DepartmentUpdate)).map(t => t.parameters))
+      .toEqual([{ organizationId: "my-organization", departmentId: "ui", typeId: "team" }]);
+  });
+
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -375,7 +437,7 @@ describe("OrganizationFocusComponent", () => {
 
     it("sets a direct report's row right under Organization, its dot where a top-level department's icon sits, at a person's row height and spacing", async () => {
       await create();
-      fixture.componentRef.setInput("directReports", [carol]);
+      fixture.componentRef.setInput("reports", [carol]);
       fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()).subDepartments);
       await settle();

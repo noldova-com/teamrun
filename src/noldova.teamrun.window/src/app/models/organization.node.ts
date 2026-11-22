@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { type Department, NameOrder, type Organization, OrganizationNodeKind, OrganizationParent, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, NameOrder, type NodeType, type Organization, OrganizationNodeKind, OrganizationParent, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 
@@ -15,22 +15,25 @@ export class OrganizationNode {
   private static readonly fewestColumns: number = 4;
   public readonly key: OrganizationParent;
   public readonly department: Department | null;
+  public readonly type: NodeType | null;
   public readonly teammate: Teammate | null;
   public readonly leader: Teammate | null;
   public readonly departments: readonly OrganizationNode[];
   public readonly reports: readonly OrganizationNode[];
   public readonly members: readonly Teammate[];
   public readonly directReports: readonly Teammate[];
+  public readonly managers: ReadonlyMap<string, Teammate>;
   public readonly headcount: number;
   public readonly total: number;
   public readonly hidden: number;
   private readonly self: readonly Teammate[];
   private readonly people: readonly Teammate[];
 
-  private constructor(key: OrganizationParent, department: Department | null, teammate: Teammate | null, leader: Teammate | null,
+  private constructor(key: OrganizationParent, department: Department | null, type: NodeType | null, teammate: Teammate | null, leader: Teammate | null,
     departments: readonly OrganizationNode[], reports: readonly OrganizationNode[]) {
     this.key = key;
     this.department = department;
+    this.type = type;
     this.teammate = teammate;
     this.leader = leader;
     this.departments = departments;
@@ -39,6 +42,7 @@ export class OrganizationNode {
     this.people = [...this.self, ...reports.flatMap(t => t.people)];
     this.members = NameOrder.sort(reports.flatMap(t => t.people), t => t.name);
     this.directReports = reports.flatMap(t => t.self);
+    this.managers = OrganizationNode.managersOf(reports);
     this.headcount = (Object.isNull(leader) ? 0 : 1) + this.members.length;
     const nested = [...departments, ...reports.flatMap(t => t.subDepartments)].reduce((sum, t) => sum + t.total, 0);
     this.total = this.headcount + nested;
@@ -70,16 +74,16 @@ export class OrganizationNode {
       if (key.kind === OrganizationNodeKind.Department)
         return organization.departments.filter(t => key.equals(OrganizationParent.department(t.id))).map(t => departmentNode(t));
       const teammate = teammates.find(t => key.equals(OrganizationParent.teammate(t.id)));
-      return Object.isUndefined(teammate) ? nodesUnder(key) : [OrganizationNode.of(key, null, teammate, null, nodesUnder(key))];
+      return Object.isUndefined(teammate) ? nodesUnder(key) : [OrganizationNode.of(key, null, null, teammate, null, nodesUnder(key))];
     });
     const departmentNode = (department: Department): OrganizationNode => {
       const key = OrganizationParent.department(department.id);
       const children = nodesUnder(key);
       const leaderNode = children.find(t => !Object.isNull(t.teammate) && t.teammate.id === department.leaderId) ?? null;
       const rest = children.filter(t => t !== leaderNode);
-      return OrganizationNode.of(key, department, null, leaderNode?.teammate ?? null, [...rest, ...leaderNode?.children ?? []]);
+      return OrganizationNode.of(key, department, organization.typeOf(department.id), null, leaderNode?.teammate ?? null, [...rest, ...leaderNode?.children ?? []]);
     };
-    return OrganizationNode.of(OrganizationParent.person, null, null, null, nodesUnder(OrganizationParent.person));
+    return OrganizationNode.of(OrganizationParent.person, null, null, null, null, nodesUnder(OrganizationParent.person));
   }
 
   public static departmentsOf(organization: Organization, parent: OrganizationParent = OrganizationParent.person): readonly Department[] {
@@ -92,9 +96,21 @@ export class OrganizationNode {
     return [node, ...node.children.flatMap(t => OrganizationNode.walk(t))];
   }
 
-  private static of(key: OrganizationParent, department: Department | null, teammate: Teammate | null, leader: Teammate | null,
+  private static managersOf(reports: readonly OrganizationNode[]): ReadonlyMap<string, Teammate> {
+    const managers = new Map<string, Teammate>();
+    for (const report of reports) {
+      for (const [id, manager] of report.managers)
+        managers.set(id, manager);
+      for (const manager of report.self)
+        for (const person of report.directReports)
+          managers.set(person.id, manager);
+    }
+    return managers;
+  }
+
+  private static of(key: OrganizationParent, department: Department | null, type: NodeType | null, teammate: Teammate | null, leader: Teammate | null,
     children: readonly OrganizationNode[]): OrganizationNode {
-    return new OrganizationNode(key, department, teammate, leader, children.filter(t => !Object.isNull(t.department)),
+    return new OrganizationNode(key, department, type, teammate, leader, children.filter(t => !Object.isNull(t.department)),
       NameOrder.sort(children.filter(t => !Object.isNull(t.teammate)), t => t.name));
   }
 }

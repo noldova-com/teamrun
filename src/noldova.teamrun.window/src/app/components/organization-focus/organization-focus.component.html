@@ -21,11 +21,11 @@ LICENSE file in the root directory of this source tree.
       aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
       class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
   </div>
-  @for (person of directReports(); track person.id) {
+  @for (person of reports(); track person.id) {
     <div class="orow person report" [class.selected]="isHere(teammate(person))">
       <span class="twist"></span>
       <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="icon slot" aria-hidden="true"><span class="dot"
-        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span><span class="spacer"></span><span
+        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span>@if (reportsToOf(person); as note) {<span class="note reports-to">{{ note }}</span>}<span class="spacer"></span><span
         class="note short">{{ resources.teammateStatusLabels[status(person)] }}</span></button>
     </div>
   }
@@ -34,8 +34,8 @@ LICENSE file in the root directory of this source tree.
       <button type="button" nol-icon-button class="twist" [icon]="layout.layout().isCollapsed(row.node.id) ? resources.organizationFocusShowIcon : resources.organizationFocusHideIcon"
         [label]="resources.formatOrganizationFocusToggle(!layout.layout().isCollapsed(row.node.id), row.node.name)"
         [attr.aria-expanded]="!layout.layout().isCollapsed(row.node.id)" (click)="layout.toggleDepartment(row.node.id)"></button>
-      <button type="button" class="obtn" [attr.aria-current]="isHere(department(row))" (click)="open(row)"><span class="material-symbols-rounded icon"
-        aria-hidden="true">{{ resources.organizationFocusDepartmentIcon }}</span><span class="label">{{ row.node.name }}</span><span class="spacer"></span>
+      <button type="button" class="obtn" [attr.aria-current]="isHere(department(row))" (click)="open(row)"><span class="icon"><nol-teamrun-organization-type-icon
+        [type]="row.node.type" [fallback]="resources.organizationFocusDepartmentIcon" /></span><span class="label">{{ row.node.name }}</span><span class="spacer"></span>
         @if (asksIn(row) > 0) {
           <span class="asks note"><span class="dot waiting" aria-hidden="true"></span>{{ resources.formatOrganizationFocusAsks(asksIn(row)) }}</span>
         }
@@ -80,12 +80,13 @@ LICENSE file in the root directory of this source tree.
       <div class="unit-head">
         @if (editing() && unit()?.department; as department) {
           <div class="edit-row">
-            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="department.name" (change)="rename(department, $event)" />
+            <input nol-text-field class="unit-rename" [attr.aria-label]="resources.formatOrganizationUnitNameLabel(unit()?.type ?? null)" [value]="department.name" (change)="rename(department, $event)" />
             <button type="button" nol-button class="delete-department" [variant]="outlined" (click)="deleteDepartment(department)"><span nolButtonIcon
-              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveDepartment }}</button>
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.formatOrganizationRemoveUnit(unit()?.type ?? null) }}</button>
           </div>
+          <nol-teamrun-organization-type-choice class="unit-type" [department]="department" />
         } @else {
-          <h2 class="unit-name">{{ unitName() }}</h2>
+          <h2 class="unit-name"><nol-teamrun-organization-type-icon [type]="unit()?.type ?? null" />{{ unitName() }}</h2>
         }
         <span class="note unit-summary">{{ unitSummary() }}</span>
         @if (editing() && focus().teammate; as teammate) {

@@ -7,10 +7,11 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { EventHub, EventSubscription } from "@noldova/teamrun.core";
+import { EventHub, EventSubscription, Resources } from "@noldova/teamrun.core";
 import { Event, EventName } from "@noldova/teamrun.protocol";
 
 import { RecordingEventListener } from "../../fixtures/recording-event-listener.fixture.js";
+import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 
 @TestClass
 export class EventHubTests {
@@ -33,5 +34,34 @@ export class EventHubTests {
     Assert.areEqual("MessageCreated", first.names().join(","));
     Assert.areEqual("MessageCreated,MessageUpdated", second.names().join(","));
     Assert.areEqual(1, second.count(EventName.MessageUpdated));
+  }
+
+  @TestMethod
+  public deliversToTheLaterListenersAndLogsWhenOneThrows(): void {
+    const log = new RecordingLog();
+    const hub = new EventHub(log);
+    const first = new RecordingEventListener();
+    const last = new RecordingEventListener();
+    hub.subscribe(first);
+    hub.subscribe({ onEvent: () => { throw new TypeError("listener failed"); } });
+    hub.subscribe(last);
+
+    hub.publish(new Event(EventName.MessageCreated, { id: "m1" }));
+
+    Assert.areEqual("MessageCreated", first.names().join(","));
+    Assert.areEqual("MessageCreated", last.names().join(","));
+    Assert.areEqual(Resources.formatEventListenerFailed(EventName.MessageCreated, "TypeError"), log.lines.join(" | "));
+  }
+
+  @TestMethod
+  public deliversToTheLaterListenersWhenOneThrowsAndNoLogIsGiven(): void {
+    const hub = new EventHub();
+    const last = new RecordingEventListener();
+    hub.subscribe({ onEvent: () => { throw new TypeError("listener failed"); } });
+    hub.subscribe(last);
+
+    hub.publish(new Event(EventName.MessageCreated, { id: "m1" }));
+
+    Assert.areEqual("MessageCreated", last.names().join(","));
   }
 }
