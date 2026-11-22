@@ -500,7 +500,7 @@ export class WakeRepliesTests {
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
     const stops: Promise<Message>[] = [];
-    host.events.subscribe({
+    FailingDelivery.on(host.events, {
       onEvent: event => {
         const message = event.name === EventName.MessageUpdated ? Message.fromJson(event.payload) : null;
         if (message?.status === MessageStatus.Running && stops.length === 0) {
