@@ -48,6 +48,7 @@ export class OrganizationTypeDialogComponent {
   }
 
   public static open(dialogs: DialogService, organization: OrganizationStoreService, type: NodeType | null): OrganizationTypeDialogComponent | null {
+    organization.clearActionError();
     const dialog = dialogs.open(OrganizationTypeDialogComponent, ".nol-teamrun-type-name");
     dialog.componentRef?.setInput("organization", organization);
     dialog.componentRef?.setInput("type", type);

@@ -59,7 +59,8 @@ describe("OrganizationTypeDialogComponent", () => {
       await userEvent.type(nameField(), text);
     await settle();
   };
-  const create = async (type: NodeType | null, configure: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
+  const create = async (type: NodeType | null, configure: (context: FakeWindowPartContext) => void = () => undefined,
+    before: () => Promise<unknown> = async () => undefined): Promise<void> => {
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organization.toJson()]);
     configure(context);
     TestBed.configureTestingModule({});
@@ -67,6 +68,7 @@ describe("OrganizationTypeDialogComponent", () => {
     await Wait.until(() => expect(store.organization().nodeTypes.map(t => t.id)).toEqual(["department", "team", "plain"]));
     created = [];
     closes = 0;
+    await before();
     const dialog = OrganizationTypeDialogComponent.open(TestBed.inject(DialogService), store, type);
     dialog?.created.subscribe(t => created.push(t.id));
     dialog?.closed.subscribe(() => closes++);
@@ -130,6 +132,17 @@ describe("OrganizationTypeDialogComponent", () => {
     await settle();
 
     expect([context.parametersOf(MethodName.NodeTypeUpdate), closes]).toEqual([{ organizationId: "my-organization", typeId: "plain", icon: "groups" }, 0]);
+  });
+
+  it("opens without the error an earlier action left, such as a refused delete", async () => {
+    let earlier: string | null = null;
+    await create(null, t => t.fail(MethodName.NodeTypeDelete, "2 units have the type Department; give them another type before deleting Department."), async () => {
+      await store.deleteNodeType("department");
+      earlier = store.actionError();
+    });
+
+    expect([earlier, element().querySelector(".nol-teamrun-dialog-error"), store.actionError()])
+      .toEqual(["2 units have the type Department; give them another type before deleting Department.", null, null]);
   });
 
   it("closes without asking the runtime when nothing about the type changed", async () => {

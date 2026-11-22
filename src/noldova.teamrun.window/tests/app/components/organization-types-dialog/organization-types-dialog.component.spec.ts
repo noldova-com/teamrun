@@ -58,7 +58,7 @@ describe("OrganizationTypesDialogComponent", () => {
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
     OrganizationTypesDialogComponent.open(TestBed.inject(DialogService), store);
     await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-types-dialog .nol-teamrun-new-type")).not.toBeNull());
-    await Wait.until(() => expect([names(), document.querySelector("nol-teamrun-organization-types-dialog .types-empty") !== null])
+    await Wait.until(() => expect([names(), !Object.isNull(document.querySelector("nol-teamrun-organization-types-dialog .types-empty"))])
       .toEqual([types.map(t => t.name), types.length === 0]));
     return store;
   };
