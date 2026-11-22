@@ -65,6 +65,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Ending a process tree on Windows:** a process whose end failed is ended again while the tree's listing still shows it, in each of the stop's ten rounds, rather than left running after its first end, and each end waits for the process to exit, all of a round's within two seconds (#344).
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
 - **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
+- **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
 - **Waiting messages:** a waiting message whose sending or Send now fails after it was kept no longer shows the request as failed, so the window doesn't add it a second time; it waits and the failure is logged (#229).
 
 ### Changed
