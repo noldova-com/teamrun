@@ -37,6 +37,74 @@ LICENSE file in the root directory of this source tree.
     </div>
   }
 
+  @if (hasOrganization()) {
+    <nol-section-header [uppercase]="true" [label]="resources.organizationsTitle" [icon]="resources.organizationsIcon" [collapsible]="true"
+      [controls]="resources.organizationsGroupId" [expanded]="isGroupOpen(groups.Organizations)" (expandedChange)="openGroup(groups.Organizations, $event)">
+      <button type="button" nol-icon-button nolSectionHeaderAction class="nol-teamrun-new-organization" [icon]="resources.addIcon" [label]="resources.newOrganizationTitle"
+        (click)="createOrganization()"></button>
+    </nol-section-header>
+    <div class="nol-teamrun-organization-list" role="tree" [id]="resources.organizationsGroupId" [attr.aria-label]="resources.organizationsTitle">
+      @if (isGroupOpen(groups.Organizations)) {
+        @for (organization of organizations(); track organization.id) {
+          <div class="nol-teamrun-row nol-teamrun-organization-row" [nolTeamrunTreeItem]="organizationsTree" [treeKey]="organization.key"
+            [treeLabel]="organization.name" [treeExpanded]="!isCollapsed(organization.key)" [nolTooltip]="organization.folder ?? organization.name" [nolTooltipSide]="beside"
+            [attr.aria-owns]="isCollapsed(organization.key) ? null : listIdOf(organization.key)" [nolContextMenuTriggerFor]="organizationMenu"
+            (toggled)="layout.toggleProject(organization.key)" (activated)="openOrganization(organization)">
+            <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(organization.key)">
+              <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(organization.key) ? resources.collapsedIcon : resources.expandedIcon }}</span>
+            </span>
+            <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="openOrganization(organization)">{{ organization.name }}</span>
+            <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon"
+              [label]="resources.rowMenuLabel" [nolMenuTriggerFor]="organizationMenu"></button>
+            <ng-template #organizationMenu>
+              <nol-menu>
+                <button nol-menu-item [icon]="resources.organizationViewIcon" [label]="resources.openOrganizationLabel" (triggered)="openOrganization(organization)"></button>
+                <button nol-menu-item [icon]="resources.editIcon" [label]="resources.renameConversationLabel" (triggered)="renameOrganization(organization)"></button>
+                <button nol-menu-item [icon]="resources.attachFolderIcon"
+                  [label]="organization.folder === null ? resources.setOrganizationFolderLabel : resources.changeOrganizationFolderLabel"
+                  (triggered)="chooseOrganizationFolder(organization)"></button>
+                @if (organization.folder !== null) {
+                  <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.clearOrganizationFolderLabel" (triggered)="clearOrganizationFolder(organization)"></button>
+                }
+                @if (organizations().length > 1) {
+                  <button nol-menu-item [icon]="resources.organizationDeleteIcon" [label]="resources.organizationDeleteLabel" (triggered)="removeOrganization(organization)"></button>
+                }
+              </nol-menu>
+            </ng-template>
+          </div>
+          @if (!isCollapsed(organization.key)) {
+            <div role="group" [id]="listIdOf(organization.key)">
+              @for (teammate of organization.teammates; track teammate.id) {
+                <ng-container [ngTemplateOutlet]="teammateRow"
+                  [ngTemplateOutletContext]="{ $implicit: teammate, organizationId: organization.id, parentKey: organization.key, deep: false }" />
+              }
+              @for (department of organization.departments; track department.id) {
+                <div class="nol-teamrun-row nol-teamrun-organization-row nol-teamrun-department-row nol-teamrun-nested" [nolTeamrunTreeItem]="organizationsTree"
+                  [treeKey]="department.id" [treeLabel]="department.path" [treeParent]="organization.key" [treeExpanded]="!isCollapsed(department.id)"
+                  [attr.aria-owns]="isCollapsed(department.id) ? null : listIdOf(department.id)" (toggled)="layout.toggleProject(department.id)"
+                  (activated)="layout.toggleProject(department.id)">
+                  <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(department.id)">
+                    <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(department.id) ? resources.collapsedIcon : resources.expandedIcon }}</span>
+                  </span>
+                  <nol-teamrun-organization-type-icon [type]="department.type" />
+                  <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="layout.toggleProject(department.id)">{{ department.path }}</span>
+                </div>
+                @if (!isCollapsed(department.id)) {
+                  <div role="group" [id]="listIdOf(department.id)">
+                    @for (teammate of department.teammates; track teammate.id) {
+                      <ng-container [ngTemplateOutlet]="teammateRow"
+                        [ngTemplateOutletContext]="{ $implicit: teammate, organizationId: organization.id, parentKey: department.id, deep: true }" />
+                    }
+                  </div>
+                }
+              }
+            </div>
+          }
+        }
+      }
+    </div>
+  }
+
   <nol-section-header [uppercase]="true" [label]="resources.projectsViewTitle" [icon]="resources.projectsIcon" [collapsible]="true" [controls]="resources.projectsGroupId" [expanded]="isGroupOpen(groups.Projects)"
     (expandedChange)="openGroup(groups.Projects, $event)" />
   @if (isGroupOpen(groups.Projects) && store.projects().length === 0) {
@@ -111,74 +179,6 @@ LICENSE file in the root directory of this source tree.
             [treeLabel]="resources.formatShowMore(chats().length - shownChats().length)" (click)="showAllChats()" (activated)="showAllChats()">
             {{ resources.formatShowMore(chats().length - shownChats().length) }}
           </div>
-        }
-      }
-    </div>
-  }
-
-  @if (hasOrganization()) {
-    <nol-section-header [uppercase]="true" [label]="resources.organizationsTitle" [icon]="resources.organizationsIcon" [collapsible]="true"
-      [controls]="resources.organizationsGroupId" [expanded]="isGroupOpen(groups.Organizations)" (expandedChange)="openGroup(groups.Organizations, $event)">
-      <button type="button" nol-icon-button nolSectionHeaderAction class="nol-teamrun-new-organization" [icon]="resources.addIcon" [label]="resources.newOrganizationTitle"
-        (click)="createOrganization()"></button>
-    </nol-section-header>
-    <div class="nol-teamrun-organization-list" role="tree" [id]="resources.organizationsGroupId" [attr.aria-label]="resources.organizationsTitle">
-      @if (isGroupOpen(groups.Organizations)) {
-        @for (organization of organizations(); track organization.id) {
-          <div class="nol-teamrun-row nol-teamrun-organization-row" [nolTeamrunTreeItem]="organizationsTree" [treeKey]="organization.key"
-            [treeLabel]="organization.name" [treeExpanded]="!isCollapsed(organization.key)" [nolTooltip]="organization.folder ?? organization.name" [nolTooltipSide]="beside"
-            [attr.aria-owns]="isCollapsed(organization.key) ? null : listIdOf(organization.key)" [nolContextMenuTriggerFor]="organizationMenu"
-            (toggled)="layout.toggleProject(organization.key)" (activated)="openOrganization(organization)">
-            <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(organization.key)">
-              <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(organization.key) ? resources.collapsedIcon : resources.expandedIcon }}</span>
-            </span>
-            <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="openOrganization(organization)">{{ organization.name }}</span>
-            <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon"
-              [label]="resources.rowMenuLabel" [nolMenuTriggerFor]="organizationMenu"></button>
-            <ng-template #organizationMenu>
-              <nol-menu>
-                <button nol-menu-item [icon]="resources.organizationViewIcon" [label]="resources.openOrganizationLabel" (triggered)="openOrganization(organization)"></button>
-                <button nol-menu-item [icon]="resources.editIcon" [label]="resources.renameConversationLabel" (triggered)="renameOrganization(organization)"></button>
-                <button nol-menu-item [icon]="resources.attachFolderIcon"
-                  [label]="organization.folder === null ? resources.setOrganizationFolderLabel : resources.changeOrganizationFolderLabel"
-                  (triggered)="chooseOrganizationFolder(organization)"></button>
-                @if (organization.folder !== null) {
-                  <button nol-menu-item [icon]="resources.detachFolderIcon" [label]="resources.clearOrganizationFolderLabel" (triggered)="clearOrganizationFolder(organization)"></button>
-                }
-                @if (organizations().length > 1) {
-                  <button nol-menu-item [icon]="resources.organizationDeleteIcon" [label]="resources.organizationDeleteLabel" (triggered)="removeOrganization(organization)"></button>
-                }
-              </nol-menu>
-            </ng-template>
-          </div>
-          @if (!isCollapsed(organization.key)) {
-            <div role="group" [id]="listIdOf(organization.key)">
-              @for (teammate of organization.teammates; track teammate.id) {
-                <ng-container [ngTemplateOutlet]="teammateRow"
-                  [ngTemplateOutletContext]="{ $implicit: teammate, organizationId: organization.id, parentKey: organization.key, deep: false }" />
-              }
-              @for (department of organization.departments; track department.id) {
-                <div class="nol-teamrun-row nol-teamrun-organization-row nol-teamrun-department-row nol-teamrun-nested" [nolTeamrunTreeItem]="organizationsTree"
-                  [treeKey]="department.id" [treeLabel]="department.path" [treeParent]="organization.key" [treeExpanded]="!isCollapsed(department.id)"
-                  [attr.aria-owns]="isCollapsed(department.id) ? null : listIdOf(department.id)" (toggled)="layout.toggleProject(department.id)"
-                  (activated)="layout.toggleProject(department.id)">
-                  <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(department.id)">
-                    <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(department.id) ? resources.collapsedIcon : resources.expandedIcon }}</span>
-                  </span>
-                  <nol-teamrun-organization-type-icon [type]="department.type" />
-                  <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="layout.toggleProject(department.id)">{{ department.path }}</span>
-                </div>
-                @if (!isCollapsed(department.id)) {
-                  <div role="group" [id]="listIdOf(department.id)">
-                    @for (teammate of department.teammates; track teammate.id) {
-                      <ng-container [ngTemplateOutlet]="teammateRow"
-                        [ngTemplateOutletContext]="{ $implicit: teammate, organizationId: organization.id, parentKey: department.id, deep: true }" />
-                    }
-                  </div>
-                }
-              }
-            </div>
-          }
         }
       }
     </div>

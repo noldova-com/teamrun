@@ -52,6 +52,8 @@ export class Resources {
   public static readonly contextOmissionNote: string = "Earlier messages were omitted from this context.";
   public static readonly defaultHopLimit: number = 4;
   public static readonly maximumTitleLength: number = 60;
+  public static readonly messageParameterName: string = "message";
+  public static readonly titleNeedsText: string = "A title needs a message with a line that isn't blank.";
   public static readonly titleOpeningLength: number = 4000;
   public static readonly titleAskTimeout: number = 60_000;
   public static readonly titleModelSeparator: string = "/";
@@ -1260,6 +1262,14 @@ export class Resources {
     return `The draft of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" was not read, so its files were kept: ${reason}.`;
   }
 
+  public static formatEventListenerFailed(eventName: string, reason: string): string {
+    return `A listener of the event "${eventName}" failed: ${reason}.`;
+  }
+
+  public static formatDeleteCleanupFailed(reason: string): string {
+    return `A cleanup after a chat's deletion failed: ${reason}.`;
+  }
+
   public static formatFailureKind(error: unknown): string {
     if (!(error instanceof Error))
       return typeof error;
@@ -1341,6 +1351,10 @@ export class Resources {
 
   public static formatMessageNotOpen(messageId: string): string {
     return `The message "${messageId}" is not a running reply.`;
+  }
+
+  public static formatReadyWakeWithoutText(wakeId: string): string {
+    return `The ready wake "${wakeId}" has no text to deliver.`;
   }
 
   public static formatReplyWithoutProvenance(messageId: string): string {

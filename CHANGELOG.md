@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
 - **Explorer:** an Organizations group lists each organization, whose name opens its own Organization view, then the teammates it places in no department and each of its departments by its path, such as `DevOps › Infra`, with its teammates; a teammate's row opens its Organization chat in that organization and shows when it waits or works, and Organization chats no longer show under Chats, Pinned or a project, even one pinned or moved there before (#402).
@@ -71,9 +72,12 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
 - **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
 - **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
+- **Deleting a chat:** once a chat is deleted, a failure in one of the cleanups after it, such as forgetting its runs, no longer skips the others or shows the delete as failed; and one part of TeamRun failing on an update no longer keeps the update from the parts after it, such as an approval's answer from its waiting run; each failure is logged (#85).
+- **Background tasks:** a task that writes a flood of output within a tenth of a second sends the window only its latest 65,536 characters, the most a task keeps, rather than all of it at once (#85).
 
 ### Changed
 
+- **Explorer:** Organizations come right after Pinned, before Projects and Chats, and the section headers stand as tall and as close to each other as New chat, Open folder and Open browser (#150, #43).
 - **The first launch's Skip for now and Continue:** they sit in a footer along the Providers tab's bottom edge, so they stay in view on a short window while the providers scroll above them (#350).
 - **A served call's approval card:** under its title, a card for a Git, GitHub or other module call that TeamRun serves names the module, the tool, the teammate and its chat, such as `Git · git_commit · Codex in "Gemini folder trust"`, as the approved design draws it (#19).
 - **Git 0.0.6:** TeamRun takes the Git and GitHub modules at 0.0.6, on Noldova Desktop 0.0.11 like TeamRun itself (#342).

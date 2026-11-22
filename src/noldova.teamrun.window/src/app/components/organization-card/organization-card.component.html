@@ -21,6 +21,9 @@ LICENSE file in the root directory of this source tree.
     } @else if (teammate().role; as role) {
       <span class="role">{{ role }}</span>
     }
+    @if (reportsTo(); as note) {
+      <span class="role reports-to">{{ note }}</span>
+    }
   </div>
   @if (shape() === shapes.Fluid && !editing()) {
     <button type="button" nol-icon-button class="chat" [icon]="resources.organizationBoardMessageIcon" [label]="resources.formatOrganizationMessageNamed(teammate().name)"
