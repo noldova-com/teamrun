@@ -444,7 +444,7 @@ export class OrganizationServiceTests {
     Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Department));
     Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement));
     Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
-    Assert.areEqual("Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Organization));
+    Assert.areEqual("Update,Delete,Insert", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Organization));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.readLayoutAsync(new OrganizationIdParams(OrganizationServiceTests.mine)));
   }
 
