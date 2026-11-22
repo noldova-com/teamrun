@@ -273,6 +273,38 @@ describe("TeammatesViewComponent", () => {
     expect(document.activeElement).toBe(button(".nol-teamrun-clear-default"));
   });
 
+  it("names the default teammate's model and effort from its provider's catalog when no listed teammate chooses either there", async () => {
+    await create(t => {
+      t.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([
+        new ProviderModel("gpt-5", "GPT-5", "Fixture", ["high", "xhigh"], true, null, true, "high", { xhigh: "Extra high" })]));
+      t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", "gpt-5", "xhigh"), "a1").toJson());
+      data.teammates = [new Teammate("erin", "Erin", null, "a1", Harness.Provider, null, null, "t", "t")];
+    });
+
+    await Wait.until(() => expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["GPT-5"], ["Extra high"]]));
+  });
+
+  it("names the default teammate's model and effort after a resync when its provider's catalog couldn't be read before", async () => {
+    let reachable = false;
+    await create(t => {
+      t.answer(MethodName.ProviderModelCatalog, () => {
+        if (!reachable)
+          throw new Error("offline");
+        return SampleData.catalog([new ProviderModel("gpt-5", "GPT-5", "Fixture", ["high", "xhigh"], true, null, true, "high", { xhigh: "Extra high" })]);
+      });
+      t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", "gpt-5", "xhigh"), "a1").toJson());
+      data.teammates = [new Teammate("erin", "Erin", null, "a1", Harness.Provider, null, null, "t", "t")];
+    });
+    await Wait.until(() => expect(context.count(MethodName.ProviderModelCatalog)).toBe(1));
+    await settle();
+    expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["gpt-5"], ["Xhigh"]]);
+    reachable = true;
+
+    context.emit(EventName.StateResyncRequested, null);
+
+    await Wait.until(() => expect([texts(".nol-teamrun-default-model"), texts(".nol-teamrun-default-effort")]).toEqual([["GPT-5"], ["Extra high"]]));
+  });
+
   it("says a default teammate saved without a provider has no provider chosen", async () => {
     await create(t => t.answer(MethodName.DefaultTeammateRead, () => new DefaultTeammate(new RequestedSettings("codex", null, null)).toJson()));
 

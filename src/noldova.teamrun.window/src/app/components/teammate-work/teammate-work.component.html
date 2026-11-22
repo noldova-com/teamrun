@@ -26,7 +26,7 @@ LICENSE file in the root directory of this source tree.
           <span class="work-title"><span class="work-strong">{{ numberOf(item) }}</span> {{ item.pullRequest.title }}</span>
           <span class="work-pull-request-meta">
             @if (ciOf(item); as ci) {
-              <span class="work-ci" [class]="ci[1]"><span class="work-dot"></span>{{ ci[0] }}</span>
+              <span class="work-ci" [class]="ci.look"><span class="work-dot"></span>{{ ci.text }}</span>
             }
             <span class="work-muted">{{ reviewOf(item) }}</span>
           </span>
@@ -50,8 +50,8 @@ LICENSE file in the root directory of this source tree.
   <div class="work-body" data-field="Artifacts">
     @for (artifact of artifacts(); track $index) {
       <span class="work">
-        <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ artifact[0] }}</span>
-        <span>{{ artifact[1] }}</span>
+        <span class="work-icon material-symbols-rounded" aria-hidden="true">{{ artifact.icon }}</span>
+        <span>{{ artifact.text }}</span>
       </span>
     }
     @if (artifactsNote(); as note) {

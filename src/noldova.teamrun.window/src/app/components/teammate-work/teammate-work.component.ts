@@ -16,6 +16,8 @@ import { PageKind } from "@noldova/teamrun.protocol";
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
 import { TeammateSourceState } from "../../enums/teammate-source-state";
+import { ArtifactLine } from "../../models/artifact-line";
+import type { CiLabel } from "../../models/ci-label";
 import type { TeammatePullRequest } from "../../models/teammate-pull-request";
 import { TeammateWorkReader } from "../../services/teammate-work.reader";
 
@@ -70,9 +72,9 @@ export class TeammateWorkComponent {
     return work.documents.length === 0 ? Resources.teammateNoDocuments
       : work.documents.map(t => TeammateWorkComponent.nameOf(t.path)).join(Resources.teammateDocumentSeparator);
   });
-  protected readonly artifacts: Signal<readonly (readonly [icon: string, text: string])[]> = computed(() => this.reader().artifacts()
-    .map(t => [t.kind === PageKind.Canvas ? Resources.teammateCanvasIcon : Resources.teammatePageIcon,
-      Resources.formatTeammateArtifact(t.kind, t.title)] as const));
+  protected readonly artifacts: Signal<readonly ArtifactLine[]> = computed(() => this.reader().artifacts()
+    .map(t => new ArtifactLine(t.kind === PageKind.Canvas ? Resources.teammateCanvasIcon : Resources.teammatePageIcon,
+      Resources.formatTeammateArtifact(t.kind, t.title))));
   protected readonly artifactsNote: Signal<string | null> = computed(() =>
     this.reader().artifactsFailure() ?? (this.artifacts().length === 0 ? Resources.teammateNoArtifacts : null));
 
@@ -88,7 +90,7 @@ export class TeammateWorkComponent {
     return Resources.formatTeammatePullRequestNumber(item.pullRequest.reference.number);
   }
 
-  protected ciOf(item: TeammatePullRequest): readonly [text: string, look: string] | null {
+  protected ciOf(item: TeammatePullRequest): CiLabel | null {
     return Object.isNull(item.checksState) ? null : Resources.teammateCiLabels[item.checksState];
   }
 

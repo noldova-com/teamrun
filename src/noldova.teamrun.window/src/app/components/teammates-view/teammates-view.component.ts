@@ -85,7 +85,10 @@ export class TeammatesViewComponent {
     effect(() => {
       resynced();
       const providers = this.store.providers();
+      const defaultTeammate = this.store.defaultTeammate();
       const chosen = new Set(this.store.teammates().filter(t => !Object.isNull(t.model) || !Object.isNull(t.effort)).map(t => t.providerId));
+      if (!Object.isNull(defaultTeammate) && !Object.isNull(defaultTeammate.providerId))
+        chosen.add(defaultTeammate.providerId);
       untracked(() => {
         for (const provider of providers.filter(t => chosen.has(t.id)))
           this.catalogReads.follow(provider.id, this.store.modelCatalogs.load(provider.kind, provider.id), t => this.catalogs.update(u => new Map(u).set(provider.id, t)));

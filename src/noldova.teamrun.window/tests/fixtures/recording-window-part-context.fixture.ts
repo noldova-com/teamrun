@@ -38,6 +38,7 @@ import {
   type MenuRowContribution,
   NotificationHandle,
   type PlaceholderContribution,
+  RuntimeRequestException,
   type SearchSourceContribution,
   type SettingsPageContribution,
   type SettingsRow,
@@ -208,7 +209,7 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   public listOpenDocumentsAsync(name: string): Promise<readonly string[] | null> {
     if (!declaration.contributes.documents.includes(name))
       return Promise.reject(new Error(`TeamRun's module.json does not declare the document ${name}.`));
-    return Object.isNull(this.openInstances) ? Promise.reject(new Error("The fixture lists no open documents.")) : Promise.resolve(this.openInstances);
+    return Object.isNull(this.openInstances) ? Promise.reject(new RuntimeRequestException("failed", "The fixture lists no open documents.")) : Promise.resolve(this.openInstances);
   }
 
   public showLinkMenu(_url: string, _event: MouseEvent): void {

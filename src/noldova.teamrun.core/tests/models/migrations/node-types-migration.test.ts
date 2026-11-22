@@ -59,13 +59,16 @@ export class NodeTypesMigrationTests {
     const [mine, other, empty] = await new OrganizationService(current).listAsync();
     const changes = (await current.database.changeFeed.readAfterAsync(0)).filter(t => t.entity === ChangeEntity.Organization || t.entity === ChangeEntity.Department);
 
+    Assert.isDefined(mine);
+    Assert.isDefined(other);
+    Assert.isDefined(empty);
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
-    Assert.areEqual(`department|Department|null|null|${mine?.createdAt ?? ""}|${mine?.createdAt ?? ""}`,
-      mine?.nodeTypes.map(t => [t.id, t.name, String(t.icon), String(t.color), t.createdAt, t.updatedAt].join("|")).join(","));
-    Assert.areEqual("department", mine?.departments[0]?.typeId);
-    Assert.areEqual(JSON.stringify([team.toJson()]), JSON.stringify(other?.nodeTypes.map(t => t.toJson())));
-    Assert.areEqual("team", other?.departments[0]?.typeId);
-    Assert.areEqual("o9|0", `${empty?.id ?? ""}|${empty?.nodeTypes.length ?? -1}`);
+    Assert.areEqual(`department|Department|null|null|${mine.createdAt}|${mine.createdAt}`,
+      mine.nodeTypes.map(t => [t.id, t.name, String(t.icon), String(t.color), t.createdAt, t.updatedAt].join("|")).join(","));
+    Assert.areEqual("department", mine.departments[0]?.typeId);
+    Assert.areEqual(JSON.stringify([team.toJson()]), JSON.stringify(other.nodeTypes.map(t => t.toJson())));
+    Assert.areEqual("team", other.departments[0]?.typeId);
+    Assert.areEqual("o9|0", `${empty.id}|${empty.nodeTypes.length}`);
     Assert.areEqual([
       `${old.slice(0, -1)},"nodeTypes":[]}`,
       `${renamed.slice(0, -1)},"nodeTypes":${JSON.stringify([new NodeType("department", "Department", null, null, "c1", "c1").toJson()])}}`,
