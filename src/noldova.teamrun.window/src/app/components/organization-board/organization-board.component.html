@@ -56,10 +56,11 @@ LICENSE file in the root directory of this source tree.
         <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node.department" /></ng-template>
       }
     }
-    @for (report of directReports(); track report.id) {
+    @for (report of reports(); track report.id) {
       <nol-teamrun-organization-card class="leader report" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name"
-        [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row" [editing]="editing()" [nolPopoverTrigger]="reportDetails"
-        [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(report))" />
+        [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row" [reportsTo]="reportsToOf(report)" [editing]="editing()"
+        [nolPopoverTrigger]="reportDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment"
+        (message)="chosen.emit(teammateTarget(report))" />
       <ng-template #reportDetails><nol-teamrun-organization-details [teammate]="report" [department]="null" /></ng-template>
     }
   </div>

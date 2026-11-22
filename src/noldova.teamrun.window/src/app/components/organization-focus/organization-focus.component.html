@@ -21,11 +21,11 @@ LICENSE file in the root directory of this source tree.
       aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
       class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
   </div>
-  @for (person of directReports(); track person.id) {
+  @for (person of reports(); track person.id) {
     <div class="orow person report" [class.selected]="isHere(teammate(person))">
       <span class="twist"></span>
       <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="icon slot" aria-hidden="true"><span class="dot"
-        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span><span class="spacer"></span><span
+        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span>@if (reportsToOf(person); as note) {<span class="note reports-to">{{ note }}</span>}<span class="spacer"></span><span
         class="note short">{{ resources.teammateStatusLabels[status(person)] }}</span></button>
     </div>
   }
