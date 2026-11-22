@@ -47,7 +47,7 @@ export class OrganizationTypeDialogComponent {
     });
   }
 
-  public static open(dialogs: DialogService, organization: OrganizationStoreService, type: NodeType | null): OrganizationTypeDialogComponent | undefined {
+  public static open(dialogs: DialogService, organization: OrganizationStoreService, type: NodeType | null): OrganizationTypeDialogComponent | null {
     const dialog = dialogs.open(OrganizationTypeDialogComponent, ".nol-teamrun-type-name");
     dialog.componentRef?.setInput("organization", organization);
     dialog.componentRef?.setInput("type", type);
