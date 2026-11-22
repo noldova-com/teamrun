@@ -10,7 +10,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import { AbilityCell, AbilitySource, MethodName, ProviderAbility, ProviderKind } from "@noldova/teamrun.protocol";
 
 import { AbilitiesPageComponent } from "../../../../src/app/components/abilities-page/abilities-page.component";
@@ -18,6 +19,7 @@ import { AbilitySettingsRows } from "../../../../src/app/services/ability-settin
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -35,6 +37,8 @@ describe("AbilitiesPageComponent", () => {
     SampleData.abilities({ [ProviderAbility.Fork]: AbilityCell.works(AbilitySource.AcpAddition) }));
   const untabled = new ProviderKind("old", "Old", true);
   let context: FakeWindowPartContext;
+  let listed: readonly ProviderKind[] | null;
+  let reads: number;
   let fixture: ComponentFixture<AbilitiesPageComponent>;
 
   const element = (): HTMLElement => {
@@ -43,15 +47,22 @@ describe("AbilitiesPageComponent", () => {
       throw new Error("The page has no element.");
     return native;
   };
-  const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => t.textContent?.trim().replace(/\s+/gu, " ") ?? "");
+  const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => Required.of(t.textContent).trim().replace(/\s+/gu, " "));
   const row = (ability: ProviderAbility): HTMLElement => {
     const found = element().querySelector<HTMLElement>(`.nol-teamrun-ability[data-ability="${ability}"]`);
     if (Object.isNull(found))
       throw new Error(`There is no row for ${ability}.`);
     return found;
   };
-  const create = async (kinds: readonly ProviderKind[], rows: boolean = false): Promise<void> => {
-    context = SampleData.createContext().answer(MethodName.ProviderKindList, () => kinds.map(t => t.toJson()));
+  const create = async (kinds: readonly ProviderKind[] | null, rows: boolean = false): Promise<void> => {
+    listed = kinds;
+    reads = 0;
+    context = SampleData.createContext().answer(MethodName.ProviderKindList, () => {
+      reads++;
+      if (Object.isNull(listed))
+        throw new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting.");
+      return listed.map(t => t.toJson());
+    });
     if (rows)
       AbilitySettingsRows.register(context, ChatStoreService.of(context));
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
@@ -138,5 +149,31 @@ describe("AbilitiesPageComponent", () => {
 
     await Wait.until(() => expect(texts("[role='status']")).toEqual(["TeamRun hasn't read its providers yet."]));
     expect(element().querySelectorAll(".nol-teamrun-ability")).toHaveLength(0);
+  });
+
+  it("says when the provider types failed to load, with Retry at the end of the provider row, and shows the abilities once a retry reads them, reading once for a second click", async () => {
+    await create(null);
+
+    await Wait.until(() => expect(texts(".nol-teamrun-kinds-failed .nol-teamrun-error-text")).toEqual([Resources.kindsUnavailableForAbilities]));
+    expect(element().querySelectorAll("[role='alert']")).toHaveLength(1);
+    expect(element().querySelector("[role='status']")).toBeNull();
+    expect(element().querySelectorAll(".nol-teamrun-ability")).toHaveLength(0);
+    const control = Required.of(element().querySelector(".nol-teamrun-abilities-provider .nol-setting-row-control")).getBoundingClientRect();
+    const message = Required.of(element().querySelector(".nol-teamrun-kinds-failed .nol-teamrun-error-text")).getBoundingClientRect();
+    const retry = Required.of(element().querySelector<HTMLElement>(".nol-teamrun-retry-kinds"));
+    const button = retry.getBoundingClientRect();
+    expect(texts(".nol-teamrun-retry-kinds")).toEqual([Resources.retryLabel]);
+    expect(Math.abs(button.right - control.right)).toBeLessThanOrEqual(0.5);
+    expect(message.left).toBeGreaterThanOrEqual(control.left - 0.5);
+    expect(message.right).toBeLessThanOrEqual(button.left + 0.5);
+
+    listed = [cursor, pi];
+    const before = reads;
+    retry.click();
+    retry.click();
+    await Wait.until(() => expect(element().querySelectorAll(".nol-teamrun-ability")).toHaveLength(Object.values(ProviderAbility).length));
+    expect(reads).toBe(before + 1);
+    expect(element().querySelector(".nol-teamrun-kinds-failed")).toBeNull();
+    expect(texts("nol-select.nol-teamrun-abilities-kind .nol-select-button")[0]).toContain("Cursor");
   });
 });

@@ -15,7 +15,7 @@ import { FailureCode } from "@noldova/desktop.protocol";
 import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import {
   Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageSender, MessageSendingPayload, MessageStatus,
-  MethodName, Organization, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate,
+  MethodName, NodeType, Organization, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate,
   TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
 } from "@noldova/teamrun.protocol";
 import { DefaultTheme, SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
@@ -194,7 +194,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
       all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
-      .toEqual([["Organization"], ["4 teammates in 3 departments"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
+      .toEqual([["Organization"], ["4 teammates in 3 units"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "2 idle", ["Alice"], ["Bob"], [["UI", "1", "1 idle", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 stopped", [], ["Offline"], [], []]
@@ -237,7 +237,7 @@ describe("OrganizationViewComponent", () => {
     context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], []).toJson());
     await settle();
 
-    expect([nested, tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([["Owner · 2 direct reports"], [], [], ["0 teammates in 0 departments"],
+    expect([nested, tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([["Owner · 2 direct reports"], [], [], ["0 teammates in 0 units"],
       ["Owner · 0 direct reports"]]);
   });
 
@@ -249,7 +249,7 @@ describe("OrganizationViewComponent", () => {
     });
 
     expect([texts(".top .headcount"), reports(), texts(".chart nol-teamrun-organization-card .name").includes("Offline"), texts(".owner .role")])
-      .toEqual([["3 teammates in 1 department"], ["Code Reviewer"], false, ["Owner · 2 direct reports"]]);
+      .toEqual([["3 teammates in 1 unit"], ["Code Reviewer"], false, ["Owner · 2 direct reports"]]);
   });
 
   it("shows the teammates placed in no department under you as your direct reports, first, with no group of their own, and no teammate the organization doesn't hold, so the headcount and the To choices count what the tree shows", async () => {
@@ -262,7 +262,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .headcount"), reports(), tree(), all(".chart nol-teamrun-organization-card").length, texts(".owner .role"),
       all(".chart *").filter(t => t.children.length === 0 && t.textContent?.includes("No department")).length]).toEqual([
-      ["3 teammates in 2 departments"], ["Code Reviewer"],
+      ["3 teammates in 2 units"], ["Code Reviewer"],
       [["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []], ["Build", "0", undefined, [], [], [], []]],
       3, ["Owner · 2 direct reports"], 0
     ]);
@@ -852,7 +852,7 @@ describe("OrganizationViewComponent", () => {
       await create();
       const shown = [one("aside.messages .to-label").textContent?.trim(), select().querySelector(".nol-select-button")?.getAttribute("aria-label"), chosenLabel()];
 
-      const offered = await pickAsync("UI (department)");
+      const offered = await pickAsync("UI (Department)");
       const ui = [heading(), chosenLabel()];
       await pickAsync("All leaders and your direct reports");
       const leaders = [heading(), chosenLabel()];
@@ -861,9 +861,9 @@ describe("OrganizationViewComponent", () => {
       await userEvent.click(one(".name", card("Offline")));
       await settle();
 
-      expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
-        ["All leaders and your direct reports", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
-        [["Chat with UI"], "UI (department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
+      expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (Department)", "Design (Department)"],
+        ["All leaders and your direct reports", "Everyone", "Design (Department)", "Alice (leads Design)", "Bob", "UI (Department)", "Code Reviewer (leads UI)", "Build (Department)", "Offline"],
+        [["Chat with UI"], "UI (Department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
     });
 
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
@@ -1038,9 +1038,9 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-confirm");
 
       expect([remove("Build").getAttribute("aria-label"), nested, cancelled, underTeammate, top, asked]).toEqual(["Delete Build",
-        ["Delete department", "Delete UI? Its departments and members move to Design.", "Delete"], 0,
-        ["Delete department", "Delete Lab? Its departments and members move to Offline.", "Delete"],
-        ["Delete department", "Delete Build? Its departments move up to report to you, and its members leave every department.", "Delete"],
+        ["Delete Department", "Delete UI? Its units and members move to Design.", "Delete"], 0,
+        ["Delete Department", "Delete Lab? Its units and members move to Offline.", "Delete"],
+        ["Delete Department", "Delete Build? Its units move up to report to you, and its members leave every unit.", "Delete"],
         [new RecordedRequest(MethodName.DepartmentDelete, { organizationId: "my-organization", departmentId: "build" })]]);
     });
 
@@ -1056,17 +1056,35 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-confirm");
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
       await closeOptionsAsync();
-      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       const label = one(".remove", card("Bob")).getAttribute("aria-label");
       one(".top .edit").click();
       await settle();
 
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
-        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob",
-        ["You", "Design (department)", "Alice", "UI (department)", "Code Reviewer", "Build (department)", "Offline"], 0]);
+        ["Remove member", "Remove Bob from Design? Bob will report to you.", "Remove"], "Remove Bob",
+        ["You", "Design (Department)", "Alice", "UI (Department)", "Code Reviewer", "Build (Department)", "Offline"], 0]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }),
         new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
+    });
+
+    it("says a removed member will report to you, where the organization then places it, among your direct reports", async () => {
+      await editAsync();
+      const before = reports();
+
+      one(".remove", card("Bob")).click();
+      const asking = await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+      organization = SampleData.organizationOf(sample.departments,
+        sample.placements.map(t => t.teammateId === "bob" ? new TeammatePlacement("bob", OrganizationParent.person, 0) : t));
+      context.emit(EventName.OrganizationChanged, organization.toJson());
+      await settle();
+      one(".top .edit").click();
+      await settle();
+
+      expect([before, asking[1], reports()]).toEqual([[], "Remove Bob from Design? Bob will report to you.", ["Bob"]]);
+      expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null })]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {
@@ -1176,7 +1194,7 @@ describe("OrganizationViewComponent", () => {
 
       one(":scope > .adds > .add-sub-department", nodeOf("Bob")).click();
       await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
-      await Wait.until(() => expect(inDialog(".nol-dialog-title").textContent?.trim()).toBe("New department"));
+      await Wait.until(() => expect(inDialog(".nol-dialog-title").textContent?.trim()).toBe("New unit"));
       const leaders = await optionsAsync(inDialog(".nol-teamrun-department-leader"));
       await closeOptionsAsync();
       await userEvent.type(inDialog(".nol-teamrun-department-name"), "{Enter}");
@@ -1233,16 +1251,151 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
     });
 
+    const team = new NodeType("team", "Team", "groups", "teal", SampleData.timestamp, SampleData.timestamp);
+    const typed = (types: readonly NodeType[], departments: readonly Department[] = organization.departments,
+      placements: readonly TeammatePlacement[] = organization.placements): Organization =>
+      new Organization("my-organization", "My organization", null, 0, SampleData.timestamp, SampleData.timestamp, types, departments, placements);
+    const changeTo = async (changed: Organization): Promise<void> => {
+      organization = changed;
+      context.emit(EventName.OrganizationChanged, changed.toJson());
+      await settle();
+    };
+    const makesType = (made: NodeType): JsonValue[] => {
+      const sent: JsonValue[] = [];
+      context.answer(MethodName.NodeTypeCreate, t => {
+        sent.push(t);
+        organization = typed([...organization.nodeTypes, made]);
+        context.emit(EventName.OrganizationChanged, organization.toJson());
+        return made.toJson();
+      });
+      return sent;
+    };
+    const makeTypeAsync = async (name: string): Promise<void> => {
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).not.toBeNull());
+      await userEvent.type(one("input.nol-teamrun-type-name", document), name);
+      one(".nol-teamrun-save", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).toBeNull());
+      await settle();
+    };
+    const addDepartmentAsync = async (): Promise<void> => {
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-type .nol-select-value")?.textContent?.trim()).toBeTruthy());
+    };
+    const typeShown = (): string | undefined => inDialog(".nol-teamrun-department-type .nol-select-value").textContent?.trim();
+
+    it("adds a department of the organization's first type unless another is chosen, and chooses a type made from the dialog's New type", async () => {
+      await editAsync();
+      const made = makesType(team);
+
+      await addDepartmentAsync();
+      const first = typeShown();
+      const offered = await optionsAsync(inDialog(".nol-teamrun-department-type"));
+      await closeOptionsAsync();
+      await chooseAsync(inDialog(".nol-teamrun-department-type"), "New type…");
+      await makeTypeAsync("Team");
+      const chosen = typeShown();
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      inDialog(".nol-teamrun-save").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+
+      expect([first, offered, chosen, made, asked]).toEqual(["Department", ["Department", "New type…"], "Team",
+        [{ organizationId: "my-organization", name: "Team", icon: null, color: null }],
+        [new RecordedRequest(MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "team", parent: { kind: "Person", id: null }, leaderId: null })]]);
+    });
+
+    it("puts back the type chosen before when the new type's dialog closes without making one", async () => {
+      await editAsync();
+      await changeTo(typed([SampleData.departmentType, team]));
+
+      await addDepartmentAsync();
+      await chooseAsync(inDialog(".nol-teamrun-department-type"), "Team");
+      await chooseAsync(inDialog(".nol-teamrun-department-type"), "New type…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).not.toBeNull());
+      one(".nol-teamrun-cancel", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).toBeNull());
+      await settle();
+      const kept = typeShown();
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      inDialog(".nol-teamrun-save").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([kept, context.count(MethodName.NodeTypeCreate), asked]).toEqual(["Team", 0,
+        [new RecordedRequest(MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "team", parent: { kind: "Person", id: null }, leaderId: null })]]);
+    });
+
+    it("opens New type at once when it adds a department to an organization with no types, asks for a type when that closes with none, and adds it once one is made", async () => {
+      await editAsync();
+      await changeTo(typed([], [], [new TeammatePlacement("alice", OrganizationParent.person, 0)]));
+      const made = makesType(team);
+
+      await addDepartmentAsync();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).not.toBeNull());
+      one(".nol-teamrun-cancel", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-type-name")).toBeNull());
+      await settle();
+      const first = typeShown();
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      await settle();
+      const blocked = inDialog(".nol-teamrun-save").hasAttribute("disabled");
+      await chooseAsync(inDialog(".nol-teamrun-department-type"), "New type…");
+      await makeTypeAsync("Team");
+      const ready = [typeShown(), inDialog(".nol-teamrun-save").hasAttribute("disabled")];
+      inDialog(".nol-teamrun-save").click();
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([first, blocked, ready, made.length, asked]).toEqual(["Choose a type", true, ["Team", false], 1,
+        [new RecordedRequest(MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "team", parent: { kind: "Person", id: null }, leaderId: null })]]);
+    });
+
+    it("sets a department's type from its Type choice among the organization's types", async () => {
+      await editAsync();
+      await changeTo(typed([SampleData.departmentType, team]));
+      const choice = (): HTMLElement => one(":scope > .department .type-choice", department("Build"));
+
+      const offered = await optionsAsync(choice());
+      await closeOptionsAsync();
+      const shown = one(".nol-select-value", choice()).textContent?.trim();
+      await chooseAsync(choice(), "Team");
+
+      expect([offered, shown, asked]).toEqual([["Department", "Team", "New type…"], "Department",
+        [new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "build", typeId: "team" })]]);
+    });
+
+    it("makes a new type from a department's Type choice and gives that department the type", async () => {
+      await editAsync();
+      const made = makesType(team);
+
+      await chooseAsync(one(":scope > .department .type-choice", department("Build")), "New type…");
+      await makeTypeAsync("Team");
+      await Wait.until(() => expect(asked).toHaveLength(1));
+
+      expect([made.length, asked]).toEqual([1, [new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "build", typeId: "team" })]]);
+    });
+
+    it("lists the organization's types from a Types button shown only while its structure is edited", async () => {
+      await editAsync();
+      await changeTo(typed([SampleData.departmentType, team]));
+
+      one(".top .types").click();
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-types-dialog .type-name")).not.toBeNull());
+      const listed = [inDialog(".nol-dialog-title").textContent?.trim(), texts("nol-teamrun-organization-types-dialog .type-name", document)];
+      await answerAsync(".nol-teamrun-cancel");
+      one(".top .edit").click();
+      await settle();
+
+      expect([listed, all(".top .types")]).toEqual([["Types", ["Department", "Team"]], []]);
+    });
+
     it("moves a nested department anywhere from its place choice, refusing one under itself in the server's words before it is sent", async () => {
       await editAsync();
 
       const offered = await optionsAsync(one(":scope > .department .place-choice", department("UI")));
       await closeOptionsAsync();
       await chooseAsync(one(":scope > .department .place-choice", department("UI")), "Offline");
-      await chooseAsync(one(":scope > .department .place-choice", department("Design")), "UI (department)");
+      await chooseAsync(one(":scope > .department .place-choice", department("Design")), "UI (Department)");
       const refused = texts(".action-error");
 
-      expect([offered, refused, asked]).toEqual([["You", "Design (department)", "Alice", "Code Reviewer", "Bob", "Build (department)", "Offline"],
+      expect([offered, refused, asked]).toEqual([["You", "Design (Department)", "Alice", "Code Reviewer", "Bob", "Build (Department)", "Offline"],
         ["A teammate or department can't be under itself."],
         [new RecordedRequest(MethodName.DepartmentMove, { organizationId: "my-organization", departmentId: "ui", parent: { kind: "Teammate", id: "offline" }, order: Resources.organizationLastOrder })]]);
     });
@@ -1313,7 +1466,7 @@ describe("OrganizationViewComponent", () => {
     it("says why a change failed until it is dismissed", async () => {
       await editAsync(() => Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is busy.")));
 
-      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
       const role = one(".action-error").getAttribute("role");
       one(".dismiss").click();
@@ -1949,6 +2102,36 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(count.getBoundingClientRect().height, 1.25 * rem);
       expect(all(".top .status-key nol-teamrun-teammate-status").map(t => [t.textContent?.trim(), getComputedStyle(t).color])).toEqual([
         ["Working", colour("text")], ["Waiting for you", colour("warning")], ["Idle", colour("text")], ["Stopped", colour("status-failed")]]);
+    });
+
+    it("draws a department's type icon a step after its toggle and before its name, centred on the name's line in the type's swatch colour, and none for a type without one", async () => {
+      await create(() => {
+        organization = new Organization("my-organization", "My organization", null, 0, SampleData.timestamp, SampleData.timestamp,
+          [SampleData.departmentType, new NodeType("team", "Team", "groups", "teal", SampleData.timestamp, SampleData.timestamp)],
+          sample.departments.map(t => t.id === "build" ? new Department("build", "Build", "team", OrganizationParent.person, null, 1, "c", "u") : t), sample.placements);
+      });
+      const colour = (name: string): string => {
+        const probe = document.createElement("span");
+        probe.style.color = `var(--nol-${name})`;
+        element().append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      };
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const head = (name: string): HTMLElement => one(":scope > .department .department-row", department(name));
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const [toggle, icon, name] = [one(".department-toggle", head("Build")), one("nol-teamrun-organization-type-icon .material-symbols-rounded", head("Build")),
+        one(".department-name", head("Build"))];
+
+      AppearanceFixture.expectPixels(box(icon).left - box(toggle).right, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(box(name).left - box(icon).right, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(box(icon).width, 1.25 * rem);
+      AppearanceFixture.expectPixels(box(icon).height, 1.25 * rem);
+      expect(Math.abs((box(icon).top + box(icon).bottom) / 2 - (box(name).top + box(name).bottom) / 2)).toBeLessThanOrEqual(1);
+      expect([icon.textContent?.trim(), getComputedStyle(icon).color, all("nol-teamrun-organization-type-icon .material-symbols-rounded", head("Design"))])
+        .toEqual(["groups", colour("swatch-teal"), []]);
+      expect(colour("swatch-teal")).not.toBe(getComputedStyle(name).color);
     });
 
     it.each([new UsageFillCase(79, "text-muted"), new UsageFillCase(80, "warning")])("draws a card's usage at $used% used as a bar across the card a step high, filled in $fill, half a step before its figure", async ({ used, fill }) => {
