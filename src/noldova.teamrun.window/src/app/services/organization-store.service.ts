@@ -51,6 +51,10 @@ export class OrganizationStoreService {
     OrganizationCatalog.release(context);
   }
 
+  public static messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
   public reload(): Promise<void> {
     return this.catalog.reload();
   }
@@ -158,9 +162,5 @@ export class OrganizationStoreService {
 
   private static unloaded(id: string): Organization {
     return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], [], []);
-  }
-
-  private static messageOf(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
   }
 }

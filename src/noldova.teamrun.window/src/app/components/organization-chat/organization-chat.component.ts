@@ -131,7 +131,7 @@ export class OrganizationChatComponent {
       return chat.id;
     }, (error: unknown) => {
       this.opening.delete(key);
-      this.errorSignal.set(error instanceof Error ? error.message : String(error));
+      this.errorSignal.set(OrganizationStoreService.messageOf(error));
       return null;
     });
     this.opening.set(key, opening);
