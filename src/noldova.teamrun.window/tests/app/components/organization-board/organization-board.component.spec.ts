@@ -11,11 +11,12 @@ import { By } from "@angular/platform-browser";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, OrganizationParent, OrganizationTarget, Teammate,
+  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, NodeType, Organization, OrganizationParent, OrganizationTarget, Teammate,
   TeammateLastReply, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
 import { OrganizationTargetKey } from "../../../../src/app/models/organization-target-key";
@@ -82,7 +83,7 @@ describe("OrganizationBoardComponent", () => {
     clock = new FakeClock(Date.parse(started) + 5 * 60_000);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
-    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
+    context.answer(MethodName.OrganizationList, () => [sample.toJson()]);
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
@@ -113,10 +114,10 @@ describe("OrganizationBoardComponent", () => {
     await settle();
     expect(texts(".ask-ago")).toEqual(["· 1 h ago"]);
     expect([texts(".leaders-section .title"), texts(".leaders-section .note"), texts(".message-leaders"), texts(".leaders > .leader .name")]).toEqual([
-      ["Reports to you"], ["They report to you; the leaders talk across departments."], ["forumMessage all leaders and your direct reports"], ["Alice", "Code Reviewer"]
+      ["Reports to you"], ["They report to you; the leaders talk across units."], ["forumMessage all leaders and your direct reports"], ["Alice", "Code Reviewer"]
     ]);
     expect([texts(".departments-section > .section-head .title"), texts(".departments-section > .section-head .note")])
-      .toEqual([["Departments"], ["Each column's members, sorted by who needs you first."]]);
+      .toEqual([["Units"], ["Each column's members, sorted by who needs you first."]]);
     expect(all(".lane").map(t => [texts(".lane-name", t), texts(".lane-count", t), texts(".lane-summary", t), all(".lane-sort", t).length,
       texts("nol-teamrun-organization-card .name", t), texts(".lane-empty", t), one(".message-department", t).getAttribute("aria-label")])).toEqual([
       [["Design"], ["2"], ["Led by Alice · 1 waiting for you · 1 idle"], 1, ["Bob"], [], "Message Design"],
@@ -131,19 +132,48 @@ describe("OrganizationBoardComponent", () => {
 
   it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and only a move while editing", async () => {
     await create();
-    fixture.componentRef.setInput("directReports", [carol]);
+    fixture.componentRef.setInput("reports", [carol]);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()).subDepartments);
     await settle();
 
     expect([texts(".leaders > .leader .name"), texts(".leaders > .report .name"), texts(".lane-name"), texts("nol-teamrun-organization-card .name", one(".lane:nth-child(3)")),
       texts(".leaders-section .note")]).toEqual([["Alice", "Code Reviewer", "Carol"], ["Carol"], ["Design", "UI", "Build"], ["Offline"],
-      ["They report to you; the leaders talk across departments."]]);
+      ["They report to you; the leaders talk across units."]]);
 
     fixture.componentRef.setInput("editing", true);
     await settle();
 
     expect([all(".move-choice", one(".leaders > .report")).length, all(".remove", one(".leaders > .report")).length, all(".lane").length]).toEqual([1, 0, 3]);
+  });
+
+  it("lists a teammate who reports to your direct report outside a department beside your direct reports, saying whom it reports to there and in Needs you", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => t.teammateId !== "carol" && t.teammateId !== "offline"),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0)]),
+      ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".leaders > .report .name"), all(".leaders > .report").map(t => texts(".reports-to", t)),
+      all(".ask").filter(t => texts(".name", t).includes("Offline")).map(t => texts(".department", t))]).toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]],
+      [["Reports to Carol"]]]);
+  });
+
+  it("lists a three-level chain outside departments beside your direct reports by name, each saying whom it reports to", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => !["bob", "carol", "offline"].includes(t.teammateId)),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0)]), ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".leaders > .report .name"), all(".leaders > .report").map(t => texts(".reports-to", t))])
+      .toEqual([["Bob", "Carol", "Offline"], [["Reports to Offline"], [], ["Reports to Carol"]]]);
   });
 
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
@@ -251,6 +281,36 @@ describe("OrganizationBoardComponent", () => {
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });
 
+  it("chooses each column's type under its name only while editing, among the organization's types, and sends the type chosen", async () => {
+    const team = new NodeType("team", "Team", null, null, SampleData.timestamp, SampleData.timestamp);
+    const last = (selector: string, root: ParentNode = element()): HTMLElement => {
+      const found = all(selector, root).at(-1);
+      if (Object.isUndefined(found))
+        throw new Error(`Nothing matches ${selector}.`);
+      return found;
+    };
+    await create();
+    const hidden = all(".lane-type").length;
+    fixture.componentRef.setInput("editing", true);
+    context.emit(EventName.OrganizationChanged, new Organization(sample.id, sample.name, null, 0, SampleData.timestamp, SampleData.timestamp,
+      [SampleData.departmentType, team], sample.departments, sample.placements).toJson());
+    await settle();
+    const build = last(".lane-type");
+    const shown = all(".lane-type").map(t => one(".nol-select-value", t).textContent?.trim());
+    const name = last(".lane-rename");
+    const lane = last(".lane");
+    const geometry = [box(build).left - box(name).left, box(build).top >= box(name).bottom, box(build).right <= box(lane).right];
+    await userEvent.click(one(".nol-select-button", build));
+    await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
+    const offered = [...document.querySelectorAll(".nol-select-option")].map(t => t.textContent?.trim());
+    await userEvent.click(one(".nol-select-option[data-value='team']", document));
+    await Wait.until(() => expect(context.count(MethodName.DepartmentUpdate)).toBe(1));
+
+    expect([hidden, shown, offered, geometry]).toEqual([0, ["Department", "Department", "Department"], ["Department", "Team", "New type…"], [0, true, true]]);
+    expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DepartmentUpdate)).map(t => t.parameters))
+      .toEqual([{ organizationId: "my-organization", departmentId: "build", typeId: "team" }]);
+  });
+
   it("asks before deleting a department, and deletes nothing when the question is closed", async () => {
     const at = <T>(items: readonly T[], index: number): T => {
       const found = items[index];
@@ -276,11 +336,11 @@ describe("OrganizationBoardComponent", () => {
     expect(deletes().map(t => t.getAttribute("aria-label"))).toEqual(["Delete Design", "Delete UI", "Delete Build"]);
     at(deletes(), 1).click();
     await settle();
-    expect(dialog()).toEqual(["Delete department", "Delete UI? Its departments and members move to Design.", "Close", "Delete"]);
+    expect(dialog()).toEqual(["Delete Department", "Delete UI? Its units and members move to Design.", "Close", "Delete"]);
     await answer(".nol-teamrun-cancel");
     at(deletes(), 0).click();
     await settle();
-    expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
+    expect(dialog()).toContain("Delete Design? Its units move up to report to you, and its members leave every unit.");
     await answer(".nol-teamrun-confirm");
 
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { organizationId: "my-organization", departmentId: "design" }]]));
@@ -301,7 +361,7 @@ describe("OrganizationBoardComponent", () => {
 
     it("draws a direct report in no department on the leaders' line, after them, at a leader's width, inset and top", async () => {
       await create();
-      fixture.componentRef.setInput("directReports", [carol]);
+      fixture.componentRef.setInput("reports", [carol]);
       fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()).subDepartments);
       await settle();

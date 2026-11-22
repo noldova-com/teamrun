@@ -27,9 +27,9 @@ import { OrganizationStoreService } from "../../../../src/app/services/organizat
 import { Resources } from "../../../../src/resources";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
-import { Required } from "../../../fixtures/required.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
 describe("OrganizationChatComponent", () => {
@@ -105,7 +105,7 @@ describe("OrganizationChatComponent", () => {
     await Wait.until(() => expect(element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled).toBe(false));
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
   };
-  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
+  const texts = (selector: string): (string | undefined)[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim());
   const type = async (text: string): Promise<void> => {
     const box = element().querySelector<HTMLTextAreaElement>("nol-teamrun-composer textarea");
     if (Object.isNull(box))
@@ -222,7 +222,7 @@ describe("OrganizationChatComponent", () => {
     await sendNow();
     await Wait.until(() => expect(sent()).toHaveLength(3));
     await fixture.whenStable();
-    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey) ?? "{}"))];
+    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(Required.of(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey))))];
 
     refused = [];
     await sendNow();

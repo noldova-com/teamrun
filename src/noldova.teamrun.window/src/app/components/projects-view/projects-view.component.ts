@@ -47,6 +47,7 @@ import { OrganizationCatalog } from "../../services/organization-catalog";
 import { ProjectsLayoutService } from "../../services/projects-layout.service";
 import { TimeFormatService } from "../../services/time-format.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
+import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 import { RenameDialogComponent } from "../rename-dialog/rename-dialog.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 import { TreeItemDirective } from "./tree-item.directive";
@@ -54,7 +55,7 @@ import { TreeItemDirective } from "./tree-item.directive";
 @Component({
   selector: "nol-teamrun-projects-view",
   imports: [CdkDrag, CdkDragHandle, CdkDropList, ContextMenuTriggerDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuSeparatorComponent,
-    MenuTriggerDirective, NgTemplateOutlet, SectionHeaderActionDirective, SectionHeaderComponent, SpinnerComponent, TeammateStatusComponent, TooltipDirective, TreeItemDirective],
+    MenuTriggerDirective, NgTemplateOutlet, OrganizationTypeIconComponent, SectionHeaderActionDirective, SectionHeaderComponent, SpinnerComponent, TeammateStatusComponent, TooltipDirective, TreeItemDirective],
   providers: [ChatStoreService.provider, ProjectsLayoutService.provider],
   templateUrl: "./projects-view.component.html",
   styleUrl: "./projects-view.component.css"

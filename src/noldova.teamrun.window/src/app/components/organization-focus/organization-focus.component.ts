@@ -32,11 +32,13 @@ import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.compone
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
+import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationChatComponent, TextFieldComponent],
+    OrganizationChatComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -48,7 +50,8 @@ export class OrganizationFocusComponent {
   private readonly dialogs: DialogService = inject(DialogService);
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
-  public readonly directReports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly reports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly managers: InputSignal<ReadonlyMap<string, Teammate>> = input<ReadonlyMap<string, Teammate>>(new Map<string, Teammate>());
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly resources: typeof Resources = Resources;
@@ -58,8 +61,8 @@ export class OrganizationFocusComponent {
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
-  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, this.directReports().length));
-  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.directReports(), this.layout.layout().focus));
+  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, this.reports().length));
+  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.reports(), this.layout.layout().focus));
   protected readonly unit: Signal<OrganizationNode | null> = computed(() => Object.isNull(this.focus().teammate) ? this.focus().department : null);
   protected readonly removable: Signal<boolean> = computed(() => {
     const focus = this.focus();
@@ -68,8 +71,8 @@ export class OrganizationFocusComponent {
   protected readonly key: Signal<string> = computed(() => OrganizationTargetKey.of(this.focus().target));
   protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
     const names = new Map<string, string>();
-    for (const person of this.directReports())
-      names.set(person.id, Resources.organizationReportsToYou);
+    for (const person of this.reports())
+      names.set(person.id, this.reportsToOf(person) ?? Resources.organizationReportsToYou);
     for (const row of this.rows())
       for (const person of row.people)
         names.set(person.id, row.node.name);
@@ -81,7 +84,7 @@ export class OrganizationFocusComponent {
     if (!Object.isNull(focus.teammate))
       return [focus.teammate];
     const department = focus.department;
-    return Object.isNull(department) ? [...this.leaders(), ...this.directReports()] : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
+    return Object.isNull(department) ? [...this.leaders(), ...this.reports()] : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
   });
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
@@ -95,10 +98,17 @@ export class OrganizationFocusComponent {
     const focus = this.focus();
     const department = focus.department;
     if (!Object.isNull(focus.teammate))
-      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, focus.departmentName, focus.teammate.model);
+      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, this.reportsToOf(focus.teammate) ?? focus.departmentName, focus.teammate.model);
     const counts = this.countsOf(this.cards());
-    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length, counts) : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
+    const under = this.cards().filter(t => this.managers().has(t.id)).length;
+    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length - under, counts, under)
+      : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
   });
+
+  protected reportsToOf(teammate: Teammate): string | null {
+    const manager = this.managers().get(teammate.id);
+    return Object.isUndefined(manager) ? null : Resources.formatOrganizationReportsTo(manager.name);
+  }
 
   protected addable(row: OrganizationOutlineRow): readonly Teammate[] {
     return OrganizationEdits.addable(row.node, this.chats.teammates());
@@ -130,7 +140,8 @@ export class OrganizationFocusComponent {
   }
 
   protected deleteDepartment(department: Department): void {
-    this.confirm(OrganizationEdits.deleteRequest(department, [...this.rows().map(t => t.node), ...this.chats.teammates()]), () => void this.organization.deleteDepartment(department.id));
+    this.confirm(OrganizationEdits.deleteRequest(department, this.organization.organization().typeOf(department.id),
+      [...this.rows().map(t => t.node), ...this.chats.teammates()]), () => void this.organization.deleteDepartment(department.id));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {

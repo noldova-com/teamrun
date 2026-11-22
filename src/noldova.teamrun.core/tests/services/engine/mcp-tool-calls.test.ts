@@ -40,6 +40,7 @@ import {
 import { ServiceException } from "@noldova/teamrun.services";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
@@ -529,7 +530,7 @@ export class McpToolCallsTests {
     host.adapter.extraDetails = [];
     const [reply] = sent.replies;
     Assert.isDefined(reply);
-    const broken = host.events.subscribe({
+    const broken = FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageCreated && Message.fromJson(event.payload).details[0]?.text === Resources.planApprovedPrompt)
           throw new RangeError("The window is gone.");

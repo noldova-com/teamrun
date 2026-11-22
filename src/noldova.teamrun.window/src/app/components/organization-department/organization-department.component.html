@@ -36,11 +36,12 @@ LICENSE file in the root directory of this source tree.
     [nolTeamrunOrganizationDrop]="node().key" [nolTeamrunOrganizationDropEditing]="editing()">
     @if (editing() && node().department; as department) {
       <div class="department-row">
-        <input #name nol-text-field class="department-field" [attr.aria-label]="resources.organizationDepartmentNameLabel" [value]="node().name"
+        <input #name nol-text-field class="department-field" [attr.aria-label]="resources.formatOrganizationUnitNameLabel(node().type)" [value]="node().name"
           (change)="rename(department)">
         <button type="button" nol-icon-button class="delete" [icon]="resources.organizationDeleteIcon"
           [label]="resources.formatOrganizationDeleteNamed(node().name)" (click)="confirmDelete(department)"></button>
       </div>
+      <nol-teamrun-organization-type-choice [department]="department" />
       <nol-select class="leader-choice" [label]="resources.organizationLeaderLabel" [options]="leaderOptions()" [value]="node().leader?.id ?? ''"
         (valueChange)="setLeader($event)" />
       <nol-select class="place-choice" [label]="resources.formatOrganizationMoveLabel(node().name)" [options]="placeOptions()" [value]="placeKeyOf(department)"
@@ -49,6 +50,7 @@ LICENSE file in the root directory of this source tree.
       <div class="department-row">
         <button type="button" nol-icon-button class="department-toggle" [icon]="isOpen() ? resources.expandedIcon : resources.collapsedIcon"
           [label]="resources.formatOrganizationCollapseLabel(node().name, isOpen())" [attr.aria-expanded]="isOpen()" (click)="toggle()"></button>
+        <nol-teamrun-organization-type-icon [type]="node().type" />
         <span class="department-name">{{ node().name }}</span>
         <span class="department-count">{{ node().headcount }}</span>
       </div>

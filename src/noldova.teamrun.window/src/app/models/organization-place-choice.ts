@@ -38,7 +38,7 @@ export class OrganizationPlaceChoice {
 
   private static under(node: OrganizationNode): readonly OrganizationPlaceChoice[] {
     return node.children.flatMap(t => [
-      new OrganizationPlaceChoice(t.key, t.key.kind === OrganizationNodeKind.Department ? Resources.formatOrganizationDepartmentOption(t.name) : t.name),
+      new OrganizationPlaceChoice(t.key, t.key.kind === OrganizationNodeKind.Department ? Resources.formatOrganizationDepartmentOption(t.name, t.type) : t.name),
       ...(Object.isNull(t.leader) ? [] : [new OrganizationPlaceChoice(OrganizationParent.teammate(t.leader.id), t.leader.name)]),
       ...OrganizationPlaceChoice.under(t)
     ]);

@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { MessageStatus, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
+import { MessageStatus, NodeType, ProviderKindInstallation, ProviderKindInstallState } from "@noldova/teamrun.protocol";
 
 import { ChatAction } from "../src/app/enums/chat-action";
 import { TeammateStatus } from "../src/app/enums/teammate-status";
@@ -108,18 +108,32 @@ describe("Resources", () => {
       Resources.formatOrganizationRoleIn(null, null)]).toEqual(["Review · Design", "Design", "Review", null]);
   });
 
+  it("names a unit with its type in a choice, or alone when it has none, and labels a type's edit button with its name", () => {
+    const team = new NodeType("team", "Team", null, null, "c", "u");
+
+    expect([Resources.formatOrganizationDepartmentOption("Design", team), Resources.formatOrganizationDepartmentOption("Design", null),
+      Resources.formatOrganizationEditType("Team")]).toEqual(["Design (Team)", "Design", "Edit Team"]);
+  });
+
+  it("names a unit's name field, its Delete and its Remove by its type, and calls it a unit when it has none", () => {
+    const team = new NodeType("team", "Team", null, null, "c", "u");
+
+    expect([team, null].map(t => [Resources.formatOrganizationUnitNameLabel(t), Resources.formatOrganizationDeleteUnit(t), Resources.formatOrganizationRemoveUnit(t)]))
+      .toEqual([["Team name", "Delete Team", "Remove Team"], ["Unit name", "Delete unit", "Remove unit"]]);
+  });
+
   it("asks before deleting a department or removing a member, saying where what it held goes", () => {
     expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
       Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
-      "Delete Design? Its departments move up to report to you, and its members leave every department.",
-      "Delete Web? Its departments and members move to Build.",
-      "Remove Alice from Design? Alice stays on the team, in no department."
+      "Delete Design? Its units move up to report to you, and its members leave every unit.",
+      "Delete Web? Its units and members move to Build.",
+      "Remove Alice from Design? Alice will report to you."
     ]);
   });
 
   it("counts the organization's teammates and departments, one in the singular", () => {
     expect([Resources.formatOrganizationHeadcount(0, 0), Resources.formatOrganizationHeadcount(1, 1), Resources.formatOrganizationHeadcount(2, 3)])
-      .toEqual(["0 teammates in 0 departments", "1 teammate in 1 department", "2 teammates in 3 departments"]);
+      .toEqual(["0 teammates in 0 units", "1 teammate in 1 unit", "2 teammates in 3 units"]);
   });
 
   it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
@@ -234,10 +248,11 @@ describe("Resources", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
   });
 
-  it("counts Focus's direct reports and a department's teammates in the singular for one and the plural for more", () => {
+  it("counts Focus's direct reports, and those under them, and a department's teammates in the singular for one and the plural for more", () => {
     expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
+      Resources.formatOrganizationFocusLeaders(3, new Map(), 1),
       Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
-      .toEqual(["Your 1 direct report", "Your 2 direct reports", "1 teammate", "2 teammates"]);
+      .toEqual(["Your 1 direct report", "Your 2 direct reports", "Your 3 direct reports and 1 under them", "1 teammate", "2 teammates"]);
   });
 
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {

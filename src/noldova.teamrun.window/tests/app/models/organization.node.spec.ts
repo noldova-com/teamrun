@@ -5,7 +5,7 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import { Department, Harness, OrganizationParent, Teammate, TeammatePlacement } from "@noldova/teamrun.protocol";
+import { Department, Harness, NodeType, Organization, OrganizationParent, Teammate, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 import { OrganizationNode } from "../../../src/app/models/organization.node";
 import { SampleData } from "../../fixtures/sample-data.fixture";
@@ -85,6 +85,25 @@ describe("OrganizationNode", () => {
     expect([root.directReports.map(t => t.id), adaNode?.directReports.map(t => t.id), adaNode?.members.map(t => t.id), root.subDepartments.map(t => t.id),
       shape(root.subDepartments), root.total, root.name, root.id]).toEqual([["ada"], ["bea", "dee"], ["bea", "dee"], ["ui"],
       [["ui", "cy", ["eve"], 2, 2, 1, []]], 5, "You", "person"]);
+  });
+
+  it("knows whom each teammate under a teammate reports to, at any depth, and none for a direct report or a department's members", () => {
+    const organization = SampleData.organizationOf([new Department("ui", "UI", "department", OrganizationParent.teammate("ada"), "cy", 0, "c", "u")],
+      [new TeammatePlacement("ada", OrganizationParent.person, 0), new TeammatePlacement("bea", OrganizationParent.teammate("ada"), 0),
+        new TeammatePlacement("dee", OrganizationParent.teammate("bea"), 0), new TeammatePlacement("cy", OrganizationParent.department("ui"), 0),
+        new TeammatePlacement("eve", OrganizationParent.department("ui"), 1)]);
+    const root = OrganizationNode.treeOf(organization, [ada, bea, cy, dee, eve]);
+
+    expect([[...root.managers].map(([id, manager]) => `${id}>${manager.id}`), root.members.map(t => t.id)]).toEqual([["dee>bea", "bea>ada"], ["ada", "bea", "dee"]]);
+  });
+
+  it("carries each department's type, and none for the person", () => {
+    const team = new NodeType("team", "Team", null, null, "c", "u");
+    const organization = new Organization("o2", "o2", null, 0, "c", "u", [SampleData.departmentType, team],
+      [new Department("design", "Design", "department", OrganizationParent.person, null, 0, "c", "u"), new Department("build", "Build", "team", OrganizationParent.person, null, 1, "c", "u")], []);
+    const root = OrganizationNode.treeOf(organization, []);
+
+    expect([root.type, ...root.departments.map(t => t.type)]).toEqual([null, SampleData.departmentType, team]);
   });
 
   it("lifts the reports of a teammate it doesn't know to that teammate's place", () => {
