@@ -39,6 +39,7 @@ export class OrganizationChatComponent {
   private readonly opening: Map<string, Promise<string | null>> = new Map();
   private readonly reached: Set<string> = new Set();
   private readonly reading: Set<string> = new Set();
+  private readonly errorSignal: WritableSignal<string | null> = signal(null);
   private retrying: string | null = null;
 
   public readonly target: ModelSignal<OrganizationTarget> = model.required<OrganizationTarget>();
@@ -70,7 +71,7 @@ export class OrganizationChatComponent {
     }
   });
   protected readonly historyInputs: Signal<Record<string, unknown>> = computed(() => ({ chatId: this.chatId() }));
-  protected readonly error: Signal<string | null> = this.organizations.actionError;
+  protected readonly error: Signal<string | null> = this.errorSignal.asReadonly();
   protected readonly recipients: Signal<readonly string[]> = computed(() =>
     this.organizations.organization().recipientsOf(this.target(), this.store.teammates().map(t => t.id)));
   protected readonly fanOutKey: Signal<string> = computed(() => Resources.formatOrganizationFanOutKey(this.organizations.id(), [...this.recipients()].sort()));
@@ -92,7 +93,10 @@ export class OrganizationChatComponent {
     effect(() => {
       const teammateId = this.teammateId();
       if (!Object.isNull(teammateId) && this.store.loaded() && Object.isNull(this.chatId()))
-        untracked(() => void this.open(teammateId));
+        untracked(() => {
+          this.errorSignal.set(null);
+          void this.open(teammateId);
+        });
     });
     effect(() => {
       const chatIds = this.recipients().flatMap(t => this.chatOf(t) ?? []);
@@ -121,12 +125,14 @@ export class OrganizationChatComponent {
     const pending = this.opening.get(key);
     if (!Object.isUndefined(pending))
       return pending;
-    const opening = this.organizations.openOrganizationChat(teammateId).then(chat => {
+    const opening = this.organizations.requestOrganizationChat(teammateId).then(chat => {
       this.opening.delete(key);
-      if (Object.isNull(chat))
-        return null;
       this.opened.update(t => new Map(t).set(key, chat.id));
       return chat.id;
+    }, (error: unknown) => {
+      this.opening.delete(key);
+      this.errorSignal.set(error instanceof Error ? error.message : String(error));
+      return null;
     });
     this.opening.set(key, opening);
     return opening;
@@ -150,6 +156,7 @@ export class OrganizationChatComponent {
       this.retrying = retrying;
       this.reached.clear();
     }
+    this.errorSignal.set(null);
     let isSent = true;
     for (const teammateId of this.recipients().filter(t => !this.reached.has(t))) {
       const chatId = this.chatOf(teammateId) ?? await this.open(teammateId);

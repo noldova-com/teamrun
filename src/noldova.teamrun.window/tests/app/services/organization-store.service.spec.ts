@@ -281,4 +281,19 @@ describe("OrganizationStoreService", () => {
     expect([missing, said, opened?.toJson(), store.actionError(), asked])
       .toEqual([null, "There is no teammate gone.", chat.toJson(), null, ["my-organization/gone", "my-organization/grok"]]);
   });
+
+  it("requests a teammate's Organization chat for the panel, which says itself why it couldn't, leaving the view's action error alone", async () => {
+    const chat = new Chat("c1", null, "Organization · Grok", "t", "t", false, null, null, false, null, false, [], false, false, null,
+      new OrganizationChat("my-organization", "grok"));
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [])
+      .answer(MethodName.OrganizationChatOpen, t => OrganizationChat.fromJson(t).teammateId === "grok" ? chat.toJson()
+        : Promise.reject(new Error("There is no teammate gone.")));
+    const store = new OrganizationStoreService(context, new OrganizationScope());
+
+    await expect(store.requestOrganizationChat("gone")).rejects.toThrow("There is no teammate gone.");
+    const said = store.actionError();
+    const opened = await store.requestOrganizationChat("grok");
+
+    expect([said, opened.toJson()]).toEqual([null, chat.toJson()]);
+  });
 });
