@@ -6,17 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import type { ErrorCode } from "@noldova/teamrun.protocol";
 
 import { RefusalDetails } from "./refusal-details.fixture";
 
-export class RefusedError extends Error {
-  public readonly code: ErrorCode;
-  public readonly details: RefusalDetails;
-
+export class RefusedError extends RuntimeRequestException {
   public constructor(message: string, code: ErrorCode, ...ids: readonly string[]) {
-    super(message);
-    this.code = code;
-    this.details = new RefusalDetails(code, [...ids]);
+    super(code, message, new RefusalDetails(code, [...ids]).toJson());
   }
 }

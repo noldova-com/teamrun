@@ -9,10 +9,14 @@
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { FailureCode, type SettingScope } from "@noldova/desktop.protocol";
-import { FileSaveOutcome } from "@noldova/desktop.window";
+import { FileSaveOutcome, RuntimeRequestException } from "@noldova/desktop.window";
 import { AttachmentShare, type ErrorCode, type EventName, type MethodName } from "@noldova/teamrun.protocol";
 
+import { RecordedRequest } from "./recorded-request.fixture";
 import { RecordingWindowPartContext } from "./recording-window-part-context.fixture";
+import { RefusedError } from "./refused-error.fixture";
+import { SavedFile } from "./saved-file.fixture";
+import { UnscriptedRequestError } from "./unscripted-request-error.fixture";
 
 export class FakeWindowPartContext extends RecordingWindowPartContext {
   private readonly handlers: Map<string, (parameters: JsonValue) => JsonValue | Promise<JsonValue>> = new Map();
@@ -21,8 +25,8 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
   private readonly settingListeners: Map<string, Set<(value: JsonValue, scope: SettingScope | null, isSet: boolean) => void>> = new Map();
   private settingFailure: string | null = null;
 
-  public readonly requests: { readonly method: string; readonly parameters: JsonValue }[] = [];
-  public readonly savedFiles: { readonly name: string; readonly bytes: Uint8Array }[] = [];
+  public readonly requests: RecordedRequest[] = [];
+  public readonly savedFiles: SavedFile[] = [];
   public saveOutcome: FileSaveOutcome = FileSaveOutcome.Saved;
 
   public get methods(): readonly string[] {
@@ -30,11 +34,11 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
   }
 
   public get events(): readonly string[] {
-    return [...this.listeners.entries()].filter(([, listeners]) => listeners.size > 0).map(([name]) => name);
+    return [...this.listeners.keys()].filter(t => (this.listeners.get(t)?.size ?? 0) > 0);
   }
 
   public get watchedSettings(): readonly string[] {
-    return [...this.settingListeners.entries()].filter(([, listeners]) => listeners.size > 0).map(([name]) => name);
+    return [...this.settingListeners.keys()].filter(t => (this.settingListeners.get(t)?.size ?? 0) > 0);
   }
 
   public static qualify(name: string): string {
@@ -59,13 +63,13 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
 
   public disconnect(method: MethodName, message: string): this {
     return this.answer(method, () => {
-      throw Object.assign(new Error(message), { code: FailureCode.Disconnected });
+      throw new RuntimeRequestException(FailureCode.Disconnected, message);
     });
   }
 
   public refuse(method: MethodName, code: ErrorCode, message: string, ...ids: readonly string[]): this {
     return this.answer(method, () => {
-      throw Object.assign(new Error(message), { code, details: { error: code, arguments: [...ids] } });
+      throw new RefusedError(message, code, ...ids);
     });
   }
 
@@ -104,10 +108,10 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
   }
 
   public override async requestAsync(method: string, parameters: JsonValue): Promise<JsonValue> {
-    this.requests.push({ method, parameters });
+    this.requests.push(new RecordedRequest(method, parameters));
     const handler = this.handlers.get(method);
     if (Object.isUndefined(handler))
-      throw new Error(`No answer scripted for ${method}`);
+      throw new UnscriptedRequestError(method);
     return handler(parameters);
   }
 
@@ -120,7 +124,7 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
   }
 
   public override saveFileAsync(name: string, bytes: Uint8Array): Promise<FileSaveOutcome> {
-    this.savedFiles.push({ name, bytes });
+    this.savedFiles.push(new SavedFile(name, bytes));
     return Promise.resolve(this.saveOutcome);
   }
 

@@ -13,7 +13,8 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { FileSaveOutcome, type StatusBarItem, WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { FileSaveOutcome, RuntimeRequestException, type StatusBarItem, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AbilityCell,
   AttachmentInput,
@@ -3263,6 +3264,17 @@ describe("ComposerComponent", () => {
       expect([context.count(MethodName.ConversationCancel), document.activeElement === box()]).toEqual([1, true]);
     });
 
+    it("leaves the reply running on an Escape with no element as its target", async () => {
+      await running();
+      await Wait.until(() => expect(root().querySelector(".nol-teamrun-composer-stop")).not.toBeNull());
+      const escape = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+
+      fixture.componentInstance.stopOnEscape(escape);
+      await fixture.whenStable();
+
+      expect([escape.defaultPrevented, context.count(MethodName.ConversationCancel)]).toEqual([false, 0]);
+    });
+
     it("refuses a file pasted during an edit with a note, keeps Add files off, and saves the edit with the message's own files", async () => {
       await running();
       await listed(waiting("w1", "first"));
@@ -5056,7 +5068,8 @@ describe("ComposerComponent", () => {
     it("says when the unsent message could not be read, saves nothing written there over it while it still can't be read, and saves it once it can", async () => {
       let readable = false;
       context.answer(MethodName.DraftRead, t => ConversationIdParams.fromJson(t).conversationId === "c1"
-        ? readable ? null : Promise.reject(new Error("unreadable")) : Promise.reject("offline"));
+        ? readable ? null : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "unreadable"))
+        : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "offline")));
       await prepare();
       await render();
 
@@ -5074,10 +5087,27 @@ describe("ComposerComponent", () => {
       expect(alert()).toBe(Resources.formatDraftUnreadable("offline"));
     });
 
+    it("lets a restore failure other than an unreadable message propagate", async () => {
+      const broken = new Error("broken");
+      vi.spyOn(ComposerDraftService.prototype, "restore").mockRejectedValue(broken);
+      const failures: unknown[] = [];
+      const record = (event: PromiseRejectionEvent): void => {
+        failures.push(event.reason);
+        event.preventDefault();
+      };
+      window.addEventListener("unhandledrejection", record);
+      onTestFinished(() => window.removeEventListener("unhandledrejection", record));
+      await prepare();
+      await render();
+      await Wait.until(() => expect(failures).toEqual([broken]));
+
+      expect(alert()).toBeUndefined();
+    });
+
     it("shows the unsent message a save's read finds after a failed read, in place of what was written, and saves nothing over it", async () => {
       let readable = false;
       context.answer(MethodName.DraftRead, () => readable
-        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new Error("unreadable")));
+        ? new Draft("c1", "a long unsent message", [], [], 3, SampleData.timestamp).toJson() : Promise.reject(new RuntimeRequestException(FailureCode.Disconnected, "unreadable")));
       await prepare();
       await render();
       await type("ok");

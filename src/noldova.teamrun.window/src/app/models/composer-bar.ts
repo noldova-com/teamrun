@@ -8,6 +8,9 @@
 
 import "@noldova/context.core";
 
+import type { AccessWidths } from "./access-widths";
+import type { FoldWidths } from "./fold-widths";
+
 export class ComposerBar {
   public static readonly unfolded: number = 0;
   public static readonly lineHidden: number = 1;
@@ -20,18 +23,18 @@ export class ComposerBar {
   private static readonly tolerance: number = 0.01;
 
   public readonly width: number;
-  public readonly insets: readonly [number, number];
+  public readonly insets: FoldWidths;
   public readonly cardMaxWidth: number;
   public readonly cardChrome: number;
   public readonly gap: number;
   public readonly ends: number;
-  public readonly access: readonly [number, number, number];
-  public readonly gauge: readonly [number, number] | null;
-  public readonly picker: readonly [number, number];
+  public readonly access: AccessWidths;
+  public readonly gauge: FoldWidths | null;
+  public readonly picker: FoldWidths;
   public readonly line: number | null;
 
-  public constructor(width: number, insets: readonly [number, number], cardMaxWidth: number, cardChrome: number, gap: number, ends: number,
-    access: readonly [number, number, number], gauge: readonly [number, number] | null, picker: readonly [number, number], line: number | null) {
+  public constructor(width: number, insets: FoldWidths, cardMaxWidth: number, cardChrome: number, gap: number, ends: number, access: AccessWidths,
+    gauge: FoldWidths | null, picker: FoldWidths, line: number | null) {
     this.width = width;
     this.insets = insets;
     this.cardMaxWidth = cardMaxWidth;
@@ -52,14 +55,14 @@ export class ComposerBar {
   }
 
   private room(fold: number): number {
-    const inset = fold < ComposerBar.tight ? this.insets[0] : this.insets[1];
-    return Math.min(this.width - inset, this.cardMaxWidth) - this.cardChrome;
+    return Math.min(this.width - this.insets.widthAt(fold >= ComposerBar.tight), this.cardMaxWidth) - this.cardChrome;
   }
 
   private need(fold: number): number {
-    const short = fold < ComposerBar.buttonShort ? 0 : 1;
-    const items = [this.access[fold < ComposerBar.accessIcon ? short : 2], this.picker[short], ...(Object.isNull(this.line) || fold >= ComposerBar.lineHidden ? [] : [this.line]),
-      ...(Object.isNull(this.gauge) ? [] : [this.gauge[fold < ComposerBar.gaugeTrack ? 0 : 1]])];
+    const short = fold >= ComposerBar.buttonShort;
+    const access = fold >= ComposerBar.accessIcon ? this.access.glyph : short ? this.access.short : this.access.labelled;
+    const items = [access, this.picker.widthAt(short), ...(Object.isNull(this.line) || fold >= ComposerBar.lineHidden ? [] : [this.line]),
+      ...(Object.isNull(this.gauge) ? [] : [this.gauge.widthAt(fold >= ComposerBar.gaugeTrack)])];
     return this.ends + items.reduce((total, t) => total + t, 0) + this.gap * (items.length + 2);
   }
 }

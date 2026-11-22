@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { JsonObject } from "@noldova/context.json";
 import type { ErrorCode } from "@noldova/teamrun.protocol";
 
 export class RefusalDetails {
@@ -15,5 +16,9 @@ export class RefusalDetails {
   public constructor(error: ErrorCode, values: readonly string[]) {
     this.error = error;
     this.arguments = values;
+  }
+
+  public toJson(): JsonObject {
+    return { error: this.error, arguments: [...this.arguments] };
   }
 }
