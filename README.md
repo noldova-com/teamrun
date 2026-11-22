@@ -1,7 +1,7 @@
 # TeamRun
 
 TeamRun is a desktop app for working with AI agents as a team.
-People chat with agents from several AI providers, give them teammates' roles, organize them into departments with leaders, and follow and approve their work in one place.
+People chat with agents from several AI providers, give them teammates' roles, organize them into units with leaders, and follow and approve their work in one place.
 The product word is "chat": every text a person sees says "chat" or "chats", never "conversation", and new work uses it from the start.
 
 It is built on [Noldova Desktop](https://github.com/noldova-com/desktop) and targets Windows and Linux on x64 and ARM64, and macOS on both Apple Silicon and Intel.
@@ -13,10 +13,10 @@ Product names and trademarks belong to their owners.
 
 ## Organization
 
-The Organization view shows the person's teammates as an organization: departments, each with an optional leader and its members, nested to any depth, with the person at the root.
-It has three layouts: the tree and the department board on one canvas, and Focus, on one department or teammate.
-Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped) and what it is doing now, and it can also show the last thing it said and its Git branch, pull requests, documents and artifacts.
-The Messages panel sends one message to a teammate, a department (its leader first, then its members), every leader or everyone; it shows how many teammates the message goes to before sending, and Stop halts the ones not yet started.
+The Organization view shows the person's teammates as an organization: units of the types the person names, such as Department or Team, each with an optional leader and its members, nested to any depth, with the person at the root.
+It has three layouts: the tree, the board and Focus, on one unit or teammate.
+Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped) and what it is doing now, and can also show the last thing it said and its Git branch, pull requests, documents and artifacts.
+The Messages panel sends one message to a teammate, a unit (its leader first, then its members), all leaders and the person's direct reports, or everyone; it shows how many teammates the message goes to before sending, and Stop halts the ones not yet started.
 ARCHITECTURE.md describes the organization's storage, the statuses and the messages.
 
 ## Building from source
