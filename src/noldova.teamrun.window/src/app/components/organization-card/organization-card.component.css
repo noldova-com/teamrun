@@ -87,7 +87,9 @@
 }
 
 .move-label {
+  flex: none;
   color: var(--nol-text-muted);
+  white-space: nowrap;
 }
 
 .move-choice {
