@@ -129,6 +129,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fixture?.whenStable();
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -205,18 +206,20 @@ describe("OrganizationChatComponent", () => {
     openAnswer = () => new Promise<JsonValue>((_, reject) => {
       refuse = reject;
     });
+    const requested = vi.spyOn(OrganizationStoreService.prototype, "requestOrganizationChat");
     await create(OrganizationTarget.teammate("alice"));
     await Wait.until(() => expect(opened).toEqual(["alice"]));
     fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
     await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
 
+    const request = requested.mock.results[0];
+    if (request?.type !== "return")
+      throw new Error("The panel didn't request Alice's chat.");
     refuse(new Error("There is no teammate alice."));
+    await request.value.then(() => undefined, () => undefined);
     await fixture.whenStable();
-    const shown = texts("[role=alert]");
-    fixture.componentRef.setInput("target", OrganizationTarget.teammate("alice"));
-    await Wait.until(() => expect(opened).toEqual(["alice", "alice"]));
 
-    expect(shown).toEqual([]);
+    expect([requested.mock.calls, texts("[role=alert]")]).toEqual([[["alice"]], []]);
   });
 
   it("says why a send to a group failed until a send reaches every recipient", async () => {
