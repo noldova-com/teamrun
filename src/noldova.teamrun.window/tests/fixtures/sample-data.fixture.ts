@@ -152,6 +152,7 @@ export class SampleData {
       .answer(MethodName.ReadingPositionSave, () => null)
       .answer(MethodName.RunOutputList, () => [])
       .answer(MethodName.RunOutputSave, () => null)
+      .answerModule("teamrun.pageList", () => [])
       .answer(MethodName.AttachmentPrepare, t => {
         const input = AttachmentInput.fromJson(t);
         return new MessageAttachment(input.name, input.mediaType, 0, `D:/data/attachments/drafts/${input.name}`).toJson();

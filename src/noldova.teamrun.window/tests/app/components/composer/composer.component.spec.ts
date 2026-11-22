@@ -112,6 +112,7 @@ import { GeometryCase } from "../../../fixtures/geometry-case.fixture";
 import { HintCase } from "../../../fixtures/hint-case.fixture";
 import { PaintedSelection } from "../../../fixtures/painted-selection.fixture";
 import { PartReadError } from "../../../fixtures/part-read-error.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { PermissionsCase } from "../../../fixtures/permissions-case.fixture";
 import { Pixel } from "../../../fixtures/pixel.fixture";
 import { PixelSpan } from "../../../fixtures/pixel-span.fixture";
@@ -132,11 +133,6 @@ import { WidthBand } from "../../../fixtures/width-band.fixture";
 describe("ComposerComponent", () => {
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<ComposerComponent>;
-  const elementOf = (found: unknown): HTMLElement => {
-    if (!(found instanceof HTMLElement))
-      throw new PartReadError("The part the spec reads isn't an element.");
-    return found;
-  };
   const attachmentOf = (found: unknown): ComposerAttachment => {
     if (!(found instanceof ComposerAttachment))
       throw new PartReadError("A dispose ran on something other than an attachment.");
@@ -163,7 +159,7 @@ describe("ComposerComponent", () => {
   };
   const remember = (settings: ComposerSettings, conversationId: string = "c1"): void => TestBed.inject(ComposerChoicesService).remember(conversationId, settings);
   const choice = (conversationId: string = "c1"): ComposerSettings | null => TestBed.inject(ComposerChoicesService).choiceOf(conversationId);
-  const root = (): HTMLElement => elementOf(fixture.nativeElement);
+  const root = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
   const box = (): HTMLTextAreaElement => Required.of(root().querySelector("textarea"));
   const expectSameRect = (after: DOMRect, before: DOMRect): void => {
     AppearanceFixture.expectPixels(after.left, before.left);
@@ -1847,7 +1843,7 @@ describe("ComposerComponent", () => {
       await userEvent.keyboard("{Enter}");
       await reach(() => Required.of(rowsOf("efforts")[0]));
 
-      expect(labelOf(elementOf(document.activeElement))).toBe("Codex can't change effort: its models each have one fixed setting.");
+      expect(labelOf(PartReads.elementOf(document.activeElement))).toBe("Codex can't change effort: its models each have one fixed setting.");
       await userEvent.keyboard("{Escape}");
       await Wait.until(() => expect(document.querySelector("nol-menu")).toBeNull());
     });
@@ -5759,7 +5755,7 @@ describe("ComposerComponent", () => {
       await other.whenStable();
       await Wait.until(() => expect(hint()).toBe(Resources.kindsUnavailable));
       const retryOf = (target: ComponentFixture<ComposerComponent>): HTMLButtonElement =>
-        Required.of(elementOf(target.nativeElement).querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
+        Required.of(PartReads.elementOf(target.nativeElement).querySelector<HTMLButtonElement>(".nol-teamrun-composer-retry"));
       const kinds = new DeferredResponse();
       context.answer(MethodName.ProviderKindList, () => kinds.promise.then(() => {
         throw new Error("still offline");

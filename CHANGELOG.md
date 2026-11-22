@@ -28,6 +28,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Pages:** an error from opening a page in the browser, saving it or copying its path now goes away when you switch chats, rather than staying over the other chat's pages, and one that comes after you switched isn't shown (#216).
 - **Pages:** a page's More button now looks pressed while its menu is open, and idle again once the menu closes (#22).
 - **Organization:** Show organization opens the first organization you have, under its name, also once My organization is deleted; a teammate placed under another teammate outside any department now says in its details that it reports to that teammate, not to you (#401).
 - **Grok's model and effort:** a Grok reply now runs on the model and reasoning effort you chose, rather than Grok's own defaults, and a Plan or Ask chat's Grok starts without its own sub-agents again (#467).

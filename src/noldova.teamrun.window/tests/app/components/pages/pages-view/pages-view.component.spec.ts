@@ -12,10 +12,10 @@ import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { ViewBadge, WindowPartTokens } from "@noldova/desktop.window";
+import { RuntimeRequestException, ViewBadge, WindowPartTokens } from "@noldova/desktop.window";
 import { type Page, PageRequest } from "@noldova/teamrun.protocol";
 import { ClipboardWriter, ThemeMode } from "@noldova/ui.components.angular";
-import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { AppearanceFixture, ClipboardWriterFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { PagesViewComponent } from "../../../../../src/app/components/pages/pages-view/pages-view.component";
 import { ChatPages } from "../../../../../src/app/services/pages/chat-pages";
@@ -23,6 +23,9 @@ import { PagesClock } from "../../../../../src/app/services/pages/pages-clock";
 import { AccessibilityFixture } from "../../../../fixtures/accessibility.fixture";
 import { EmulatedMediaFixture } from "../../../../fixtures/emulated-media.fixture";
 import type { FakeWindowPartContext } from "../../../../fixtures/fake-window-part-context.fixture";
+import { FixedPagesClock } from "../../../../fixtures/fixed-pages-clock.fixture";
+import { PartReadError } from "../../../../fixtures/part-read-error.fixture";
+import { PartReads } from "../../../../fixtures/part-reads.fixture";
 import { SampleData } from "../../../../fixtures/sample-data.fixture";
 import { SamplePages } from "../../../../fixtures/sample-pages.fixture";
 import { Wait } from "../../../../fixtures/wait.fixture";
@@ -36,32 +39,29 @@ describe("PagesViewComponent", () => {
   let fixture: ComponentFixture<PagesViewComponent>;
   let chat: WritableSignal<string | null>;
   let release: () => void;
-  let copied: string[];
+  let clipboard: ClipboardWriterFixture;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
   const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
   const rows = (): HTMLButtonElement[] => [...element().querySelectorAll<HTMLButtonElement>(".row-open")];
-  const row = (id: string): HTMLButtonElement => element().querySelector(`[data-nol-teamrun-page="${id}"]`) as HTMLButtonElement;
+  const row = (id: string): HTMLButtonElement => PartReads.buttonOf(element().querySelector(`[data-nol-teamrun-page="${id}"]`));
   const menuLabelOf = (item: Element): string => item.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? "";
   const menuItems = (): string[] => [...document.querySelectorAll("[role='menuitem']")].map(t => menuLabelOf(t));
   const menuItem = (label: string): HTMLElement => {
     const item = [...document.querySelectorAll<HTMLElement>("[role='menuitem']")].find(t => menuLabelOf(t) === label);
     if (Object.isUndefined(item))
-      throw new Error(`The menu has no item ${label}.`);
+      throw new PartReadError(`The menu has no item ${label}.`);
     return item;
   };
   const create = async (list: readonly Page[] | (() => JsonValue | Promise<JsonValue>) = [checklist, email, options], chatId: string | null = SamplePages.chatId): Promise<void> => {
     context = SamplePages.context(list).answerModule(SamplePages.open, t => SamplePages.view(PageRequest.fromJson(t).pageId === "p1" ? checklist : options).toJson())
       .answerModule(SamplePages.read, () => "<p>checklist</p>");
     chat = signal(chatId);
-    copied = [];
+    clipboard = new ClipboardWriterFixture();
     release = PagesViewComponent.provide(context, chat, () => () => undefined, signal(new Map()));
     TestBed.configureTestingModule({
-      providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: PagesClock, useValue: { now: (): number => now, every: (): (() => void) => () => undefined } },
-        { provide: ClipboardWriter, useValue: { writeTextAsync: (text: string): Promise<boolean> => {
-          copied.push(text);
-          return Promise.resolve(true);
-        } } }]
+      providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: PagesClock, useValue: new FixedPagesClock(now) },
+        { provide: ClipboardWriter, useValue: clipboard }]
     });
     fixture = TestBed.createComponent(PagesViewComponent);
     fixture.autoDetectChanges();
@@ -156,13 +156,13 @@ describe("PagesViewComponent", () => {
     await Wait.until(() => expect(menuItems()).toHaveLength(4));
     menuItem("Copy the file's path").click();
 
-    await Wait.until(() => expect(copied).toEqual([SamplePages.view(checklist).file]));
+    await Wait.until(() => expect(clipboard.texts).toEqual([SamplePages.view(checklist).file]));
   });
 
   it("says when a row's action fails, as an alert", async () => {
     await create();
     context.answerModule(SamplePages.open, () => {
-      throw new Error("down");
+      throw new RuntimeRequestException("failed", "down");
     });
 
     row("p1").focus();
@@ -198,13 +198,13 @@ describe("PagesViewComponent", () => {
     let fails = true;
     await create(() => {
       if (fails)
-        throw new Error("down");
+        throw new RuntimeRequestException("failed", "down");
       return [checklist.toJson()];
     });
 
     const error = texts(".load-error[role='alert'] .error-text");
     fails = false;
-    (element().querySelector(".retry") as HTMLButtonElement).click();
+    PartReads.buttonOf(element().querySelector(".retry")).click();
 
     await Wait.until(() => expect(texts(".title")).toEqual(["Launch checklist"]));
     expect(error).toEqual(["TeamRun couldn't list this chat's pages."]);
@@ -229,7 +229,7 @@ describe("PagesViewComponent", () => {
         element().style.width = "16rem";
         await fixture.whenStable();
 
-        const box = (view: Element | null): DOMRect => (view as HTMLElement).getBoundingClientRect();
+        const box = (view: Element | null): DOMRect => PartReads.elementOf(view).getBoundingClientRect();
         const host = box(element());
         const inline = AppearanceFixture.measureLook("space-3") / 2;
         const start = host.left + inline + AppearanceFixture.measureLook("space-3");
@@ -246,7 +246,7 @@ describe("PagesViewComponent", () => {
           AppearanceFixture.expectPixels(box(view).height, 2 * AppearanceFixture.measureLook("space-2") + 2 * AppearanceFixture.measureLook("line-panel"));
         AppearanceFixture.expectPixels(box(element().querySelector(".row")).left, host.left + inline);
         AppearanceFixture.expectPixels(box(rows()[1] ?? null).top - box(rows()[0] ?? null).bottom, 0);
-        AppearanceFixture.expectTruncates(element().querySelector(".title") as HTMLElement);
+        AppearanceFixture.expectTruncates(PartReads.elementOf(element().querySelector(".title")));
         AppearanceFixture.expectPixels(box(element().querySelector(".rows")).right, host.right - inline);
       });
 
@@ -255,14 +255,14 @@ describe("PagesViewComponent", () => {
       element().style.height = "30rem";
       await fixture.whenStable();
 
-      const box = (selector: string): DOMRect => (element().querySelector(selector) as HTMLElement).getBoundingClientRect();
+      const box = (selector: string): DOMRect => PartReads.elementOf(element().querySelector(selector)).getBoundingClientRect();
       const host = element().getBoundingClientRect();
       const empty = box(".empty");
-      const title = getComputedStyle(element().querySelector(".empty-title") as HTMLElement);
+      const title = getComputedStyle(PartReads.elementOf(element().querySelector(".empty-title")));
 
       AppearanceFixture.expectPixels(empty.top + empty.height / 2, host.top + host.height / 2);
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(element().querySelector(".empty-glyph") as HTMLElement).fontSize), AppearanceFixture.toPixels(2.25));
-      const text = getComputedStyle(element().querySelector(".empty-text") as HTMLElement);
+      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(PartReads.elementOf(element().querySelector(".empty-glyph"))).fontSize), AppearanceFixture.toPixels(2.25));
+      const text = getComputedStyle(PartReads.elementOf(element().querySelector(".empty-text")));
       AppearanceFixture.expectPixels(Number.parseFloat(title.fontSize), AppearanceFixture.measureLook("text-title"));
       AppearanceFixture.expectPixels(Number.parseFloat(title.lineHeight), AppearanceFixture.measureLook("line-panel"));
       AppearanceFixture.expectPixels(Number.parseFloat(text.fontSize), AppearanceFixture.measureLook("text-panel"));
@@ -299,7 +299,7 @@ describe("PagesViewComponent", () => {
       await fixture.whenStable();
 
       const fills = [...element().querySelectorAll(".row")].map(t => getComputedStyle(t).backgroundColor);
-      expect([fills[1], getComputedStyle(rows()[0]?.querySelector(".glyph") as HTMLElement).color, getComputedStyle(rows()[0]?.querySelector(".title") as HTMLElement).color])
+      expect([fills[1], getComputedStyle(PartReads.elementOf(rows()[0]?.querySelector(".glyph"))).color, getComputedStyle(PartReads.elementOf(rows()[0]?.querySelector(".title"))).color])
         .toEqual([AppearanceFixture.readColor(FixtureTheme.theme, mode, "selected"), AppearanceFixture.readColor(FixtureTheme.theme, mode, "text"),
           AppearanceFixture.readColor(FixtureTheme.theme, mode, "text-strong")]);
     });
@@ -307,7 +307,7 @@ describe("PagesViewComponent", () => {
 
   it("keeps a row's More shown and pressed while the menu it opened is open, though focus moves into the menu, and lets it go once the menu closes", async () => {
     await create();
-    const more = element().querySelector(".row-more") as HTMLButtonElement;
+    const more = PartReads.buttonOf(element().querySelector(".row-more"));
 
     more.click();
     await Wait.until(() => expect(menuItems()).toHaveLength(4));
