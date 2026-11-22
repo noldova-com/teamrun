@@ -1251,7 +1251,7 @@ export class Resources {
   public static readonly flowNodeData: string = "flowNode";
   public static readonly flowParentData: string = "flowParent";
   public static readonly flowShapeData: string = "flowShape";
-  public static readonly afterPseudo: string = "::after";
+  public static readonly beforePseudo: string = "::before";
   public static readonly borderBox: string = "border-box";
   public static readonly organizationEmpty: string = "No units yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";

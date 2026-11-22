@@ -1182,7 +1182,7 @@ describe("OrganizationViewComponent", () => {
       const refused = searchTexts(".error");
       await userEvent.keyboard("{Escape}");
       await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
-      await searchAsync(one(".chart .kids .adds .add-member"), "off");
+      await searchAsync(one(".chart .tree > .adds > .add-member"), "off");
       await pickAsync("Offline");
 
       expect([offered.includes("Bob"), refused, asked]).toEqual([false, ["A teammate or department can't be under itself."],
@@ -1585,9 +1585,9 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(box(leader).left, box(card).left);
       AppearanceFixture.expectPixels(box(member).left + box(member).width / 2, box(leader).left + box(leader).width / 2);
       AppearanceFixture.expectPixels(box(member).top - box(leader).bottom, space(3) * 2);
-      expect([line(reports, "::before").borderLeftStyle, line(reports, "::after").borderTopStyle, line(report, "::before").borderLeftStyle])
-        .toEqual(["solid", "solid", "solid"]);
-      for (const length of [line(reports, "::before").height, line(reports, "::after").top, line(report, "::before").height])
+      expect([line(reports, "::before").borderLeftStyle, line(report, "::after").display, line(report, "::before").borderLeftStyle])
+        .toEqual(["solid", "none", "solid"]);
+      for (const length of [line(reports, "::before").height, line(report, "::before").height])
         AppearanceFixture.expectPixels(Number.parseFloat(length), space(3));
       AppearanceFixture.expectPixels(box(kids).top - box(owner).bottom, 0);
       AppearanceFixture.expectPixels(box(card).top - box(kids).top, space(3) * 2);
@@ -1630,7 +1630,7 @@ describe("OrganizationViewComponent", () => {
       const uiStem = one(":scope > .stem", ui);
       const reports = one(":scope > .reports", design);
       const bob = card("Bob");
-      const bus = box(reports).top + Number.parseFloat(getComputedStyle(reports, "::after").top) * scale;
+      const bus = box(reports).top + AppearanceFixture.measureLook("space-3") * scale;
       const uiCard = one(":scope > .department", ui);
       const alice = card("Alice");
       const gap = AppearanceFixture.measureLook("space-2");
@@ -1928,7 +1928,7 @@ describe("OrganizationViewComponent", () => {
       const scale = box(tree).width / TreeFlowLines.layoutWidthOf(tree);
       const reports = one(".chart .tree > .reports");
       const middle = box(reports).left + box(reports).width / 2;
-      const bus = box(reports).top + Number.parseFloat(getComputedStyle(reports, "::after").top) * scale;
+      const bus = box(reports).top + AppearanceFixture.measureLook("space-3") * scale;
       const gap = AppearanceFixture.measureLook("space-2");
       const eve = box(card("Eve"));
       const fay = box(card("Fay"));
@@ -1989,27 +1989,106 @@ describe("OrganizationViewComponent", () => {
       expect(box(ui).right).toBeLessThanOrEqual(box(bobNode).right);
     });
 
-    it("joins the add buttons to the bar over the departments while editing, as it joins a department, the line meeting the pair's middle", async () => {
-      await create();
-      element().style.width = "72rem";
-      element().style.height = "60rem";
-      one(".top .edit").click();
-      await settle();
-      one(".chart .nol-canvas-actual").click();
-      await settle();
-      const kid = one(".chart .tree > .kids > .kid:last-child");
-      const box = kid.getBoundingClientRect();
-      const member = one(".add-member", kid).getBoundingClientRect();
-      const button = one(".add-department", kid).getBoundingClientRect();
-      const bar = getComputedStyle(kid, "::before");
-      const drop = getComputedStyle(kid, "::after");
+    describe("while editing", () => {
+      const chain = SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0),
+        new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0), new TeammatePlacement("offline", OrganizationParent.teammate("bob"), 0)]);
+      const wide = SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0),
+        new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0), new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 1)]);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const centre = (view: Element): number => box(view).left + box(view).width / 2;
+      const nodeOf = (name: string): HTMLElement => Required.of(card(name).closest<HTMLElement>("nol-teamrun-organization-department"));
+      const editAsync = async (shown: Organization): Promise<void> => {
+        await create(() => {
+          organization = shown;
+        });
+        element().style.width = "72rem";
+        element().style.height = "60rem";
+        one(".top .edit").click();
+        await settle();
+        await Wait.until(async () => {
+          one(".chart .nol-canvas-actual").click();
+          await settle();
+          expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+        });
+      };
+      const expectAddsUnder = (owner: HTMLElement, adds: HTMLElement): void => {
+        const member = one(":scope > .add-member", adds);
+        const other = one(":scope > button:last-child", adds);
+        const line = getComputedStyle(adds, "::before");
+        const next = adds.nextElementSibling;
+        const reaches = !Object.isNull(next) && (next.classList.contains("reports") || next.classList.contains("kids"));
+        AppearanceFixture.expectPixels(box(adds).top, box(owner).bottom);
+        AppearanceFixture.expectPixels(member.getBoundingClientRect().top - box(owner).bottom, AppearanceFixture.measureLook("space-3"));
+        AppearanceFixture.expectPixels((box(member).right + box(other).left) / 2, centre(owner));
+        AppearanceFixture.expectPixels(box(other).left - box(member).right, AppearanceFixture.measureLook("space-2"));
+        AppearanceFixture.expectPixels(box(adds).left + Number.parseFloat(line.left), centre(owner));
+        expect(line.borderLeftStyle).toBe("solid");
+        AppearanceFixture.expectPixels(box(adds).top + Number.parseFloat(line.height), reaches && !Object.isNull(next) ? box(next).top : box(member).top);
+        if (reaches && !Object.isNull(next))
+          expect(box(next).top).toBeGreaterThanOrEqual(box(adds).bottom);
+      };
 
-      expect([getComputedStyle(kid).position, bar.borderTopStyle, drop.borderLeftStyle]).toEqual(["relative", "solid", "solid"]);
-      AppearanceFixture.expectPixels(Number.parseFloat(bar.right), box.width / 2);
-      AppearanceFixture.expectPixels(box.left + Number.parseFloat(drop.left), box.left + box.width / 2);
-      AppearanceFixture.expectPixels(box.top + Number.parseFloat(drop.height), button.top);
-      AppearanceFixture.expectPixels(box.left + box.width / 2, (member.left + button.right) / 2);
-      AppearanceFixture.expectPixels(member.top, button.top);
+      it("puts each person's add row right under that person's card in a chain, the line from the card running through the row's middle to its reports", async () => {
+        await editAsync(chain);
+
+        expect([all(".chart .adds").length, all(".chart .tree > .kids").length]).toEqual([4, 0]);
+        expectAddsUnder(one(".chart .tree > .owner"), one(".chart .tree > .adds"));
+        for (const name of ["Alice", "Bob", "Offline"])
+          expectAddsUnder(one(":scope > .self", nodeOf(name)), one(":scope > .adds", nodeOf(name)));
+        expect(box(one(":scope > .adds", nodeOf("Alice"))).bottom).toBeLessThanOrEqual(box(card("Bob")).top);
+        expect(box(one(":scope > .adds", nodeOf("Bob"))).bottom).toBeLessThanOrEqual(box(card("Offline")).top);
+      });
+
+      it("draws a single report's connector straight down from the line above, with no bar", async () => {
+        await editAsync(chain);
+        const reports = all(".chart .reports");
+
+        expect(all(".chart .report").map(t => getComputedStyle(t, "::after").display)).toEqual(["none", "none", "none"]);
+        for (const view of reports)
+          AppearanceFixture.expectPixels(box(view).left + Number.parseFloat(getComputedStyle(view, "::before").left), centre(one(":scope > .report > .self", view)));
+      });
+
+      it("draws a wide tree's bar from its first report's middle to its last's, each report drawing its own part without a break", async () => {
+        await editAsync(wide);
+        const reports = one(":scope > .reports", nodeOf("Alice"));
+        const [first, last] = all(":scope > .report", reports);
+        const part = (view: HTMLElement | undefined): [number, number, number] => {
+          const shown = Required.of(view);
+          const bar = getComputedStyle(shown, "::after");
+          return [box(shown).left + Number.parseFloat(bar.left), box(shown).right - Number.parseFloat(bar.right), box(shown).top + Number.parseFloat(bar.top)];
+        };
+        const [firstStart, firstEnd, firstTop] = part(first);
+        const [lastStart, lastEnd, lastTop] = part(last);
+
+        expect([first?.classList.contains("row-start"), last?.classList.contains("row-end"), getComputedStyle(Required.of(first), "::after").borderTopStyle])
+          .toEqual([true, true, "solid"]);
+        AppearanceFixture.expectPixels(firstStart, centre(card("Bob")));
+        AppearanceFixture.expectPixels(lastStart, firstEnd);
+        AppearanceFixture.expectPixels(lastEnd, centre(card("Code Reviewer")));
+        AppearanceFixture.expectPixels(firstTop, box(reports).top + AppearanceFixture.measureLook("space-3"));
+        AppearanceFixture.expectPixels(lastTop, firstTop);
+        expectAddsUnder(card("Alice"), one(":scope > .adds", nodeOf("Alice")));
+      });
+
+      it("puts a department's add row under its leader and yours above the departments, each joined to the line below", async () => {
+        await editAsync(sample);
+
+        expectAddsUnder(one(".chart .tree > .owner"), one(".chart .tree > .adds"));
+        expectAddsUnder(one(":scope > .leader", department("Design")), one(":scope > .adds", department("Design")));
+        expectAddsUnder(one(":scope > .department", department("Build")), one(":scope > .adds", department("Build")));
+        expect(box(one(":scope > .adds", department("Design"))).bottom).toBeLessThanOrEqual(box(card("Bob")).top);
+      });
+
+      it("keeps Reports to on one line on every card", async () => {
+        await editAsync(wide);
+        const lines = all(".chart nol-teamrun-organization-card .move-label").map(t => {
+          const range = document.createRange();
+          range.selectNodeContents(t);
+          return new Set([...range.getClientRects()].map(u => Math.round(u.top))).size;
+        });
+
+        expect(lines).toEqual([1, 1, 1]);
+      });
     });
 
     describe.each([new ViewSizeCase("the narrowest a document gets", 13.75, true), new ViewSizeCase("a wide window", 72, false)])("at $size", ({ width, wraps }) => {
