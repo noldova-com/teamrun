@@ -42,7 +42,7 @@ describe("OrganizationTypesDialogComponent", () => {
     return found;
   };
   const rows = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-types-dialog .type-row")];
-  const names = (): string[] => rows().map(t => t.querySelector(".type-name")?.textContent?.trim() ?? "");
+  const names = (): (string | undefined)[] => rows().map(t => t.querySelector(".type-name")?.textContent?.trim());
   const row = (name: string): HTMLElement => {
     const found = rows().find(t => t.querySelector(".type-name")?.textContent?.trim() === name);
     if (Object.isUndefined(found))
