@@ -17,6 +17,7 @@ import { OrganizationCardField } from "../../../../src/app/enums/organization-ca
 import { OrganizationCardShape } from "../../../../src/app/enums/organization-card-shape";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
+import { OrganizationScope } from "../../../../src/app/services/organization-scope";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
@@ -27,7 +28,12 @@ describe("OrganizationCardComponent's shapes", () => {
   let context: FakeWindowPartContext;
   let fixture: ComponentFixture<OrganizationCardComponent>;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new Error("The fixture has no element.");
+    return native;
+  };
   const one = (selector: string): HTMLElement => {
     const found = element().querySelector<HTMLElement>(selector);
     if (Object.isNull(found))
@@ -56,7 +62,7 @@ describe("OrganizationCardComponent's shapes", () => {
     if (Object.isNull(parent))
       throw new Error("The card has no parent.");
     parent.style.width = "30rem";
-    OrganizationLayoutService.of(context).showOnEveryCard(OrganizationCardField.Model, true);
+    new OrganizationLayoutService(context, new OrganizationScope()).showOnEveryCard(OrganizationCardField.Model, true);
     await Wait.until(() => expect(element().querySelector(".model")).not.toBeNull());
     await settle();
   };

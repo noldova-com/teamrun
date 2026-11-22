@@ -72,6 +72,7 @@ import {
   MessageSendResult,
   MessageStatus,
   MethodName,
+  OrganizationChat,
   OwnMcpServer,
   OwnMcpServerState,
   PlanUsage,
@@ -248,7 +249,7 @@ describe("ChatStoreService", () => {
     expect([...context.events].sort()).toEqual([
       "teamrun.approvalCreated", "teamrun.approvalUpdated", "teamrun.backgroundTaskOutput", "teamrun.backgroundTaskUpdated", "teamrun.backgroundTasksCleared",
       "teamrun.composerDefaultUpdated", "teamrun.conversationDeleted", "teamrun.conversationRewound", "teamrun.detailAppended", "teamrun.detailUpdated", "teamrun.messageCreated", "teamrun.messageUpdated",
-      "teamrun.organizationChanged", "teamrun.organizationLayoutUpdated", "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
+      "teamrun.organizationChanged", "teamrun.organizationLayoutUpdated", "teamrun.organizationRemoved", "teamrun.panelRequested", "teamrun.planUsageUpdated", "teamrun.projectFolderChanged", "teamrun.projectsLayoutUpdated", "teamrun.providerKindInstallationChanged", "teamrun.providerKindsChanged",
       "teamrun.providerSignInsChanged", "teamrun.providerUpdated", "teamrun.replyCheckpointEnded", "teamrun.replyCheckpointStarted", "teamrun.replyThinking", "teamrun.signInLink",
       "teamrun.stateInvalidated", "teamrun.stateResyncRequested", "teamrun.waitingMessagesChanged", "teamrun.windowReloadRequested"
     ]);
@@ -888,6 +889,20 @@ describe("ChatStoreService", () => {
     states.push(store.shownConversationId(), store.selectedConversationId());
 
     expect(states).toEqual(["c2", "c1", null, "c1"]);
+  });
+
+  it("finds a teammate's Organization chats by the organization and the teammate, so one teammate keeps a chat in each organization", async () => {
+    const chatIn = (id: string, organizationId: string): Conversation => new Conversation(id, null, "Organization · Alice", SampleData.timestamp, SampleData.timestamp,
+      false, null, null, false, null, false, [], false, false, null, new OrganizationChat(organizationId, "alice"));
+    context.answer(MethodName.ConversationList, t => Object.isNull(ConversationListParams.fromJson(t).projectId)
+      ? [chatIn("mine", "my-organization").toJson(), chatIn("studio", "studio").toJson()] : [SampleData.conversation.toJson()]);
+    await store.initialize();
+
+    expect([store.organizationChatOf("my-organization", "alice")?.id, store.organizationChatOf("studio", "alice")?.id, store.organizationChatOf("studio", "bob")])
+      .toEqual(["mine", "studio", null]);
+    expect([store.organizationChats("studio").map(t => t.id), store.organizationChats("other").map(t => t.id)]).toEqual([["studio"], []]);
+    expect([store.organizationChatsByTeammate("my-organization").get("alice")?.id, store.organizationChatsByTeammate("studio").get("alice")?.id,
+      store.organizationChatsByTeammate("studio").size]).toEqual(["mine", "studio", 1]);
   });
 
   it("hands out each message that arrives in a chat on screen once, and none that arrive elsewhere, updated, or after the chat leaves the screen", async () => {

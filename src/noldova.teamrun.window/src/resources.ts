@@ -885,7 +885,9 @@ export class Resources {
   public static readonly teammatesDocumentInstance: string = "teammates";
   public static readonly teammatesViewIcon: string = "group";
   public static readonly organizationDocumentName: string = "teamrun.organization";
-  public static readonly organizationDocumentInstance: string = "organization";
+  public static readonly organizationDocumentInstance: string = "my-organization";
+  public static readonly organizationOldDocumentInstance: string = "organization";
+  public static readonly organizationUnloadedTime: string = "1970-01-01T00:00:00.000Z";
   public static readonly organizationViewIcon: string = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
@@ -2095,8 +2097,12 @@ export class Resources {
     return `${author}: ${text}`;
   }
 
-  public static formatOrganizationFanOutKey(teammateIds: readonly string[]): string {
-    return `organization:${teammateIds.join(",")}`;
+  public static formatOrganizationFanOutKey(organizationId: string, teammateIds: readonly string[]): string {
+    return `organization:${organizationId}:${teammateIds.join(",")}`;
+  }
+
+  public static formatOrganizationChatKey(organizationId: string, teammateId: string): string {
+    return `${organizationId}/${teammateId}`;
   }
   public static formatOrganizationFanOutRetry(key: string, text: string, sources: readonly string[]): string {
     return JSON.stringify([key, text, sources]);

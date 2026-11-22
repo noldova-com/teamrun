@@ -15,13 +15,14 @@ import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
   AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
-  MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateIdParams, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
+  MethodName, type Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
 import { OrganizationChatComponent } from "../../../../src/app/components/organization-chat/organization-chat.component";
 import { ComposerSettings } from "../../../../src/app/models/composer-settings";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
+import { OrganizationCatalog } from "../../../../src/app/services/organization-catalog";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { Resources } from "../../../../src/resources";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
@@ -32,7 +33,7 @@ import { Wait } from "../../../fixtures/wait.fixture";
 describe("OrganizationChatComponent", () => {
   const design = new Department("d1", "Design", OrganizationParent.person, "alice", 0, "c", "u");
   const placed = (...ids: readonly string[]): TeammatePlacement[] => ids.map((t, i) => new TeammatePlacement(t, OrganizationParent.department("d1"), i));
-  const pair = new Organization([design], placed("alice", "bob"));
+  const pair = SampleData.organizationOf([design], placed("alice", "bob"));
   const chatOf = (teammateId: string): Conversation => new Conversation(`org-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp,
     false, null, null, false, null, false, [], false, false, null, new OrganizationChat("my-organization", teammateId));
   let context: FakeWindowPartContext;
@@ -59,7 +60,7 @@ describe("OrganizationChatComponent", () => {
     context = SampleData.createContext();
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
-    context.answer(MethodName.OrganizationList, () => organization.toJson())
+    context.answer(MethodName.OrganizationList, () => [organization.toJson()])
       .answer(MethodName.MessageListOpen, () => running.map(t => t.toJson()))
       .answer(MethodName.TeammateLastReplyList, () => lastReplies.map(t => t.toJson()))
       .answer(MethodName.MessagePage, t => {
@@ -73,7 +74,7 @@ describe("OrganizationChatComponent", () => {
       .answer(MethodName.ConversationList, t => Object.isNull(ConversationListParams.fromJson(t).projectId) ? kept.map(u => u.toJson())
         : [SampleData.conversation.toJson()])
       .answer(MethodName.OrganizationChatOpen, t => {
-        const id = TeammateIdParams.fromJson(t).teammateId;
+        const id = OrganizationChat.fromJson(t).teammateId;
         opened.push(id);
         return openAnswer(id);
       })
@@ -90,7 +91,7 @@ describe("OrganizationChatComponent", () => {
     element().style.height = "40rem";
     fixture.autoDetectChanges();
     await Wait.until(() => expect(ChatStoreService.of(context).loaded()).toBe(true));
-    await Wait.until(() => expect(OrganizationStoreService.of(context).organization().departments).toHaveLength(1));
+    await Wait.until(() => expect(OrganizationCatalog.of(context).organizations()[0]?.departments).toHaveLength(1));
     await fixture.whenStable();
   };
   const box = (): HTMLTextAreaElement | null => element().querySelector<HTMLTextAreaElement>("nol-teamrun-composer textarea");
@@ -211,7 +212,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   it("still sends to the other recipients when one's send fails, keeps the text and its draft, and retries only the recipient it didn't reach", async () => {
-    organization = new Organization([design], placed("alice", "bob", "reviewer"));
+    organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
     refused = ["org-bob"];
     await create(OrganizationTarget.department("d1"));
@@ -230,7 +231,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   it("retries a file picked in the panel only to the recipient it didn't reach, though the file is prepared again under a new path", async () => {
-    organization = new Organization([design], placed("alice", "bob", "reviewer"));
+    organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
     refused = ["org-bob"];
     await create(OrganizationTarget.department("d1"));
@@ -254,7 +255,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   it("sends again to every recipient when a retry carries other attachments", async () => {
-    organization = new Organization([design], placed("alice", "bob", "reviewer"));
+    organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
     refused = ["org-bob"];
     await create(OrganizationTarget.department("d1"));
@@ -289,7 +290,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   it("shows each recipient's reply that ended in that recipient's own chat before the panel opened, read from the chat, whatever the teammate replied elsewhere", async () => {
-    organization = new Organization([design], placed("alice", "bob", "reviewer"));
+    organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
     lastReplies = [new TeammateLastReply("bob", "c1", "r2", "Elsewhere.", SampleData.timestamp)];
     pages = new Map([["org-alice", [SampleData.userMessage, reply("org-alice", MessageStatus.Completed)]],

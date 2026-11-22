@@ -1,0 +1,109 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import "@noldova/context.core";
+import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
+import { Resources } from "@noldova/teamrun.core";
+import {
+  ChatFolderAttachParams, Conversation, DepartmentCreateParams, Harness, MessageSendParams, MethodName, OrganizationParent, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams,
+  Request, type Teammate, TeammateCreateParams, TeammatePlaceParams
+} from "@noldova/teamrun.protocol";
+
+import { CoreHost } from "../../fixtures/core-host.fixture.js";
+
+@TestClass
+export class OrganizationChatFoldersTests {
+  @TestMethod
+  public async runsAnOrganizationChatWithNoFolderOfItsOwnInItsOrganizationsCurrentFolder(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const first = OrganizationChatFoldersTests.folder(host, "first");
+    const second = OrganizationChatFoldersTests.folder(host, "second");
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", first));
+    await host.organization.placeAsync(new TeammatePlaceParams(studio.id, ada.id, OrganizationParent.person, 0));
+    const chat = new OrganizationChat(studio.id, ada.id);
+    const own = await host.engine.openOrganizationChatAsync(chat);
+
+    await OrganizationChatFoldersTests.sendAsync(host, chat, "One");
+    await host.organization.updateOrganizationAsync(new OrganizationUpdateParams(studio.id, "Studio", second));
+    await OrganizationChatFoldersTests.sendAsync(host, chat, "Two");
+    await host.organization.updateOrganizationAsync(new OrganizationUpdateParams(studio.id, "Studio", null));
+    await OrganizationChatFoldersTests.sendAsync(host, chat, "Three");
+
+    Assert.areEqual(`${first},${second},${own.folder}`, host.adapter.requests.map(t => t.workingDirectory).join(","));
+    Assert.isTrue(host.adapter.requests[0]?.prompt.includes(Resources.organizationNoDepartment) ?? false);
+  }
+
+  @TestMethod
+  public async keepsAnOrganizationChatsOwnFolderOverItsOrganizations(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", OrganizationChatFoldersTests.folder(host, "studio")));
+    const chat = new OrganizationChat(studio.id, ada.id);
+    const opened = await host.engine.openOrganizationChatAsync(chat);
+    const own = OrganizationChatFoldersTests.folder(host, "own");
+    const attached = await host.dispatcher.dispatch(new Request("r", MethodName.ChatFolderAttach, new ChatFolderAttachParams(opened.id, own).toJson()));
+
+    await OrganizationChatFoldersTests.sendAsync(host, chat, "Here");
+
+    Assert.isFalse(attached.hasErrors);
+    Assert.areEqual(own, Conversation.fromJson(attached.payload).attachedFolder);
+    Assert.areEqual(own, host.adapter.requests[0]?.workingDirectory);
+  }
+
+  @TestMethod
+  public async runsAChatOfADeletedOrganizationInItsOwnFolder(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", OrganizationChatFoldersTests.folder(host, "studio")));
+    const chat = new OrganizationChat(studio.id, ada.id);
+    const opened = await host.engine.openOrganizationChatAsync(chat);
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id));
+
+    await host.engine.sendAsync(new MessageSendParams(opened.id, "Still here", null, null, [], [], ada.id));
+    await host.engine.waitForIdle();
+
+    Assert.areEqual(opened.folder, host.adapter.requests[0]?.workingDirectory);
+    Assert.isFalse(host.adapter.requests[0]?.prompt.includes(Resources.organizationNoDepartment) ?? true);
+  }
+
+  @TestMethod
+  public async tellsATeammateItsPlaceInTheOrganizationItsChatBelongsTo(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+    await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person, ada.id));
+    await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", OrganizationParent.person, ada.id));
+
+    await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(studio.id, ada.id), "Status?");
+    await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(Resources.defaultOrganizationId, ada.id), "Status?");
+
+    Assert.isTrue(host.adapter.requests[0]?.prompt.includes(Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Art"),
+      Resources.organizationReportsToPerson), "Status?")) ?? false);
+    Assert.isTrue(host.adapter.requests[1]?.prompt.includes(Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
+      Resources.organizationReportsToPerson), "Status?")) ?? false);
+  }
+
+  private static async teammateAsync(host: CoreHost): Promise<Teammate> {
+    return await host.teammates.createAsync(new TeammateCreateParams("Ada", null, (await host.providerOfAsync()).id, Harness.Provider, null, null));
+  }
+
+  private static async sendAsync(host: CoreHost, chat: OrganizationChat, text: string): Promise<void> {
+    const opened = await host.engine.openOrganizationChatAsync(chat);
+    await host.engine.sendAsync(new MessageSendParams(opened.id, text, null, null, [], [], chat.teammateId));
+    await host.engine.waitForIdle();
+  }
+
+  private static folder(host: CoreHost, name: string): string {
+    const path = join(host.directory.path, name);
+    mkdirSync(path, { recursive: true });
+    return path;
+  }
+}

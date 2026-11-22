@@ -68,7 +68,7 @@ describe("OrganizationCardComponent's folder", () => {
     menuItem(label).click();
     await settle();
   };
-  const placeOf = (): Conversation | null => ChatStoreService.of(context).organizationChatOf("alice");
+  const placeOf = (): Conversation | null => ChatStoreService.of(context).organizationChatOf("my-organization", "alice");
   const create = async (answer: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
     context = SampleData.createContext();
     const data = new TeammateFixture(context);
@@ -165,7 +165,7 @@ describe("OrganizationCardComponent's folder", () => {
     await create(t => t.answer(MethodName.OrganizationChatOpen, () => Promise.reject(new Error("The teammate is gone."))));
     context.chosenFolder = "D:/work/site";
     await choose(Resources.attachFolderLabel);
-    await Wait.until(() => expect(OrganizationStoreService.of(context).actionError()).toBe("The teammate is gone."));
+    await Wait.until(() => expect(fixture.debugElement.injector.get(OrganizationStoreService).actionError()).toBe("The teammate is gone."));
     await choose(Resources.moveToProjectLabel);
     await Wait.until(() => expect(labels()).toContain(SampleData.project.name));
     menuItem(SampleData.project.name).click();

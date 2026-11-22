@@ -44,11 +44,11 @@ export class DepartmentsMigrationTests {
     await using current = await DatabaseContext.openAsync(directory.path);
     const connection = current.database.connection;
     await connection.executeAsync(new SqlQuery("INSERT INTO teammates (id, name, json, createdAt, updatedAt) VALUES ('t1', 'ada', '{}', 't', 't')"));
-    await connection.executeAsync(new SqlQuery("INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES ('d1', NULL, '{}', 't', 't')"));
+    await connection.executeAsync(new SqlQuery("INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES ('d1', 'my-organization', NULL, '{}', 't', 't')"));
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
     Assert.areEqual(oldJson, (await connection.queryAsync(new SqlQuery("SELECT json FROM projects WHERE id = 'p'")))[0]?.readString("json"));
     await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery(
-      "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES ('d2', 'gone', '{}', 't', 't')")), Error);
+      "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES ('d2', 'my-organization', 'gone', '{}', 't', 't')")), Error);
   }
 }

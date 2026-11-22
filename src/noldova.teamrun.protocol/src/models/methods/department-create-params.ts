@@ -15,18 +15,22 @@ import { Department } from "../department.js";
 import { OrganizationParent } from "../organization-parent.js";
 
 export class DepartmentCreateParams {
+  public readonly organizationId: string;
   public readonly name: string;
   public readonly parent: OrganizationParent;
   public readonly leaderId: string | null;
 
   public constructor(
+    organizationId: string,
     name: string,
     parent: OrganizationParent,
     leaderId: string | null = null) {
+    ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
     Department.validateName(name);
     if (!Object.isNull(leaderId))
       ArgumentException.throwIfNullOrWhitespace(leaderId, Resources.leaderIdField);
 
+    this.organizationId = organizationId;
     this.name = name;
     this.parent = parent;
     this.leaderId = leaderId;
@@ -36,6 +40,7 @@ export class DepartmentCreateParams {
     const reader = JsonReader.fromValue(value, path);
     const parent = reader.readObject(Resources.parentField);
     return new DepartmentCreateParams(
+      reader.readNonBlankString(Resources.organizationIdField),
       Department.readName(reader),
       OrganizationParent.fromJson(parent.toJson(), parent.path),
       reader.hasField(Resources.leaderIdField) ? reader.readNullableString(Resources.leaderIdField) : null);
@@ -43,6 +48,7 @@ export class DepartmentCreateParams {
 
   public toJson(): JsonObject {
     return {
+      [Resources.organizationIdField]: this.organizationId,
       [Resources.nameField]: this.name,
       [Resources.parentField]: this.parent.toJson(),
       [Resources.leaderIdField]: this.leaderId

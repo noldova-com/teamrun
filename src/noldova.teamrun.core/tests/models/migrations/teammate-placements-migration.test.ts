@@ -52,20 +52,20 @@ export class TeammatePlacementsMigrationTests {
     }
     await using current = await DatabaseContext.openAsync(directory.path);
     const connection = current.database.connection;
-    const organization = await new OrganizationService(current).listAsync();
+    const [organization] = await new OrganizationService(current).listAsync();
     const tables = await connection.queryAsync(new SqlQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'departmentMembers'"));
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
-    Assert.areEqual("t1:d2:0,t3:d1:0,t2:d1:1", organization.placements.filter(t => t.parent.kind === OrganizationNodeKind.Department)
+    Assert.areEqual("t1:d2:0,t3:d1:0,t2:d1:1", organization?.placements.filter(t => t.parent.kind === OrganizationNodeKind.Department)
       .map(t => `${t.teammateId}:${t.parent.id ?? ""}:${t.order}`).join(","));
-    Assert.areEqual("t4:0,t5:1", organization.placementsUnder(OrganizationParent.person).toSorted((a, b) => a.order - b.order)
+    Assert.areEqual("t4:0,t5:1", organization?.placementsUnder(OrganizationParent.person).toSorted((a, b) => a.order - b.order)
       .map(t => `${t.teammateId}:${t.order}`).join(","));
-    Assert.areEqual("d1:Person:,d2:Department:d1", organization.departments.map(t => `${t.id}:${t.parent.kind}:${t.parent.id ?? ""}`).join(","));
-    Assert.areEqual("t2", organization.departments[0]?.leaderId);
-    Assert.areEqual("", organization.unplaced(["t1", "t2", "t3", "t4", "t5"]).join(","));
+    Assert.areEqual("d1:Person:,d2:Department:d1", organization?.departments.map(t => `${t.id}:${t.parent.kind}:${t.parent.id ?? ""}`).join(","));
+    Assert.areEqual("t2", organization?.departments[0]?.leaderId);
+    Assert.areEqual("", organization?.unplaced(["t1", "t2", "t3", "t4", "t5"]).join(","));
     Assert.areEqual(0, tables.length);
     Assert.isFalse((await connection.queryAsync(new SqlQuery("SELECT json FROM departments"))).some(t => t.readString("json").includes("parentId")));
-    await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO teammatePlacements (teammateId, json) VALUES ('t1', '{}')")), Error);
-    await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO teammatePlacements (teammateId, json) VALUES ('gone', '{}')")), Error);
+    await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO teammatePlacements (organizationId, teammateId, json) VALUES ('my-organization', 't1', '{}')")), Error);
+    await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO teammatePlacements (organizationId, teammateId, json) VALUES ('my-organization', 'gone', '{}')")), Error);
   }
 }

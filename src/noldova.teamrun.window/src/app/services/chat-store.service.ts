@@ -602,10 +602,6 @@ export class ChatStoreService {
     return this.findConversation(conversationId);
   }
 
-  public organizationChatOf(teammateId: string): Conversation | null {
-    return this.organizationChatsByTeammate().get(teammateId) ?? null;
-  }
-
   public folderOf(conversationId: string): string | null {
     const conversation = this.findConversation(conversationId);
     return conversation?.folder ?? this.projects().find(t => t.id === conversation?.projectId)?.rootPath ?? null;
@@ -619,14 +615,18 @@ export class ChatStoreService {
     return this.conversationsByProjectSignal().get(projectId) ?? [];
   }
 
-  public organizationChats(): readonly Conversation[] {
-    return [...this.conversationsByProjectSignal().values()].flatMap(t => t.filter(u => !Object.isNull(u.organizationChat)));
+  public organizationChatOf(organizationId: string, teammateId: string): Conversation | null {
+    return this.organizationChatsByTeammate(organizationId).get(teammateId) ?? null;
   }
 
-  public organizationChatsByTeammate(): ReadonlyMap<string, Conversation> {
+  public organizationChats(organizationId: string): readonly Conversation[] {
+    return [...this.conversationsByProjectSignal().values()].flatMap(t => t.filter(u => u.organizationChat?.organizationId === organizationId));
+  }
+
+  public organizationChatsByTeammate(organizationId: string): ReadonlyMap<string, Conversation> {
     const chats = new Map<string, Conversation>();
     for (const chat of [...this.conversationsByProjectSignal().values()].flat())
-      if (!Object.isNull(chat.organizationChat))
+      if (chat.organizationChat?.organizationId === organizationId)
         chats.set(chat.organizationChat.teammateId, chat);
     return chats;
   }

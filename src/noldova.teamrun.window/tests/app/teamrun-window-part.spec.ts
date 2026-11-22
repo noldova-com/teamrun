@@ -48,7 +48,8 @@ import { ChatPages } from "../../src/app/services/pages/chat-pages";
 import { ChatPagesResources } from "../../src/app/services/pages/chat-pages-resources";
 import { PageDocuments } from "../../src/app/services/pages/page-documents";
 import { TitleModelOptions } from "../../src/app/services/title-model-options";
-import { OrganizationLayoutService } from "../../src/app/services/organization-layout.service";
+import { OrganizationCatalog } from "../../src/app/services/organization-catalog";
+import { OrganizationLayoutState } from "../../src/app/services/organization-layout-state";
 import { ProjectsLayoutService } from "../../src/app/services/projects-layout.service";
 import { SubAgentsBadge } from "../../src/app/services/sub-agents-badge";
 import { TimeFormatService } from "../../src/app/services/time-format.service";
@@ -130,7 +131,7 @@ describe("TeamRun's window part", () => {
     expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null, null]);
     await shows[1]?.runAsync(null);
     expect(context.openedDocuments).toEqual([
-      { name: "teamrun.organization", instance: "organization", title: "Organization", options: undefined },
+      { name: "teamrun.organization", instance: "my-organization", title: "Organization", options: undefined },
       { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
       { name: "teamrun.providers", instance: "providers", title: "Providers", options: undefined },
       { name: "teamrun.mcpServers", instance: "mcpServers", title: "MCP servers", options: undefined },
@@ -606,7 +607,8 @@ describe("TeamRun's window part", () => {
     const store = ChatStoreService.of(context);
     const tasks = BackgroundTaskStoreService.of(context);
     const layout = ProjectsLayoutService.of(context);
-    const organizationLayout = OrganizationLayoutService.of(context);
+    const organizationLayout = OrganizationLayoutState.of(context, "my-organization");
+    const organizations = OrganizationCatalog.of(context);
     const choice = ComposerDefaultService.of(context);
     const pages = ChatPages.of(context);
 
@@ -618,13 +620,15 @@ describe("TeamRun's window part", () => {
     expect(ChatStoreService.of(context)).not.toBe(store);
     expect(BackgroundTaskStoreService.of(context)).not.toBe(tasks);
     expect(ProjectsLayoutService.of(context)).not.toBe(layout);
-    expect(OrganizationLayoutService.of(context)).not.toBe(organizationLayout);
+    expect(OrganizationLayoutState.of(context, "my-organization")).not.toBe(organizationLayout);
+    expect(OrganizationCatalog.of(context)).not.toBe(organizations);
     expect(ComposerDefaultService.of(context)).not.toBe(choice);
     expect(ChatPages.of(context)).not.toBe(pages);
     ChatStoreService.release(context);
     BackgroundTaskStoreService.release(context);
     ProjectsLayoutService.release(context);
-    OrganizationLayoutService.release(context);
+    OrganizationLayoutState.release(context);
+    OrganizationCatalog.release(context);
     ComposerDefaultService.release(context);
     ChatPages.release(context);
   });

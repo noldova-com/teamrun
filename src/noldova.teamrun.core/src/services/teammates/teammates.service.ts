@@ -93,10 +93,11 @@ export class TeammatesService implements ITeammatesService {
       Object.isNull(window) || list.models.find(t => t.matches(model))?.contextWindows?.allows(window) === true ? window : null;
     return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const chosen = await this.readDefaultAsync(transaction);
-      const requested = chosen?.requested;
-      if (chosen?.providerId === providerId && unlisted(requested!.model, requested!.speed, requested!.mode))
-        await this.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(new RequestedSettings(requested!.kind, requested!.model, requested!.effort,
-          speedOf(requested!.model, requested!.speed), modeOf(requested!.mode)), providerId)), transaction);
+      if (!Object.isNull(chosen) && chosen.providerId === providerId && unlisted(chosen.requested.model, chosen.requested.speed, chosen.requested.mode)) {
+        const requested = chosen.requested;
+        await this.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(new RequestedSettings(requested.kind, requested.model, requested.effort,
+          speedOf(requested.model, requested.speed), modeOf(requested.mode)), providerId)), transaction);
+      }
       const cleared: Teammate[] = [];
       for (const u of (await this.listAsync(transaction)).filter(t => t.providerId === providerId
         && (unlisted(t.model, t.speed, t.mode) || windowOf(t.model, t.contextWindow) !== t.contextWindow)))
@@ -113,7 +114,7 @@ export class TeammatesService implements ITeammatesService {
     return teammate;
   }
 
-  public async deleteAsync(params: TeammateIdParams): Promise<boolean> {
+  public async deleteAsync(params: TeammateIdParams): Promise<readonly string[]> {
     return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const teammate = await this.requireAsync(params.teammateId, transaction);
       await this.conversations.removeTeammateMembersAsync(teammate.id, transaction);
@@ -137,14 +138,14 @@ export class TeammatesService implements ITeammatesService {
       return await this.context.database.connection.runInTransactionAsync(t => this.setDefaultAsync(params, t));
 
     const chosen = params.defaultTeammate;
-    const providerId = chosen?.providerId ?? null;
-    if (!Object.isNull(providerId)) {
+    if (!Object.isNull(chosen) && !Object.isNull(chosen.providerId)) {
+      const providerId = chosen.providerId;
       const provider = await this.providers.findAsync(providerId, transaction);
       if (Object.isNull(provider))
         throw new ServiceException(ErrorCode.NotFound, Resources.formatProviderNotFound(providerId), [providerId]);
-      if (provider.kind !== chosen!.requested.kind)
-        throw new ServiceException(ErrorCode.InvalidParams, Resources.formatProviderMismatch(providerId, chosen!.requested.kind),
-          [providerId, chosen!.requested.kind]);
+      if (provider.kind !== chosen.requested.kind)
+        throw new ServiceException(ErrorCode.InvalidParams, Resources.formatProviderMismatch(providerId, chosen.requested.kind),
+          [providerId, chosen.requested.kind]);
     }
     const previous = await this.readDefaultAsync(transaction);
     if (Object.isNull(chosen)) {
@@ -165,8 +166,10 @@ export class TeammatesService implements ITeammatesService {
   public async moveProviderlessDefaultAsync(providerOf: (kind: string, transaction: SqlTransaction) => Promise<string | null>): Promise<DefaultTeammate | null> {
     return await this.context.database.connection.runInTransactionAsync(async transaction => {
       const chosen = await this.readDefaultAsync(transaction);
-      const providerId = Object.isNull(chosen) || !Object.isNull(chosen.providerId) ? null : await providerOf(chosen.requested.kind, transaction);
-      return Object.isNull(providerId) ? null : await this.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(chosen!.requested, providerId)), transaction);
+      if (Object.isNull(chosen) || !Object.isNull(chosen.providerId))
+        return null;
+      const providerId = await providerOf(chosen.requested.kind, transaction);
+      return Object.isNull(providerId) ? null : await this.setDefaultAsync(new DefaultTeammateSetParams(new DefaultTeammate(chosen.requested, providerId)), transaction);
     });
   }
 

@@ -150,7 +150,6 @@ export class Resources {
   public static readonly preferencesTable: string = "preferences";
   public static readonly defaultTeammatePreference: string = "defaultTeammate";
   public static readonly projectsLayoutPreference: string = "projectsLayout";
-  public static readonly organizationLayoutPreference: string = "organizationLayout";
   public static readonly composerDefaultPreference: string = "composerDefault";
   public static readonly firstLaunchPreference: string = "firstLaunch";
   public static readonly outsideChatsPreference: string = "outsideChats";
@@ -477,8 +476,9 @@ export class Resources {
   public static readonly departmentsMigrationId: string = "20261120120000_Departments";
   public static readonly departmentsTable: string = "departments";
   public static readonly departmentMembersTable: string = "departmentMembers";
-  public static readonly selectDepartments: string = "SELECT json FROM departments ORDER BY createdAt, rowid";
-  public static readonly insertDepartment: string = "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
+  public static readonly selectDepartments: string = "SELECT json FROM departments WHERE organizationId = ? ORDER BY createdAt, rowid";
+  public static readonly insertDepartment: string =
+    "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)";
   public static readonly updateDepartment: string = "UPDATE departments SET parentId = ?, json = ?, updatedAt = ? WHERE id = ?";
   public static readonly deleteDepartment: string = "DELETE FROM departments WHERE id = ?";
   public static readonly teammatePlacementsMigrationId: string = "20261123090000_TeammatePlacements";
@@ -493,10 +493,38 @@ export class Resources {
   public static readonly moveDepartmentParentsIntoJson: string = "UPDATE departments SET json = json_remove(json_set(json, '$.parent', "
     + "CASE WHEN parentId IS NULL THEN json_object('kind', 'Person', 'id', NULL) ELSE json_object('kind', 'Department', 'id', parentId) END), "
     + "'$.parentId')";
-  public static readonly selectTeammatePlacements: string = "SELECT json FROM teammatePlacements ORDER BY rowid";
-  public static readonly insertTeammatePlacement: string = "INSERT INTO teammatePlacements (teammateId, json) VALUES (?, ?)";
-  public static readonly updateTeammatePlacement: string = "UPDATE teammatePlacements SET json = ? WHERE teammateId = ?";
-  public static readonly deleteTeammatePlacement: string = "DELETE FROM teammatePlacements WHERE teammateId = ?";
+  public static readonly selectTeammatePlacements: string = "SELECT json FROM teammatePlacements WHERE organizationId = ? ORDER BY rowid";
+  public static readonly insertTeammatePlacement: string = "INSERT INTO teammatePlacements (organizationId, teammateId, json) VALUES (?, ?, ?)";
+  public static readonly updateTeammatePlacement: string = "UPDATE teammatePlacements SET json = ? WHERE organizationId = ? AND teammateId = ?";
+  public static readonly deleteTeammatePlacement: string = "DELETE FROM teammatePlacements WHERE organizationId = ? AND teammateId = ?";
+  public static readonly selectTeammateOrganizations: string = "SELECT organizationId FROM teammatePlacements WHERE teammateId = ? ORDER BY rowid";
+  public static readonly organizationIdColumn: string = "organizationId";
+  public static readonly organizationsMigrationId: string = "20261124090000_Organizations";
+  public static readonly organizationsTable: string = "organizations";
+  public static readonly defaultOrganizationName: string = "My organization";
+  public static readonly insertDefaultOrganization: string = "INSERT INTO organizations (id, json, createdAt, updatedAt) "
+    + "SELECT 'my-organization', json_object('id', 'my-organization', 'name', 'My organization', 'folder', NULL, 'order', 0, "
+    + "'createdAt', now, 'updatedAt', now, 'departments', json_array(), 'placements', json_array()), now, now "
+    + "FROM (SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS now)";
+  public static readonly copyDepartments: string = "CREATE TABLE departmentsCopy AS SELECT id, parentId, json, createdAt, updatedAt FROM departments";
+  public static readonly dropDepartments: string = "DROP TABLE departments";
+  public static readonly restoreDepartments: string = "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) "
+    + "SELECT id, 'my-organization', parentId, json, createdAt, updatedAt FROM departmentsCopy ORDER BY rowid";
+  public static readonly dropDepartmentsCopy: string = "DROP TABLE departmentsCopy";
+  public static readonly copyTeammatePlacements: string = "CREATE TABLE teammatePlacementsCopy AS SELECT teammateId, json FROM teammatePlacements";
+  public static readonly dropTeammatePlacements: string = "DROP TABLE teammatePlacements";
+  public static readonly restoreTeammatePlacements: string = "INSERT INTO teammatePlacements (organizationId, teammateId, json) "
+    + "SELECT 'my-organization', teammateId, json FROM teammatePlacementsCopy ORDER BY rowid";
+  public static readonly dropTeammatePlacementsCopy: string = "DROP TABLE teammatePlacementsCopy";
+  public static readonly moveOrganizationLayout: string =
+    "UPDATE preferences SET name = 'organizationLayout:my-organization' WHERE name = 'organizationLayout'";
+  public static readonly selectOrganizations: string = "SELECT json FROM organizations ORDER BY rowid";
+  public static readonly selectOrganization: string = "SELECT json FROM organizations WHERE id = ?";
+  public static readonly insertOrganization: string = "INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES (?, ?, ?, ?)";
+  public static readonly updateOrganization: string = "UPDATE organizations SET json = ?, updatedAt = ? WHERE id = ?";
+  public static readonly deleteOrganization: string = "DELETE FROM organizations WHERE id = ?";
+  public static readonly deleteOrganizationDepartments: string = "DELETE FROM departments WHERE organizationId = ?";
+  public static readonly deleteOrganizationPlacements: string = "DELETE FROM teammatePlacements WHERE organizationId = ?";
   public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
   public static readonly organizationMessagesTable: string = "organizationMessages";
   public static readonly organizationMessagesDropMigrationId: string = "20261124090000_OrganizationMessagesDrop";
@@ -1999,6 +2027,22 @@ export class Resources {
 
   public static formatTeammateNotFound(id: string): string {
     return `Teammate not found: ${id}.`;
+  }
+
+  public static formatOrganizationLayoutPreference(organizationId: string): string {
+    return `organizationLayout:${organizationId}`;
+  }
+
+  public static formatOrganizationNotFound(id: string): string {
+    return `Organization ${id} doesn't exist.`;
+  }
+
+  public static formatLastOrganization(name: string): string {
+    return `${name} is the only organization; create another before deleting it.`;
+  }
+
+  public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string {
+    return `${organizationId}/${teammateId}`;
   }
 
   public static formatDepartmentNotFound(id: string): string {

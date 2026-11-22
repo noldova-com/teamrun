@@ -570,6 +570,10 @@ export class Resources {
   public static readonly invalidOrganizationOrder: string = "A place's order among its siblings is a whole number from 0.";
   public static readonly unknownOrganizationParent: string = "A parent is the person, a placed teammate or a department of the same organization.";
   public static readonly teammatePlacedTwice: string = "A teammate has at most one place in the organization.";
+  public static readonly invalidOrganizationName: string = "An organization name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
+  public static readonly blankOrganizationFolder: string = "An organization's default folder is a path or null, never blank.";
+  public static readonly invalidOrganizationListOrder: string = "An organization's order in the list is a whole number from 0.";
+  public static readonly defaultOrganizationId: string = "my-organization";
   public static readonly personCannotMove: string = "The person stays at the top of the organization.";
   public static readonly targetIdRequired: string = "A teammate or department target names its id; leaders and everyone name none.";
   public static readonly recipientTwice: string = "A teammate is a recipient of a message at most once.";

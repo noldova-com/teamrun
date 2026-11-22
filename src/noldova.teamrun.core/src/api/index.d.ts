@@ -159,7 +159,10 @@ import type {
   DepartmentUpdateParams,
   Organization,
   OrganizationChat,
-  OrganizationLayoutSaveParams
+  OrganizationCreateParams,
+  OrganizationIdParams,
+  OrganizationLayoutSaveParams,
+  OrganizationUpdateParams
 } from "@noldova/teamrun.protocol";
 
 /**
@@ -209,8 +212,10 @@ export declare enum ChangeEntity {
   Department = "Department",
   /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id, as the feed kept it before the tree. */
   DepartmentMember = "DepartmentMember",
-  /** A `TeammatePlacement`: a teammate's place in the organization, keyed by the teammate's id. */
-  TeammatePlacement = "TeammatePlacement"
+  /** A `TeammatePlacement`: a teammate's place in an organization, keyed by `formatTeammatePlacementKey`. */
+  TeammatePlacement = "TeammatePlacement",
+  /** An `Organization`'s id, name, folder and order, keyed by its id; its tree is in its departments and placements. */
+  Organization = "Organization"
 }
 
 /**
@@ -2891,10 +2896,6 @@ export declare class Resources {
    */
   public static readonly projectsLayoutPreference: string;
   /**
-   * The name of the Organization view's layout preference.
-   */
-  public static readonly organizationLayoutPreference: string;
-  /**
    * The name of the composer's default choice preference.
    */
   public static readonly composerDefaultPreference: string;
@@ -3054,9 +3055,9 @@ export declare class Resources {
   public static readonly departmentsTable: string;
   /** The table of which teammate was in which department, until `TeammatePlacementsMigration` moves it to `teammatePlacements`. */
   public static readonly departmentMembersTable: string;
-  /** Selects every department's JSON. */
+  /** Selects every department's JSON in one organization. */
   public static readonly selectDepartments: string;
-  /** Inserts a department. */
+  /** Inserts a department into an organization. */
   public static readonly insertDepartment: string;
   /** Updates a department's parent and JSON. */
   public static readonly updateDepartment: string;
@@ -3074,14 +3075,58 @@ export declare class Resources {
   public static readonly dropDepartmentMembers: string;
   /** Rewrites each department's JSON to hold its `parent` node in place of `parentId`. */
   public static readonly moveDepartmentParentsIntoJson: string;
-  /** Selects every placement's JSON. */
+  /** Selects every placement's JSON in one organization. */
   public static readonly selectTeammatePlacements: string;
-  /** Inserts a placement. */
+  /** Inserts a placement into an organization. */
   public static readonly insertTeammatePlacement: string;
-  /** Updates a placement's JSON. */
+  /** Updates a placement's JSON in an organization. */
   public static readonly updateTeammatePlacement: string;
-  /** Takes a teammate out of the organization. */
+  /** Takes a teammate out of an organization. */
   public static readonly deleteTeammatePlacement: string;
+  /** Selects the ids of the organizations a teammate is placed in. */
+  public static readonly selectTeammateOrganizations: string;
+  /** The `organizationId` column. */
+  public static readonly organizationIdColumn: string;
+  /** The organizations migration's fixed id: `20261124090000_Organizations`. */
+  public static readonly organizationsMigrationId: string;
+  /** The organizations table: each organization's id, name, folder and order as its JSON, with an empty tree. */
+  public static readonly organizationsTable: string;
+  /** The name of the organization every database starts with: `My organization`. */
+  public static readonly defaultOrganizationName: string;
+  /** Inserts "My organization", with no folder, first in the list. */
+  public static readonly insertDefaultOrganization: string;
+  /** Copies the departments aside while the table is made again with its organization. */
+  public static readonly copyDepartments: string;
+  /** Drops the `departments` table. */
+  public static readonly dropDepartments: string;
+  /** Puts the copied departments back, each in "My organization". */
+  public static readonly restoreDepartments: string;
+  /** Drops the departments' copy. */
+  public static readonly dropDepartmentsCopy: string;
+  /** Copies the placements aside while the table is made again with its organization. */
+  public static readonly copyTeammatePlacements: string;
+  /** Drops the `teammatePlacements` table. */
+  public static readonly dropTeammatePlacements: string;
+  /** Puts the copied placements back, each in "My organization". */
+  public static readonly restoreTeammatePlacements: string;
+  /** Drops the placements' copy. */
+  public static readonly dropTeammatePlacementsCopy: string;
+  /** Renames the Organization view's layout preference to "My organization"'s. */
+  public static readonly moveOrganizationLayout: string;
+  /** Selects every organization's JSON. */
+  public static readonly selectOrganizations: string;
+  /** Selects one organization's JSON. */
+  public static readonly selectOrganization: string;
+  /** Inserts an organization. */
+  public static readonly insertOrganization: string;
+  /** Updates an organization's JSON. */
+  public static readonly updateOrganization: string;
+  /** Deletes an organization. */
+  public static readonly deleteOrganization: string;
+  /** Deletes an organization's departments. */
+  public static readonly deleteOrganizationDepartments: string;
+  /** Deletes an organization's placements. */
+  public static readonly deleteOrganizationPlacements: string;
   /** The organization messages migration's fixed id: `20261121090000_OrganizationMessages`. */
   public static readonly organizationMessagesMigrationId: string;
   /** The organization messages table. */
@@ -4721,6 +4766,13 @@ export declare class Resources {
   public static formatTeammateNotFound(id: string): string;
 
   /** Missing department diagnostic. */
+  public static formatOrganizationLayoutPreference(organizationId: string): string;
+  /** Says no organization has the id. */
+  public static formatOrganizationNotFound(id: string): string;
+  /** Says the only organization can't be deleted. */
+  public static formatLastOrganization(name: string): string;
+  /** Returns a placement's key in the change feed: the organization's id and the teammate's. */
+  public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string;
   public static formatDepartmentNotFound(id: string): string;
 
   /** Why a teammate that has no place in the organization can't be a parent. */
@@ -10140,10 +10192,31 @@ export declare class AttachmentStore {
 /** The organization under the person: departments, their leaders and their members. */
 export interface IOrganizationService {
   /**
-   * Returns the organization: every department, and every placed teammate's place.
+   * Returns every organization, each with every department and every placed teammate's place, by their order, then by when they were created.
    * @param transaction The transaction to read in, or none.
    */
-  listAsync(transaction?: SqlTransaction): Promise<Organization>;
+  listAsync(transaction?: SqlTransaction): Promise<readonly Organization[]>;
+
+  /**
+   * Returns one organization with its tree, or null when none has the id.
+   * @param transaction The transaction to read in, or none.
+   */
+  findAsync(organizationId: string, transaction?: SqlTransaction): Promise<Organization | null>;
+
+  /** Creates an organization with no departments and no placed teammates, last in the list, and records it in the change feed. */
+  createOrganizationAsync(params: OrganizationCreateParams): Promise<Organization>;
+
+  /**
+   * Renames an organization and sets its default folder, and records it in the change feed.
+   * @throws ServiceException `NotFound` for an unknown organization.
+   */
+  updateOrganizationAsync(params: OrganizationUpdateParams): Promise<Organization>;
+
+  /**
+   * Deletes an organization with its departments, placements and layout, in one transaction; its teammates and their chats stay.
+   * @throws ServiceException `NotFound` for an unknown organization, `Conflict` for the last one.
+   */
+  deleteOrganizationAsync(params: OrganizationIdParams): Promise<void>;
 
   /**
    * Creates a department last among the departments under its parent and records it in the change feed; a leader given is placed
@@ -10191,24 +10264,25 @@ export interface IOrganizationService {
   placeAsync(params: TeammatePlaceParams): Promise<void>;
 
   /**
-   * Reads the Organization view's layout, or `null` when none is kept.
+   * Reads an organization's Organization view layout, or `null` when none is kept.
    * @param transaction The transaction to read in, or none.
+   * @throws ServiceException `NotFound` for an unknown organization.
    */
-  readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null>;
+  readLayoutAsync(params: OrganizationIdParams, transaction?: SqlTransaction): Promise<JsonObject | null>;
 
   /**
-   * Keeps the Organization view's layout in the preferences, replacing the one kept, and records it in the change feed.
+   * Keeps an organization's Organization view layout in the preferences, replacing the one kept, and records it in the change feed.
    * @returns The layout kept.
    */
   saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject>;
 
   /**
-   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
+   * Takes a teammate being deleted out of every organization and clears its leadership, in the deleting transaction.
    * @param teammateId The teammate's id.
    * @param transaction The deleting transaction.
-   * @returns Whether the teammate was in a department.
+   * @returns The ids of the organizations it was placed in.
    */
-  removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+  removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<readonly string[]>;
 }
 
 /** Keeps the organization in the `departments` and `teammatePlacements` tables, recording each change in the change feed. */
@@ -10216,11 +10290,20 @@ export declare class OrganizationService implements IOrganizationService {
   /** Creates the service over the database. */
   public constructor(context: DatabaseContext);
 
-  /**
-   * Returns the organization: every department, and which teammate is in which.
-   * @param transaction The transaction to read in, or none.
-   */
-  public listAsync(transaction?: SqlTransaction): Promise<Organization>;
+  /** See {@link IOrganizationService.listAsync}. */
+  public listAsync(transaction?: SqlTransaction): Promise<readonly Organization[]>;
+
+  /** See {@link IOrganizationService.findAsync}. */
+  public findAsync(organizationId: string, transaction?: SqlTransaction): Promise<Organization | null>;
+
+  /** See {@link IOrganizationService.createOrganizationAsync}. */
+  public createOrganizationAsync(params: OrganizationCreateParams): Promise<Organization>;
+
+  /** See {@link IOrganizationService.updateOrganizationAsync}. */
+  public updateOrganizationAsync(params: OrganizationUpdateParams): Promise<Organization>;
+
+  /** See {@link IOrganizationService.deleteOrganizationAsync}. */
+  public deleteOrganizationAsync(params: OrganizationIdParams): Promise<void>;
 
   /** See {@link IOrganizationService.createAsync}. */
   public createAsync(params: DepartmentCreateParams): Promise<Department>;
@@ -10245,24 +10328,20 @@ export declare class OrganizationService implements IOrganizationService {
   public placeAsync(params: TeammatePlaceParams): Promise<void>;
 
   /**
-   * Reads the Organization view's layout, or `null` when none is kept.
+   * Reads an organization's Organization view layout, or `null` when none is kept.
    * @param transaction The transaction to read in, or none.
+   * @throws ServiceException `NotFound` for an unknown organization.
    */
-  public readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null>;
+  public readLayoutAsync(params: OrganizationIdParams, transaction?: SqlTransaction): Promise<JsonObject | null>;
 
   /**
-   * Keeps the Organization view's layout in the preferences, replacing the one kept, and records it in the change feed.
+   * Keeps an organization's Organization view layout in the preferences, replacing the one kept, and records it in the change feed.
    * @returns The layout kept.
    */
   public saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject>;
 
-  /**
-   * Takes a teammate being deleted out of its department and clears its leadership, in the deleting transaction.
-   * @param teammateId The teammate's id.
-   * @param transaction The deleting transaction.
-   * @returns Whether the teammate was in a department.
-   */
-  public removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;
+  /** See {@link IOrganizationService.removeTeammateAsync}. */
+  public removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<readonly string[]>;
 }
 
 export interface ITeammatesService {
@@ -10305,7 +10384,7 @@ export interface ITeammatesService {
   /**
    * Deletes memberships while retaining historical messages and mentions, and answers whether the teammate left a department.
    */
-  deleteAsync(params: TeammateIdParams): Promise<boolean>;
+  deleteAsync(params: TeammateIdParams): Promise<readonly string[]>;
 
   /**
    * Reads the default teammate set in Settings, or `null` when none is set.
@@ -10377,7 +10456,7 @@ export declare class TeammatesService implements ITeammatesService {
    * Deletes memberships while retaining historical messages and mentions; the teammate leaves its department, and a department
    * it led has no leader, in the same transaction; it answers whether the teammate left a department.
    */
-  public deleteAsync(params: TeammateIdParams): Promise<boolean>;
+  public deleteAsync(params: TeammateIdParams): Promise<readonly string[]>;
 
   /**
    * Reads the default teammate from the `preferences` table, or `null` when none is set.
@@ -11375,6 +11454,19 @@ export declare class TeammatePlacementsMigration extends SqlMigration {
   public constructor();
 
   /** Creates the table keyed to `teammates` and moves the data. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/**
+ * Gives the organization its own row, so there can be several: adds the `organizations` table with "My organization", makes
+ * `departments` and `teammatePlacements` again keyed to their organization with every row in "My organization", places each teammate
+ * that had no place directly under the person, and renames the Organization view's layout preference to "My organization"'s.
+ */
+export declare class OrganizationsMigration extends SqlMigration {
+  /** Uses the fixed organizations migration id. */
+  public constructor();
+
+  /** Creates the table, makes the two tables again and moves the data. */
   public override apply(builder: MigrationBuilder): void;
 }
 

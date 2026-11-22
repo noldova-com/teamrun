@@ -16,19 +16,23 @@ import { Department } from "../department.js";
 import { OrganizationParent } from "../organization-parent.js";
 
 export class DepartmentMoveParams {
+  public readonly organizationId: string;
   public readonly departmentId: string;
   public readonly parent: OrganizationParent;
   public readonly order: number;
 
   public constructor(
+    organizationId: string,
     departmentId: string,
     parent: OrganizationParent,
     order: number) {
+    ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
     ArgumentException.throwIfNullOrWhitespace(departmentId, Resources.departmentIdField);
     if (parent.kind === OrganizationNodeKind.Department && parent.id === departmentId)
       throw new ArgumentException(Resources.departmentOwnParent, Resources.parentField);
     Department.validateOrder(order);
 
+    this.organizationId = organizationId;
     this.departmentId = departmentId;
     this.parent = parent;
     this.order = order;
@@ -38,6 +42,7 @@ export class DepartmentMoveParams {
     const reader = JsonReader.fromValue(value, path);
     const parent = reader.readObject(Resources.parentField);
     return new DepartmentMoveParams(
+      reader.readNonBlankString(Resources.organizationIdField),
       reader.readNonBlankString(Resources.departmentIdField),
       OrganizationParent.fromJson(parent.toJson(), parent.path),
       reader.readInteger(Resources.orderField));
@@ -45,6 +50,7 @@ export class DepartmentMoveParams {
 
   public toJson(): JsonObject {
     return {
+      [Resources.organizationIdField]: this.organizationId,
       [Resources.departmentIdField]: this.departmentId,
       [Resources.parentField]: this.parent.toJson(),
       [Resources.orderField]: this.order

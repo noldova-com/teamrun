@@ -218,7 +218,7 @@ export class TeammatesServiceTests {
       provenance, "t", "t", "t", [], teammate.id, "Alice");
     await host.messages.insertAsync(user);
     await host.messages.insertAsync(reply);
-    Assert.isFalse(await host.teammates.deleteAsync(new TeammateIdParams(teammate.id)));
+    Assert.areEqual(0, (await host.teammates.deleteAsync(new TeammateIdParams(teammate.id))).length);
     Assert.isNull(await host.teammates.findAsync(teammate.id));
     Assert.areEqual(0, (await host.conversations.listMembersAsync(new ConversationIdParams(conversation.id))).length);
     Assert.areEqual("Alice", (await host.messages.findAsync(reply.id))?.teammateName);
@@ -237,19 +237,23 @@ export class TeammatesServiceTests {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, ada.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, ada.id));
     const organization = host.organization;
     const failing: IOrganizationService = {
       listAsync: t => organization.listAsync(t),
+      findAsync: (id, t) => organization.findAsync(id, t),
+      createOrganizationAsync: t => organization.createOrganizationAsync(t),
+      updateOrganizationAsync: t => organization.updateOrganizationAsync(t),
+      deleteOrganizationAsync: t => organization.deleteOrganizationAsync(t),
       createAsync: t => organization.createAsync(t),
       updateAsync: t => organization.updateAsync(t),
       moveAsync: t => organization.moveAsync(t),
       deleteAsync: t => organization.deleteAsync(t),
       setMemberAsync: t => organization.setMemberAsync(t),
       placeAsync: t => organization.placeAsync(t),
-      readLayoutAsync: t => organization.readLayoutAsync(t),
+      readLayoutAsync: (params, t) => organization.readLayoutAsync(params, t),
       saveLayoutAsync: t => organization.saveLayoutAsync(t),
       removeTeammateAsync: async (teammateId, transaction) => {
         await organization.removeTeammateAsync(teammateId, transaction);
@@ -258,14 +262,14 @@ export class TeammatesServiceTests {
     };
 
     await Assert.throwsAsync(() => new TeammatesService(host.context, host.providers, host.conversations, failing).deleteAsync(new TeammateIdParams(ada.id)), Error);
-    const kept = await host.organization.listAsync();
+    const [kept] = await host.organization.listAsync();
     const departed = await host.teammates.deleteAsync(new TeammateIdParams(ada.id));
-    const left = await host.organization.listAsync();
+    const [left] = await host.organization.listAsync();
 
-    Assert.areEqual(`${ada.id},${design.id}`, `${kept.departments[0]?.leaderId},${kept.departmentOf(ada.id)}`);
-    Assert.isNull(left.departments[0]?.leaderId);
-    Assert.isNull(left.departmentOf(ada.id));
-    Assert.isTrue(departed);
+    Assert.areEqual(`${ada.id},${design.id}`, `${kept?.departments[0]?.leaderId ?? ""},${kept?.departmentOf(ada.id) ?? ""}`);
+    Assert.isNull(left?.departments[0]?.leaderId);
+    Assert.isNull(left?.departmentOf(ada.id));
+    Assert.areEqual(Resources.defaultOrganizationId, departed.join(","));
     Assert.isNull(await host.teammates.findAsync(ada.id));
   }
 

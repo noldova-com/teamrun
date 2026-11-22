@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, inject, linkedSignal, signal, type Signal, type WritableSignal } from "@angular/core";
+import { Component, computed, inject, input, type InputSignal, linkedSignal, signal, type Signal, type WritableSignal } from "@angular/core";
 
 import { OrganizationTarget, OrganizationTargetKind, type Teammate } from "@noldova/teamrun.protocol";
 
@@ -24,6 +24,7 @@ import { OrganizationTargetChoice } from "../../models/organization-target-choic
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
+import { OrganizationScope } from "../../services/organization-scope";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
@@ -40,13 +41,15 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
     MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationBoardComponent, OrganizationCardComponent, OrganizationChatComponent,
     OrganizationChatsComponent, OrganizationDepartmentComponent, OrganizationDetailsComponent, OrganizationFocusComponent, PopoverTriggerDirective, SelectComponent,
     TeammateStatusComponent],
-  providers: [ChatStoreService.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
+  providers: [ChatStoreService.provider, OrganizationScope.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider],
   host: { class: "nol-teamrun-organization-view" },
   templateUrl: "./organization-view.component.html",
   styleUrls: ["../organization-tree.css", "./organization-view.component.css"]
 })
 export class OrganizationViewComponent {
   private readonly store: ChatStoreService = inject(ChatStoreService);
+
+  public readonly instance: InputSignal<string> = input<string>(Resources.organizationDocumentInstance);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
@@ -86,6 +89,10 @@ export class OrganizationViewComponent {
   });
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.tree().filter(t => !Object.isNull(t.leader)).length
     + this.directReports().length));
+
+  public constructor() {
+    inject(OrganizationScope).follow(this.instance);
+  }
 
   protected showView(value: string): void {
     this.layout.showView(OrganizationLayout.viewOf(value));

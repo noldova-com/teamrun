@@ -40,7 +40,7 @@ describe("OrganizationViewComponent", () => {
   let organization: Organization;
   let saves: JsonValue[];
 
-  const sample = new Organization([
+  const sample = SampleData.organizationOf([
     new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
     new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
     new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
@@ -108,9 +108,9 @@ describe("OrganizationViewComponent", () => {
     organization = sample;
     saves = [];
     context = SampleData.createContext()
-      .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationList, () => [organization.toJson()])
       .answer(MethodName.OrganizationChatOpen, t => {
-        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        const teammateId = OrganizationChat.fromJson(t).teammateId;
         return new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
           null, new OrganizationChat("my-organization", teammateId)).toJson();
       })
@@ -159,17 +159,34 @@ describe("OrganizationViewComponent", () => {
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
   });
 
+  it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [new Department("ops", "Ops", OrganizationParent.person, null, 0, "c", "u")],
+      [new TeammatePlacement("alice", OrganizationParent.department("ops"), 0)]);
+    const names = (): (string | undefined)[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(t => texts(":scope > .department .department-name", t)[0]);
+    await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
+    const mine = names();
+
+    fixture.componentRef.setInput("instance", "o2");
+    await Wait.until(() => expect(names()).toContain("Ops"));
+    await Wait.until(() => expect(context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationLayoutRead)).map(t => t.parameters))
+      .toEqual([{ organizationId: "my-organization" }, { organizationId: "o2" }]));
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], []).toJson());
+    await settle();
+
+    expect([mine, names()]).toEqual([["Design", "Build"], ["Ops"]]);
+  });
+
   it("follows each change to the organization as it comes, the teammates placed under you as your direct reports, and none once no one is placed", async () => {
     await create();
-    context.emit(EventName.OrganizationChanged, new Organization([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u")],
-      [new TeammatePlacement("offline", OrganizationParent.department("build"), 0), new TeammatePlacement("alice", OrganizationParent.person, 0),
-        new TeammatePlacement("bob", OrganizationParent.person, 1), new TeammatePlacement("reviewer", OrganizationParent.person, 2)]).toJson());
+    const underYou = (ids: readonly string[]): TeammatePlacement[] => ids.map((t, i) => new TeammatePlacement(t, OrganizationParent.person, i));
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u")],
+      [new TeammatePlacement("offline", OrganizationParent.department("build"), 0), ...underYou(["alice", "bob", "reviewer"])]).toJson());
     await settle();
 
     expect([tree(), reports(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Alice", "Bob", "Code Reviewer"],
       ["Owner · 4 direct reports"]]);
 
-    context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], []).toJson());
     await settle();
 
     expect([tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([[], [], ["0 teammates in 0 departments"], ["Owner · 0 direct reports"]]);
@@ -177,7 +194,7 @@ describe("OrganizationViewComponent", () => {
 
   it("leaves a teammate with no placement out of the organization: no card, no direct report and no place in the headcount", async () => {
     await create(() => {
-      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u")],
+      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
           new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
     });
@@ -186,38 +203,38 @@ describe("OrganizationViewComponent", () => {
       .toEqual([["3 teammates in 1 department"], ["Code Reviewer"], false, ["Owner · 2 direct reports"]]);
   });
 
-  it("shows the teammates in no department under you as your direct reports, first, with no group of their own, so the headcount counts what the tree shows", async () => {
+  it("shows the teammates placed in no department under you as your direct reports, first, with no group of their own, and no teammate the organization doesn't hold, so the headcount and the To choices count what the tree shows", async () => {
     await create(() => {
-      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
         new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
-          new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
+          new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
     });
 
     expect([texts(".top .headcount"), reports(), tree(), all(".chart nol-teamrun-organization-card").length, texts(".owner .role"),
       all(".chart *").filter(t => t.children.length === 0 && t.textContent?.includes("No department")).length]).toEqual([
-      ["4 teammates in 2 departments"], ["Code Reviewer", "Offline"],
+      ["3 teammates in 2 departments"], ["Code Reviewer"],
       [["Design", "2", "2 idle", ["Alice"], ["Bob"], [], []], ["Build", "0", undefined, [], [], [], []]],
-      4, ["Owner · 3 direct reports"], 0
+      3, ["Owner · 2 direct reports"], 0
     ]);
     await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
     await Wait.until(() => expect(document.querySelectorAll(".nol-select-option").length).toBeGreaterThan(0));
     const offered = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
     await userEvent.keyboard("{Escape}");
     await settle();
-    expect(offered).toEqual(expect.arrayContaining(["Code Reviewer", "Offline"]));
-    expect(offered.some(t => t.includes("No department"))).toBe(false);
+    expect(offered).toEqual(expect.arrayContaining(["Code Reviewer"]));
+    expect([offered.some(t => t.includes("No department")), offered.includes("Offline")]).toEqual([false, false]);
 
     one(".top .edit").click();
     await settle();
 
-    expect([all(".chart .tree > .kids > .report > nol-teamrun-organization-card").length, ["Code Reviewer", "Offline"].map(t => all(".move-choice, .remove", card(t)).length)]).toEqual([2, [0, 0]]);
+    expect([all(".chart .tree > .kids > .report > nol-teamrun-organization-card").length, ["Code Reviewer"].map(t => all(".move-choice, .remove", card(t)).length)]).toEqual([1, [0]]);
   });
 
   it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you reaches them", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => {
-      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
         new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
           new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
@@ -264,7 +281,7 @@ describe("OrganizationViewComponent", () => {
     expect([shape(department("UI")), shape(department("Build"))])
       .toEqual([["UI", "1", "1 idle", ["Code Reviewer"], [], [], []], ["Build", "1", "1 stopped", [], [], [], ["1 member hidden"]]]);
 
-    organization = new Organization([new Department("top", "Top", OrganizationParent.person, null, 0, "c", "u"),
+    organization = SampleData.organizationOf([new Department("top", "Top", OrganizationParent.person, null, 0, "c", "u"),
       new Department("ui", "UI", OrganizationParent.department("top"), "reviewer", 0, "c", "u")],
       [new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
     context.emit(EventName.OrganizationChanged, organization.toJson());
@@ -272,7 +289,7 @@ describe("OrganizationViewComponent", () => {
 
     expect(shape(department("Top"))).toEqual(["Top", "0", undefined, [], [], [], ["1 member hidden"]]);
 
-    organization = new Organization([new Department("ui", "UI", OrganizationParent.person, null, 0, "c", "u")], []);
+    organization = SampleData.organizationOf([new Department("ui", "UI", OrganizationParent.person, null, 0, "c", "u")], []);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
@@ -284,7 +301,7 @@ describe("OrganizationViewComponent", () => {
     await create(context => context.answer(MethodName.OrganizationList, () => {
       if (fails)
         throw new Error("The database is locked.");
-      return sample.toJson();
+      return [sample.toJson()];
     }), false);
     await Wait.until(() => expect(texts(".failure .error")).toHaveLength(1));
 
@@ -640,7 +657,7 @@ describe("OrganizationViewComponent", () => {
     });
 
     it("asks whom to message while there is no department to talk to", async () => {
-      await create(context => context.answer(MethodName.OrganizationList, () => Organization.empty.toJson()), false);
+      await create(context => context.answer(MethodName.OrganizationList, () => [SampleData.organizationOf([], []).toJson()]), false);
 
       expect([heading(), texts("aside.messages .nol-teamrun-organization-empty")]).toEqual([[], ["Choose whom to message."]]);
     });
@@ -757,7 +774,7 @@ describe("OrganizationViewComponent", () => {
       await rename("Design", "Design");
       await rename("Design", " Craft ");
 
-      expect([shown, blank, asked]).toEqual([[0, "Design", "Department name"], "Design", [[MethodName.DepartmentUpdate, { departmentId: "design", name: "Craft" }]]]);
+      expect([shown, blank, asked]).toEqual([[0, "Design", "Department name"], "Design", [[MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", name: "Craft" }]]]);
     });
 
     it("chooses a department's leader among its members in name order, or none", async () => {
@@ -770,8 +787,8 @@ describe("OrganizationViewComponent", () => {
       await chooseAsync(leader(), "No leader");
 
       expect([options, asked]).toEqual([["No leader", "Alice", "Bob"], [
-        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: "bob" }],
-        [MethodName.DepartmentUpdate, { departmentId: "design", leaderId: null }]
+        [MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: "bob" }],
+        [MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: null }]
       ]]);
     });
 
@@ -790,7 +807,7 @@ describe("OrganizationViewComponent", () => {
       expect([remove("Build").getAttribute("aria-label"), nested, cancelled, top, asked]).toEqual(["Delete Build",
         ["Delete department", "Delete UI? Its departments and members move to Design.", "Delete"], 0,
         ["Delete department", "Delete Build? Its departments move up to report to you, and its members leave every department.", "Delete"],
-        [[MethodName.DepartmentDelete, { departmentId: "build" }]]]);
+        [[MethodName.DepartmentDelete, { organizationId: "my-organization", departmentId: "build" }]]]);
     });
 
     it("removes a member from its card once you confirm, moves it to another department, and shows neither once editing is done", async () => {
@@ -813,8 +830,8 @@ describe("OrganizationViewComponent", () => {
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
         ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
-      expect(asked).toEqual([[MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: null }],
-        [MethodName.DepartmentMemberSet, { teammateId: "bob", departmentId: "build" }]]);
+      expect(asked).toEqual([[MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }],
+        [MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: "build" }]]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {
@@ -849,19 +866,19 @@ describe("OrganizationViewComponent", () => {
       menuItem("Alice").click();
       await Wait.until(() => expect(asked).toHaveLength(1));
 
-      expect([offered, asked]).toEqual([["Alice", "Bob", "Code Reviewer"], [[MethodName.DepartmentMemberSet, { teammateId: "alice", departmentId: "build" }]]]);
+      expect([offered, asked]).toEqual([["Alice", "Bob", "Code Reviewer"], [[MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "alice", departmentId: "build" }]]]);
     });
 
     it("adds a department under you, even when there is none yet", async () => {
       await editAsync();
-      context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0)]).toJson());
       await settle();
 
       const empty = texts(".empty");
       one(".chart .add-department").click();
       await Wait.until(() => expect(asked).toHaveLength(1));
 
-      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]]]);
+      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]]]);
     });
 
     it("says why a change failed until it is dismissed", async () => {
@@ -999,7 +1016,7 @@ describe("OrganizationViewComponent", () => {
 
     it("lays a direct report out first in the row under you, its card at a department card's width and top, hung off the same line", async () => {
       await create(() => {
-        organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+        organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
           new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
           [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
             new TeammatePlacement("bob", OrganizationParent.department("design"), 1),

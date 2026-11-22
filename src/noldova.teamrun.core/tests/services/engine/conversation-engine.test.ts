@@ -520,7 +520,7 @@ export class ConversationEngineTests {
     const benProvider = await host.createProviderAsync("fake", "Ben");
     const grok = await host.teammates.createAsync(new TeammateCreateParams("Grok", null, grokProvider.id, Harness.Provider, null, null));
     const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, benProvider.id, Harness.Provider, null, null));
-    await host.organization.placeAsync(new TeammatePlaceParams(grok.id, OrganizationParent.person, 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(Resources.defaultOrganizationId, grok.id, OrganizationParent.person, 0));
     const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, grok.id));
 
     const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok @Ben look", null, null,
@@ -545,10 +545,10 @@ export class ConversationEngineTests {
     const memberProvider = await host.createProviderAsync("fake", "Member");
     const lead = await host.teammates.createAsync(new TeammateCreateParams("Lead", null, leadProvider.id, Harness.Provider, null, null));
     const member = await host.teammates.createAsync(new TeammateCreateParams("Member", null, memberProvider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(lead.id, design.id));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(member.id, design.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, lead.id));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, lead.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, member.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, lead.id));
     const leadChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, lead.id));
     const memberChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));
     const reopened = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));

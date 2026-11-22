@@ -36,5 +36,6 @@ export enum EventName {
   WindowReloadRequested = "WindowReloadRequested",
   WaitingMessagesChanged = "WaitingMessagesChanged",
   OrganizationChanged = "OrganizationChanged",
+  OrganizationRemoved = "OrganizationRemoved",
   OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
 }

@@ -11,8 +11,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat, OrganizationLayoutSaveParams,
-  OrganizationParent, Teammate, TeammateIdParams, TeammatePlacement
+  Conversation, Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent,
+  Teammate, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -39,7 +39,7 @@ describe("OrganizationFocusComponent", () => {
   let saves: OrganizationLayout[];
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
-  const sample = new Organization([
+  const sample = SampleData.organizationOf([
     new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
     new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
     new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
@@ -84,9 +84,9 @@ describe("OrganizationFocusComponent", () => {
     context = SampleData.createContext()
       .answer(MethodName.MessageListOpen, () => [waiting.toJson()])
       .answer(MethodName.OrganizationLayoutRead, () => ({ focus }))
-      .answer(MethodName.OrganizationList, () => sample.toJson())
+      .answer(MethodName.OrganizationList, () => [sample.toJson()])
       .answer(MethodName.OrganizationChatOpen, t => {
-        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        const teammateId = OrganizationChat.fromJson(t).teammateId;
         return new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
           null, new OrganizationChat("my-organization", teammateId)).toJson();
       })
@@ -137,7 +137,8 @@ describe("OrganizationFocusComponent", () => {
   it("outlines a teammate in no department as a top-level row of its own, first, counted under Organization, which focuses it under Organization alone", async () => {
     await create();
     fixture.componentRef.setInput("directReports", [carol]);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
+      sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
       ChatStoreService.of(context).teammates()));
     await settle();
 
@@ -249,9 +250,9 @@ describe("OrganizationFocusComponent", () => {
     one(".add-department").click();
 
     await Wait.until(() => expect(edits()).toEqual([
-      ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
+      ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
   });
 
@@ -279,7 +280,7 @@ describe("OrganizationFocusComponent", () => {
     expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
     await answer(".nol-teamrun-confirm");
 
-    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { organizationId: "my-organization", departmentId: "design" }]]));
   });
 
   it("talks under the canvas with whoever is focused: a teammate in their Organization chat, a group through a send to each", async () => {
@@ -346,7 +347,7 @@ describe("OrganizationFocusComponent", () => {
     await answer(".nol-teamrun-cancel");
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-confirm");
-    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { teammateId: "bob", departmentId: null }]]));
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "bob", departmentId: null }]]));
     expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["deleteRemove teammate"]], 0]);
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
@@ -367,7 +368,8 @@ describe("OrganizationFocusComponent", () => {
     it("sets a direct report's row right under Organization, its dot where a top-level department's icon sits, at a person's row height and spacing", async () => {
       await create();
       fixture.componentRef.setInput("directReports", [carol]);
-      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
+        sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
         ChatStoreService.of(context).teammates()));
       await settle();
       const dot = box(one(".dot", row("Carol")));

@@ -26,6 +26,7 @@ import {
   Conversation,
   ConversationIdParams,
   ConversationListParams,
+  type Department,
   DetailKind,
   Draft,
   DraftSaveParams,
@@ -37,6 +38,7 @@ import {
   MessageStatus,
   MethodName,
   ObservedSettings,
+  Organization,
   OrganizationLayoutSaveParams,
   Project,
   ProjectListing,
@@ -53,6 +55,8 @@ import {
   ProviderModel,
   ProviderModelList,
   RequestedSettings,
+  Resources as ProtocolResources,
+  type TeammatePlacement,
   WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
 
@@ -89,9 +93,13 @@ export class SampleData {
     SampleData.timestamp,
     null);
 
+  public static organizationOf(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
+    return new Organization(ProtocolResources.defaultOrganizationId, "My organization", null, 0, SampleData.timestamp, SampleData.timestamp, departments, placements);
+  }
+
   public static abilities(overrides: Partial<Record<ProviderAbility, AbilityCell>> = {}): ProviderAbilities {
-    const works = Object.fromEntries(Object.values(ProviderAbility).map(t => [t, AbilityCell.works(AbilitySource.Acp)])) as Record<ProviderAbility, AbilityCell>;
-    return new ProviderAbilities({ ...works, ...overrides });
+    return ProviderAbilities.fromJson({ [ProtocolResources.cellsField]: Object.fromEntries(Object.values(ProviderAbility)
+      .map(t => [t, (overrides[t] ?? AbilityCell.works(AbilitySource.Acp)).toJson()])) });
   }
 
   public static detail(sequence: number, kind: DetailKind, text: string): MessageDetail {

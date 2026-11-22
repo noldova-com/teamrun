@@ -432,6 +432,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   public async openOrganizationChatAsync(chat: OrganizationChat): Promise<Conversation> {
     const teammate = await this.requireTeammateAsync(chat.teammateId);
     const opening = await this.context.database.connection.runInTransactionAsync(async transaction => {
+      if (Object.isNull(await this.organization.findAsync(chat.organizationId, transaction)))
+        throw new ServiceException(ErrorCode.NotFound, Resources.formatOrganizationNotFound(chat.organizationId), [chat.organizationId]);
       const known = await this.conversations.findOrganizationChatAsync(chat, transaction);
       return Object.isNull(known) ? new OrganizationChatOpening(await this.conversations.createAsync(new ConversationCreateParams(null,
         Resources.formatOrganizationChatTitle(teammate.name), teammate.id), transaction, chat), true) : new OrganizationChatOpening(known, false);
@@ -461,8 +463,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const chat = conversation.organizationChat;
     if (Object.isNull(chat) || !Object.isNull(sender))
       return null;
-    const organization = await this.organization.listAsync(transaction);
-    if (Object.isNull(organization.parentOf(OrganizationParent.teammate(chat.teammateId))))
+    const organization = await this.organization.findAsync(chat.organizationId, transaction);
+    if (Object.isNull(organization) || Object.isNull(organization.parentOf(OrganizationParent.teammate(chat.teammateId))))
       return null;
     const teammates = await this.teammates.listAsync(transaction);
     const department = organization.departments.find(t => t.id === organization.departmentOf(chat.teammateId));
@@ -2024,6 +2026,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const folders = this.context.chatFolders;
     if (!Object.isNull(conversation.attachedFolder))
       return WorkFolder.attached(conversation.attachedFolder);
+    const folder = Object.isNull(conversation.organizationChat) || !Object.isNull(conversation.projectId) ? null
+      : (await this.organization.findAsync(conversation.organizationChat.organizationId, transaction))?.folder ?? null;
+    if (!Object.isNull(folder))
+      return WorkFolder.attached(folder);
     if (Object.isNull(conversation.projectId))
       return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
     const project = await this.projects.findAsync(conversation.projectId, transaction);

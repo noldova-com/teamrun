@@ -8,7 +8,7 @@
 
 import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
-import { JsonReader, type JsonObject } from "@noldova/context.json";
+import { JsonException, JsonReader, type JsonObject } from "@noldova/context.json";
 
 import { OrganizationNodeKind } from "../enums/organization-node-kind.js";
 import { OrganizationTargetKind } from "../enums/organization-target-kind.js";
@@ -20,14 +20,31 @@ import type { OrganizationTarget } from "./organization-target.js";
 import { TeammatePlacement } from "./teammate-placement.js";
 
 export class Organization {
-  public static readonly empty: Organization = new Organization([], []);
-
+  public readonly id: string;
+  public readonly name: string;
+  public readonly folder: string | null;
+  public readonly order: number;
+  public readonly createdAt: string;
+  public readonly updatedAt: string;
   public readonly departments: readonly Department[];
   public readonly placements: readonly TeammatePlacement[];
 
   public constructor(
+    id: string,
+    name: string,
+    folder: string | null,
+    order: number,
+    createdAt: string,
+    updatedAt: string,
     departments: readonly Department[],
     placements: readonly TeammatePlacement[]) {
+    ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
+    Organization.validateName(name);
+    Organization.validateFolder(folder);
+    if (!Number.isSafeInteger(order) || order < 0)
+      throw new ArgumentException(Resources.invalidOrganizationListOrder, Resources.orderField);
+    ArgumentException.throwIfNullOrWhitespace(createdAt, Resources.createdAtField);
+    ArgumentException.throwIfNullOrWhitespace(updatedAt, Resources.updatedAtField);
     const ids = new Set(departments.map(t => t.id));
     if (ids.size !== departments.length)
       throw new ArgumentException(Resources.duplicateDepartment, Resources.departmentsField);
@@ -35,6 +52,12 @@ export class Organization {
     if (placed.size !== placements.length)
       throw new ArgumentException(Resources.teammatePlacedTwice, Resources.placementsField);
 
+    this.id = id;
+    this.name = name;
+    this.folder = folder;
+    this.order = order;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
     this.departments = [...departments].sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
     this.placements = [...placements].sort((a, b) => a.order - b.order || a.teammateId.localeCompare(b.teammateId));
     if ([...departments.map(t => t.parent), ...placements.map(t => t.parent)].some(t => !this.has(t)))
@@ -136,18 +159,62 @@ export class Organization {
     }
   }
 
+  public withTree(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
+    return new Organization(this.id, this.name, this.folder, this.order, this.createdAt, this.updatedAt, departments, placements);
+  }
+
+  public static validateName(name: string): void {
+    if (!Organization.allowsName(name))
+      throw new ArgumentException(Resources.invalidOrganizationName, Resources.nameField);
+  }
+
+  public static readName(reader: JsonReader): string {
+    const name = reader.readString(Resources.nameField);
+    if (!Organization.allowsName(name))
+      throw new JsonException(Resources.invalidOrganizationName, `${reader.path}.${Resources.nameField}`);
+    return name;
+  }
+
+  public static validateFolder(folder: string | null): void {
+    if (!Object.isNull(folder))
+      ArgumentException.throwIfNullOrWhitespace(folder, Resources.folderField);
+  }
+
+  public static readFolder(reader: JsonReader): string | null {
+    const folder = reader.readNullableString(Resources.folderField);
+    if (!Object.isNull(folder) && folder.trim().length === 0)
+      throw new JsonException(Resources.blankOrganizationFolder, `${reader.path}.${Resources.folderField}`);
+    return folder;
+  }
+
   public static fromJson(value: unknown, path?: string): Organization {
     const reader = JsonReader.fromValue(value, path);
     return new Organization(
+      reader.readNonBlankString(Resources.idField),
+      Organization.readName(reader),
+      Organization.readFolder(reader),
+      reader.readInteger(Resources.orderField),
+      reader.readNonBlankString(Resources.createdAtField),
+      reader.readNonBlankString(Resources.updatedAtField),
       reader.readObjectArray(Resources.departmentsField).map(t => Department.fromJson(t.toJson(), t.path)),
       reader.readObjectArray(Resources.placementsField).map(t => TeammatePlacement.fromJson(t.toJson(), t.path)));
   }
 
   public toJson(): JsonObject {
     return {
+      [Resources.idField]: this.id,
+      [Resources.nameField]: this.name,
+      [Resources.folderField]: this.folder,
+      [Resources.orderField]: this.order,
+      [Resources.createdAtField]: this.createdAt,
+      [Resources.updatedAtField]: this.updatedAt,
       [Resources.departmentsField]: this.departments.map(t => t.toJson()),
       [Resources.placementsField]: this.placements.map(t => t.toJson())
     };
+  }
+
+  private static allowsName(name: string): boolean {
+    return Resources.departmentNamePattern.test(name) && name.trim().length > 0;
   }
 
   private has(parent: OrganizationParent): boolean {

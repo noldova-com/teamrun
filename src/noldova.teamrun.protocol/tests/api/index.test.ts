@@ -36,6 +36,9 @@ export class ProtocolApiTests {
     Assert.isDefined(api.DepartmentMoveParams);
     Assert.isDefined(api.DepartmentIdParams);
     Assert.isDefined(api.DepartmentMemberSetParams);
+    Assert.isDefined(api.OrganizationIdParams);
+    Assert.isDefined(api.OrganizationCreateParams);
+    Assert.isDefined(api.OrganizationUpdateParams);
     Assert.isDefined(api.TeammatePlaceParams);
     Assert.isDefined(api.OrganizationNodeKind);
     Assert.isDefined(api.OrganizationParent);

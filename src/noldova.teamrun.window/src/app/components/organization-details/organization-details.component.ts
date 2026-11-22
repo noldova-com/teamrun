@@ -62,7 +62,7 @@ export class OrganizationDetailsComponent {
         return Resources.formatOrganizationDetailsUsage((Resources.wholePercent - meter.percent) / Resources.wholePercent, meter.label);
     return Resources.organizationDetailsNoUsage;
   });
-  protected readonly worksIn: Signal<string> = computed(() => ConversationActions.placeOf(this.store, this.store.organizationChatOf(this.teammate().id))
+  protected readonly worksIn: Signal<string> = computed(() => ConversationActions.placeOf(this.store, this.store.organizationChatOf(this.organization.id(), this.teammate().id))
     ?? Resources.organizationOwnFolder);
   protected readonly last: Signal<OrganizationSaid | null> = computed(() => {
     const reply = this.statuses.lastReplyOf(this.teammate().id)();

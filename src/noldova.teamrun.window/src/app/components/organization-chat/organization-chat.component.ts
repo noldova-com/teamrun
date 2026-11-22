@@ -73,7 +73,7 @@ export class OrganizationChatComponent {
   protected readonly error: Signal<string | null> = this.organizations.actionError;
   protected readonly recipients: Signal<readonly string[]> = computed(() =>
     this.organizations.organization().recipientsOf(this.target(), this.store.teammates().map(t => t.id)));
-  protected readonly fanOutKey: Signal<string> = computed(() => Resources.formatOrganizationFanOutKey([...this.recipients()].sort()));
+  protected readonly fanOutKey: Signal<string> = computed(() => Resources.formatOrganizationFanOutKey(this.organizations.id(), [...this.recipients()].sort()));
   protected readonly fanOut: ComposerFanOut = new ComposerFanOut((text, settings, attachments, sources) => this.sendToEach(text, settings, attachments, sources));
   protected readonly rows: Signal<readonly OrganizationRecipientRow[]> = computed(() => this.recipients()
     .flatMap(id => this.store.teammates().filter(t => t.id === id)).map(teammate => {
@@ -112,21 +112,23 @@ export class OrganizationChatComponent {
   }
 
   private chatOf(teammateId: string): string | null {
-    return this.store.organizationChatOf(teammateId)?.id ?? this.opened().get(teammateId) ?? null;
+    const organizationId = this.organizations.id();
+    return this.store.organizationChatOf(organizationId, teammateId)?.id ?? this.opened().get(Resources.formatOrganizationChatKey(organizationId, teammateId)) ?? null;
   }
 
   private open(teammateId: string): Promise<string | null> {
-    const pending = this.opening.get(teammateId);
+    const key = Resources.formatOrganizationChatKey(this.organizations.id(), teammateId);
+    const pending = this.opening.get(key);
     if (!Object.isUndefined(pending))
       return pending;
     const opening = this.organizations.openOrganizationChat(teammateId).then(chat => {
-      this.opening.delete(teammateId);
+      this.opening.delete(key);
       if (Object.isNull(chat))
         return null;
-      this.opened.update(t => new Map(t).set(teammateId, chat.id));
+      this.opened.update(t => new Map(t).set(key, chat.id));
       return chat.id;
     });
-    this.opening.set(teammateId, opening);
+    this.opening.set(key, opening);
     return opening;
   }
 

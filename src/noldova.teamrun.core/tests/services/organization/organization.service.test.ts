@@ -12,7 +12,8 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity } from "@noldova/teamrun.core";
 import {
   type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
-  type Organization, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent, type Teammate, TeammateCreateParams, TeammatePlaceParams
+  type Organization, OrganizationCreateParams, OrganizationIdParams, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent,
+  OrganizationUpdateParams, Resources, type Teammate, TeammateCreateParams, TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -20,20 +21,22 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 
 @TestClass
 export class OrganizationServiceTests {
+  private static readonly mine: string = Resources.defaultOrganizationId;
+
   @TestMethod
   public async createsEachDepartmentLastAmongItsSiblingsUnderThePersonOrAParent(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const a = await OrganizationServiceTests.createAsync(host, "A");
     const b = await OrganizationServiceTests.createAsync(host, "B");
     const child = await OrganizationServiceTests.createAsync(host, "Child", a.id);
-    const organization = await host.organization.listAsync();
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual("A:0,B:1", OrganizationServiceTests.children(organization, null));
     Assert.areEqual("Child:0", OrganizationServiceTests.children(organization, a.id));
     Assert.areEqual(a.id, child.parentId);
     Assert.isNull(b.leaderId);
     Assert.areEqual("Insert,Insert,Insert", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Department));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams("Lost", OrganizationParent.department("gone"))));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Lost", OrganizationParent.department("gone"))));
   }
 
   @TestMethod
@@ -42,20 +45,20 @@ export class OrganizationServiceTests {
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
     const bob = await OrganizationServiceTests.teammateAsync(host, "Bob");
     const design = await OrganizationServiceTests.createAsync(host, "Design");
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, design.id));
 
-    const led = await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
-    const renamed = await host.organization.updateAsync(new DepartmentUpdateParams(design.id, "Product", undefined));
-    const cleared = await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, null));
+    const led = await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, design.id, undefined, ada.id));
+    const renamed = await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, design.id, "Product", undefined));
+    const cleared = await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, design.id, undefined, null));
 
     Assert.areEqual(ada.id, led.leaderId);
     Assert.areEqual(`Product,${ada.id}`, `${renamed.name},${renamed.leaderId}`);
     Assert.isNull(cleared.leaderId);
-    Assert.isNull((await host.organization.listAsync()).departments[0]?.leaderId);
-    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, bob.id));
-    Assert.areEqual(`${design.id}:0,${design.id}:1`, OrganizationServiceTests.places(await host.organization.listAsync(), ada, bob));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, "gone")));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateAsync(new DepartmentUpdateParams("gone", "X", undefined)));
+    Assert.isNull((await OrganizationServiceTests.mineAsync(host)).departments[0]?.leaderId);
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, design.id, undefined, bob.id));
+    Assert.areEqual(`${design.id}:0,${design.id}:1`, OrganizationServiceTests.places(await OrganizationServiceTests.mineAsync(host), ada, bob));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, design.id, undefined, "gone")));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, "gone", "X", undefined)));
   }
 
   @TestMethod
@@ -66,12 +69,12 @@ export class OrganizationServiceTests {
     await OrganizationServiceTests.createAsync(host, "C");
     const d = await OrganizationServiceTests.createAsync(host, "D");
 
-    await host.organization.moveAsync(new DepartmentMoveParams(b.id, OrganizationParent.person, 1));
-    const kept = OrganizationServiceTests.children(await host.organization.listAsync(), null);
-    await host.organization.moveAsync(new DepartmentMoveParams(d.id, OrganizationParent.person, 0));
-    const first = OrganizationServiceTests.children(await host.organization.listAsync(), null);
-    const moved = await host.organization.moveAsync(new DepartmentMoveParams(a.id, OrganizationParent.person, 99));
-    const last = OrganizationServiceTests.children(await host.organization.listAsync(), null);
+    await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, b.id, OrganizationParent.person, 1));
+    const kept = OrganizationServiceTests.children(await OrganizationServiceTests.mineAsync(host), null);
+    await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, d.id, OrganizationParent.person, 0));
+    const first = OrganizationServiceTests.children(await OrganizationServiceTests.mineAsync(host), null);
+    const moved = await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, a.id, OrganizationParent.person, 99));
+    const last = OrganizationServiceTests.children(await OrganizationServiceTests.mineAsync(host), null);
 
     Assert.areEqual("A:0,B:1,C:2,D:3", kept);
     Assert.areEqual("D:0,A:1,B:2,C:3", first);
@@ -88,14 +91,14 @@ export class OrganizationServiceTests {
     const c = await OrganizationServiceTests.createAsync(host, "C");
     await OrganizationServiceTests.createAsync(host, "Kept", c.id);
 
-    const moved = await host.organization.moveAsync(new DepartmentMoveParams(first.id, OrganizationParent.department(c.id), 0));
-    const organization = await host.organization.listAsync();
-    await host.organization.moveAsync(new DepartmentMoveParams(first.id, OrganizationParent.person, 1));
+    const moved = await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, first.id, OrganizationParent.department(c.id), 0));
+    const organization = await OrganizationServiceTests.mineAsync(host);
+    await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, first.id, OrganizationParent.person, 1));
 
     Assert.areEqual(`${c.id}:0`, `${moved.parentId}:${moved.order}`);
     Assert.areEqual("Second:0", OrganizationServiceTests.children(organization, a.id));
     Assert.areEqual("First:0,Kept:1", OrganizationServiceTests.children(organization, c.id));
-    Assert.areEqual("A:0,First:1,C:2", OrganizationServiceTests.children(await host.organization.listAsync(), null));
+    Assert.areEqual("A:0,First:1,C:2", OrganizationServiceTests.children(await OrganizationServiceTests.mineAsync(host), null));
   }
 
   @TestMethod
@@ -105,11 +108,11 @@ export class OrganizationServiceTests {
     const middle = await OrganizationServiceTests.createAsync(host, "Middle", top.id);
     const bottom = await OrganizationServiceTests.createAsync(host, "Bottom", middle.id);
 
-    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(top.id, OrganizationParent.department(bottom.id), 0)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(top.id, OrganizationParent.department(middle.id), 0)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams(top.id, OrganizationParent.department("gone"), 0)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams("gone", OrganizationParent.person, 0)));
-    Assert.areEqual("Top:0", OrganizationServiceTests.children(await host.organization.listAsync(), null));
+    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, top.id, OrganizationParent.department(bottom.id), 0)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, top.id, OrganizationParent.department(middle.id), 0)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, top.id, OrganizationParent.department("gone"), 0)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, "gone", OrganizationParent.person, 0)));
+    Assert.areEqual("Top:0", OrganizationServiceTests.children(await OrganizationServiceTests.mineAsync(host), null));
   }
 
   @TestMethod
@@ -123,21 +126,21 @@ export class OrganizationServiceTests {
     await OrganizationServiceTests.createAsync(host, "After", root.id);
     await OrganizationServiceTests.createAsync(host, "X", gone.id);
     await OrganizationServiceTests.createAsync(host, "Y", gone.id);
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(cy.id, root.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(root.id, undefined, cy.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, cy.id, root.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, root.id, undefined, cy.id));
     for (const teammate of [ada, bob])
-      await host.organization.setMemberAsync(new DepartmentMemberSetParams(teammate.id, gone.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(gone.id, undefined, ada.id));
+      await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, teammate.id, gone.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, gone.id, undefined, ada.id));
 
-    await host.organization.deleteAsync(new DepartmentIdParams(gone.id));
-    const organization = await host.organization.listAsync();
+    await host.organization.deleteAsync(new DepartmentIdParams(OrganizationServiceTests.mine, gone.id));
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual("X:0,Y:1,After:2", OrganizationServiceTests.children(organization, root.id));
     Assert.areEqual([root.id, root.id, root.id].join(","), [ada, bob, cy].map(t => organization.departmentOf(t.id)).join(","));
     Assert.areEqual(cy.id, organization.departments.find(t => t.id === root.id)?.leaderId);
     Assert.isFalse(organization.departments.some(t => t.id === gone.id));
     Assert.areEqual(ChangeOperation.Delete, (await host.context.database.changeFeed.readAfterAsync(0)).filter(t => t.entityId === gone.id).at(-1)?.operation);
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.deleteAsync(new DepartmentIdParams(gone.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.deleteAsync(new DepartmentIdParams(OrganizationServiceTests.mine, gone.id)));
   }
 
   @TestMethod
@@ -146,10 +149,10 @@ export class OrganizationServiceTests {
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
     const top = await OrganizationServiceTests.createAsync(host, "Top");
     await OrganizationServiceTests.createAsync(host, "Inner", top.id);
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, top.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, top.id));
 
-    await host.organization.deleteAsync(new DepartmentIdParams(top.id));
-    const organization = await host.organization.listAsync();
+    await host.organization.deleteAsync(new DepartmentIdParams(OrganizationServiceTests.mine, top.id));
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.isNull(organization.departmentOf(ada.id));
     Assert.areEqual(0, organization.members.length);
@@ -163,16 +166,16 @@ export class OrganizationServiceTests {
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
     const parent = await OrganizationServiceTests.createAsync(host, "Parent");
     const inner = await OrganizationServiceTests.createAsync(host, "Inner", parent.id);
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, inner.id));
-    const before = await host.organization.listAsync();
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, inner.id));
+    const before = await OrganizationServiceTests.mineAsync(host);
 
-    const listing = host.organization.listAsync();
-    const deleting = host.organization.deleteAsync(new DepartmentIdParams(inner.id));
+    const listing = OrganizationServiceTests.mineAsync(host);
+    const deleting = host.organization.deleteAsync(new DepartmentIdParams(OrganizationServiceTests.mine, inner.id));
     const listed = await listing;
     await deleting;
 
     Assert.areEqual(JSON.stringify(before.toJson()), JSON.stringify(listed.toJson()));
-    Assert.areEqual(parent.id, (await host.organization.listAsync()).departmentOf(ada.id));
+    Assert.areEqual(parent.id, (await OrganizationServiceTests.mineAsync(host)).departmentOf(ada.id));
   }
 
   @TestMethod
@@ -181,21 +184,23 @@ export class OrganizationServiceTests {
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
     const a = await OrganizationServiceTests.createAsync(host, "A");
     const b = await OrganizationServiceTests.createAsync(host, "B");
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, null));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, a.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(a.id, undefined, ada.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, a.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, a.id, undefined, ada.id));
 
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, b.id));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, b.id));
-    const moved = await host.organization.listAsync();
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, null));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, b.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, b.id));
+    const moved = await OrganizationServiceTests.mineAsync(host);
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, null));
+    const left = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual(b.id, moved.departmentOf(ada.id));
     Assert.isNull(moved.departments.find(t => t.id === a.id)?.leaderId);
-    Assert.areEqual("Person:0", OrganizationServiceTests.parentOf(await host.organization.listAsync(), ada));
+    Assert.isNull(left.departmentOf(ada.id));
+    Assert.areEqual("Person:0", OrganizationServiceTests.parentOf(left, ada));
     Assert.areEqual("Insert,Update,Update,Update", await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.setMemberAsync(new DepartmentMemberSetParams("gone", a.id)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, "gone")));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, "gone", a.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, "gone")));
   }
 
   @TestMethod
@@ -204,15 +209,15 @@ export class OrganizationServiceTests {
     const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
     const bob = await OrganizationServiceTests.teammateAsync(host, "Bob");
     const a = await OrganizationServiceTests.createAsync(host, "A");
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, a.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(a.id, undefined, ada.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, a.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, a.id, undefined, ada.id));
 
     const removed = await host.context.database.connection.runInTransactionAsync(t => host.organization.removeTeammateAsync(ada.id, t));
     const outside = await host.context.database.connection.runInTransactionAsync(t => host.organization.removeTeammateAsync(bob.id, t));
-    const organization = await host.organization.listAsync();
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
-    Assert.isTrue(removed);
-    Assert.isFalse(outside);
+    Assert.areEqual(OrganizationServiceTests.mine, removed.join(","));
+    Assert.areEqual(0, outside.length);
     Assert.areEqual(0, organization.members.length);
     Assert.isNull(organization.departments[0]?.leaderId);
   }
@@ -225,25 +230,25 @@ export class OrganizationServiceTests {
     const cy = await OrganizationServiceTests.teammateAsync(host, "Cy");
     const ops = await OrganizationServiceTests.createAsync(host, "Ops");
     for (const teammate of [ada, bob])
-      await host.organization.setMemberAsync(new DepartmentMemberSetParams(teammate.id, ops.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(ops.id, undefined, ada.id));
+      await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, teammate.id, ops.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, ops.id, undefined, ada.id));
 
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person, ada.id));
-    const under = await host.organization.createAsync(new DepartmentCreateParams("Under Bob", OrganizationParent.teammate(bob.id)));
-    const organization = await host.organization.listAsync();
+    const design = await host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Design", OrganizationParent.person, ada.id));
+    const under = await host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Under Bob", OrganizationParent.teammate(bob.id)));
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual(`${ada.id},${design.id}:0,${ops.id}:0`, `${design.leaderId},${OrganizationServiceTests.places(organization, ada, bob)}`);
     Assert.isNull(organization.departments.find(t => t.id === ops.id)?.leaderId);
     Assert.areEqual(`${OrganizationNodeKind.Teammate}:${bob.id}`, `${under.parent.kind}:${under.parent.id}`);
     Assert.areEqual("Under Bob:0", OrganizationServiceTests.children(organization, OrganizationParent.teammate(bob.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams,
-      () => host.organization.createAsync(new DepartmentCreateParams("Bob's", OrganizationParent.department(under.id), bob.id)));
+      () => host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Bob's", OrganizationParent.department(under.id), bob.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams,
-      () => host.organization.createAsync(new DepartmentCreateParams("Bob's", OrganizationParent.teammate(bob.id), bob.id)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.updateAsync(new DepartmentUpdateParams(under.id, undefined, bob.id)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams("X", OrganizationParent.person, "gone")));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams("X", OrganizationParent.teammate(cy.id))));
-    Assert.areEqual(3, (await host.organization.listAsync()).departments.length);
+      () => host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Bob's", OrganizationParent.teammate(bob.id), bob.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, under.id, undefined, bob.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "X", OrganizationParent.person, "gone")));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "X", OrganizationParent.teammate(cy.id))));
+    Assert.areEqual(3, (await OrganizationServiceTests.mineAsync(host)).departments.length);
   }
 
   @TestMethod
@@ -255,17 +260,17 @@ export class OrganizationServiceTests {
     const cy = await OrganizationServiceTests.teammateAsync(host, "Cy");
     const dee = await OrganizationServiceTests.teammateAsync(host, "Dee");
     const place = (teammate: Teammate, parent: OrganizationParent | null, order: number): Promise<void> =>
-      host.organization.placeAsync(new TeammatePlaceParams(teammate.id, parent, order));
+      host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, teammate.id, parent, order));
     const underBoss = OrganizationParent.teammate(boss.id);
 
     await place(boss, OrganizationParent.person, 0);
     await place(ann, underBoss, 0);
     await place(kid, underBoss, 0);
     await place(cy, underBoss, 9);
-    const placed = await host.organization.listAsync();
+    const placed = await OrganizationServiceTests.mineAsync(host);
     await place(ann, OrganizationParent.person, 0);
     await place(cy, underBoss, 0);
-    const moved = await host.organization.listAsync();
+    const moved = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual(`${boss.id}:0,${boss.id}:1,${boss.id}:2`, OrganizationServiceTests.places(placed, kid, ann, cy));
     Assert.areEqual(`:0,:1,${boss.id}:1,${boss.id}:0`, OrganizationServiceTests.places(moved, ann, boss, kid, cy));
@@ -274,8 +279,8 @@ export class OrganizationServiceTests {
     await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => place(boss, OrganizationParent.teammate(kid.id), 0));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => place(boss, OrganizationParent.department("gone"), 0));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => place(boss, OrganizationParent.teammate(dee.id), 0));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.placeAsync(new TeammatePlaceParams("gone", OrganizationParent.person, 0)));
-    Assert.areEqual(JSON.stringify(moved.toJson()), JSON.stringify((await host.organization.listAsync()).toJson()));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, "gone", OrganizationParent.person, 0)));
+    Assert.areEqual(JSON.stringify(moved.toJson()), JSON.stringify((await OrganizationServiceTests.mineAsync(host)).toJson()));
   }
 
   @TestMethod
@@ -286,15 +291,15 @@ export class OrganizationServiceTests {
     const kid = await OrganizationServiceTests.teammateAsync(host, "Kid");
     const cy = await OrganizationServiceTests.teammateAsync(host, "Cy");
     const ops = await OrganizationServiceTests.createAsync(host, "Ops");
-    await host.organization.placeAsync(new TeammatePlaceParams(boss.id, OrganizationParent.department(ops.id), 0));
-    await host.organization.placeAsync(new TeammatePlaceParams(kid.id, OrganizationParent.department(ops.id), 1));
-    await host.organization.placeAsync(new TeammatePlaceParams(ann.id, OrganizationParent.teammate(boss.id), 0));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.teammate(boss.id), cy.id));
-    await host.organization.updateAsync(new DepartmentUpdateParams(ops.id, undefined, boss.id));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, OrganizationParent.department(ops.id), 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, kid.id, OrganizationParent.department(ops.id), 1));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, ann.id, OrganizationParent.teammate(boss.id), 0));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Design", OrganizationParent.teammate(boss.id), cy.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(OrganizationServiceTests.mine, ops.id, undefined, boss.id));
 
-    await host.organization.placeAsync(new TeammatePlaceParams(boss.id, null, 0));
-    await host.organization.placeAsync(new TeammatePlaceParams(boss.id, null, 0));
-    const organization = await host.organization.listAsync();
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, null, 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, null, 0));
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual(`:,${ops.id}:0,${ops.id}:1,${design.id}:0`, OrganizationServiceTests.places(organization, boss, kid, ann, cy));
     Assert.areEqual(`Design:0`, OrganizationServiceTests.children(organization, OrganizationParent.department(ops.id)));
@@ -310,17 +315,17 @@ export class OrganizationServiceTests {
     const kid = await OrganizationServiceTests.teammateAsync(host, "Kid");
     const dee = await OrganizationServiceTests.teammateAsync(host, "Dee");
     const design = await OrganizationServiceTests.createAsync(host, "Design");
-    await host.organization.placeAsync(new TeammatePlaceParams(boss.id, OrganizationParent.person, 0));
-    await host.organization.setMemberAsync(new DepartmentMemberSetParams(kid.id, design.id));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, OrganizationParent.person, 0));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, kid.id, design.id));
 
-    const moved = await host.organization.moveAsync(new DepartmentMoveParams(design.id, OrganizationParent.teammate(boss.id), 0));
-    const organization = await host.organization.listAsync();
+    const moved = await host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, design.id, OrganizationParent.teammate(boss.id), 0));
+    const organization = await OrganizationServiceTests.mineAsync(host);
 
     Assert.areEqual(`${boss.id},`, `${moved.parent.id},${moved.parentId ?? ""}`);
     Assert.areEqual("Design:0", OrganizationServiceTests.children(organization, OrganizationParent.teammate(boss.id)));
     Assert.areEqual(boss.id, organization.managerOf(kid.id));
-    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(design.id, OrganizationParent.teammate(kid.id), 0)));
-    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams(design.id, OrganizationParent.teammate(dee.id), 0)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.InvalidParams, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, design.id, OrganizationParent.teammate(kid.id), 0)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.moveAsync(new DepartmentMoveParams(OrganizationServiceTests.mine, design.id, OrganizationParent.teammate(dee.id), 0)));
   }
 
   @TestMethod
@@ -329,16 +334,100 @@ export class OrganizationServiceTests {
     const first = { collapsed: ["d1"], cardsShow: { status: true } };
     const second = { collapsed: [], cards: { t1: { usage: true } } };
 
-    Assert.isNull(await host.organization.readLayoutAsync());
-    Assert.areEqual(JSON.stringify(first), JSON.stringify(await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(first))));
-    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(second));
+    Assert.isNull(await host.organization.readLayoutAsync(new OrganizationIdParams(OrganizationServiceTests.mine)));
+    Assert.areEqual(JSON.stringify(first), JSON.stringify(await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(OrganizationServiceTests.mine, first))));
+    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(OrganizationServiceTests.mine, second));
 
-    Assert.areEqual(JSON.stringify(second), JSON.stringify(await host.organization.readLayoutAsync()));
+    Assert.areEqual(JSON.stringify(second), JSON.stringify(await host.organization.readLayoutAsync(new OrganizationIdParams(OrganizationServiceTests.mine))));
     Assert.areEqual("Insert,Update", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
   }
 
+  @TestMethod
+  public async listsMyOrganizationFirstAndCreatesRenamesAndDeletesOthers(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", "/work/studio"));
+    const lab = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Lab", null));
+    const renamed = await host.organization.updateOrganizationAsync(new OrganizationUpdateParams(studio.id, "Design studio", null));
+
+    Assert.areEqual("My organization:0,Design studio:1,Lab:2", (await host.organization.listAsync()).map(t => `${t.name}:${t.order}`).join(","));
+    Assert.areEqual("Design studio|null|0|0", [renamed.name, String(renamed.folder), renamed.departments.length, renamed.placements.length].join("|"));
+    Assert.areEqual("/work/studio", studio.folder);
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(lab.id));
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(OrganizationServiceTests.mine));
+    Assert.areEqual("Design studio", (await host.organization.listAsync()).map(t => t.name).join(","));
+    Assert.isNull(await host.organization.findAsync(lab.id));
+    Assert.areEqual("Insert,Insert,Update,Delete,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Organization));
+    await OrganizationServiceTests.failsAsync(ErrorCode.Conflict, () => host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.deleteOrganizationAsync(new OrganizationIdParams(lab.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateOrganizationAsync(new OrganizationUpdateParams(lab.id, "Lab", null)));
+  }
+
+  @TestMethod
+  public async keepsEachOrganizationsTreeApartAndPlacesATeammateOnceInEach(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+    const design = await OrganizationServiceTests.createAsync(host, "Design");
+    const art = await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(studio.id, ada.id, art.id));
+    const mine = await OrganizationServiceTests.mineAsync(host);
+    const other = await host.organization.findAsync(studio.id);
+
+    Assert.areEqual(`Design|${design.id}`, `${mine.departments.map(t => t.name).join(",")}|${mine.departmentOf(ada.id) ?? ""}`);
+    Assert.areEqual(`Art|${art.id}`, `${other?.departments.map(t => t.name).join(",") ?? ""}|${other?.departmentOf(ada.id) ?? ""}`);
+    for (const action of [
+      () => host.organization.setMemberAsync(new DepartmentMemberSetParams(studio.id, ada.id, design.id)),
+      () => host.organization.updateAsync(new DepartmentUpdateParams(studio.id, design.id, "X", undefined)),
+      () => host.organization.moveAsync(new DepartmentMoveParams(studio.id, design.id, OrganizationParent.person, 0)),
+      () => host.organization.deleteAsync(new DepartmentIdParams(studio.id, design.id)),
+      () => host.organization.createAsync(new DepartmentCreateParams(studio.id, "Lost", OrganizationParent.department(design.id))),
+      () => host.organization.placeAsync(new TeammatePlaceParams("gone", ada.id, OrganizationParent.person, 0))])
+      await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, action);
+    const removed = await host.context.database.connection.runInTransactionAsync(t => host.organization.removeTeammateAsync(ada.id, t));
+    Assert.areEqual(`${OrganizationServiceTests.mine},${studio.id}`, removed.join(","));
+    Assert.areEqual(0, (await host.organization.listAsync()).reduce((count, t) => count + t.placements.length, 0));
+  }
+
+  @TestMethod
+  public async deletesAnOrganizationWithItsTreeAndLayoutAndKeepsItsTeammates(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+    const art = await host.organization.createAsync(new DepartmentCreateParams(studio.id, "Art", OrganizationParent.person, ada.id));
+    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(studio.id, { collapsed: [art.id] }));
+    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(OrganizationServiceTests.mine, { collapsed: [] }));
+
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id));
+
+    Assert.areEqual("Ada", (await host.teammates.listAsync()).map(t => t.name).join(","));
+    Assert.areEqual('{"collapsed":[]}', JSON.stringify(await host.organization.readLayoutAsync(new OrganizationIdParams(OrganizationServiceTests.mine))));
+    Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Department));
+    Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement));
+    Assert.areEqual("Insert,Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.readLayoutAsync(new OrganizationIdParams(studio.id)));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(studio.id, {})));
+  }
+
+  @TestMethod
+  public async deletesAnOrganizationWithNoLayoutKept(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id));
+
+    Assert.areEqual("", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
+  }
+
+  private static async mineAsync(host: CoreHost): Promise<Organization> {
+    const organization = await host.organization.findAsync(OrganizationServiceTests.mine);
+    if (Object.isNull(organization))
+      throw new Error(OrganizationServiceTests.mine);
+    return organization;
+  }
+
   private static async createAsync(host: CoreHost, name: string, parentId: string | null = null): Promise<Department> {
-    return await host.organization.createAsync(new DepartmentCreateParams(name, OrganizationParent.departmentOrPerson(parentId)));
+    return await host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, name, OrganizationParent.departmentOrPerson(parentId)));
   }
 
   private static parentOf(organization: Organization, teammate: Teammate): string {

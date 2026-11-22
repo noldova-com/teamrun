@@ -100,7 +100,7 @@ export class OrganizationCardComponent {
 
   protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
 
-  protected readonly chat: Signal<Conversation | null> = computed(() => this.store.organizationChatOf(this.teammate().id));
+  protected readonly chat: Signal<Conversation | null> = computed(() => this.store.organizationChatOf(this.organization.id(), this.teammate().id));
   protected readonly worksIn: Signal<string> = computed(() =>
     Resources.formatOrganizationWorksIn(this.teammate().name, ConversationActions.placeOf(this.store, this.chat()) ?? Resources.organizationOwnFolderInText));
   protected readonly inProject: Signal<boolean> = computed(() => !Object.isNull(this.chat()?.projectId ?? null));

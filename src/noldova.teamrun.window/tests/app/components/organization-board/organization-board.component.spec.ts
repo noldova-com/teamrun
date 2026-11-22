@@ -11,7 +11,7 @@ import { By } from "@angular/platform-browser";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationParent, OrganizationTarget, Teammate,
+  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, OrganizationParent, OrganizationTarget, Teammate,
   TeammateLastReply, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular";
@@ -39,7 +39,7 @@ describe("OrganizationBoardComponent", () => {
   let clock: FakeClock;
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
-  const sample = new Organization([
+  const sample = SampleData.organizationOf([
     new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
     new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
     new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
@@ -131,7 +131,8 @@ describe("OrganizationBoardComponent", () => {
   it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and no move or remove while editing", async () => {
     await create();
     fixture.componentRef.setInput("directReports", [carol]);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
+      sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
       ChatStoreService.of(context).teammates()));
     await settle();
 
@@ -235,9 +236,9 @@ describe("OrganizationBoardComponent", () => {
     one(".add-department").click();
 
     await Wait.until(() => expect(edits()).toEqual([
-      ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
-      ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
+      ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });
@@ -274,7 +275,7 @@ describe("OrganizationBoardComponent", () => {
     expect(dialog()).toContain("Delete Design? Its departments move up to report to you, and its members leave every department.");
     await answer(".nol-teamrun-confirm");
 
-    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { departmentId: "design" }]]));
+    await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentDelete", { organizationId: "my-organization", departmentId: "design" }]]));
   });
 
   describe.each([
@@ -293,7 +294,8 @@ describe("OrganizationBoardComponent", () => {
     it("draws a direct report in no department on the leaders' line, after them, at a leader's width, inset and top", async () => {
       await create();
       fixture.componentRef.setInput("directReports", [carol]);
-      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
+        sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
         ChatStoreService.of(context).teammates()));
       await settle();
       const leader = box(one(".leaders > .leader:nth-child(2)"));

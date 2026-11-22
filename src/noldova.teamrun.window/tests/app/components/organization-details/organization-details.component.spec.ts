@@ -11,8 +11,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, ConversationListParams, Department, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat, OrganizationParent,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateLastReply, TeammatePlacement
+  Conversation, ConversationListParams, Department, EventName, Message, MessageAuthor, MessageStatus, MethodName, OrganizationChat, OrganizationParent, PlanUsage,
+  PlanWindow, PlanWindowName, TeammateLastReply, TeammatePlacement
 } from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -37,7 +37,7 @@ describe("OrganizationDetailsComponent", () => {
   let fixture: ComponentFixture<OrganizationViewComponent>;
   let clock: FakeClock;
 
-  const organization = new Organization([
+  const organization = SampleData.organizationOf([
     new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
     new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
     new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u"),
@@ -95,7 +95,7 @@ describe("OrganizationDetailsComponent", () => {
     clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
     context = SampleData.createContext()
-      .answer(MethodName.OrganizationList, () => organization.toJson())
+      .answer(MethodName.OrganizationList, () => [organization.toJson()])
       .answer(MethodName.OrganizationLayoutSave, () => null);
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
@@ -159,8 +159,8 @@ describe("OrganizationDetailsComponent", () => {
   });
 
   it("says a teammate in no department, a card under you in the tree, reports to you", async () => {
-    await create(context => context.answer(MethodName.OrganizationList, () => new Organization(organization.departments,
-      [...organization.placements.filter(t => t.teammateId !== "offline"), new TeammatePlacement("offline", OrganizationParent.person, 0)]).toJson()));
+    await create(context => context.answer(MethodName.OrganizationList, () => [SampleData.organizationOf(organization.departments,
+      organization.placements.map(t => t.teammateId === "offline" ? new TeammatePlacement("offline", OrganizationParent.person, 0) : t)).toJson()]));
 
     await focus("Offline");
 

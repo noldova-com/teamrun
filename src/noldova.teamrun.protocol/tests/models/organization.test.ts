@@ -15,7 +15,7 @@ import { Department, Organization, OrganizationNodeKind, OrganizationParent, Org
 export class OrganizationTests {
   @TestMethod
   public preservesItsFieldsAndRejectsMalformedValues(): void {
-    const value = new Organization([OrganizationTests.department("d1", null, 0), OrganizationTests.department("d2", "d1", 0)],
+    const value = OrganizationTests.of([OrganizationTests.department("d1", null, 0), OrganizationTests.department("d2", "d1", 0)],
       [new TeammatePlacement("t1", OrganizationParent.department("d2"), 0), new TeammatePlacement("t2", OrganizationParent.teammate("t1"), 0)]);
     const json = value.toJson();
 
@@ -25,13 +25,13 @@ export class OrganizationTests {
         JsonException).path);
     Assert.areEqual("$.input.placements.0.teammateId",
       Assert.throws(() => Organization.fromJson({ ...json, placements: [{ parent: OrganizationParent.person.toJson(), order: 0 }] }, "$.input"), JsonException).path);
-    Assert.areEqual("$.input.placements", Assert.throws(() => Organization.fromJson({ departments: [] }, "$.input"), JsonException).path);
-    Assert.areEqual(0, Organization.empty.departments.length + Organization.empty.placements.length);
+    Assert.areEqual("$.input.placements", Assert.throws(() => Organization.fromJson({ ...json, placements: undefined }, "$.input"), JsonException).path);
+    Assert.areEqual(0, OrganizationTests.of([], []).departments.length + OrganizationTests.of([], []).placements.length);
   }
 
   @TestMethod
   public listsDepartmentsByOrderThenByCreation(): void {
-    const organization = new Organization([OrganizationTests.department("late", null, 1, "2"), OrganizationTests.department("b", null, 0, "3"),
+    const organization = OrganizationTests.of([OrganizationTests.department("late", null, 1, "2"), OrganizationTests.department("b", null, 0, "3"),
       OrganizationTests.department("a", null, 1, "1"), OrganizationTests.department("child", "a", 0, "0")], []);
 
     Assert.areEqual("b,a,late", organization.departmentsUnder(OrganizationParent.person).map(t => t.id).join(","));
@@ -80,14 +80,14 @@ export class OrganizationTests {
   }
 
   @TestMethod
-  public listsTheTeammatesNotYetPlaced(): void {
+  public listsTheTeammatesPlacedAndNotYetPlaced(): void {
     Assert.areEqual("new,other", OrganizationTests.tree().unplaced(["ann", "new", "boss", "other"]).join(","));
   }
 
   @TestMethod
   public countsDepartmentLeadersAndTeammatesWithSomeoneUnderThemAsLeaders(): void {
     Assert.areEqual("boss2,lead,boss", OrganizationTests.tree().leaders.join(","));
-    Assert.areEqual("", Organization.empty.leaders.join(","));
+    Assert.areEqual("", OrganizationTests.of([], []).leaders.join(","));
   }
 
   @TestMethod
@@ -95,7 +95,7 @@ export class OrganizationTests {
     const design = new Department("design", "Design", OrganizationParent.person, "lead", 0, "c", "u");
     const web = new Department("web", "Web", OrganizationParent.department("design"), "web-lead", 0, "c", "u");
     const docs = new Department("docs", "Docs", OrganizationParent.department("web"), null, 1, "c", "u");
-    const organization = new Organization([design, web, docs], [new TeammatePlacement("lead", OrganizationParent.department("design"), 0),
+    const organization = OrganizationTests.of([design, web, docs], [new TeammatePlacement("lead", OrganizationParent.department("design"), 0),
       new TeammatePlacement("web-lead", OrganizationParent.department("web"), 0),
       new TeammatePlacement("dev", OrganizationParent.department("web"), 1), new TeammatePlacement("writer", OrganizationParent.department("docs"), 0),
       new TeammatePlacement("intern", OrganizationParent.teammate("dev"), 0)]);
@@ -127,7 +127,7 @@ export class OrganizationTests {
     const design = new Department("design", "Design", OrganizationParent.person, "lead", 1, "c", "u");
     const web = new Department("web", "Web", OrganizationParent.department("design"), null, 0, "c", "u");
     const ops = new Department("ops", "Ops", OrganizationParent.person, "boss", 0, "c", "u");
-    const organization = new Organization([design, web, ops],
+    const organization = OrganizationTests.of([design, web, ops],
       [new TeammatePlacement("ann", OrganizationParent.department("design"), 0), new TeammatePlacement("lead", OrganizationParent.department("design"), 1),
         new TeammatePlacement("gone", OrganizationParent.department("design"), 2),
         new TeammatePlacement("kid", OrganizationParent.department("web"), 0), new TeammatePlacement("boss", OrganizationParent.department("ops"), 0),
@@ -139,7 +139,7 @@ export class OrganizationTests {
     Assert.areEqual("", organization.recipientsOf(OrganizationTarget.department("missing"), teammates).join(","));
     Assert.areEqual("boss,lead,ann,sol", organization.recipientsOf(OrganizationTarget.leaders, teammates).join(","));
     Assert.areEqual("boss", organization.recipientsOf(OrganizationTarget.leaders, ["boss"]).join(","));
-    Assert.areEqual("", new Organization([new Department("ops", "Ops", OrganizationParent.person, "outside", 0, "c", "u")], [])
+    Assert.areEqual("", OrganizationTests.of([new Department("ops", "Ops", OrganizationParent.person, "outside", 0, "c", "u")], [])
       .recipientsOf(OrganizationTarget.leaders, ["solo", "outside"]).join(","));
     Assert.areEqual("aide,ann,boss,kid,lead,sol", organization.recipientsOf(OrganizationTarget.everyone, teammates).join(","));
     Assert.areEqual("sol", organization.recipientsOf(OrganizationTarget.teammate("sol"), teammates).join(","));
@@ -152,16 +152,16 @@ export class OrganizationTests {
     const d1 = OrganizationTests.department("d1", null, 0);
     const d2 = OrganizationTests.department("d2", null, 1);
 
-    Assert.areEqual("departments", Assert.throws(() => new Organization([d1, d1], []), ArgumentException).parameterName);
-    Assert.areEqual("placements", Assert.throws(() => new Organization([d1, d2],
+    Assert.areEqual("departments", Assert.throws(() => OrganizationTests.of([d1, d1], []), ArgumentException).parameterName);
+    Assert.areEqual("placements", Assert.throws(() => OrganizationTests.of([d1, d2],
       [new TeammatePlacement("t1", OrganizationParent.department("d1"), 0), new TeammatePlacement("t1", OrganizationParent.department("d2"), 0)]),
       ArgumentException).parameterName);
-    Assert.areEqual("parent", Assert.throws(() => new Organization([OrganizationTests.department("d2", "gone", 0)], []), ArgumentException).parameterName);
-    Assert.areEqual("parent", Assert.throws(() => new Organization([d1], [new TeammatePlacement("t1", OrganizationParent.department("gone"), 0)]),
+    Assert.areEqual("parent", Assert.throws(() => OrganizationTests.of([OrganizationTests.department("d2", "gone", 0)], []), ArgumentException).parameterName);
+    Assert.areEqual("parent", Assert.throws(() => OrganizationTests.of([d1], [new TeammatePlacement("t1", OrganizationParent.department("gone"), 0)]),
       ArgumentException).parameterName);
-    Assert.areEqual("parent", Assert.throws(() => new Organization([d1], [new TeammatePlacement("t1", OrganizationParent.teammate("nobody"), 0)]),
+    Assert.areEqual("parent", Assert.throws(() => OrganizationTests.of([d1], [new TeammatePlacement("t1", OrganizationParent.teammate("nobody"), 0)]),
       ArgumentException).parameterName);
-    Assert.isTrue(Assert.throws(() => new Organization([OrganizationTests.department("d2", "gone", 0)], []), ArgumentException).message
+    Assert.isTrue(Assert.throws(() => OrganizationTests.of([OrganizationTests.department("d2", "gone", 0)], []), ArgumentException).message
       .startsWith(Resources.unknownOrganizationParent));
   }
 
@@ -170,7 +170,7 @@ export class OrganizationTests {
     const a = new Department("a", "A", OrganizationParent.teammate("t1"), null, 0, "c", "u");
     const b = new Department("b", "B", OrganizationParent.department("a"), null, 0, "c", "u");
     const cycle = (departments: readonly Department[], placements: readonly TeammatePlacement[]): boolean =>
-      Assert.throws(() => new Organization(departments, placements), ArgumentException).message.startsWith(Resources.organizationNodeUnderItself);
+      Assert.throws(() => OrganizationTests.of(departments, placements), ArgumentException).message.startsWith(Resources.organizationNodeUnderItself);
 
     Assert.isTrue(cycle([OrganizationTests.department("x", "y", 0), OrganizationTests.department("y", "x", 0)], []));
     Assert.isTrue(cycle([], [new TeammatePlacement("t1", OrganizationParent.teammate("t2"), 0),
@@ -179,11 +179,36 @@ export class OrganizationTests {
     Assert.isTrue(cycle([OrganizationTests.department("z", "x", 0), OrganizationTests.department("x", "y", 1),
       OrganizationTests.department("y", "x", 1)], []));
     Assert.areEqual(OrganizationNodeKind.Teammate,
-      new Organization([a, b], [new TeammatePlacement("t1", OrganizationParent.person, 0)]).departments[0]?.parent.kind);
+      OrganizationTests.of([a, b], [new TeammatePlacement("t1", OrganizationParent.person, 0)]).departments[0]?.parent.kind);
+  }
+
+  @TestMethod
+  public keepsItsNameFolderAndOrder(): void {
+    const value = new Organization("o2", "Studio", "/work/studio", 1, "c", "u", [], []);
+    const moved = value.withTree([OrganizationTests.department("d1", null, 0)], [new TeammatePlacement("t1", OrganizationParent.person, 0)]);
+    const json = value.toJson();
+
+    Assert.areEqual("o2|Studio|/work/studio|1|c|u", [moved.id, moved.name, moved.folder, moved.order, moved.createdAt, moved.updatedAt].join("|"));
+    Assert.areEqual("d1|t1", `${moved.departments[0]?.id ?? ""}|${moved.placements[0]?.teammateId ?? ""}`);
+    Assert.isNull(Organization.fromJson({ ...json, folder: null }).folder);
+    Assert.areEqual("id", Assert.throws(() => new Organization(" ", "Studio", null, 0, "c", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("name", Assert.throws(() => new Organization("o2", "a\nb", null, 0, "c", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("folder", Assert.throws(() => new Organization("o2", "Studio", " ", 0, "c", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, -1, "c", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, 0.5, "c", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("createdAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "", "u", [], []), ArgumentException).parameterName);
+    Assert.areEqual("updatedAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "", [], []), ArgumentException).parameterName);
+    Assert.areEqual("$.input.name", Assert.throws(() => Organization.fromJson({ ...json, name: " " }, "$.input"), JsonException).path);
+    Assert.areEqual("$.input.folder", Assert.throws(() => Organization.fromJson({ ...json, folder: " " }, "$.input"), JsonException).path);
+    Assert.areEqual("$.input.folder", Assert.throws(() => Organization.fromJson({ ...json, folder: 1 }, "$.input"), JsonException).path);
+  }
+
+  private static of(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
+    return new Organization("o1", "My organization", null, 0, "c", "u", departments, placements);
   }
 
   private static tree(): Organization {
-    return new Organization([
+    return OrganizationTests.of([
       new Department("ops", "Ops", OrganizationParent.person, "boss2", 0, "c", "u"),
       new Department("design", "Design", OrganizationParent.teammate("boss"), "lead", 0, "c", "u"),
       new Department("web", "Web", OrganizationParent.department("design"), null, 0, "c", "u")

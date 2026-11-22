@@ -554,9 +554,29 @@ export declare enum MethodName {
    */
   TeammateDelete = "TeammateDelete",
   /**
-   * Lists the organization: its departments and where each placed teammate sits. Parameters: `null`. Result: `Organization`.
+   * Lists every organization, each with its departments and where each teammate placed in it sits, by their order, the one every
+   * database starts with first. Parameters: `null`. Result: `Organization[]`.
+   * Each method below that names an organization fails with `NotFound` when it doesn't exist, and a department of another
+   * organization is `NotFound` too.
    */
   OrganizationList = "OrganizationList",
+  /**
+   * Creates an organization with no departments and no placed teammates, last in the list, and publishes `OrganizationChanged`.
+   * Parameters: `OrganizationCreateParams`. Result: `Organization`.
+   */
+  OrganizationCreate = "OrganizationCreate",
+  /**
+   * Renames an organization and sets its default folder, and publishes `OrganizationChanged`. A teammate's Organization chat
+   * with no folder of its own works in the new folder from its next turn. Parameters: `OrganizationUpdateParams`.
+   * Result: `Organization`.
+   */
+  OrganizationUpdate = "OrganizationUpdate",
+  /**
+   * Deletes an organization with its departments, placements and layout, and publishes `OrganizationRemoved`; its teammates
+   * and their chats stay. Deleting the last organization fails with `Conflict`. Parameters: `OrganizationIdParams`.
+   * Result: `null`.
+   */
+  OrganizationDelete = "OrganizationDelete",
   /**
    * Creates a department, last among the departments under its parent, and publishes `OrganizationChanged`; a leader given is
    * placed in it first, from wherever it was, and leads it, in the same transaction. Parameters: `DepartmentCreateParams`.
@@ -594,8 +614,8 @@ export declare enum MethodName {
    */
   TeammatePlace = "TeammatePlace",
   /**
-   * Reads the Organization view's layout: its collapsed departments and what its cards show.
-   * Parameters: none. Result: the layout's JSON object, or `null` when none is kept.
+   * Reads an Organization view's layout: its collapsed departments and what its cards show.
+   * Parameters: `OrganizationIdParams`. Result: the layout's JSON object, or `null` when none is kept.
    */
   OrganizationLayoutRead = "OrganizationLayoutRead",
   /**
@@ -604,8 +624,8 @@ export declare enum MethodName {
    */
   OrganizationLayoutSave = "OrganizationLayoutSave",
   /**
-   * Finds a teammate's Organization chat, or makes it when there is none yet, without sending anything.
-   * Parameters: `TeammateIdParams`. Result: `Chat`.
+   * Finds a teammate's Organization chat in one organization, or makes it when there is none yet, without sending anything.
+   * Parameters: `OrganizationChat`. Result: `Chat`.
    */
   OrganizationChatOpen = "OrganizationChatOpen",
   /**
@@ -1346,12 +1366,17 @@ export declare enum EventName {
    */
   WaitingMessagesChanged = "WaitingMessagesChanged",
   /**
-   * The organization changed: a department was created, renamed, moved or deleted, a leader was set or cleared, a teammate
-   * changed department, or a deleted teammate left its department. Payload: `Organization`, the whole organization after the change.
+   * An organization changed: it was created, renamed or given another folder, a department was created, renamed, moved or deleted,
+   * a leader was set or cleared, a teammate changed department, or a deleted teammate left its department. Payload: `Organization`,
+   * the whole organization after the change.
    */
   OrganizationChanged = "OrganizationChanged",
   /**
-   * The Organization view's layout was saved. Payload: the layout's JSON object.
+   * An organization was deleted. Payload: `OrganizationIdParams`.
+   */
+  OrganizationRemoved = "OrganizationRemoved",
+  /**
+   * An Organization view's layout was saved. Payload: `OrganizationLayoutSaveParams`, the organization's id and the layout.
    */
   OrganizationLayoutUpdated = "OrganizationLayoutUpdated"
 }
@@ -2226,6 +2251,14 @@ export declare class Resources {
   public static readonly unknownOrganizationParent: string;
   /** Why an organization that places a teammate twice is refused. */
   public static readonly teammatePlacedTwice: string;
+  /** Why an organization name that isn't 1 to 100 characters on one line is refused. */
+  public static readonly invalidOrganizationName: string;
+  /** Why a blank default folder is refused. */
+  public static readonly blankOrganizationFolder: string;
+  /** Why an organization's order in the list that isn't a whole number from 0 is refused. */
+  public static readonly invalidOrganizationListOrder: string;
+  /** The id of the organization every database starts with, "My organization". */
+  public static readonly defaultOrganizationId: string;
   /** Why moving the person is refused. */
   public static readonly personCannotMove: string;
   /**
@@ -11935,20 +11968,64 @@ export declare class DepartmentMember {
  * each with one parent and none under itself. A teammate with no place isn't in the organization.
  */
 export declare class Organization {
-  /** The organization with no departments and no placed teammates. */
-  public static readonly empty: Organization;
+  /** The organization's id. */
+  public readonly id: string;
+  /** Its name. */
+  public readonly name: string;
+  /** The default folder of its teammates' Organization chats that have no folder of their own, or null for each chat's own folder. */
+  public readonly folder: string | null;
+  /** Its place in the list of organizations, from 0. */
+  public readonly order: number;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
   /** The departments, by their order among their siblings, then by when they were created. */
   public readonly departments: readonly Department[];
   /** The placed teammates, by their order among their siblings, then by id. */
   public readonly placements: readonly TeammatePlacement[];
   /**
    * Creates a validated immutable value.
-   * @throws ArgumentException when two departments share an id, a teammate is placed twice, a parent is neither the person,
-   * a placed teammate nor one of the departments, or a teammate or department sits under itself.
+   * @throws ArgumentException when the id, a time or the folder is blank, the name is invalid, the order isn't a whole number from 0,
+   * two departments share an id, a teammate is placed twice, a parent is neither the person, a placed teammate nor one of the departments,
+   * or a teammate or department sits under itself.
    */
   public constructor(
+    id: string,
+    name: string,
+    folder: string | null,
+    order: number,
+    createdAt: string,
+    updatedAt: string,
     departments: readonly Department[],
     placements: readonly TeammatePlacement[]);
+  /**
+   * Returns this organization with another tree.
+   * @param departments The departments.
+   * @param placements The placed teammates.
+   * @returns The organization, with the same id, name, folder, order and times.
+   */
+  public withTree(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization;
+  /**
+   * Checks an organization name.
+   * @throws ArgumentException when it isn't 1 to 100 characters on one line, or is only spaces.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Reads and checks the `name` field.
+   * @throws JsonException when it is missing or invalid.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Checks a default folder.
+   * @throws ArgumentException when it is blank.
+   */
+  public static validateFolder(folder: string | null): void;
+  /**
+   * Reads and checks the `folder` field.
+   * @throws JsonException when it is missing, not text or null, or blank.
+   */
+  public static readFolder(reader: JsonReader): string | null;
   /** The teammates placed directly in a department, as department memberships. */
   public get members(): readonly DepartmentMember[];
   /** The leaders: each department's leader, in the departments' order, then each placed teammate with a teammate or department under it. */
@@ -12159,6 +12236,8 @@ export declare class OrganizationChat {
 
 /** Parameters for creating a department, last among the departments under its parent, with an optional first member who leads it. */
 export declare class DepartmentCreateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** The name. */
   public readonly name: string;
   /** What it goes under. */
@@ -12170,6 +12249,7 @@ export declare class DepartmentCreateParams {
    * @throws ArgumentException when the name is invalid or the leader id is blank.
    */
   public constructor(
+    organizationId: string,
     name: string,
     parent: OrganizationParent,
     leaderId?: string | null);
@@ -12181,6 +12261,8 @@ export declare class DepartmentCreateParams {
 
 /** Parameters for renaming a department or setting or clearing its leader; an omitted field stays. */
 export declare class DepartmentUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
   /** The new name, or undefined to keep it. */
@@ -12192,6 +12274,7 @@ export declare class DepartmentUpdateParams {
    * @throws ArgumentException when it changes nothing or a field is invalid.
    */
   public constructor(
+    organizationId: string,
     departmentId: string,
     name: string | undefined,
     leaderId: string | null | undefined);
@@ -12210,6 +12293,8 @@ export declare class DepartmentUpdateParams {
 
 /** Parameters for placing a teammate in the organization, or taking it out. */
 export declare class TeammatePlaceParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** The teammate's id. */
   public readonly teammateId: string;
   /** What it goes under, or null to take it out of the organization. */
@@ -12221,6 +12306,7 @@ export declare class TeammatePlaceParams {
    * @throws ArgumentException when the id is blank, the teammate is its own parent, or the order isn't a whole number from 0.
    */
   public constructor(
+    organizationId: string,
     teammateId: string,
     parent: OrganizationParent | null,
     order: number);
@@ -12232,6 +12318,8 @@ export declare class TeammatePlaceParams {
 
 /** Parameters for moving a department under another parent or to another place among its siblings. */
 export declare class DepartmentMoveParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
   /** What it goes under. */
@@ -12243,6 +12331,7 @@ export declare class DepartmentMoveParams {
    * @throws ArgumentException when a field is blank, the department is its own parent, or the order isn't a whole number from 0.
    */
   public constructor(
+    organizationId: string,
     departmentId: string,
     parent: OrganizationParent,
     order: number);
@@ -12252,12 +12341,70 @@ export declare class DepartmentMoveParams {
   public toJson(): JsonObject;
 }
 
+/** Parameters naming one organization. */
+export declare class OrganizationIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** Creates a validated immutable value. */
+  public constructor(organizationId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationIdParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for creating an organization, placed last in the list. */
+export declare class OrganizationCreateParams {
+  /** The name. */
+  public readonly name: string;
+  /** The default folder of its teammates' Organization chats, or null for each chat's own folder. */
+  public readonly folder: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the name is invalid or the folder is blank.
+   */
+  public constructor(name: string, folder: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming an organization and setting its default folder. */
+export declare class OrganizationUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The new name. */
+  public readonly name: string;
+  /** The new default folder, or null for each chat's own folder. */
+  public readonly folder: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id or the folder is blank, or the name is invalid.
+   */
+  public constructor(organizationId: string, name: string, folder: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationUpdateParams;
+  /**
+   * Returns the organization with this update's name and folder.
+   * @param organization The organization as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed organization.
+   */
+  public applyTo(organization: Organization, updatedAt: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
 /** Parameters naming one department. */
 export declare class DepartmentIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** department Id. */
   public readonly departmentId: string;
   /** Creates a validated immutable value. */
   public constructor(
+    organizationId: string,
     departmentId: string);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentIdParams;
@@ -12267,12 +12414,15 @@ export declare class DepartmentIdParams {
 
 /** Parameters for putting a teammate in a department, or in none. */
 export declare class DepartmentMemberSetParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /** teammate Id. */
   public readonly teammateId: string;
   /** The department, or null for none. */
   public readonly departmentId: string | null;
   /** Creates a validated immutable value. */
   public constructor(
+    organizationId: string,
     teammateId: string,
     departmentId: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
@@ -12286,6 +12436,8 @@ export declare class DepartmentMemberSetParams {
  * TeamRun keeps as it is.
  */
 export declare class OrganizationLayoutSaveParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
   /**
    * The layout.
    */
@@ -12294,11 +12446,11 @@ export declare class OrganizationLayoutSaveParams {
   /**
    * Initializes the parameters.
    */
-  public constructor(layout: JsonObject);
+  public constructor(organizationId: string, layout: JsonObject);
 
   /**
    * Reads the parameters from untrusted JSON.
-   * @throws JsonException when `layout` is missing or not an object.
+   * @throws JsonException when `organizationId` is missing or blank, or `layout` is missing or not an object.
    */
   public static fromJson(value: unknown, path?: string): OrganizationLayoutSaveParams;
 

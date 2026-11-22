@@ -37,6 +37,9 @@ import {
   DepartmentIdParams,
   DepartmentMemberSetParams,
   OrganizationLayoutSaveParams,
+  OrganizationCreateParams,
+  OrganizationIdParams,
+  OrganizationUpdateParams,
   OrganizationChat,
   DepartmentMoveParams,
   DepartmentUpdateParams,
@@ -242,13 +245,18 @@ export class RequestDispatcher {
       }
       case MethodName.TeammateDelete: {
         const params = TeammateIdParams.fromJson(payload);
-        if (await this.teammates.deleteAsync(params) && !Object.isNull(this.organization))
-          await this.publishOrganizationAsync(this.organization);
+        const departed = await this.teammates.deleteAsync(params);
+        if (!Object.isNull(this.organization))
+          for (const organizationId of departed)
+            await this.publishOrganizationAsync(this.organization, organizationId);
         this.tasks?.stopTeammate(params.teammateId, null);
         this.engine.forgetTeammate(params.teammateId, null);
         return null;
       }
       case MethodName.OrganizationList:
+      case MethodName.OrganizationCreate:
+      case MethodName.OrganizationUpdate:
+      case MethodName.OrganizationDelete:
       case MethodName.DepartmentCreate:
       case MethodName.DepartmentUpdate:
       case MethodName.DepartmentMove:
@@ -259,8 +267,7 @@ export class RequestDispatcher {
       case MethodName.OrganizationLayoutSave:
         return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
       case MethodName.OrganizationChatOpen:
-        return (await this.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId,
-          TeammateIdParams.fromJson(payload).teammateId))).toJson();
+        return (await this.engine.openOrganizationChatAsync(OrganizationChat.fromJson(payload))).toJson();
       case MethodName.SharedMcpServerList:
         return (await RequestDispatcher.require(this.sharedServers, method).listAsync()).map(t => t.toJson());
       case MethodName.SharedMcpServerCreate:
@@ -629,41 +636,79 @@ export class RequestDispatcher {
   }
 
   private async organizeAsync(organization: IOrganizationService, method: string, payload: JsonValue): Promise<JsonValue> {
-    let result: JsonValue = null;
     switch (method) {
       case MethodName.OrganizationList:
-        return (await organization.listAsync()).toJson();
+        return (await organization.listAsync()).map(t => t.toJson());
+      case MethodName.OrganizationCreate: {
+        const created = await organization.createOrganizationAsync(OrganizationCreateParams.fromJson(payload));
+        this.publish(new Event(EventName.OrganizationChanged, created.toJson()));
+        return created.toJson();
+      }
+      case MethodName.OrganizationUpdate: {
+        const params = OrganizationUpdateParams.fromJson(payload);
+        await organization.updateOrganizationAsync(params);
+        return await this.publishOrganizationAsync(organization, params.organizationId);
+      }
+      case MethodName.OrganizationDelete: {
+        const params = OrganizationIdParams.fromJson(payload);
+        await organization.deleteOrganizationAsync(params);
+        this.publish(new Event(EventName.OrganizationRemoved, params.toJson()));
+        return null;
+      }
       case MethodName.OrganizationLayoutRead:
-        return await organization.readLayoutAsync();
+        return await organization.readLayoutAsync(OrganizationIdParams.fromJson(payload));
       case MethodName.OrganizationLayoutSave: {
-        const layout = await organization.saveLayoutAsync(OrganizationLayoutSaveParams.fromJson(payload));
-        this.publish(new Event(EventName.OrganizationLayoutUpdated, layout));
+        const params = OrganizationLayoutSaveParams.fromJson(payload);
+        const layout = await organization.saveLayoutAsync(params);
+        this.publish(new Event(EventName.OrganizationLayoutUpdated, params.toJson()));
         return layout;
       }
-      case MethodName.DepartmentCreate:
-        result = (await organization.createAsync(DepartmentCreateParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentUpdate:
-        result = (await organization.updateAsync(DepartmentUpdateParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentMove:
-        result = (await organization.moveAsync(DepartmentMoveParams.fromJson(payload))).toJson();
-        break;
-      case MethodName.DepartmentDelete:
-        await organization.deleteAsync(DepartmentIdParams.fromJson(payload));
-        break;
-      case MethodName.TeammatePlace:
-        await organization.placeAsync(TeammatePlaceParams.fromJson(payload));
-        break;
-      default:
-        await organization.setMemberAsync(DepartmentMemberSetParams.fromJson(payload));
+      case MethodName.DepartmentCreate: {
+        const params = DepartmentCreateParams.fromJson(payload);
+        const department = await organization.createAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentUpdate: {
+        const params = DepartmentUpdateParams.fromJson(payload);
+        const department = await organization.updateAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentMove: {
+        const params = DepartmentMoveParams.fromJson(payload);
+        const department = await organization.moveAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return department.toJson();
+      }
+      case MethodName.DepartmentDelete: {
+        const params = DepartmentIdParams.fromJson(payload);
+        await organization.deleteAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      case MethodName.TeammatePlace: {
+        const params = TeammatePlaceParams.fromJson(payload);
+        await organization.placeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      default: {
+        const params = DepartmentMemberSetParams.fromJson(payload);
+        await organization.setMemberAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
     }
-    await this.publishOrganizationAsync(organization);
-    return result;
   }
 
-  private async publishOrganizationAsync(organization: IOrganizationService): Promise<void> {
-    this.publish(new Event(EventName.OrganizationChanged, (await organization.listAsync()).toJson()));
+  private async publishOrganizationAsync(organization: IOrganizationService, organizationId: string): Promise<JsonValue> {
+    const found = await organization.findAsync(organizationId);
+    if (Object.isNull(found))
+      return null;
+    const json = found.toJson();
+    this.publish(new Event(EventName.OrganizationChanged, json));
+    return json;
   }
 
   private publish(event: Event): void {

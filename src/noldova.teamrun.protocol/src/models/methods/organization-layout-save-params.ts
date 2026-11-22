@@ -7,22 +7,31 @@
  */
 
 import "@noldova/context.core";
+import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonReader, type JsonObject } from "@noldova/context.json";
 
 import { Resources } from "../../resources.js";
 
 export class OrganizationLayoutSaveParams {
+  public readonly organizationId: string;
   public readonly layout: JsonObject;
 
-  public constructor(layout: JsonObject) {
+  public constructor(organizationId: string, layout: JsonObject) {
+    ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
+
+    this.organizationId = organizationId;
     this.layout = layout;
   }
 
   public static fromJson(value: unknown, path?: string): OrganizationLayoutSaveParams {
-    return new OrganizationLayoutSaveParams(JsonReader.fromValue(value, path).readObject(Resources.layoutField).toJson());
+    const reader = JsonReader.fromValue(value, path);
+    return new OrganizationLayoutSaveParams(reader.readNonBlankString(Resources.organizationIdField), reader.readObject(Resources.layoutField).toJson());
   }
 
   public toJson(): JsonObject {
-    return { [Resources.layoutField]: this.layout };
+    return {
+      [Resources.organizationIdField]: this.organizationId,
+      [Resources.layoutField]: this.layout
+    };
   }
 }
