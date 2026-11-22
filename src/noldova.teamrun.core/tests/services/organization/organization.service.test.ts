@@ -474,8 +474,8 @@ export class OrganizationServiceTests {
     await host.organization.createAsync(new DepartmentCreateParams(OrganizationServiceTests.mine, "Art", team.id, OrganizationParent.person));
     const squad = await host.organization.updateNodeTypeAsync(new NodeTypeUpdateParams(OrganizationServiceTests.mine, team.id, "Squad", undefined, undefined));
     const both = await Assert.throwsAsync(() => host.organization.deleteNodeTypeAsync(new NodeTypeIdParams(OrganizationServiceTests.mine, team.id)), ServiceException);
-    Assert.areEqual(`${ErrorCode.Conflict}|1 department is a Team; give it another type before deleting Team.`, `${used.info.name}|${used.message}`);
-    Assert.areEqual("2 departments are Squads; give them another type before deleting Squad.", both.message);
+    Assert.areEqual(`${ErrorCode.Conflict}|1 unit has the type Team; give it another type before deleting Team.`, `${used.info.name}|${used.message}`);
+    Assert.areEqual("2 units have the type Squad; give them another type before deleting Squad.", both.message);
     Assert.areEqual(`Department,Squad|${team.id}`, `${(await OrganizationServiceTests.mineAsync(host)).nodeTypes.map(t => t.name).join(",")}|${squad.id}`);
   }
 

@@ -2072,8 +2072,8 @@ export class Resources {
   }
 
   public static formatNodeTypeInUse(name: string, count: number): string {
-    return count === 1 ? `1 department is a ${name}; give it another type before deleting ${name}.`
-      : `${count} departments are ${name}s; give them another type before deleting ${name}.`;
+    return count === 1 ? `1 unit has the type ${name}; give it another type before deleting ${name}.`
+      : `${count} units have the type ${name}; give them another type before deleting ${name}.`;
   }
 
   public static formatDepartmentNotFound(id: string): string {
