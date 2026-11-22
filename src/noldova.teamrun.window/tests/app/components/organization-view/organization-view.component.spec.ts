@@ -1174,23 +1174,25 @@ describe("OrganizationViewComponent", () => {
     it("creates a teammate with the typed name from the search, in this organization only, under a department, under a teammate and under you", async () => {
       await editAsync();
       const store = ChatStoreService.of(context);
-      const createAsync = async (trigger: HTMLElement, name: string): Promise<string | undefined> => {
+      const ids = new Map<string, string>();
+      const createAsync = async (trigger: HTMLElement, name: string): Promise<string> => {
         const placed = asked.length;
         await searchAsync(trigger, name);
         await pickAsync("New teammate…");
         await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
-        const shown = document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")?.value;
+        const shown = Required.of(document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")).value;
         one("button[form='nol-teamrun-teammate-form']", document).click();
         await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
         await fadedAsync();
         await Wait.until(() => expect(asked).toHaveLength(placed + 1));
+        ids.set(name, Required.of(store.teammates().find(t => t.name === name)).id);
         return shown;
       };
 
       const shown = [await createAsync(one(":scope > .adds > .add-member", department("Build")), "Dana"),
         await createAsync(one(":scope > .adds > .add-member", nodeOf("Bob")), "Eve"),
         await createAsync(one(".chart .kids .adds .add-member"), "Finn")];
-      const id = (name: string): string => Required.of(store.teammates().find(t => t.name === name)).id;
+      const id = (name: string): string => Required.of(ids.get(name));
 
       expect([shown, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([["Dana", "Eve", "Finn"], null, [
         new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Dana"), parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }),
