@@ -66,7 +66,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
 - **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
 - **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
-- **Background tasks:** a task that writes a flood of output within a tenth of a second sends the window only its latest 65,536 characters, the most a task keeps, rather than all of it at once (#229).
+- **Background tasks:** a task that writes a flood of output within a tenth of a second sends the window only its latest 65,536 characters, the most a task keeps, rather than all of it at once (#85).
 
 ### Changed
 
