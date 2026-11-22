@@ -28,11 +28,13 @@ import { OrganizationDepartmentDialogComponent } from "../organization-departmen
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationDropDirective } from "../organization-drop.directive";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
+import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
   imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, NgTemplateOutlet, OrganizationCardComponent, OrganizationDetailsComponent,
-    OrganizationDropDirective, OrganizationTeammateSearchComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
+    OrganizationDropDirective, OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
@@ -116,7 +118,8 @@ export class OrganizationDepartmentComponent {
 
   protected confirmDelete(department: Department): void {
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
-    dialog.componentRef?.setInput("request", OrganizationEdits.deleteRequest(department, [...this.organization.organization().departments, ...this.store.teammates()]));
+    dialog.componentRef?.setInput("request", OrganizationEdits.deleteRequest(department, this.organization.organization().typeOf(department.id),
+      [...this.organization.organization().departments, ...this.store.teammates()]));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)

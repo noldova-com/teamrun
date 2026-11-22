@@ -65,14 +65,6 @@ export class OrganizationCatalog {
     return this.organizationsSignal().at(0) ?? null;
   }
 
-  public async settledAsync(): Promise<void> {
-    for (let loading = this.loading; ; loading = this.loading) {
-      await loading;
-      if (loading === this.loading)
-        return;
-    }
-  }
-
   public reload(): Promise<void> {
     this.loading = this.load();
     return this.loading;

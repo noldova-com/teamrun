@@ -165,6 +165,7 @@ LICENSE file in the root directory of this source tree.
                   <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(department.id)">
                     <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(department.id) ? resources.collapsedIcon : resources.expandedIcon }}</span>
                   </span>
+                  <nol-teamrun-organization-type-icon [type]="department.type" />
                   <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="layout.toggleProject(department.id)">{{ department.path }}</span>
                 </div>
                 @if (!isCollapsed(department.id)) {
