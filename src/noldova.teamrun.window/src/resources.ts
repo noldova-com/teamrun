@@ -1952,6 +1952,10 @@ export class Resources {
     return `Choose what ${name}'s card shows and where ${name} works`;
   }
 
+  public static formatOrganizationReportsTo(manager: string): string {
+    return `Reports to ${manager}`;
+  }
+
   public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
     const parts = [role, department].filter(t => !Object.isNull(t) && t.length > 0);
     return parts.length === 0 ? null : parts.join(" · ");

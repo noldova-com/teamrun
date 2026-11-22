@@ -87,6 +87,16 @@ describe("OrganizationNode", () => {
       [["ui", "cy", ["eve"], 2, 2, 1, []]], 5, "You", "person"]);
   });
 
+  it("knows whom each teammate under a teammate reports to, at any depth, and none for a direct report or a department's members", () => {
+    const organization = SampleData.organizationOf([new Department("ui", "UI", "department", OrganizationParent.teammate("ada"), "cy", 0, "c", "u")],
+      [new TeammatePlacement("ada", OrganizationParent.person, 0), new TeammatePlacement("bea", OrganizationParent.teammate("ada"), 0),
+        new TeammatePlacement("dee", OrganizationParent.teammate("bea"), 0), new TeammatePlacement("cy", OrganizationParent.department("ui"), 0),
+        new TeammatePlacement("eve", OrganizationParent.department("ui"), 1)]);
+    const root = OrganizationNode.treeOf(organization, [ada, bea, cy, dee, eve]);
+
+    expect([[...root.managers].map(([id, manager]) => `${id}>${manager.id}`), root.members.map(t => t.id)]).toEqual([["dee>bea", "bea>ada"], ["ada", "bea", "dee"]]);
+  });
+
   it("lifts the reports of a teammate it doesn't know to that teammate's place", () => {
     const organization = SampleData.organizationOf([], [new TeammatePlacement("gone", OrganizationParent.person, 0), new TeammatePlacement("ada", OrganizationParent.teammate("gone"), 0)]);
 

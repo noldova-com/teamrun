@@ -21,6 +21,7 @@ export class OrganizationNode {
   public readonly reports: readonly OrganizationNode[];
   public readonly members: readonly Teammate[];
   public readonly directReports: readonly Teammate[];
+  public readonly managers: ReadonlyMap<string, Teammate>;
   public readonly headcount: number;
   public readonly total: number;
   public readonly hidden: number;
@@ -39,6 +40,7 @@ export class OrganizationNode {
     this.people = [...this.self, ...reports.flatMap(t => t.people)];
     this.members = NameOrder.sort(reports.flatMap(t => t.people), t => t.name);
     this.directReports = reports.flatMap(t => t.self);
+    this.managers = OrganizationNode.managersOf(reports);
     this.headcount = (Object.isNull(leader) ? 0 : 1) + this.members.length;
     const nested = [...departments, ...reports.flatMap(t => t.subDepartments)].reduce((sum, t) => sum + t.total, 0);
     this.total = this.headcount + nested;
@@ -90,6 +92,18 @@ export class OrganizationNode {
 
   public static walk(node: OrganizationNode): readonly OrganizationNode[] {
     return [node, ...node.children.flatMap(t => OrganizationNode.walk(t))];
+  }
+
+  private static managersOf(reports: readonly OrganizationNode[]): ReadonlyMap<string, Teammate> {
+    const managers = new Map<string, Teammate>();
+    for (const report of reports) {
+      for (const [id, manager] of report.managers)
+        managers.set(id, manager);
+      if (!Object.isNull(report.teammate))
+        for (const person of report.directReports)
+          managers.set(person.id, report.teammate);
+    }
+    return managers;
   }
 
   private static of(key: OrganizationParent, department: Department | null, teammate: Teammate | null, leader: Teammate | null,

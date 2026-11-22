@@ -131,7 +131,7 @@ describe("OrganizationBoardComponent", () => {
 
   it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and only a move while editing", async () => {
     await create();
-    fixture.componentRef.setInput("directReports", [carol]);
+    fixture.componentRef.setInput("reports", [carol]);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()).subDepartments);
     await settle();
@@ -144,6 +144,21 @@ describe("OrganizationBoardComponent", () => {
     await settle();
 
     expect([all(".move-choice", one(".leaders > .report")).length, all(".remove", one(".leaders > .report")).length, all(".lane").length]).toEqual([1, 0, 3]);
+  });
+
+  it("lists a teammate who reports to your direct report outside a department beside your direct reports, saying whom it reports to there and in Needs you", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => t.teammateId !== "carol" && t.teammateId !== "offline"),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0)]),
+      ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".leaders > .report .name"), all(".leaders > .report").map(t => texts(".reports-to", t)),
+      all(".ask").filter(t => texts(".name", t).includes("Offline")).map(t => texts(".department", t))]).toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]],
+      [["Reports to Carol"]]]);
   });
 
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
@@ -301,7 +316,7 @@ describe("OrganizationBoardComponent", () => {
 
     it("draws a direct report in no department on the leaders' line, after them, at a leader's width, inset and top", async () => {
       await create();
-      fixture.componentRef.setInput("directReports", [carol]);
+      fixture.componentRef.setInput("reports", [carol]);
       fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()).subDepartments);
       await settle();
