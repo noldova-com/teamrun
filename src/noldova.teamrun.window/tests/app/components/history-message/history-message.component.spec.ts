@@ -1016,15 +1016,18 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(stop.height, finished.height);
     });
 
-    it("shows a reply stopped at a usage limit as one 13 px stopped line in the error colour, the message's column gap under the answer from its start edge, with no glyph and no used-up line", async () => {
+    it("shows a reply stopped at a usage limit as one 13 px stopped line in the error colour, space-1 under the answer from its start edge and space-2 above the part after it, with no glyph and no used-up line", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, mode);
       const stopped = "Stopped: Claude · Work reached its usage limit. It resets at 18:00.";
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Failed, [detail(0, DetailKind.Text, "Reading upload-client.ts first."),
-        detail(1, DetailKind.Error, stopped, { usedUp: true, usedUpUntil: new Date(clock.now() + 7_200_000).toISOString(), stopped: true })]));
+        detail(1, DetailKind.Error, stopped, { usedUp: true, usedUpUntil: new Date(clock.now() + 7_200_000).toISOString(), stopped: true }),
+        detail(2, DetailKind.Text, "Picking up where it stopped.")]));
       await Wait.until(() => expect(textOf(".reply-stopped")).toBe(stopped));
+      await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view").length).toBe(2), MarkdownWait.coldImport);
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       const line = box(".reply-stopped");
       const answer = box(".nol-markdown-view");
+      const after = [...element().querySelectorAll(".nol-markdown-view")].at(1)?.getBoundingClientRect() ?? new DOMRect();
       const style = getComputedStyle(one(".reply-stopped"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-error)";
@@ -1035,7 +1038,8 @@ describe("HistoryMessageComponent", () => {
         .toEqual([null, null, null]);
       expect([style.color, style.fontSize, style.lineHeight]).toEqual([getComputedStyle(probe).color, "13px", getComputedStyle(probe).lineHeight]);
       AppearanceFixture.expectPixels(line.left, answer.left);
-      AppearanceFixture.expectPixels(line.top - answer.bottom, AppearanceFixture.measureLook("space-2"));
+      AppearanceFixture.expectPixels(line.top - answer.bottom, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(after.top - line.bottom, AppearanceFixture.measureLook("space-2"));
       probe.remove();
     });
 
