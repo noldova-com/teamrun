@@ -16,6 +16,7 @@ import { TaskOutputReader } from "@noldova/teamrun.providers";
 import { ClaudeTestHost } from "../../fixtures/claude-test-host.fixture.js";
 import { FakeClaudeQuery } from "../../fixtures/fake-claude-query.fixture.js";
 import { GateStep } from "../../fixtures/gate-step.fixture.js";
+import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { SdkMessages } from "../../fixtures/sdk-messages.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -333,10 +334,8 @@ export class ClaudeTasksTests {
       const result = await adapter.runTurn(host.createRequest("Start"), listener, new AbortController().signal);
       const open = [query.closeCount, adapter.activeRunCount];
       await listener.taskStarts[0]!.stop();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return query.closeCount === 1;
-      }, "The query was not closed after the idle limit.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => query.closeCount === 1, "The query was not closed after the idle limit.");
 
       Assert.areEqual(TurnOutcome.Completed, result.outcome);
       Assert.areEqual(JSON.stringify([0, 1]), JSON.stringify(open));
