@@ -32,7 +32,7 @@ import { TimeFormatService } from "../../services/time-format.service";
     ConfigurationTableShareDirective, IconButtonComponent, TooltipDirective],
   providers: [ChatStoreService.provider],
   templateUrl: "./computer-use-grants-view.component.html",
-  styleUrls: ["../settings-view.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css"]
 })
 export class ComputerUseGrantsViewComponent {
   protected readonly resources: typeof Resources = Resources;
@@ -44,6 +44,7 @@ export class ComputerUseGrantsViewComponent {
   protected readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly brokenIcons: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly times: TimeFormatService = inject(TimeFormatService);
+  private reads: number = 0;
 
   public constructor() {
     void this.list();
@@ -88,16 +89,18 @@ export class ComputerUseGrantsViewComponent {
   }
 
   private async list(): Promise<void> {
+    this.reads++;
+    const read = this.reads;
     this.reading.set(true);
-    try {
-      this.grants.set((await this.store.listComputerUseGrants()).toSorted((a, b) => a.grantedAt.localeCompare(b.grantedAt)));
-      this.readError.set(null);
-    }
-    catch (error) {
-      this.readError.set(error instanceof Error ? error.message : String(error));
-    }
-    finally {
-      this.reading.set(false);
-    }
+    const answer = await this.store.listComputerUseGrants().then(
+      t => (): void => {
+        this.grants.set(t.toSorted((a, b) => a.grantedAt.localeCompare(b.grantedAt)));
+        this.readError.set(null);
+      },
+      (error: unknown) => (): void => this.readError.set(error instanceof Error ? error.message : String(error)));
+    if (read !== this.reads)
+      return;
+    this.reading.set(false);
+    answer();
   }
 }

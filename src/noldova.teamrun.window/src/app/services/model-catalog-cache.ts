@@ -30,7 +30,7 @@ export class ModelCatalogCache {
   public load(kind: string, providerId: string | null, refresh: boolean = false, workingDirectory: string | null = null): Promise<ModelCatalog> {
     const key = JSON.stringify([kind, providerId, workingDirectory]);
     const cached = this.cached.get(key);
-    if (!refresh && !Object.isUndefined(cached) && !cached.awaitsTurn && !this.expired.has(cached) && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
+    if (!refresh && !Object.isUndefined(cached) && !cached.failed && !cached.awaitsTurn && !this.expired.has(cached) && this.now() - cached.fetchedAt < Resources.modelCatalogLifetime)
       return Promise.resolve(cached);
     const pending = this.pending.get(key);
     if (!Object.isUndefined(pending))

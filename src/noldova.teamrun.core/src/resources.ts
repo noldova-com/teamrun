@@ -1261,6 +1261,14 @@ export class Resources {
     return `The draft of the chat ending in "${conversationId.slice(-Resources.loggedIdLength)}" was not read, so its files were kept: ${reason}.`;
   }
 
+  public static formatEventListenerFailed(eventName: string, reason: string): string {
+    return `A listener of the event "${eventName}" failed: ${reason}.`;
+  }
+
+  public static formatDeleteCleanupFailed(reason: string): string {
+    return `A cleanup after a chat's deletion failed: ${reason}.`;
+  }
+
   public static formatFailureKind(error: unknown): string {
     if (!(error instanceof Error))
       return typeof error;

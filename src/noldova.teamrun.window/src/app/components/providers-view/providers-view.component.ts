@@ -62,7 +62,7 @@ import { ProviderTerminalComponent } from "../provider-terminal/provider-termina
     ProviderListComponent, ProviderMenuComponent, ProviderStepComponent, ProviderTerminalComponent, SpinnerComponent],
   providers: [ChatStoreService.provider],
   templateUrl: "./providers-view.component.html",
-  styleUrls: ["../settings-view.css", "./providers-view.component.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css", "./providers-view.component.css"]
 })
 export class ProvidersViewComponent {
   protected readonly resources: typeof Resources = Resources;

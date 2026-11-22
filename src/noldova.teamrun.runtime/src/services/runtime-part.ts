@@ -232,7 +232,7 @@ export class RuntimePart implements IRuntimePart {
     const options = new DbContextOptionsBuilder().use(new ModuleDatabaseProvider(context.database), new DataSource(Resources.dataSourceName, context.moduleFolder));
     const database = DatabaseContext.attach(options, context.moduleFolder);
     this.database = database;
-    const events = new EventHub();
+    const events = new EventHub(context.log);
     const attachments = new AttachmentStore(database.dataDirectory);
     const drafts = new DraftsService(database, attachments, context.log);
     const conversations = new ConversationsService(database, drafts, context.log);
@@ -296,7 +296,7 @@ export class RuntimePart implements IRuntimePart {
       : new ComputerUseGrantsService(new RuntimeRememberedAppGrants(context.permissions), conversations, teammates, apps,
         ComputerUseGrantTimings.createDefault(), new NodeTimer());
     const dispatcher = new RequestDispatcher(kinds, providers, projects, conversations, messages, approvals, engine, teammates, events, drafts, folder,
-      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization);
+      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization, context.log);
     const methods = new Map<string, IMethodHandler>();
     const clients = new WindowClients(new DispatchedMethod(MethodName.WindowFocused, dispatcher), windows);
     context.onClientClosed(t => clients.close(t));

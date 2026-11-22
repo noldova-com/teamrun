@@ -6,9 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type { IAbilityRow } from "./i-ability-row";
+:host {
+  display: contents;
+}
 
-export interface IAbilityGroupView {
-  readonly title: string;
-  readonly rows: readonly IAbilityRow[];
+.material-symbols-rounded {
+  font-size: var(--nol-teamrun-type-icon-size, 1.25rem);
+  line-height: 1;
+  flex: none;
 }
