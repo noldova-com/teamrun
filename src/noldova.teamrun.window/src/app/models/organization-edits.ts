@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type Department, NameOrder, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, NameOrder, type NodeType, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import type { INamedParent } from "../interfaces/i-named-parent";
@@ -19,9 +19,9 @@ export class OrganizationEdits {
     return NameOrder.sort(teammates.filter(t => !inside.has(t.id)), t => t.name);
   }
 
-  public static deleteRequest(department: Department, parents: readonly INamedParent[]): ConfirmRequest {
+  public static deleteRequest(department: Department, type: NodeType | null, parents: readonly INamedParent[]): ConfirmRequest {
     const parent = parents.find(t => t.id === department.parent.id)?.name ?? null;
-    return new ConfirmRequest(Resources.organizationDeleteDepartmentTitle, Resources.formatOrganizationDeleteDepartment(department.name, parent),
+    return new ConfirmRequest(Resources.formatOrganizationDeleteUnit(type), Resources.formatOrganizationDeleteDepartment(department.name, parent),
       Resources.organizationDeleteLabel, null, true);
   }
 

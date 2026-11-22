@@ -39,7 +39,8 @@ export class OrganizationExplorer {
         const department = child.kind === OrganizationNodeKind.Department ? organization.departments.find(t => t.id === child.id) : undefined;
         const names = Object.isUndefined(department) ? path : [...path, department.name];
         if (!Object.isUndefined(department))
-          departments.push(new OrganizationExplorerDepartment(department.id, names.join(Resources.departmentPathSeparator), teammatesIn(department.id)));
+          departments.push(new OrganizationExplorerDepartment(department.id, names.join(Resources.departmentPathSeparator),
+            organization.typeOf(department.id), teammatesIn(department.id)));
         visit(child, names);
       }
     };
