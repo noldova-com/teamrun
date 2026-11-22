@@ -39,6 +39,8 @@ export class ComputerUseGrantsViewComponent {
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly grants: WritableSignal<readonly ComputerUseGrant[] | null> = signal(null);
   protected readonly error: WritableSignal<string | null> = signal(null);
+  protected readonly readError: WritableSignal<string | null> = signal(null);
+  protected readonly reading: WritableSignal<boolean> = signal(false);
   protected readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly brokenIcons: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly times: TimeFormatService = inject(TimeFormatService);
@@ -80,13 +82,22 @@ export class ComputerUseGrantsViewComponent {
     await this.list();
   }
 
+  protected async retry(): Promise<void> {
+    if (!this.reading())
+      await this.list();
+  }
+
   private async list(): Promise<void> {
+    this.reading.set(true);
     try {
       this.grants.set((await this.store.listComputerUseGrants()).toSorted((a, b) => a.grantedAt.localeCompare(b.grantedAt)));
+      this.readError.set(null);
     }
     catch (error) {
-      this.grants.set([]);
-      this.error.set(error instanceof Error ? error.message : String(error));
+      this.readError.set(error instanceof Error ? error.message : String(error));
+    }
+    finally {
+      this.reading.set(false);
     }
   }
 }

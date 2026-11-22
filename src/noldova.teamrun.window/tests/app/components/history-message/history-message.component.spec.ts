@@ -11,8 +11,8 @@ import { signal, type WritableSignal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 import type { JsonValue } from "@noldova/context.json";
-import { NotificationSeverity } from "@noldova/desktop.protocol";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode, NotificationSeverity } from "@noldova/desktop.protocol";
+import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import { HostAccount, HostChanges, HostItem, HostPerson, HostReference, HostSignIn, ReferenceKind, ReferenceState } from "@noldova/git.hosting.protocol";
 import { GitRemote, GitStatus, RemoteTransport } from "@noldova/git.protocol";
 import {
@@ -73,23 +73,54 @@ import { TerminalRunBusy, TerminalRunEnd, TerminalRunNotTypedException, Terminal
 import { AvatarComponent, ClipboardWriter, DefaultTheme, LinkGesture, MessageComponent, ShellRun, ThemeMode } from "@noldova/ui.components.angular";
 import { provideCodeHighlighting } from "@noldova/ui.components.angular/code-highlighting";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
-import { AppearanceFixture, type ClipboardWriterFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { AppearanceFixture, ClipboardWriterFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
 
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { AttachedFileCase } from "../../../fixtures/attached-file-case.fixture";
+import { AttachedImageCase } from "../../../fixtures/attached-image-case.fixture";
+import { AuthorLook } from "../../../fixtures/author-look.fixture";
+import { AvatarLook } from "../../../fixtures/avatar-look.fixture";
+import { BadgeBox } from "../../../fixtures/badge-box.fixture";
+import { BurstSince } from "../../../fixtures/burst-since.fixture";
+import { ChipLookCase } from "../../../fixtures/chip-look-case.fixture";
 import { CodedError } from "../../../fixtures/coded-error.fixture";
+import { ControlPartCase } from "../../../fixtures/control-part-case.fixture";
+import { CutReplyCase } from "../../../fixtures/cut-reply-case.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeInlineTerminals, FakeRunStarter } from "../../../fixtures/fake-inline-terminals.fixture";
+import { FlashCase } from "../../../fixtures/flash-case.fixture";
+import { FrameWait } from "../../../fixtures/frame-wait.fixture";
+import { ImageSize } from "../../../fixtures/image-size.fixture";
+import { LinkedFileCase } from "../../../fixtures/linked-file-case.fixture";
 import { MarkdownWait } from "../../../fixtures/markdown-wait.fixture";
+import { MentionCase } from "../../../fixtures/mention-case.fixture";
+import { OutsideLinkCase } from "../../../fixtures/outside-link-case.fixture";
+import { PaceCase } from "../../../fixtures/pace-case.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { PartReadError } from "../../../fixtures/part-read-error.fixture";
+import { PixelSpan } from "../../../fixtures/pixel-span.fixture";
+import { PlanFirstCase } from "../../../fixtures/plan-first-case.fixture";
+import { PlanStepShown } from "../../../fixtures/plan-step-shown.fixture";
+import { PlanTitleCase } from "../../../fixtures/plan-title-case.fixture";
 import { RefusedError } from "../../../fixtures/refused-error.fixture";
+import { Required } from "../../../fixtures/required.fixture";
+import { RewindCase } from "../../../fixtures/rewind-case.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
+import { SampledFrame } from "../../../fixtures/sampled-frame.fixture";
+import { ShownNotice } from "../../../fixtures/shown-notice.fixture";
 import { ShownText } from "../../../fixtures/shown-text.fixture";
+import { StatRow } from "../../../fixtures/stat-row.fixture";
+import { StatusMark } from "../../../fixtures/status-mark.fixture";
+import { SteadyFrame } from "../../../fixtures/steady-frame.fixture";
+import { StepTextCase } from "../../../fixtures/step-text-case.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
+import { ThemeCase } from "../../../fixtures/theme-case.fixture";
 import { SamplePages } from "../../../fixtures/sample-pages.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
+import { WakeCase } from "../../../fixtures/wake-case.fixture";
 import { HistoryMessageComponent } from "../../../../src/app/components/history-message/history-message.component";
 import { TeammateAvatarComponent } from "../../../../src/app/components/teammate-avatar/teammate-avatar.component";
 import { ChatAction } from "../../../../src/app/enums/chat-action";
@@ -114,7 +145,7 @@ import { Resources } from "../../../../src/resources";
 describe("HistoryMessageComponent", () => {
   const decidedAt = "2026-09-10T08:05:00.000Z";
   const detail = (sequence: number, kind: DetailKind, text: string, payload: Record<string, unknown> | null = null): MessageDetail =>
-    new MessageDetail(sequence, kind, text, payload === null ? null : JSON.parse(JSON.stringify(payload)), SampleData.timestamp);
+    new MessageDetail(sequence, kind, text, Object.isNull(payload) ? null : JSON.parse(JSON.stringify(payload)), SampleData.timestamp);
   const steps = [
     detail(0, DetailKind.Command, "> ls\nfile.txt", { tool: "Bash" }),
     detail(1, DetailKind.Text, "Here is **the** answer."),
@@ -127,7 +158,12 @@ describe("HistoryMessageComponent", () => {
   let shown: WritableSignal<boolean>;
   let fixture: ComponentFixture<HistoryMessageComponent>;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new PartReadError("The fixture has no element.");
+    return native;
+  };
   const store = (): ChatStoreService => TestBed.inject(ChatStoreService);
   const render = (message: Message): void => {
     fixture = TestBed.createComponent(HistoryMessageComponent);
@@ -152,12 +188,30 @@ describe("HistoryMessageComponent", () => {
     fixture.detectChanges();
   };
   const textOf = (selector: string): string | null => element().querySelector(selector)?.textContent?.trim() ?? null;
-  const box = (selector: string): DOMRect => element().querySelector(selector)?.getBoundingClientRect() ?? new DOMRect();
+  const box = (selector: string): DOMRect => one(selector).getBoundingClientRect();
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
     const found = root.querySelector<HTMLElement>(selector);
     if (Object.isNull(found))
-      throw new Error(`Nothing matches ${selector}.`);
+      throw new PartReadError(`Nothing matches ${selector}.`);
     return found;
+  };
+  const hostOf = <T>(component: ComponentFixture<T>): HTMLElement => {
+    const native: unknown = component.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new PartReadError("The component has no element.");
+    return native;
+  };
+  const messageView = (): MessageComponent => {
+    const view: unknown = fixture.debugElement.query(By.directive(MessageComponent)).componentInstance;
+    if (!(view instanceof MessageComponent))
+      throw new PartReadError("The message shows no message view.");
+    return view;
+  };
+  const clipboard = (): ClipboardWriterFixture => {
+    const writer = TestBed.inject(ClipboardWriter);
+    if (!(writer instanceof ClipboardWriterFixture))
+      throw new PartReadError("The clipboard is not the fixture's.");
+    return writer;
   };
   const middleOf = (rect: DOMRect): number => rect.top + rect.height / 2;
   const awaitingPlan = (approved: boolean = false): Message => new Message("m2", "c1", 1, MessageAuthor.Provider, "m1", MessageStatus.Completed,
@@ -197,10 +251,10 @@ describe("HistoryMessageComponent", () => {
     await click(statsButton());
     return Wait.until(() => one(panelSelector, document));
   };
-  const statRows = (view: HTMLElement): string[][] => [...view.querySelectorAll(".stats-row")]
-    .map(t => [t.classList.contains("part") ? "part" : "row", t.querySelector("dt")?.textContent?.trim() ?? "", t.querySelector("dd")?.textContent?.trim() ?? ""]);
+  const statRows = (view: HTMLElement): StatRow[] => [...view.querySelectorAll(".stats-row")]
+    .map(t => new StatRow(t.classList.contains("part") ? "part" : "row", Required.of(one("dt", t).textContent).trim(), Required.of(one("dd", t).textContent).trim()));
   const planned = (...statuses: PlanStepStatus[]): MessageDetail => detail(1, DetailKind.Plan, "Plan", new ReplyPlan(statuses.map((t, i) =>
-    new PlanStep(["Read the code", "Fix the bug", "Run the tests"][i]!, t, i === 1 ? "Fixing the bug" : null)), null).toJson());
+    new PlanStep(Required.of(["Read the code", "Fix the bug", "Run the tests"][i]), t, i === 1 ? "Fixing the bug" : null)), null).toJson());
   const planReply = (plan: MessageDetail): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Running,
     [detail(0, DetailKind.Text, "Here's my plan."), plan, detail(2, DetailKind.Command, "> ls\nfile.txt", { tool: "Bash" }), detail(3, DetailKind.Text, "Done.")]);
   const openConversation = async (): Promise<void> => {
@@ -253,7 +307,7 @@ describe("HistoryMessageComponent", () => {
   it("opens a reply's link with how the person opened it, a click, Ctrl+click or a middle click, so the window places it by the Links settings", async () => {
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "See [the docs](https://example.com/docs).")]));
     await Wait.until(() => expect(element().querySelector("a.nol-markdown-link")).not.toBeNull(), MarkdownWait.coldImport);
-    const link = element().querySelector<HTMLAnchorElement>("a.nol-markdown-link")!;
+    const link = Required.of(element().querySelector<HTMLAnchorElement>("a.nol-markdown-link"));
 
     link.dispatchEvent(new MouseEvent("click", { button: 0, bubbles: true, cancelable: true }));
     link.dispatchEvent(new MouseEvent("click", { button: 0, ctrlKey: true, bubbles: true, cancelable: true }));
@@ -299,10 +353,9 @@ describe("HistoryMessageComponent", () => {
   });
 
   it.each([
-    { shown: "a reply, only the name it hands off to", author: MessageAuthor.Provider, provenance: SampleData.provenance, sender: null, marked: ["@Bob"] },
-    { shown: "a teammate's send, only the name it sends to", author: MessageAuthor.User, provenance: null, sender: new MessageSender("c2", "t1", "Code Reviewer"),
-      marked: ["@Bob"] },
-    { shown: "the person's message, a quoted name too", author: MessageAuthor.User, provenance: null, sender: null, marked: ["@Alice", "@Bob"] }
+    new MentionCase("a reply, only the name it hands off to", MessageAuthor.Provider, SampleData.provenance, null, ["@Bob"]),
+    new MentionCase("a teammate's send, only the name it sends to", MessageAuthor.User, null, new MessageSender("c2", "t1", "Code Reviewer"), ["@Bob"]),
+    new MentionCase("the person's message, a quoted name too", MessageAuthor.User, null, null, ["@Alice", "@Bob"])
   ])("marks in $shown", async ({ author, provenance, sender, marked }) => {
     new TeammateFixture(context);
     await Wait.until(() => expect(store().teammates().length).toBeGreaterThan(1));
@@ -316,9 +369,11 @@ describe("HistoryMessageComponent", () => {
   });
 
   it.each([
-    { shown: "the person's bubble with no name under it", author: MessageAuthor.User, provenance: null, column: ".nol-message-bubble .nol-message-content", caption: null },
-    { shown: "a reply with its name under it", author: MessageAuthor.Provider, provenance: SampleData.provenance, column: ".nol-message-content", caption: "chart.png" }
-  ].flatMap(t => [ThemeMode.Light, ThemeMode.Dark].map(mode => ({ ...t, mode }))))("shows each attached image in $shown, in $mode, at the column's width up to 24rem high, and keeps a chip for other files", async ({ author, provenance, column, caption, mode }) => {
+    new AttachedImageCase("the person's bubble with no name under it", MessageAuthor.User, null, ".nol-message-bubble .nol-message-content", null, ThemeMode.Light),
+    new AttachedImageCase("the person's bubble with no name under it", MessageAuthor.User, null, ".nol-message-bubble .nol-message-content", null, ThemeMode.Dark),
+    new AttachedImageCase("a reply with its name under it", MessageAuthor.Provider, SampleData.provenance, ".nol-message-content", "chart.png", ThemeMode.Light),
+    new AttachedImageCase("a reply with its name under it", MessageAuthor.Provider, SampleData.provenance, ".nol-message-content", "chart.png", ThemeMode.Dark)
+  ])("shows each attached image in $shown, in $mode, at the column's width up to 24rem high, and keeps a chip for other files", async ({ author, provenance, column, caption, mode }) => {
     AppearanceFixture.apply(FixtureTheme.theme, mode);
     const canvas = document.createElement("canvas");
     canvas.width = 1200;
@@ -336,11 +391,10 @@ describe("HistoryMessageComponent", () => {
     fixture.detectChanges();
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const frame = box(".nol-teamrun-image-frame");
-    const named = box(".nol-teamrun-image-caption");
     const area = box(column);
     expect([...element().querySelectorAll(".nol-message-attachment-name")].map(t => t.textContent?.trim())).toEqual(["notes.txt"]);
     expect(textOf(".nol-teamrun-image-caption")).toBe(caption);
-    expect(box(".nol-teamrun-image-preview").bottom).toBeCloseTo(Object.isNull(caption) ? frame.bottom : named.bottom, 0);
+    expect(box(".nol-teamrun-image-preview").bottom).toBeCloseTo(Object.isNull(caption) ? frame.bottom : box(".nol-teamrun-image-caption").bottom, 0);
     expect(frame.width).toBeGreaterThan(0);
     expect(frame.left).toBeGreaterThanOrEqual(area.left - 0.5);
     expect(frame.right).toBeLessThanOrEqual(area.right + 0.5);
@@ -348,6 +402,7 @@ describe("HistoryMessageComponent", () => {
     expect(Math.min(Math.abs(frame.height - 24 * rem), Math.abs(frame.width - box(".attached-images").width))).toBeLessThan(1);
     expect(frame.width / frame.height).toBeCloseTo(1200 / 900, 1);
     if (!Object.isNull(caption)) {
+      const named = box(".nol-teamrun-image-caption");
       expect(named.top).toBeGreaterThanOrEqual(frame.bottom - 0.5);
       expect(named.left).toBeCloseTo(frame.left, 0);
     }
@@ -359,14 +414,19 @@ describe("HistoryMessageComponent", () => {
   });
 
   it("sets narrow attached images side by side 0.25rem apart, wraps a wide one to its own row 1.5rem below, and names each in its tooltip", async () => {
-    const sizes = new Map<string, [width: number, height: number]>([["tall.png", [120, 160]], ["small.png", [90, 120]], ["wide.png", [6000, 1000]]]);
+    const sizes = new Map<string, ImageSize>().set("tall.png", new ImageSize(120, 160)).set("small.png", new ImageSize(90, 120)).set("wide.png", new ImageSize(6000, 1000));
     context.answer(MethodName.AttachmentShare, parameters => {
       const name = AttachmentReadParams.fromJson(parameters).path.slice("D:/data/attachments/".length);
       const canvas = document.createElement("canvas");
-      [canvas.width, canvas.height] = sizes.get(name)!;
+      const size = Required.of(sizes.get(name));
+      canvas.width = size.width;
+      canvas.height = size.height;
       return context.share(canvas.toDataURL("image/png"));
     });
-    const attachments = [...sizes].map(([name, [width, height]]) => new MessageAttachment(name, "image/png", 1000, `D:/data/attachments/${name}`, width, height));
+    const attachments = [...sizes.keys()].map(name => {
+      const size = Required.of(sizes.get(name));
+      return new MessageAttachment(name, "image/png", 1000, `D:/data/attachments/${name}`, size.width, size.height);
+    });
     const viewer = ImageViewerService.of(context, TestBed.inject(ImageViewerService.clipboard));
     const read = viewer.loadAsync.bind(viewer);
     const loads: Promise<HTMLImageElement | null>[] = [];
@@ -389,21 +449,25 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelectorAll(".nol-teamrun-image")).toHaveLength(3);
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const previews = [...element().querySelectorAll("nol-teamrun-image-preview")];
-    const [tall, small, wide] = previews.map(t => t.getBoundingClientRect());
+    const rects = previews.map(t => t.getBoundingClientRect());
+    const tall = Required.of(rects[0]);
+    const small = Required.of(rects[1]);
+    const wide = Required.of(rects[2]);
     const frames = [...element().querySelectorAll(".nol-teamrun-image-frame")].map(t => t.getBoundingClientRect());
     const area = box(".attached-images");
     expect(frames.slice(0, 2).map(t => `${Math.round(t.width)}x${Math.round(t.height)}`)).toEqual(["120x160", "90x120"]);
-    expect((small!.left - tall!.right) / rem).toBeCloseTo(0.25, 1);
-    expect(small!.bottom).toBeCloseTo(tall!.bottom, 0);
-    expect(frames[1]!.bottom).toBeCloseTo(frames[0]!.bottom, 0);
-    expect(tall!.left).toBeCloseTo(area.left, 0);
-    expect((wide!.top - tall!.bottom) / rem).toBeCloseTo(1.5, 1);
-    expect(wide!.left).toBeCloseTo(area.left, 0);
-    expect(frames[2]!.width).toBeCloseTo(area.width, 0);
+    expect((small.left - tall.right) / rem).toBeCloseTo(0.25, 1);
+    expect(small.bottom).toBeCloseTo(tall.bottom, 0);
+    expect(Required.of(frames[1]).bottom).toBeCloseTo(Required.of(frames[0]).bottom, 0);
+    expect(tall.left).toBeCloseTo(area.left, 0);
+    expect((wide.top - tall.bottom) / rem).toBeCloseTo(1.5, 1);
+    expect(wide.left).toBeCloseTo(area.left, 0);
+    expect(Required.of(frames[2]).width).toBeCloseTo(area.width, 0);
 
-    await userEvent.hover(previews[1]!.querySelector(".nol-teamrun-image-frame")!);
+    const smallFrame = Required.of(Required.of(previews[1]).querySelector(".nol-teamrun-image-frame"));
+    await userEvent.hover(smallFrame);
     await Wait.until(() => expect(document.querySelector(".cdk-overlay-container nol-tooltip")?.textContent?.trim()).toBe("small.png"));
-    await userEvent.unhover(previews[1]!.querySelector(".nol-teamrun-image-frame")!);
+    await userEvent.unhover(smallFrame);
   });
 
   it("puts a finished reply's line before its answer, closed until asked, opens its steps and the text between them as one block before the answer, and lists the files it edited", async () => {
@@ -432,10 +496,10 @@ describe("HistoryMessageComponent", () => {
     expect(blocks).toHaveLength(1);
     expect([...element().querySelectorAll("nol-teamrun-activity-block .nol-tool-call-title")].map(t => t.textContent)).toEqual(["> ls", "Edit: D:\\other\\a.ts"]);
     await Wait.until(() => expect(blocks[0]?.querySelector(".step-text strong")?.textContent).toBe("the"), MarkdownWait.coldImport);
-    const answer = [...element().querySelectorAll(".nol-markdown-view")].at(-1)!;
+    const answer = Required.of([...element().querySelectorAll(".nol-markdown-view")].at(-1));
     expect(answer.textContent?.trim()).toBe("Done.");
-    expect((blocks[0]?.compareDocumentPosition(answer) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(((toggle?.compareDocumentPosition(blocks[0]!) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(Required.of(blocks[0]).compareDocumentPosition(answer) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(Required.of(toggle).compareDocumentPosition(Required.of(blocks[0])) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
     await click(toggle);
     expect(element().querySelector("nol-teamrun-activity-block")).toBeNull();
@@ -556,16 +620,16 @@ describe("HistoryMessageComponent", () => {
       expect(stepTitle()).toBe("> ls");
 
       await show(running(ls, make));
-      const seen = [stepTitle() ?? String.empty];
+      const seen = [Required.of(stepTitle())];
       await frames(() => {
-        const title = stepTitle() ?? String.empty;
+        const title = Required.of(stepTitle());
         if (title !== seen.at(-1))
           seen.push(title);
         return title === "> make all";
       });
       expect(seen[0]?.length).toBeLessThan("> make all".length);
       expect(seen.length).toBeGreaterThan(2);
-      expect(seen.every((title, index) => "> make all".startsWith(title) && title.length > (index === 0 ? 0 : seen[index - 1]?.length ?? 0))).toBe(true);
+      expect(seen.every((title, index) => "> make all".startsWith(title) && title.length > (index === 0 ? 0 : Required.of(seen[index - 1]).length))).toBe(true);
       expect(seen.at(-1)).toBe("> make all");
     });
 
@@ -645,7 +709,7 @@ describe("HistoryMessageComponent", () => {
     expect(textOf(".activity-toggle .activity-text")).toBe("Working for 12s");
     expect(expanded()).toBe("false");
     expect(element().querySelector("nol-teamrun-activity-block")).toBeNull();
-    const times = (time: string): number => element().textContent!.split(time).length - 1;
+    const times = (time: string): number => Required.of(element().textContent).split(time).length - 1;
     expect(element().querySelector(".nol-message-footer :is(.activity-toggle, .activity-label, nol-spinner)")).toBeNull();
     expect(element().querySelectorAll(".activity-line nol-spinner")).toHaveLength(1);
     expect(times("12s")).toBe(1);
@@ -676,7 +740,7 @@ describe("HistoryMessageComponent", () => {
     fixture.componentRef.setInput("revealsStep", 1);
     fixture.componentRef.setInput("flashStart", new Date());
     await fixture.whenStable();
-    const controls = remembered.mock.lastCall![1];
+    const controls = Required.of(remembered.mock.lastCall)[1];
     const open = controls.expansion.activity();
 
     fixture.componentRef.setInput("flashStart", new Date(Date.now() + 1000));
@@ -689,12 +753,12 @@ describe("HistoryMessageComponent", () => {
   it("streams a working reply's text above its footer's Stop, holding back an emphasis still open", async () => {
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Running, [detail(0, DetailKind.Text, "Checking the build **now")]));
 
-    await Wait.until(() => expect((element().querySelector("nol-markdown-view") as HTMLElement).innerText.trim()).toBe("Checking the build"), MarkdownWait.coldImport);
+    await Wait.until(() => expect(one("nol-markdown-view").innerText.trim()).toBe("Checking the build"), MarkdownWait.coldImport);
     expect(box("nol-markdown-view").bottom).toBeLessThanOrEqual(box(".nol-message-footer .cancel").top);
   });
 
-  for (const [pace, loadedFrame] of [["", 0], [", also when each frame takes 80 ms, as on a loaded runner", 80]] as const)
-    it(`reveals a working reply's text at the streaming pace in the kit's bursts at least 48 ms apart, between batches six frames apart, never taking back what showed, and keeps its paragraphs' elements${pace}`, async () => {
+  for (const paced of [new PaceCase("", 0), new PaceCase(", also when each frame takes 80 ms, as on a loaded runner", 80)])
+    it(`reveals a working reply's text at the streaming pace in the kit's bursts at least 48 ms apart, between batches six frames apart, never taking back what showed, and keeps its paragraphs' elements${paced.pace}`, async () => {
       const words = Array.from({ length: 80 }, (_, index) => `word${index}`).join(" ");
       const first = "The first paragraph.";
       const reply = (length: number): Message =>
@@ -703,19 +767,19 @@ describe("HistoryMessageComponent", () => {
       const visibleOf = (node: Node): string => [...node.childNodes]
         .map(t => t instanceof Text ? t.data : t instanceof HTMLElement && !t.hidden ? visibleOf(t) : "").join("");
       const hides = (name: string, range: AbstractRange): boolean =>
-        range.startContainer.parentElement !== null && getComputedStyle(range.startContainer.parentElement, `::highlight(${name})`).color === "rgba(0, 0, 0, 0)";
-      const shownOf = (view: HTMLElement): number => visibleOf(view).length - [...CSS.highlights]
-        .flatMap(([name, ranges]) => [...ranges].filter((t): t is Range => t instanceof Range && view.contains(t.startContainer) && hides(name, t)))
+        !Object.isNull(range.startContainer.parentElement) && getComputedStyle(range.startContainer.parentElement, `::highlight(${name})`).color === "rgba(0, 0, 0, 0)";
+      const shownOf = (view: HTMLElement): number => visibleOf(view).length - [...CSS.highlights.keys()]
+        .flatMap(name => [...Required.of(CSS.highlights.get(name))].filter((t): t is Range => t instanceof Range && view.contains(t.startContainer) && hides(name, t)))
         .reduce((sum, t) => sum + t.toString().length, 0);
       render(reply(40));
       await Wait.until(() => expect(element().querySelectorAll("nol-markdown-view p")).toHaveLength(2), MarkdownWait.coldImport);
       const view = one("nol-markdown-view");
       const paragraphs = [...view.querySelectorAll("p")];
-      const frames: [number, number, number | undefined][] = [];
+      const frames: SampledFrame[] = [];
       let rendered: number | undefined = arrivedOf(40);
       const sample = (time: number): void => {
-        frames.push([time, shownOf(view), rendered]);
-        while (performance.now() < time + loadedFrame)
+        frames.push(new SampledFrame(time, shownOf(view), rendered));
+        while (performance.now() < time + paced.loadedFrame)
           continue;
         frame = requestAnimationFrame(sample);
       };
@@ -723,22 +787,18 @@ describe("HistoryMessageComponent", () => {
 
       try {
         const waitStart = performance.now();
-        try {
-          await Wait.until(() => expect(frames.filter(t => t[1] === t[2]).length).toBeGreaterThanOrEqual(2), { timeout: 1_000 + 2 * loadedFrame });
-        }
-        catch (error) {
-          throw new Error(`After ${Math.round(performance.now() - waitStart)} ms, ${frames.length} sampled frames, fewer than two showing all ${arrivedOf(40)} arrived characters; `
-            + `text ${JSON.stringify(visibleOf(view))}; highlights ${JSON.stringify([...CSS.highlights].map(([name, ranges]) => [name, [...ranges].map(t => t.toString())]))}; `
-            + `frames as [ms from the wait, shown, arrived] ${JSON.stringify(frames.map(t => [Math.round(t[0] - waitStart), t[1], t[2]]))}`, { cause: error });
-        }
+        await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(2), { timeout: FrameWait.hangGuard });
+        expect(frames.slice(0, 2).map(t => t.shown), `The first two sampled frames show all ${arrivedOf(40)} arrived characters, as the kit shows a working reply's first text at once; `
+          + `text ${JSON.stringify(visibleOf(view))}; highlights ${JSON.stringify([...CSS.highlights.keys()].map(name => [name, [...Required.of(CSS.highlights.get(name))].map(t => t.toString())]))}; `
+          + `frames as [ms from the wait, shown, arrived] ${JSON.stringify(frames.map(t => [Math.round(t.time - waitStart), t.shown, t.arrived]))}`).toEqual([arrivedOf(40), arrivedOf(40)]);
         for (const length of [140, 240, 340]) {
           rendered = undefined;
           await show(reply(length));
           rendered = arrivedOf(length);
           const sampled = frames.length;
-          await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(sampled + 6), { timeout: 1_000 + 6 * loadedFrame });
+          await Wait.until(() => expect(frames.length).toBeGreaterThanOrEqual(sampled + 6), { timeout: FrameWait.hangGuard });
         }
-        await Wait.until(() => expect(frames.at(-1)?.[1]).toBe(frames.at(-1)?.[2]), { timeout: 5_000 });
+        await Wait.until(() => expect(frames.at(-1)?.shown).toBe(frames.at(-1)?.arrived), { timeout: FrameWait.hangGuard });
       }
       finally {
         cancelAnimationFrame(frame);
@@ -746,47 +806,53 @@ describe("HistoryMessageComponent", () => {
 
       const step = (left: number, elapsed: number): number => Math.min(left, Math.max(left * (1 - Math.exp(-elapsed / 250)), 40 * elapsed / 1_000));
       const burst = 48;
-      const timeAt = (index: number): number => frames[index]?.[0] ?? 0;
-      const shownAt = (index: number): number => frames[index]?.[1] ?? 0;
-      const lastShowing = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t[1] !== shownAt(at - 1));
-      const lastArrival = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t[2] !== frames[at - 1]?.[2]);
-      const batchStart = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t[2] !== frames[at - 1]?.[2] && frames[at - 1]?.[2] !== undefined);
-      const sinceBase = (index: number, base: number): [number, number][] =>
-        [[base, timeAt(index) - timeAt(base)], [base, timeAt(index - 1) - timeAt(base - 1)]];
-      const sinceBursts = (index: number): [number, number][] => [lastShowing(index), lastArrival(index), lastArrival(index) + 1]
+      const timeAt = (index: number): number => Required.of(frames[index]).time;
+      const shownAt = (index: number): number => Required.of(frames[index]).shown;
+      const lastShowing = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t.shown !== shownAt(at - 1));
+      const lastArrival = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t.arrived !== frames[at - 1]?.arrived);
+      const batchStart = (index: number): number => frames.findLastIndex((t, at) => at > 0 && at < index && t.arrived !== frames[at - 1]?.arrived && !Object.isUndefined(frames[at - 1]?.arrived));
+      const sinceBase = (index: number, base: number): BurstSince[] =>
+        [new BurstSince(base, timeAt(index) - timeAt(base)), new BurstSince(base, timeAt(index - 1) - timeAt(base - 1))];
+      const sinceBursts = (index: number): BurstSince[] => [lastShowing(index), lastArrival(index), lastArrival(index) + 1]
         .filter(t => t > 0 && t < index).flatMap(t => sinceBase(index, t));
-      const steady = frames.flatMap(([time, shown, arrived], index) => {
+      const steady = frames.flatMap((sampled, index) => {
+        const time = sampled.time;
+        const shown = sampled.shown;
+        const arrived = sampled.arrived;
         const before = frames[index - 1];
-        if (index < 4 || arrived === undefined || frames.slice(index - 4, index).some(t => t[2] !== arrived) || before === undefined)
+        if (index < 4 || Object.isUndefined(arrived) || frames.slice(index - 4, index).some(t => t.arrived !== arrived) || Object.isUndefined(before))
           return [];
-        const fits = shown === before[1]
-          ? shown === arrived || sinceBursts(index).some(([, elapsed]) => elapsed < burst)
-          : sinceBursts(index).some(([base, elapsed]) => Math.abs(shown - shownAt(base) - step(arrived - shownAt(base), elapsed)) <= 1);
-        return [[time - before[0], fits ? "fits" : `frame ${index} showed ${shown - before[1]} of ${arrived - before[1]} left`] as const];
+        const fits = shown === before.shown
+          ? shown === arrived || sinceBursts(index).some(t => t.elapsed < burst)
+          : sinceBursts(index).some(t => Math.abs(shown - shownAt(t.base) - step(arrived - shownAt(t.base), t.elapsed)) <= 1);
+        return [new SteadyFrame(time - before.time, fits ? "fits" : `frame ${index} showed ${shown - before.shown} of ${arrived - before.shown} left`)];
       });
-      const steadyTime = steady.reduce((sum, [elapsed]) => sum + elapsed, 0);
-      const fast = frames.flatMap(([, shown, arrived], index) => {
+      const steadyTime = steady.reduce((sum, t) => sum + t.elapsed, 0);
+      const fast = frames.flatMap((sampled, index) => {
+        const shown = sampled.shown;
+        const arrived = sampled.arrived;
         const before = frames[index - 1];
         const base = lastShowing(index) > 0 ? lastShowing(index) : batchStart(index);
-        return index < 2 || base < 1 || before === undefined || arrived === undefined || shown === before[1]
-          || sinceBase(index, base).some(([, elapsed]) => shown - shownAt(base) <= step(arrived - shownAt(base), elapsed) + 1) ? [] :
-          [`frame ${index} showed ${shown - before[1]} of ${arrived - before[1]} left`];
+        return index < 2 || base < 1 || Object.isUndefined(before) || Object.isUndefined(arrived) || shown === before.shown
+          || sinceBase(index, base).some(t => shown - shownAt(base) <= step(arrived - shownAt(base), t.elapsed) + 1) ? [] :
+          [`frame ${index} showed ${shown - before.shown} of ${arrived - before.shown} left`];
       });
-      const last = frames.findLastIndex(t => (t[2] ?? t[1]) - t[1] >= 6);
-      const ended = frames.findIndex((t, index) => index > last && t[1] === t[2]);
-      const changed = frames.findLastIndex((t, index) => index > 0 && index <= last && t[1] !== shownAt(index - 1));
+      const last = frames.findLastIndex(t => (t.arrived ?? t.shown) - t.shown >= 6);
+      const ended = frames.findIndex((t, index) => index > last && t.shown === t.arrived);
+      const changed = frames.findLastIndex((t, index) => index > 0 && index <= last && t.shown !== shownAt(index - 1));
       const start = changed > 0 ? changed : last;
-      const [lastFrame, endedFrame] = [frames[last], frames[ended]];
+      const lastFrame = frames[last];
+      const endedFrame = frames[ended];
 
-      expect(frames.every((t, index) => index === 0 || t[1] >= (frames[index - 1]?.[1] ?? 0))).toBe(true);
+      expect(frames.every((t, index) => index === 0 || t.shown >= shownAt(index - 1))).toBe(true);
       expect(steadyTime, `${steady.length} steady frames over ${Math.round(steadyTime)} ms`).toBeGreaterThan(1_000 / 3);
-      expect(steady.map(([, t]) => t).filter(t => t !== "fits")).toEqual([]);
+      expect(steady.map(t => t.verdict).filter(t => t !== "fits")).toEqual([]);
       expect(fast).toEqual([]);
-      if (lastFrame === undefined || endedFrame === undefined)
-        throw new Error(`The reply never showed all it had: ${frames.length} frames, the last with 6 or more characters left at ${last}, all shown at ${ended}.`);
-      const left = (lastFrame[2] ?? lastFrame[1]) - lastFrame[1];
-      const tails = [0, 1].map(t => (frames[ended - t]?.[0] ?? 0) - (frames[start - t]?.[0] ?? 0));
-      const gap = Math.max(...frames.slice(start - 1, ended + 1).map((t, index, all) => index === 0 ? 0 : t[0] - (all[index - 1]?.[0] ?? 0)));
+      if (Object.isUndefined(lastFrame) || Object.isUndefined(endedFrame))
+        throw new PartReadError(`The reply never showed all it had: ${frames.length} frames, the last with 6 or more characters left at ${last}, all shown at ${ended}.`);
+      const left = (lastFrame.arrived ?? lastFrame.shown) - lastFrame.shown;
+      const tails = [0, 1].map(t => timeAt(ended - t) - timeAt(start - t));
+      const gap = Math.max(...frames.slice(start - 1, ended + 1).map((t, index, all) => index === 0 ? 0 : t.time - Required.of(all[index - 1]).time));
       expect(tails.filter(t => t >= (left - 1) * 25 - 5 && t <= left * 25 + gap + burst + 5), `${left} characters took ${tails.join(" or ")} ms`).not.toHaveLength(0);
       expect(view.querySelectorAll("p")[0]).toBe(paragraphs[0]);
       expect(view.querySelectorAll("p")[1]).toBe(paragraphs[1]);
@@ -808,8 +874,8 @@ describe("HistoryMessageComponent", () => {
 
     expect(emptied).toHaveLength(3);
     expect(without).toHaveLength(3);
-    for (const [index, value] of emptied.entries())
-      expect(Math.abs(value - (without[index] ?? Number.NaN))).toBeLessThan(0.5);
+    for (let index = 0; index < emptied.length; index++)
+      expect(Math.abs(Required.of(emptied[index]) - (without[index] ?? Number.NaN))).toBeLessThan(0.5);
   });
 
   it("keeps a command in one row from its start to its end, and marks a non-zero exit failed with its code inside the open row", async () => {
@@ -822,7 +888,9 @@ describe("HistoryMessageComponent", () => {
 
     await show(SampleData.withStatus(SampleData.reply, MessageStatus.Running, [command("$ npm test\nFailed to create unified exec process\n(exit -1)", -1, "failed")]));
     await Wait.until(() => expect(textOf(".nol-tool-call-status")).toBe("Failed"));
-    const [card, header, error] = [box(".nol-tool-call"), box(".nol-tool-call-header"), box(".nol-tool-call-error")];
+    const card = box(".nol-tool-call");
+    const header = box(".nol-tool-call-header");
+    const error = box(".nol-tool-call-error");
 
     expect(element().querySelectorAll(".calls > li")).toHaveLength(1);
     expect(textOf(".nol-tool-call-error > span:last-child")).toBe(Resources.formatExitCode(-1));
@@ -840,7 +908,8 @@ describe("HistoryMessageComponent", () => {
 
     await show(SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled, cut));
     await Wait.until(() => expect(textOf(".nol-tool-call-status")).toBe("Cancelled"));
-    const [header, state] = [box(".nol-tool-call-header"), box(".nol-tool-call-state")];
+    const header = box(".nol-tool-call-header");
+    const state = box(".nol-tool-call-state");
 
     expect(textOf(".nol-tool-call-status-glyph")).toBe("block");
     expect(state.left).toBeGreaterThanOrEqual(header.left);
@@ -853,7 +922,8 @@ describe("HistoryMessageComponent", () => {
     render(SampleData.withStatus(SampleData.reply, MessageStatus.AwaitingApproval, [command("inProgress")]));
     await click(element().querySelector(".activity-toggle"));
     await Wait.until(() => expect(textOf(".nol-tool-call-status")).toBe("Waiting for permission"));
-    const [header, state] = [box(".nol-tool-call-header"), box(".nol-tool-call-state")];
+    const header = box(".nol-tool-call-header");
+    const state = box(".nol-tool-call-state");
 
     expect(textOf(".nol-tool-call-status-glyph")).toBe("pan_tool");
     expect(textOf(".nol-message-header .nol-chip")).toBe(textOf(".nol-tool-call-status"));
@@ -873,7 +943,7 @@ describe("HistoryMessageComponent", () => {
       detail(1, DetailKind.Note, "The reply was cancelled.")];
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Cancelled, cut));
     await Wait.until(() => expect(element().querySelector(".activity-toggle")).not.toBeNull());
-    element().querySelector<HTMLButtonElement>(".activity-toggle")!.click();
+    Required.of(element().querySelector<HTMLButtonElement>(".activity-toggle")).click();
     await Wait.until(() => expect(element().querySelectorAll(".calls > li")).toHaveLength(1));
 
     expect(textOf(".nol-message-header .nol-chip")).toBe("Cancelled");
@@ -895,10 +965,10 @@ describe("HistoryMessageComponent", () => {
       detail(2, DetailKind.Command, "$ npm test\n", { command: "npm test", cwd: "D:\\repo", exitCode: null, status: "inProgress" })];
 
     const failure = detail(3, DetailKind.Error, "The provider stopped answering.");
-    const cases: readonly (readonly [MessageStatus, readonly MessageDetail[]])[] =
-      [[MessageStatus.Cancelled, cut], [MessageStatus.Interrupted, cut], [MessageStatus.Failed, [...cut, failure]]];
-    for (const [status, details] of cases) {
-      render(SampleData.withStatus(SampleData.reply, status, details));
+    const cases: readonly CutReplyCase[] =
+      [new CutReplyCase(MessageStatus.Cancelled, cut), new CutReplyCase(MessageStatus.Interrupted, cut), new CutReplyCase(MessageStatus.Failed, [...cut, failure])];
+    for (const cutCase of cases) {
+      render(SampleData.withStatus(SampleData.reply, cutCase.status, cutCase.details));
       await Wait.until(() => expect(textOf(".nol-markdown-view")).toBe("Here is half an answer"), MarkdownWait.coldImport);
       const toggle = element().querySelector<HTMLButtonElement>(".activity-toggle");
       const text = box(".nol-markdown-view");
@@ -926,7 +996,7 @@ describe("HistoryMessageComponent", () => {
     fixture.detectChanges();
     expect(clock.running).toBe(1);
     expect(textOf(".activity-text")).toBe("Working for 17s");
-    expect(element().textContent!.split("17s").length - 1).toBe(1);
+    expect(Required.of(element().textContent).split("17s").length - 1).toBe(1);
   });
 
   it("puts a working reply's Stop in its footer's end, alone, without a spinner, keeps the footer shown without hover, and cancels the reply", async () => {
@@ -939,18 +1009,18 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelectorAll(".cancel")).toHaveLength(1);
     expect(element().querySelector(".nol-message-footer-end nol-spinner")).toBeNull();
     expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
-    await userEvent.unhover(element().querySelector(".nol-message")!);
+    await userEvent.unhover(Required.of(element().querySelector(".nol-message")));
     expect(document.querySelectorAll(".nol-message:is(:hover, :focus-within)")).toHaveLength(0);
-    await Wait.until(() => expect(getComputedStyle(element().querySelector(".nol-message-footer")!).opacity).toBe("1"));
+    await Wait.until(() => expect(getComputedStyle(Required.of(element().querySelector(".nol-message-footer"))).opacity).toBe("1"));
 
     await click(element().querySelector(".nol-message-footer .cancel"));
     await Wait.until(() => expect(context.parametersOf(MethodName.MessageCancel)).toEqual(new MessageIdParams(running.id).toJson()));
   });
 
   describe.each([
-    { look: "light", mode: ThemeMode.Light, forcedColors: "none" },
-    { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
-    { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
+    new ThemeCase("light", ThemeMode.Light, "none"),
+    new ThemeCase("dark", ThemeMode.Dark, "none"),
+    new ThemeCase("forced colors", ThemeMode.Light, "active")
   ])("in $look", ({ mode, forcedColors }) => {
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
@@ -980,10 +1050,10 @@ describe("HistoryMessageComponent", () => {
       const stop = (): HTMLButtonElement => {
         const found = element().querySelector(".nol-message-footer .cancel");
         if (!(found instanceof HTMLButtonElement))
-          throw new Error("Stop is not shown.");
+          throw new PartReadError("Stop is not shown.");
         return found;
       };
-      const before = [box(".nol-message-footer .cancel"), box(".activity-line")] as const;
+      const before = [box(".nol-message-footer .cancel"), box(".activity-line")];
 
       stop().focus();
       await userEvent.keyboard("{Enter}");
@@ -996,9 +1066,14 @@ describe("HistoryMessageComponent", () => {
       expect([textOf(".activity-text"), stop().getAttribute("aria-disabled"), stop().disabled, document.activeElement === stop(), calls])
         .toEqual(["Stopping…", "true", false, true, 1]);
       expect(textOf(".nol-message-footer .cancel")).toMatch(/Stop$/u);
-      for (const [earlier, after] of [[before[0], box(".nol-message-footer .cancel")], [before[1], box(".activity-line")]] as const)
-        for (const edge of ["left", "top", "width", "height"] as const)
+      const afterStop = [box(".nol-message-footer .cancel"), box(".activity-line")];
+      const edges: readonly ("left" | "top" | "width" | "height")[] = ["left", "top", "width", "height"];
+      for (let index = 0; index < afterStop.length; index++) {
+        const earlier = Required.of(before[index]);
+        const after = Required.of(afterStop[index]);
+        for (const edge of edges)
           AppearanceFixture.expectPixels(after[edge], earlier[edge]);
+      }
       held.reject(new Error("The reply couldn't be stopped."));
       await Wait.until(() => expect(stop().getAttribute("aria-disabled")).toBeNull());
       fixture.detectChanges();
@@ -1008,7 +1083,8 @@ describe("HistoryMessageComponent", () => {
     it("keeps a working reply's footer row as tall while its Stop shows as once the reply has finished, with the default theme, and Stop the row's height", async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       const running = await working();
-      const [row, stop] = [box(".nol-message-footer"), box(".nol-message-footer .cancel")];
+      const row = box(".nol-message-footer");
+      const stop = box(".nol-message-footer .cancel");
 
       await show(SampleData.withStatus(running, MessageStatus.Completed, steps.slice(0, 2)));
       await Wait.until(() => expect(element().querySelector(".cancel")).toBeNull());
@@ -1029,7 +1105,7 @@ describe("HistoryMessageComponent", () => {
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       const line = box(".reply-stopped");
       const answer = box(".nol-markdown-view");
-      const after = [...element().querySelectorAll(".nol-markdown-view")].at(1)?.getBoundingClientRect() ?? new DOMRect();
+      const after = Required.of([...element().querySelectorAll(".nol-markdown-view")].at(1)).getBoundingClientRect();
       const style = getComputedStyle(one(".reply-stopped"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-error)";
@@ -1119,8 +1195,8 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(context.ranCommands).toEqual([{ name: "browser.openPage", commandArguments: { profileKey: "p1", instance: "c1" } }]));
     vi.spyOn(context, "runCommandAsync").mockRejectedValueOnce(new Error("The Browser isn't installed."));
     await click(page());
-    await Wait.until(() => expect(context.shownNotices().map(t => [t.title, t.text, t.severity]))
-      .toEqual([["Couldn't open the page", Resources.chatPageNotShown, NotificationSeverity.Error]]));
+    await Wait.until(() => expect(context.shownNotices().map(t => new ShownNotice(t.title, t.text, t.severity)))
+      .toEqual([new ShownNotice("Couldn't open the page", Resources.chatPageNotShown, NotificationSeverity.Error)]));
     expect(Resources.chatPageNotShown).toBe("Couldn't bring the chat's page forward.");
   });
 
@@ -1181,7 +1257,7 @@ describe("HistoryMessageComponent", () => {
       ApprovalStatus.Pending, null, SampleData.timestamp, null).toJson());
 
     await Wait.until(() => expect(cards()).toHaveLength(1));
-    const card = cards()[0] ?? element();
+    const card = Required.of(cards()[0]);
     expect(card.querySelector(".nol-permission-card-risk")).not.toBeNull();
     expect(card.querySelector(".nol-permission-card-description")).toBeNull();
     expect(card.querySelector(".nol-permission-card-requester")?.nextElementSibling?.classList.contains("nol-permission-card-details")).toBe(true);
@@ -1210,8 +1286,8 @@ describe("HistoryMessageComponent", () => {
       const title = rows()[1]?.querySelector(".nol-tool-call-title")?.getBoundingClientRect();
       const note = rows()[1]?.querySelector(".nol-tool-call-note")?.getBoundingClientRect();
       expect(notes()).toEqual([null, " · waiting for your answer"]);
-      expect([note !== undefined && title !== undefined && note.left > title.left && note.right <= title.right + 0.5,
-        note !== undefined && title !== undefined && note.top >= title.top - 0.5 && note.bottom <= title.bottom + 0.5]).toEqual([true, true]);
+      expect([!Object.isUndefined(note) && !Object.isUndefined(title) && note.left > title.left && note.right <= title.right + 0.5,
+        !Object.isUndefined(note) && !Object.isUndefined(title) && note.top >= title.top - 0.5 && note.bottom <= title.bottom + 0.5]).toEqual([true, true]);
 
       context.emit(EventName.ApprovalUpdated, asked.withDecision("yes", decidedAt).toJson());
       await Wait.until(() => expect(cards()).toEqual([]));
@@ -1271,7 +1347,7 @@ describe("HistoryMessageComponent", () => {
 
     const text = (): DOMRect => box(".activity-label, .activity-text");
     const spinner = (): DOMRect => box(".activity-line nol-spinner");
-    const gap = Number.parseFloat(getComputedStyle(element().querySelector(".activity-line")!).columnGap);
+    const gap = Number.parseFloat(getComputedStyle(Required.of(element().querySelector(".activity-line"))).columnGap);
     expect(textOf(".activity-label")).toBe("Thinking… 12s");
     expect(box(".activity-label").bottom).toBeLessThanOrEqual(box(".nol-message-footer").top);
     expect(element().querySelector(".activity-toggle")).toBeNull();
@@ -1285,10 +1361,13 @@ describe("HistoryMessageComponent", () => {
 
     await show(SampleData.withStatus(running, MessageStatus.Running, steps.slice(0, 1)));
     expect(textOf(".activity-text")).toBe("Working for 14s");
-    for (const [index, after] of [box(".activity-line"), text()].entries()) {
-      expect(after.top).toBeCloseTo(before[index]!.top, 1);
-      expect(after.left).toBeCloseTo(before[index]!.left, 1);
-      expect(after.height).toBeCloseTo(before[index]!.height, 1);
+    const afterSteps = [box(".activity-line"), text()];
+    for (let index = 0; index < afterSteps.length; index++) {
+      const after = Required.of(afterSteps[index]);
+      const earlier = Required.of(before[index]);
+      expect(after.top).toBeCloseTo(earlier.top, 1);
+      expect(after.left).toBeCloseTo(earlier.left, 1);
+      expect(after.height).toBeCloseTo(earlier.height, 1);
     }
     expect(text().left - spinner().right).toBeCloseTo(gap, 1);
 
@@ -1309,15 +1388,16 @@ describe("HistoryMessageComponent", () => {
     context.emit(EventName.ReplyCheckpointStarted, new MessageIdParams(running.id).toJson());
     await fixture.whenStable();
     fixture.detectChanges();
-    const saving = [textOf(".activity-text"), box(".activity-text")] as const;
+    const savingText = textOf(".activity-text");
+    const savingBox = box(".activity-text");
     clock.advance(2_000);
     context.emit(EventName.ReplyCheckpointEnded, new MessageIdParams(running.id).toJson());
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect([saving[0], textOf(".activity-text")]).toEqual(["Saving a checkpoint… 12s", "Working for 14s"]);
-    AppearanceFixture.expectPixels(saving[1].left, before.left);
-    AppearanceFixture.expectPixels(saving[1].top, before.top);
+    expect([savingText, textOf(".activity-text")]).toEqual(["Saving a checkpoint… 12s", "Working for 14s"]);
+    AppearanceFixture.expectPixels(savingBox.left, before.left);
+    AppearanceFixture.expectPixels(savingBox.top, before.top);
   });
 
   it("shows a working reply's newest thought as its latest line, and its step title once a step or text follows it", async () => {
@@ -1343,7 +1423,7 @@ describe("HistoryMessageComponent", () => {
     const header = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header");
     const paragraph = (text: string): Element | undefined => [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === text);
     const follows = (first: Element | null | undefined, second: Element | null | undefined): number =>
-      (first?.compareDocumentPosition(second ?? first) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING;
+      Required.of(first).compareDocumentPosition(Required.of(second)) & Node.DOCUMENT_POSITION_FOLLOWING;
 
     expect(element().querySelectorAll("nol-teamrun-plan-card")).toHaveLength(1);
     expect([textOf("nol-teamrun-plan-card .title"), textOf("nol-teamrun-plan-card .progress"), header()?.getAttribute("aria-expanded")]).toEqual(["Plan", "0 of 3", "false"]);
@@ -1382,8 +1462,8 @@ describe("HistoryMessageComponent", () => {
   });
 
   it.each([
-    { state: "its chat's Plan first is off", planFirst: false, later: false },
-    { state: "a later message follows it", planFirst: true, later: true }
+    new PlanFirstCase("its chat's Plan first is off", false, false),
+    new PlanFirstCase("a later message follows it", true, true)
   ])("offers no Approve plan on a plan-first reply's open plan once $state", async ({ planFirst, later }) => {
     const after = new Message("m3", "c1", 2, MessageAuthor.User, null, MessageStatus.Completed, [detail(0, DetailKind.Text, "Shorter, please.")], null,
       SampleData.timestamp, null, SampleData.timestamp);
@@ -1415,8 +1495,8 @@ describe("HistoryMessageComponent", () => {
     const header = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header");
     const paragraph = (value: string): Element | undefined => [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === value);
     const follows = (first: Element | null | undefined, second: Element | null | undefined): number =>
-      (first?.compareDocumentPosition(second ?? first) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING;
-    const shown = (): string[] => [...element().querySelectorAll("nol-plan .nol-plan-text")].map(t => t.textContent?.trim() ?? "");
+      Required.of(first).compareDocumentPosition(Required.of(second)) & Node.DOCUMENT_POSITION_FOLLOWING;
+    const shown = (): string[] => [...element().querySelectorAll("nol-plan .nol-plan-text")].map(t => Required.of(t.textContent).trim());
 
     expect([textOf("nol-teamrun-plan-card .title"), textOf("nol-teamrun-plan-card .progress")]).toEqual(["Plan", "1 of 3"]);
     expect(paragraph("Read it first.")).toBeUndefined();
@@ -1445,21 +1525,23 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
     await click(element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header"));
     await Wait.until(() => expect(element().querySelector("nol-plan")).not.toBeNull());
-    const steps = (): (string | boolean)[][] => [...element().querySelectorAll("nol-plan .nol-plan-step")]
-      .map(t => [t.querySelector(".nol-plan-text")?.textContent?.trim() ?? "", !Object.isNull(t.querySelector(".nol-plan-spinner"))]);
+    const steps = (): PlanStepShown[] => [...element().querySelectorAll("nol-plan .nol-plan-step")]
+      .map(t => new PlanStepShown(Required.of(one(".nol-plan-text", t).textContent).trim(), !Object.isNull(t.querySelector(".nol-plan-spinner"))));
     const marker = (index: number): DOMRect => {
       const found = element().querySelectorAll("nol-plan .nol-plan-marker")[index];
       if (Object.isUndefined(found))
-        throw new Error(`The plan shows no step marker ${index}.`);
+        throw new PartReadError(`The plan shows no step marker ${index}.`);
       return found.getBoundingClientRect();
     };
 
-    expect(steps()).toEqual([["Read the code", false], ["Fixing the bug", true], ["Run the tests", false]]);
+    expect(steps()).toEqual([new PlanStepShown("Read the code", false), new PlanStepShown("Fixing the bug", true), new PlanStepShown("Run the tests", false)]);
 
     for (const status of [MessageStatus.Completed, MessageStatus.Failed, MessageStatus.Cancelled, MessageStatus.Interrupted]) {
       await show(SampleData.withStatus(running, status));
-      expect([status, steps(), textOf("nol-teamrun-plan-card .progress")]).toEqual([status, [["Read the code", false], ["Fix the bug", false], ["Run the tests", false]], "1 of 3"]);
-      const [ended, pending] = [marker(1), marker(2)];
+      expect([status, steps(), textOf("nol-teamrun-plan-card .progress")]).toEqual([status,
+        [new PlanStepShown("Read the code", false), new PlanStepShown("Fix the bug", false), new PlanStepShown("Run the tests", false)], "1 of 3"]);
+      const ended = marker(1);
+      const pending = marker(2);
       AppearanceFixture.expectPixels(ended.left, pending.left);
       AppearanceFixture.expectPixels(ended.width, pending.width);
       AppearanceFixture.expectPixels(ended.height, pending.height);
@@ -1502,10 +1584,10 @@ describe("HistoryMessageComponent", () => {
       await show(texted(heading));
       expect(title()).toBe("Plan");
     }
-    for (const [text, first] of [["Move the cache\n\n---\nRead it first.", "Move the cache"], ["Move the cache\n- - -", "Move the cache"],
-      ["- Read the code\n---", "- Read the code"], ["1. Read the code\n===", "1. Read the code"], ["Move the cache\n= Read it first.", "Move the cache"]] as const) {
-      await show(texted(text));
-      expect(title()).toBe(first);
+    for (const titled of [new PlanTitleCase("Move the cache\n\n---\nRead it first.", "Move the cache"), new PlanTitleCase("Move the cache\n- - -", "Move the cache"),
+      new PlanTitleCase("- Read the code\n---", "- Read the code"), new PlanTitleCase("1. Read the code\n===", "1. Read the code"), new PlanTitleCase("Move the cache\n= Read it first.", "Move the cache")]) {
+      await show(texted(titled.text));
+      expect(title()).toBe(titled.first);
     }
   });
 
@@ -1526,7 +1608,7 @@ describe("HistoryMessageComponent", () => {
     probe.style.color = "var(--nol-error)";
     expect(textOf(".reply-error-text")).toBe("The provider refused.");
     expect(textOf(".reply-error-glyph")).toBe("error");
-    expect(getComputedStyle(element().querySelector(".reply-error") ?? probe).color).toBe(getComputedStyle(probe).color);
+    expect(getComputedStyle(one(".reply-error")).color).toBe(getComputedStyle(probe).color);
     expect(getComputedStyle(probe).color).not.toBe(getComputedStyle(element()).color);
     expect(box(".reply-error-glyph").right).toBeLessThanOrEqual(box(".reply-error-text").left);
     expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1);
@@ -1535,15 +1617,15 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelector(".nol-message-error, .nol-message-retry, .nol-message-status")).toBeNull();
     probe.remove();
 
-    const marks: [MessageStatus, string | null, boolean | null][] = [];
+    const marks: StatusMark[] = [];
     for (const status of [MessageStatus.Pending, MessageStatus.AwaitingApproval, MessageStatus.Cancelled, MessageStatus.Interrupted]) {
       await show(SampleData.withStatus(SampleData.reply, status, []));
       const chip = element().querySelector(".nol-message-header .nol-chip");
-      marks.push([status, chip?.textContent?.trim() ?? null, chip?.classList.contains("nol-chip-failed") ?? null]);
+      marks.push(new StatusMark(status, chip?.textContent?.trim() ?? null, chip?.classList.contains("nol-chip-failed") ?? null));
     }
     expect(marks).toEqual([
-      [MessageStatus.Pending, null, null], [MessageStatus.AwaitingApproval, "Waiting for permission", false], [MessageStatus.Cancelled, "Cancelled", false],
-      [MessageStatus.Interrupted, "Interrupted", false]
+      new StatusMark(MessageStatus.Pending, null, null), new StatusMark(MessageStatus.AwaitingApproval, "Waiting for permission", false), new StatusMark(MessageStatus.Cancelled, "Cancelled", false),
+      new StatusMark(MessageStatus.Interrupted, "Interrupted", false)
     ]);
     expect(textOf(".activity-label")).toBe("Worked for 0s");
   });
@@ -1552,7 +1634,7 @@ describe("HistoryMessageComponent", () => {
     const until = new Date(clock.now() + 7_200_000).toISOString();
     const failed = (payload: Record<string, unknown> | null): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Failed,
       [detail(0, DetailKind.Error, "The provider's turn failed: You've hit your limit.", payload)]);
-    const notes = (): string[] => [...element().querySelectorAll(".reply-error-used-up")].map(t => (t.textContent ?? String.empty).trim());
+    const notes = (): string[] => [...element().querySelectorAll(".reply-error-used-up")].map(t => Required.of(t.textContent).trim());
     render(failed(null));
     await Wait.until(() => expect(textOf(".nol-message-author")).toBe("Codex · Work"));
     const plain = notes();
@@ -1568,10 +1650,12 @@ describe("HistoryMessageComponent", () => {
     expect(unknown).toEqual([Resources.formatUsedUpTurn("Codex · Work", Resources.usedUpLabel)]);
     expect(notes()).toEqual([Resources.formatUsedUpTurn("Codex · Work", TestBed.inject(UsageFormatterService).usedUpState(until))]);
     expect(notes()[0]).toMatch(/^Codex · Work: used up, resets [^.]+\.$/);
-    expect(texts.map(t => (t.textContent ?? String.empty).trim())).toEqual([notes()[0], "The provider's turn failed: You've hit your limit."]);
-    expect(texts[0]?.getBoundingClientRect().left).toBeCloseTo(texts[1]?.getBoundingClientRect().left ?? Number.NaN, 1);
-    expect((texts[1]?.getBoundingClientRect().top ?? 0) - (texts[0]?.getBoundingClientRect().bottom ?? 0)).toBeCloseTo(space, 1);
-    expect(texts[0]?.getBoundingClientRect().right).toBeLessThanOrEqual(box(".reply-error").right);
+    expect(texts.map(t => Required.of(t.textContent).trim())).toEqual([notes()[0], "The provider's turn failed: You've hit your limit."]);
+    const first = Required.of(texts[0]).getBoundingClientRect();
+    const second = Required.of(texts[1]).getBoundingClientRect();
+    expect(first.left).toBeCloseTo(second.left, 1);
+    expect(second.top - first.bottom).toBeCloseTo(space, 1);
+    expect(first.right).toBeLessThanOrEqual(box(".reply-error").right);
 
     await show(failed({ usedUp: true, usedUpUntil: new Date(clock.now() - 3_600_000).toISOString() }));
     expect(notes()[0]).toMatch(/^Codex · Work: was used up until [^.]+[.]$/);
@@ -1629,11 +1713,12 @@ describe("HistoryMessageComponent", () => {
   it("draws a default teammate's send as its replies are, under its provider's name, and never marks a sender's own name", async () => {
     new TeammateFixture(context);
     await Wait.until(() => expect(store().teammates().length).toBeGreaterThan(1));
-    const look = (): string[] => {
-      const avatar = element().querySelector<HTMLElement>(".nol-message-avatar");
-      return [textOf(".nol-message-author") ?? "", avatar?.textContent?.trim() ?? "", avatar?.className ?? "", avatar?.style.getPropertyValue("--nol-avatar-fill") ?? ""];
+    const look = (): AuthorLook => {
+      const avatar = one(".nol-message-avatar");
+      return new AuthorLook(Required.of(textOf(".nol-message-author")), Required.of(avatar.textContent).trim(), avatar.className,
+        avatar.style.getPropertyValue("--nol-avatar-fill"));
     };
-    const marked = (): string[] => [...element().querySelectorAll(".nol-markdown-mention")].map(t => t.textContent?.trim() ?? "");
+    const marked = (): string[] => [...element().querySelectorAll(".nol-markdown-mention")].map(t => Required.of(t.textContent).trim());
     const sent = (sender: MessageSender): Message => new Message("m9", "c1", 8, MessageAuthor.User, null, MessageStatus.Completed,
       [detail(0, DetailKind.Text, "@Bob asks @Alice to look.")], null, SampleData.timestamp, null, SampleData.timestamp, [], null, null, [], sender);
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, []));
@@ -1641,8 +1726,8 @@ describe("HistoryMessageComponent", () => {
 
     await show(sent(new MessageSender("c2", null, "Codex")));
     await Wait.until(() => expect(marked()).toEqual(["@Bob", "@Alice"]), MarkdownWait.coldImport);
-    expect(look()).toEqual(["Codex", ...reply.slice(1)]);
-    expect(reply[0]).toBe("Codex · Work");
+    expect(look()).toEqual(new AuthorLook("Codex", reply.letter, reply.className, reply.fill));
+    expect(reply.author).toBe("Codex · Work");
     await show(sent(new MessageSender("c2", "bob", "Bob")));
     await Wait.until(() => expect(marked()).toEqual(["@Alice"]));
     expect(textOf(".nol-message-avatar")).toBe("B");
@@ -1650,7 +1735,7 @@ describe("HistoryMessageComponent", () => {
 
   it("names a message a teammate sent from another chat by the teammate, never as the person, with its chain's note, and opens the sending chat", async () => {
     const note = "The chain stopped after 4 hand-offs. You can change this limit in Settings › TeamRun. Mention a teammate to go on.";
-    const header = (): (string | undefined)[] => [...element().querySelector(".nol-message-header")?.children ?? []].map(t => t.textContent?.trim());
+    const header = (): (string | undefined)[] => [...one(".nol-message-header").children].map(t => t.textContent?.trim());
     await Wait.until(() => expect(store().loaded()).toBe(true));
     render(sentFrom("c1", [detail(0, DetailKind.Text, "What changed?"), detail(1, DetailKind.Note, note, { source: "handOff" })]));
 
@@ -1666,7 +1751,7 @@ describe("HistoryMessageComponent", () => {
   });
 
   it("names a message from outside TeamRun by its quoted label, marks it Outside and links no chat, even one with the sender's chat id", async () => {
-    const header = (): (string | undefined)[] => [...element().querySelector(".nol-message-header")?.children ?? []].map(t => t.textContent?.trim());
+    const header = (): (string | undefined)[] => [...one(".nol-message-header").children].map(t => t.textContent?.trim());
     await Wait.until(() => expect(store().loaded()).toBe(true));
 
     render(new Message("m9", "c1", 8, MessageAuthor.User, null, MessageStatus.Completed, [detail(0, DetailKind.Text, "@Bob what changed?")], null,
@@ -1706,7 +1791,7 @@ describe("HistoryMessageComponent", () => {
       detail(2, DetailKind.Text, "Thanks.")
     ]);
     const line = (): HTMLElement => one("nol-teamrun-wake-line");
-    const shown = (): string => [line().textContent ?? "", ...[line(), ...line().querySelectorAll("*")].flatMap(t => [...t.attributes].map(u => u.value))].join(" ");
+    const shown = (): string => [Required.of(line().textContent), ...[line(), ...line().querySelectorAll("*")].flatMap(t => [...t.attributes].map(u => u.value))].join(" ");
     await Wait.until(() => expect(store().loaded()).toBe(true));
     render(woken("c1"));
 
@@ -1791,7 +1876,7 @@ describe("HistoryMessageComponent", () => {
       .toEqual([[Resources.sustainShowHandover, "false", true]]);
     expect(element().querySelector(".sustain-handover")).toBeNull();
 
-    await click(toggles()[0] ?? null);
+    await click(Required.of(toggles()[0]));
     const shown = one(".sustain-handover");
     expect([shown.getAttribute("role"), shown.getAttribute("aria-label")]).toEqual(["region", Resources.sustainHandoverLabel]);
     expect(one(".sustain-handover-heading", shown).textContent).toBe(Resources.sustainHandoverHeading);
@@ -1799,7 +1884,7 @@ describe("HistoryMessageComponent", () => {
     expect(one(".sustain-handover-reads", shown).textContent).toBe(reads);
     expect([toggles()[0]?.textContent, toggles()[0]?.getAttribute("aria-expanded")]).toEqual([Resources.sustainHideHandover, "true"]);
 
-    await click(toggles()[0] ?? null);
+    await click(Required.of(toggles()[0]));
     expect(element().querySelector(".sustain-handover")).toBeNull();
     expect([toggles()[0]?.textContent, toggles()[0]?.getAttribute("aria-expanded")]).toEqual([Resources.sustainShowHandover, "false"]);
   });
@@ -1844,17 +1929,18 @@ describe("HistoryMessageComponent", () => {
 
     expect([view.getAttribute("role"), view.getAttribute("aria-label"), statsButton()?.getAttribute("aria-expanded"), view.querySelector(".stats-note")])
       .toEqual(["dialog", "Reply stats", "true", null]);
-    expect(statRows(view)).toEqual([["row", "Tokens in", "260,000"], ["part", "From cache", "200,000"], ["part", "Written to cache", "10,000"], ["part", "New", "50,000"],
-      ["row", "Tokens out", "1,500"], ["part", "Reasoning", "600"], ["row", "Cost", "$0.02"], ["row", "Context", "42% of 200,000 tokens"], ["row", "Time worked", "1m 5s"],
-      ["row", "Model", "gpt-5 · high"]]);
+    expect(statRows(view)).toEqual([new StatRow("row", "Tokens in", "260,000"), new StatRow("part", "From cache", "200,000"),
+      new StatRow("part", "Written to cache", "10,000"), new StatRow("part", "New", "50,000"), new StatRow("row", "Tokens out", "1,500"),
+      new StatRow("part", "Reasoning", "600"), new StatRow("row", "Cost", "$0.02"), new StatRow("row", "Context", "42% of 200,000 tokens"),
+      new StatRow("row", "Time worked", "1m 5s"), new StatRow("row", "Model", "gpt-5 · high")]);
   });
 
   it("leaves new input out for Grok, whose input count may not hold its cache counts", async () => {
     render(measured(MessageStatus.Completed, new ReplyUsage(1_000, 10, null, null, 400), "grok"));
     await fixture.whenStable();
 
-    expect(statRows(await openStats())).toEqual([["row", "Tokens in", "1,000"], ["part", "From cache", "400"], ["row", "Tokens out", "10"], ["row", "Time worked", "1m 5s"],
-      ["row", "Model", "gpt-5 · high"]]);
+    expect(statRows(await openStats())).toEqual([new StatRow("row", "Tokens in", "1,000"), new StatRow("part", "From cache", "400"),
+      new StatRow("row", "Tokens out", "10"), new StatRow("row", "Time worked", "1m 5s"), new StatRow("row", "Model", "gpt-5 · high")]);
   });
 
   it("shows a reply's context percentage on its button when it reports only context, and says in the panel that no tokens were reported", async () => {
@@ -1864,7 +1950,7 @@ describe("HistoryMessageComponent", () => {
     expect(statsButton()?.textContent?.trim()).toBe("42% context");
     const view = await openStats();
     expect([view.querySelector(".stats-note")?.textContent?.trim(), statRows(view)]).toEqual([Resources.noTokensReportedText,
-      [["row", "Context", "42% of 200,000 tokens"], ["row", "Time worked", "1m 5s"], ["row", "Model", "gpt-5 · high"]]]);
+      [new StatRow("row", "Context", "42% of 200,000 tokens"), new StatRow("row", "Time worked", "1m 5s"), new StatRow("row", "Model", "gpt-5 · high")]]);
   });
 
   it("shows an icon-only stats button when nothing is reported, whose panel still says so, and no button while a reply works or for a person", async () => {
@@ -1876,7 +1962,7 @@ describe("HistoryMessageComponent", () => {
       .toEqual([Resources.statsGlyph, Resources.showStatsLabel, Resources.statsGlyph]);
     const view = await openStats();
     expect([view.querySelector(".stats-note")?.textContent?.trim(), statRows(view)]).toEqual([Resources.noTokensReportedText,
-      [["row", "Time worked", "1m 5s"], ["row", "Model", "gpt-5 · high"]]]);
+      [new StatRow("row", "Time worked", "1m 5s"), new StatRow("row", "Model", "gpt-5 · high")]]);
     fixture.destroy();
 
     render(measured(MessageStatus.Running, everyFigure));
@@ -1893,7 +1979,7 @@ describe("HistoryMessageComponent", () => {
     expect([statsButton()?.textContent?.trim(), statsButton()?.getAttribute("aria-label")]).toEqual([Resources.statsGlyph, Resources.showStatsLabel]);
     const view = await openStats();
     expect([view.querySelector(".stats-note")?.textContent?.trim(), statRows(view)]).toEqual([Resources.noTokensReportedText,
-      [["row", "Cost", "$0.02"], ["row", "Time worked", "1m 5s"], ["row", "Model", "gpt-5 · high"]]]);
+      [new StatRow("row", "Cost", "$0.02"), new StatRow("row", "Time worked", "1m 5s"), new StatRow("row", "Model", "gpt-5 · high")]]);
   });
 
   it.each([MessageStatus.Cancelled, MessageStatus.Interrupted])("ends a %s reply with its stats button and opens its panel", async status => {
@@ -1901,7 +1987,7 @@ describe("HistoryMessageComponent", () => {
     await fixture.whenStable();
 
     expect(statsButton()?.textContent?.trim()).toBe("260K in · 1.5K out");
-    expect(statRows(await openStats())[0]).toEqual(["row", "Tokens in", "260,000"]);
+    expect(statRows(await openStats())[0]).toEqual(new StatRow("row", "Tokens in", "260,000"));
   });
 
   it("names a reply's default model in its author's tooltip as its provider does", async () => {
@@ -1911,7 +1997,7 @@ describe("HistoryMessageComponent", () => {
     const reply = (kind: string): Message => new Message("m6", "c1", 5, MessageAuthor.Provider, "m1", MessageStatus.Cancelled, [],
       new Provenance(null, new RequestedSettings(kind, null, "medium"), new ObservedSettings(null, null, null, null), null, false),
       SampleData.timestamp, SampleData.timestamp, SampleData.timestamp);
-    const description = (): string | null => (fixture.debugElement.query(By.directive(MessageComponent)).componentInstance as MessageComponent).authorDescription();
+    const description = (): string | null => messageView().authorDescription();
 
     render(reply("copilot"));
     expect(description()).toBe("Auto · medium");
@@ -1924,7 +2010,7 @@ describe("HistoryMessageComponent", () => {
     context.answer(MethodName.ProviderModelCatalog, () => SampleData.catalog([new ProviderModel("gpt-5", "GPT-5", "", [], true, null, true)]));
     await Wait.until(() => expect(store().loaded()).toBe(true));
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed));
-    const description = (): string | null => (fixture.debugElement.query(By.directive(MessageComponent)).componentInstance as MessageComponent).authorDescription();
+    const description = (): string | null => messageView().authorDescription();
     const before = description();
 
     await store().modelCatalogs.load("codex", "a1");
@@ -1941,8 +2027,8 @@ describe("HistoryMessageComponent", () => {
     render(reply(teammates.alice));
     const avatar = (): HTMLElement | null => element().querySelector<HTMLElement>(".nol-message-avatar");
 
-    expect([...element().querySelector(".nol-message-header")?.children ?? []].map(t => t.textContent?.trim())).toEqual(["A", "Alice", "·\u00a0Codex", "Cancelled"]);
-    expect((fixture.debugElement.query(By.directive(MessageComponent)).componentInstance as MessageComponent).authorDescription()).toBe("gpt-5 · high");
+    expect([...one(".nol-message-header").children].map(t => t.textContent?.trim())).toEqual(["A", "Alice", "·\u00a0Codex", "Cancelled"]);
+    expect(messageView().authorDescription()).toBe("gpt-5 · high");
     expect(box(".nol-message-author").left).toBeGreaterThan(box(".nol-message-avatar").right);
     expect(Math.abs(middleOf(box(".nol-message-header .nol-chip")) - middleOf(box(".nol-message-author")))).toBeLessThanOrEqual(1);
     expect(element().querySelector(".nol-avatar-unavailable, .nol-message-author-unavailable")).toBeNull();
@@ -1965,7 +2051,9 @@ describe("HistoryMessageComponent", () => {
     expect([textOf(".nol-message-author"), element().querySelector(".reply-provider")]).toEqual(["Codex · Work", null]);
 
     await show(reply(teammates.alice.id, teammates.alice.name));
-    const [name, provider, header] = [box(".nol-message-author"), box(".reply-provider"), box(".nol-message-header")];
+    const name = box(".nol-message-author");
+    const provider = box(".reply-provider");
+    const header = box(".nol-message-header");
     expect([textOf(".nol-message-author"), textOf(".reply-provider"), size(".reply-provider") < size(".nol-message-author")]).toEqual(["Alice", "·\u00a0Codex", true]);
     AppearanceFixture.expectPixels(provider.left - name.right, AppearanceFixture.measureLook("space-1"));
     AppearanceFixture.expectPixels(middleOf(provider), middleOf(name));
@@ -1999,7 +2087,7 @@ describe("HistoryMessageComponent", () => {
     const gap = AppearanceFixture.measureLook("space-2");
     const tooltipAsync = async (anchor: HTMLElement): Promise<(string | undefined)[]> => Wait.until(() => {
       const parts = [...document.querySelectorAll(".cdk-overlay-container nol-tooltip :is(.nol-tooltip-title, .nol-tooltip-description)")].map(t => t.textContent?.trim());
-      const pane = document.querySelector(".cdk-overlay-container .nol-tooltip-pane")?.getBoundingClientRect() ?? new DOMRect();
+      const pane = one(".cdk-overlay-container .nol-tooltip-pane", document).getBoundingClientRect();
       const host = anchor.getBoundingClientRect();
       expect(parts).toHaveLength(2);
       AppearanceFixture.expectPixels(host.top - pane.bottom, gap);
@@ -2010,13 +2098,15 @@ describe("HistoryMessageComponent", () => {
     const shown = (selector: string): HTMLElement => {
       const found = element().querySelector<HTMLElement>(selector);
       if (Object.isNull(found))
-        throw new Error(`Nothing matches ${selector}.`);
+        throw new PartReadError(`Nothing matches ${selector}.`);
       return found;
     };
-    const [name, avatar] = await Wait.until(() => {
+    const shownParts = await Wait.until(() => {
       expect(shown(".nol-message-author").tabIndex).toBe(0);
-      return [shown(".nol-message-author"), shown(".nol-message-avatar")] as const;
+      return [shown(".nol-message-author"), shown(".nol-message-avatar")];
     });
+    const name = Required.of(shownParts[0]);
+    const avatar = Required.of(shownParts[1]);
 
     await userEvent.hover(name);
     const overName = await tooltipAsync(name);
@@ -2036,13 +2126,13 @@ describe("HistoryMessageComponent", () => {
   });
 
   it("paints each teammate's avatar in the teammate's own colour, as the Explorer does, and shows none on the person's bubble", async () => {
-    const paint = (): string => element().querySelector<HTMLElement>(".nol-message-avatar")?.style.getPropertyValue("--nol-avatar-fill") ?? "";
+    const paint = (): string => one(".nol-message-avatar").style.getPropertyValue("--nol-avatar-fill");
     const avatar = TestBed.createComponent(AvatarComponent);
     avatar.componentRef.setInput("name", "Reviewer");
     const kitPaint = (teammateId: string): string => {
       avatar.componentRef.setInput("colorKey", teammateId);
       avatar.detectChanges();
-      return (avatar.nativeElement as HTMLElement).style.getPropertyValue("--nol-avatar-fill");
+      return hostOf(avatar).style.getPropertyValue("--nol-avatar-fill");
     };
     const reply = (id: string, teammateId: string, name: string): Message => new Message(id, "c1", 5, MessageAuthor.Provider, "m1", MessageStatus.Completed, [],
       SampleData.provenance, SampleData.timestamp, SampleData.timestamp, SampleData.timestamp, [], teammateId, name);
@@ -2062,14 +2152,16 @@ describe("HistoryMessageComponent", () => {
   it("draws a reply's avatar with the letter and colours the members row and the composer give its teammate, the Default's for a Default reply", async () => {
     const teammates = new TeammateFixture(context);
     await Wait.until(() => expect(store().teammates()).toHaveLength(3));
-    const look = (avatar: HTMLElement | null): string[] => [avatar?.textContent?.trim() ?? "", avatar?.style.getPropertyValue("--nol-avatar-fill") ?? "",
-      avatar?.style.getPropertyValue("--nol-avatar-letter") ?? ""];
+    const look = (avatar: HTMLElement | null): AvatarLook => {
+      const found = Required.of(avatar);
+      return new AvatarLook(Required.of(found.textContent).trim(), found.style.getPropertyValue("--nol-avatar-fill"), found.style.getPropertyValue("--nol-avatar-letter"));
+    };
     const member = TestBed.createComponent(TeammateAvatarComponent);
     member.componentRef.setInput("teammate", null);
-    const memberLook = (teammate: Teammate | null): string[] => {
+    const memberLook = (teammate: Teammate | null): AvatarLook => {
       member.componentRef.setInput("teammate", teammate);
       member.detectChanges();
-      return look((member.nativeElement as HTMLElement).querySelector("nol-avatar"));
+      return look(hostOf(member).querySelector("nol-avatar"));
     };
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, []));
     const byDefault = look(element().querySelector(".nol-message-avatar"));
@@ -2080,8 +2172,8 @@ describe("HistoryMessageComponent", () => {
 
     expect(textOf(".nol-message-author")).toBe("Alice");
     expect([byDefault, byAlice]).toEqual([memberLook(null), memberLook(teammates.alice)]);
-    expect([byDefault[0], byAlice[0]]).toEqual(["D", "A"]);
-    expect(byDefault[1]).not.toBe(byAlice[1]);
+    expect([byDefault.letter, byAlice.letter]).toEqual(["D", "A"]);
+    expect(byDefault.fill).not.toBe(byAlice.fill);
   });
 
   it("marks the teammates a teammate's reply mentions as it marks them in the person's message", async () => {
@@ -2099,20 +2191,20 @@ describe("HistoryMessageComponent", () => {
   });
 
   it.each([
-    { provider: "claude", model: "claude-opus-5", look: { tool: "Bash", toolUseId: "t1" }, check: { tool: "Bash", toolUseId: "t3" } },
-    { provider: "codex", model: "gpt-5", look: { command: "ls", cwd: "D:\\repo", exitCode: 0, status: "completed" },
-      check: { command: "npm test", cwd: "D:\\repo", exitCode: 0, status: "completed" } },
-    { provider: "grok", model: "grok-4", look: { toolCallId: "call-1", status: "completed", files: [], tool: "execute" },
-      check: { toolCallId: "call-3", status: "completed", files: [], tool: "execute" } },
-    { provider: "copilot", model: "claude-sonnet-4.5", look: { toolCallId: "toolu_1", kind: "execute", status: "completed", rawInput: { command: "ls" }, files: [], tool: "execute" },
-      check: { toolCallId: "toolu_3", kind: "execute", status: "completed", rawInput: { command: "npm test" }, files: [], tool: "execute" } }
+    new StepTextCase("claude", "claude-opus-5", { tool: "Bash", toolUseId: "t1" }, { tool: "Bash", toolUseId: "t3" }),
+    new StepTextCase("codex", "gpt-5", { command: "ls", cwd: "D:\\repo", exitCode: 0, status: "completed" },
+      { command: "npm test", cwd: "D:\\repo", exitCode: 0, status: "completed" }),
+    new StepTextCase("grok", "grok-4", { toolCallId: "call-1", status: "completed", files: [], tool: "execute" },
+      { toolCallId: "call-3", status: "completed", files: [], tool: "execute" }),
+    new StepTextCase("copilot", "claude-sonnet-4.5", { toolCallId: "toolu_1", kind: "execute", status: "completed", rawInput: { command: "ls" }, files: [], tool: "execute" },
+      { toolCallId: "toolu_3", kind: "execute", status: "completed", rawInput: { command: "npm test" }, files: [], tool: "execute" })
   ])("shows $provider's text before its last step at the answer's edge with no bar while it works, and among its steps in its order once it ends or is reopened", async ({ provider, model, look, check }) => {
     const reply = (status: MessageStatus, id: string = "m2"): Message => SampleData.withStatus(new Message(id, "c1", 1, MessageAuthor.Provider, "m1", MessageStatus.Running, [
       detail(0, DetailKind.Text, "First a look."), detail(1, DetailKind.Command, "> ls", look), detail(2, DetailKind.Text, "Then a check."),
       detail(3, DetailKind.Command, "> npm test", check), detail(4, DetailKind.Text, "Done.")
     ], new Provenance("a1", new RequestedSettings(provider, model, null), new ObservedSettings(provider, model, null, "1.0"), "s1", false),
     SampleData.timestamp, SampleData.timestamp, null), status);
-    const replyTexts = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(".nol-markdown-view")].filter(t => t.closest("nol-teamrun-activity-block") === null);
+    const replyTexts = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(".nol-markdown-view")].filter(t => Object.isNull(t.closest("nol-teamrun-activity-block")));
     const rows = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-activity-block .calls > li")];
     const expectInterim = (text: HTMLElement): void => {
       const shown = getComputedStyle(text);
@@ -2131,19 +2223,23 @@ describe("HistoryMessageComponent", () => {
       await click(element().querySelector(".activity-toggle"));
       await Wait.until(() => expect(rows().map(t => t.querySelector(".step-text")?.textContent?.trim() ?? null)).toEqual(["First a look.", null, "Then a check.", null]),
         MarkdownWait.coldImport);
-      const block = element().querySelector<HTMLElement>("nol-teamrun-activity-block")!.getBoundingClientRect();
-      const [first, listed, second, tested] = rows().map(t => t.getBoundingClientRect());
-      expect(rows().map(t => t.querySelector("nol-tool-call") !== null)).toEqual([false, true, false, true]);
+      const block = Required.of(element().querySelector<HTMLElement>("nol-teamrun-activity-block")).getBoundingClientRect();
+      const rects = rows().map(t => t.getBoundingClientRect());
+      const first = Required.of(rects[0]);
+      const listed = Required.of(rects[1]);
+      const second = Required.of(rects[2]);
+      const tested = Required.of(rects[3]);
+      expect(rows().map(t => !Object.isNull(t.querySelector("nol-tool-call")))).toEqual([false, true, false, true]);
       expect(textOf("nol-teamrun-activity-block .summary")).toBe("Ran 2 commands");
       for (const text of element().querySelectorAll<HTMLElement>("nol-teamrun-activity-block .step-text")) {
         expectInterim(text);
-        AppearanceFixture.expectPixels(text.getBoundingClientRect().left, listed!.left);
+        AppearanceFixture.expectPixels(text.getBoundingClientRect().left, listed.left);
       }
-      AppearanceFixture.expectPixels(listed!.top - first!.bottom, AppearanceFixture.measureLook("space-1"));
-      AppearanceFixture.expectPixels(second!.top - listed!.bottom, AppearanceFixture.measureLook("space-1"));
-      AppearanceFixture.expectPixels(tested!.top - second!.bottom, AppearanceFixture.measureLook("space-1"));
-      expect(replyTexts()[0]!.getBoundingClientRect().top).toBeGreaterThanOrEqual(block.bottom);
-      AppearanceFixture.expectPixels(replyTexts()[0]!.getBoundingClientRect().left, block.left);
+      AppearanceFixture.expectPixels(listed.top - first.bottom, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(second.top - listed.bottom, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(tested.top - second.bottom, AppearanceFixture.measureLook("space-1"));
+      expect(Required.of(replyTexts()[0]).getBoundingClientRect().top).toBeGreaterThanOrEqual(block.bottom);
+      AppearanceFixture.expectPixels(Required.of(replyTexts()[0]).getBoundingClientRect().left, block.left);
     };
     render(reply(MessageStatus.Running));
 
@@ -2154,9 +2250,9 @@ describe("HistoryMessageComponent", () => {
     expect(element().querySelector("nol-teamrun-activity-block")).toBeNull();
     for (const text of replyTexts().slice(0, 2)) {
       expect(parseFloat(getComputedStyle(text).borderInlineStartWidth)).toBe(0);
-      AppearanceFixture.expectPixels(text.getBoundingClientRect().left, replyTexts()[2]!.getBoundingClientRect().left);
+      AppearanceFixture.expectPixels(text.getBoundingClientRect().left, Required.of(replyTexts()[2]).getBoundingClientRect().left);
     }
-    expect(replyTexts()[1]!.getBoundingClientRect().top).toBeGreaterThanOrEqual(replyTexts()[0]!.getBoundingClientRect().bottom);
+    expect(Required.of(replyTexts()[1]).getBoundingClientRect().top).toBeGreaterThanOrEqual(Required.of(replyTexts()[0]).getBoundingClientRect().bottom);
 
     await show(reply(MessageStatus.Completed));
     await expectFolded();
@@ -2199,7 +2295,8 @@ describe("HistoryMessageComponent", () => {
         String(view().classList.contains("nol-message-interim"))];
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Running, details));
       await Wait.until(() => expect(textOf(".nol-markdown-view")).toBe("First a look."), MarkdownWait.coldImport);
-      const [edge, working] = [start(), look()];
+      const edge = start();
+      const working = look();
 
       await show(SampleData.withStatus(SampleData.reply, status, status === MessageStatus.Failed ? [...details, detail(2, DetailKind.Error, "The provider failed.")] : details));
 
@@ -2219,8 +2316,8 @@ describe("HistoryMessageComponent", () => {
       detail(5, DetailKind.Text, "Fixed:\n\n- `a.ts`")
     ]));
     await fixture.whenStable();
-    const writer = TestBed.inject(ClipboardWriter) as ClipboardWriterFixture;
-    const copy = (): HTMLButtonElement => element().querySelector<HTMLButtonElement>(".nol-message-copy") as HTMLButtonElement;
+    const writer = clipboard();
+    const copy = (): HTMLButtonElement => Required.of(element().querySelector<HTMLButtonElement>(".nol-message-copy"));
 
     expect(copy().getAttribute("aria-label")).toBe("Copy message");
     await click(copy());
@@ -2246,7 +2343,7 @@ describe("HistoryMessageComponent", () => {
     const one = <T extends Element>(root: ParentNode, selector: string): T => {
       const found = root.querySelector<T>(selector);
       if (Object.isNull(found))
-        throw new Error(`Nothing matches ${selector}.`);
+        throw new PartReadError(`Nothing matches ${selector}.`);
       return found;
     };
     const shownCard = (id: string): HTMLElement => one<HTMLElement>(element(), `[data-nol-teamrun-approval="${id}"]`);
@@ -2257,7 +2354,7 @@ describe("HistoryMessageComponent", () => {
         const { approvalId, optionId } = ApprovalDecideParams.fromJson(parameters);
         const decided = approvals.find(t => t.id === approvalId);
         if (Object.isUndefined(decided))
-          throw new Error(`No approval ${approvalId} to decide.`);
+          throw new PartReadError(`No approval ${approvalId} to decide.`);
         return decided.withDecision(optionId, decidedAt).toJson();
       });
     };
@@ -2420,7 +2517,7 @@ describe("HistoryMessageComponent", () => {
       expect(firstChoice("q1")?.checked).toBe(true);
 
       await show(SampleData.withStatus(SampleData.reply, MessageStatus.AwaitingApproval, [first, said(1, "Meanwhile, more.", 3)]));
-      const later = (): DOMRect => [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === "Meanwhile, more.")?.getBoundingClientRect() ?? new DOMRect();
+      const later = (): DOMRect => Required.of([...element().querySelectorAll("p")].find(t => t.textContent?.trim() === "Meanwhile, more.")).getBoundingClientRect();
       await Wait.until(() => expect(later().height).toBeGreaterThan(0), MarkdownWait.coldImport);
 
       expect(cardOf("q1")).toBe(card);
@@ -2434,7 +2531,7 @@ describe("HistoryMessageComponent", () => {
     const unknown = "0192e4f0-7c1a-7b2e-9d3f-000000000000";
     const text = `Astra messaged me from chat ${id}, not ${unknown}.`;
     const replyWith = (status: MessageStatus, said: string): Message => SampleData.withStatus(SampleData.reply, status, [detail(0, DetailKind.Text, said)]);
-    const links = (): string[] => [...element().querySelectorAll("a.nol-markdown-link")].map(t => t.textContent?.trim() ?? "");
+    const links = (): string[] => [...element().querySelectorAll("a.nol-markdown-link")].map(t => Required.of(t.textContent).trim());
 
     beforeEach(async () => {
       const release = new Conversation(id, null, "Release plan", SampleData.timestamp, SampleData.timestamp);
@@ -2445,7 +2542,7 @@ describe("HistoryMessageComponent", () => {
     it("shows a known chat's id as a link titled with the chat's name that opens the chat, while Copy keeps the raw id", async () => {
       render(replyWith(MessageStatus.Completed, text));
       await Wait.until(() => expect(links()).toEqual(["Release plan"]), MarkdownWait.coldImport);
-      const writer = TestBed.inject(ClipboardWriter) as ClipboardWriterFixture;
+      const writer = clipboard();
 
       expect(textOf(".nol-markdown-view")).toBe(`Astra messaged me from chat Release plan, not ${unknown}.`);
       await click(element().querySelector<HTMLElement>("a.nol-markdown-link"));
@@ -2526,9 +2623,9 @@ describe("HistoryMessageComponent", () => {
   });
 
   it.each([
-    { kind: "a reply", message: SampleData.withStatus(SampleData.reply, MessageStatus.Completed) },
-    { kind: "TeamRun's own message", message: new Message("m7", "c1", 6, MessageAuthor.TeamRun, null, MessageStatus.Completed, [], null, SampleData.timestamp, null,
-      SampleData.timestamp) }
+    new RewindCase("a reply", SampleData.withStatus(SampleData.reply, MessageStatus.Completed)),
+    new RewindCase("TeamRun's own message", new Message("m7", "c1", 6, MessageAuthor.TeamRun, null, MessageStatus.Completed, [], null, SampleData.timestamp, null,
+      SampleData.timestamp))
   ])("offers no Rewind on $kind", ({ message }) => {
     render(message);
 
@@ -2561,8 +2658,9 @@ describe("HistoryMessageComponent", () => {
       .toEqual([["Onboarding options", "v2 · Made by Opus · Edited by Opus · just now"], ["Launch checklist", "Page · v1 · Made by Opus · just now"]]);
     expect(cards.map(t => Object.isUndefined(text) ? null : text.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING))
       .toEqual([Node.DOCUMENT_POSITION_FOLLOWING, Node.DOCUMENT_POSITION_FOLLOWING]);
-    AppearanceFixture.expectPixels((cards[0]?.getBoundingClientRect().top ?? 0) - (text?.getBoundingClientRect().bottom ?? 0), AppearanceFixture.measureLook("space-2"));
-    AppearanceFixture.expectPixels((cards[1]?.getBoundingClientRect().top ?? 0) - (cards[0]?.getBoundingClientRect().bottom ?? 0), AppearanceFixture.measureLook("space-2"));
+    const firstCard = Required.of(cards[0]).getBoundingClientRect();
+    AppearanceFixture.expectPixels(firstCard.top - Required.of(text).getBoundingClientRect().bottom, AppearanceFixture.measureLook("space-2"));
+    AppearanceFixture.expectPixels(Required.of(cards[1]).getBoundingClientRect().top - firstCard.bottom, AppearanceFixture.measureLook("space-2"));
   });
 
   it("shows a running edit's page on its card while the reply's edit runs, and the edited page once it ends", async () => {
@@ -2620,13 +2718,15 @@ describe("HistoryMessageComponent", () => {
     const files = element().querySelector("nol-teamrun-edited-files");
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     expect(previews.map(t => t.querySelector(".nol-teamrun-image-frame")?.getAttribute("aria-label"))).toEqual(["chart.png", "graph.png"]);
-    expect(files === null ? null : files.compareDocumentPosition(previews[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect((previews[0]!.getBoundingClientRect().top - (files?.getBoundingClientRect().bottom ?? 0)) / rem).toBeCloseTo(1.25, 1);
-    expect((previews[1]!.getBoundingClientRect().top - previews[0]!.getBoundingClientRect().bottom) / rem).toBeCloseTo(0.75, 1);
+    const chartPreview = Required.of(previews[0]);
+    const graphPreview = Required.of(previews[1]);
+    expect(Object.isNull(files) ? null : files.compareDocumentPosition(chartPreview) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect((chartPreview.getBoundingClientRect().top - Required.of(files).getBoundingClientRect().bottom) / rem).toBeCloseTo(1.25, 1);
+    expect((graphPreview.getBoundingClientRect().top - chartPreview.getBoundingClientRect().bottom) / rem).toBeCloseTo(0.75, 1);
     expect(context.count(MethodName.WrittenImageRead)).toBe(2);
     expect(context.parametersOf(MethodName.WrittenImageRead)).toEqual(new WrittenImageReadParams("c1", SampleData.reply.id, "D:\\repo\\out\\chart.png").toJson());
 
-    previews[1]!.querySelector<HTMLButtonElement>(".nol-teamrun-image-frame")!.click();
+    Required.of(graphPreview.querySelector<HTMLButtonElement>(".nol-teamrun-image-frame")).click();
     await fixture.whenStable();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("graph.png"));
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
@@ -2642,11 +2742,11 @@ describe("HistoryMessageComponent", () => {
       return url.slice(url.indexOf(",") + 1);
     };
     const stored = "D:\\data\\images\\reply-1.png";
-    const contents = new Map([[stored, png(600, 600)], ["D:\\repo\\out\\moon.png", png(2000, 500)]]);
+    const contents = new Map<string, string>().set(stored, png(600, 600)).set("D:\\repo\\out\\moon.png", png(2000, 500));
     context.answer(MethodName.WrittenImageRead, parameters => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
-      if (data === undefined)
+      if (Object.isUndefined(data))
         throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("\\") + 1), "image/png", 4, data).toJson();
     });
@@ -2670,7 +2770,7 @@ describe("HistoryMessageComponent", () => {
     const texts = ["Here is the sun.", "And the moon, saved in the project.", "Done."];
     const shownBlocks = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-image-preview, .reply-image-missing, p")]
       .filter(t => t.localName === "nol-teamrun-image-preview" || t.classList.contains("reply-image-missing")
-        || t.closest("nol-teamrun-image-preview") === null && texts.includes(t.textContent?.trim() ?? ""));
+        || Object.isNull(t.closest("nol-teamrun-image-preview")) && texts.includes(Required.of(t.textContent).trim()));
 
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, generated));
     element().style.display = "block";
@@ -2684,25 +2784,32 @@ describe("HistoryMessageComponent", () => {
     const blocks = shownBlocks();
     const names = blocks.map(t => t.querySelector(".nol-teamrun-image-frame")?.getAttribute("aria-label") ?? t.querySelector(".reply-error-text")?.textContent?.trim()
       ?? t.textContent?.trim());
-    const [sunText, sun, moonText, moon, gone, failed, done] = blocks.map(t => t.getBoundingClientRect());
-    const column = sun!.width;
-    const frame = (index: number): DOMRect => blocks[index]!.querySelector(".nol-teamrun-image-frame")!.getBoundingClientRect();
+    const rects = blocks.map(t => t.getBoundingClientRect());
+    const sunText = Required.of(rects[0]);
+    const sun = Required.of(rects[1]);
+    const moonText = Required.of(rects[2]);
+    const moon = Required.of(rects[3]);
+    const gone = Required.of(rects[4]);
+    const failed = Required.of(rects[5]);
+    const done = Required.of(rects[6]);
+    const column = sun.width;
+    const frame = (index: number): DOMRect => Required.of(Required.of(blocks[index]).querySelector(".nol-teamrun-image-frame")).getBoundingClientRect();
     expect(names).toEqual(["Here is the sun.", "sun.png", "And the moon, saved in the project.", "moon.png", Resources.formatImageLoadFailed("gone.png"),
       Resources.imageGenerationFailed, "Done."]);
     expect([frame(1).width, frame(1).height, frame(3).width, frame(3).height].map(t => t / rem))
       .toEqual([24, 24, column / rem, column / 4 / rem].map(t => expect.closeTo(t, 1)));
     expect(column / rem).toBeGreaterThan(30);
-    expect([sun!.top - sunText!.bottom, moonText!.top - sun!.bottom, moon!.top - moonText!.bottom, done!.top - failed!.bottom].map(t => t / rem))
+    expect([sun.top - sunText.bottom, moonText.top - sun.bottom, moon.top - moonText.bottom, done.top - failed.bottom].map(t => t / rem))
       .toEqual([1.25, 1.25, 1.25, 1.25].map(t => expect.closeTo(t, 1)));
-    expect(failed!.top).toBeGreaterThan(gone!.bottom);
-    expect((blocks[5]!.querySelector(".reply-error-glyph")!.getBoundingClientRect().left - sunText!.left) / rem).toBeCloseTo(0, 1);
+    expect(failed.top).toBeGreaterThan(gone.bottom);
+    expect((Required.of(Required.of(blocks[5]).querySelector(".reply-error-glyph")).getBoundingClientRect().left - sunText.left) / rem).toBeCloseTo(0, 1);
     expect(context.requests.filter(t => t.method === "teamrun.writtenImageRead").map(t => WrittenImageReadParams.fromJson(t.parameters).path).sort())
       .toEqual(["D:\\data\\images\\reply-1.png", "D:\\repo\\out\\gone.png", "D:\\repo\\out\\moon.png"]);
 
-    blocks[1]!.querySelector<HTMLButtonElement>(".nol-teamrun-image-frame")!.click();
+    Required.of(Required.of(blocks[1]).querySelector<HTMLButtonElement>(".nol-teamrun-image-frame")).click();
     await fixture.whenStable();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("sun.png"));
-    document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)).click();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("moon.png"));
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull());
@@ -2721,14 +2828,19 @@ describe("HistoryMessageComponent", () => {
       ]));
       await Wait.until(() => expect(element().querySelectorAll(".reply-image-missing")).toHaveLength(3));
 
-      const [failed, unknownFormat, overCap] = [...element().querySelectorAll<HTMLElement>(".reply-image-missing")];
-      const lines = (block: HTMLElement): string[] => [...block.querySelectorAll(".reply-error-text")].map(t => t.textContent?.trim() ?? "");
-      expect([lines(failed!), lines(unknownFormat!), lines(overCap!)])
+      const missing = [...element().querySelectorAll<HTMLElement>(".reply-image-missing")];
+      const failed = Required.of(missing[0]);
+      const unknownFormat = Required.of(missing[1]);
+      const overCap = Required.of(missing[2]);
+      const lines = (block: HTMLElement): string[] => [...block.querySelectorAll(".reply-error-text")].map(t => Required.of(t.textContent).trim());
+      expect([lines(failed), lines(unknownFormat), lines(overCap)])
         .toEqual([[Resources.imageGenerationFailed, Resources.imageLimitReached], [Resources.imageNotShown], [Resources.imageNotShown]]);
-      const [heading, reason] = [...failed!.querySelectorAll(".reply-error-text")].map(t => t.getBoundingClientRect());
-      expect(reason!.left).toBeCloseTo(heading!.left, 1);
-      expect(reason!.top).toBeGreaterThanOrEqual(heading!.bottom);
-      expect(failed!.querySelector(".reply-error-glyph")!.getBoundingClientRect().right).toBeLessThanOrEqual(heading!.left);
+      const errorRects = [...failed.querySelectorAll(".reply-error-text")].map(t => t.getBoundingClientRect());
+      const heading = Required.of(errorRects[0]);
+      const reason = Required.of(errorRects[1]);
+      expect(reason.left).toBeCloseTo(heading.left, 1);
+      expect(reason.top).toBeGreaterThanOrEqual(heading.bottom);
+      expect(Required.of(failed.querySelector(".reply-error-glyph")).getBoundingClientRect().right).toBeLessThanOrEqual(heading.left);
       expect(element().querySelector("nol-teamrun-image-preview")).toBeNull();
     });
 
@@ -2746,17 +2858,22 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(element().textContent).toContain("It failed."), MarkdownWait.coldImport);
     await Wait.until(() => expect(element().querySelectorAll(".reply-image-missing")).toHaveLength(1));
 
-    const failed = element().querySelector<HTMLElement>(".reply-image-missing")!;
-    const [heading, reason] = [...failed.querySelectorAll<HTMLElement>(".reply-error-text")];
+    const failed = Required.of(element().querySelector<HTMLElement>(".reply-image-missing"));
+    const errorTexts = [...failed.querySelectorAll<HTMLElement>(".reply-error-text")];
+    const heading = errorTexts[0];
+    const reason = errorTexts[1];
     expect([heading?.textContent?.trim(), reason?.textContent?.trim()]).toEqual([Resources.imageGenerationFailed, message]);
-    expect(element().textContent!.indexOf("Drawing it.")).toBeLessThan(element().textContent!.indexOf(message));
-    expect(element().textContent!.indexOf(message)).toBeLessThan(element().textContent!.indexOf("It failed."));
-    const [top, bottom] = [heading!.getBoundingClientRect(), reason!.getBoundingClientRect()];
+    const shownText = Required.of(element().textContent);
+    expect(shownText.indexOf("Drawing it.")).toBeLessThan(shownText.indexOf(message));
+    expect(shownText.indexOf(message)).toBeLessThan(shownText.indexOf("It failed."));
+    const reasonText = Required.of(reason);
+    const top = Required.of(heading).getBoundingClientRect();
+    const bottom = reasonText.getBoundingClientRect();
     expect(bottom.left).toBeCloseTo(top.left, 1);
     expect(bottom.top).toBeGreaterThanOrEqual(top.bottom);
     expect(bottom.height).toBeGreaterThan(top.height);
     expect(bottom.right).toBeLessThanOrEqual(failed.getBoundingClientRect().right + 0.5);
-    expect(reason!.scrollWidth).toBeLessThanOrEqual(reason!.clientWidth);
+    expect(reasonText.scrollWidth).toBeLessThanOrEqual(reasonText.clientWidth);
   });
 
   it("shows nothing in a running reply for an image still being generated", async () => {
@@ -2775,11 +2892,11 @@ describe("HistoryMessageComponent", () => {
       const url = canvas.toDataURL("image/png");
       return url.slice(url.indexOf(",") + 1);
     };
-    const contents = new Map([["D:\\repo\\out/chart.png", png(48, 32)], ["D:\\repo\\out/b c.png", png(30, 20)]]);
+    const contents = new Map<string, string>().set("D:\\repo\\out/chart.png", png(48, 32)).set("D:\\repo\\out/b c.png", png(30, 20));
     context.answer(MethodName.WrittenImageRead, parameters => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
-      if (data === undefined)
+      if (Object.isUndefined(data))
         throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("/") + 1), "image/png", 4, data).toJson();
     });
@@ -2805,11 +2922,12 @@ describe("HistoryMessageComponent", () => {
 
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const frames = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-image-frame")];
-    const chart = frames[0]!.getBoundingClientRect();
-    const paragraph = frames[0]!.closest("p")!;
+    const chartFrame = Required.of(frames[0]);
+    const chart = chartFrame.getBoundingClientRect();
+    const paragraph = Required.of(chartFrame.closest("p"));
     expect(frames.map(t => t.getAttribute("aria-label"))).toEqual(["chart.png", "b c.png"]);
     expect(frames.map(t => t.closest(".nol-markdown-image"))).toEqual(images().slice(0, 2));
-    expect(images().map(t => t.querySelector(".nol-teamrun-image-frame") === null ? t.textContent?.trim() : null))
+    expect(images().map(t => Object.isNull(t.querySelector(".nol-teamrun-image-frame")) ? t.textContent?.trim() : null))
       .toEqual([null, null, ...alts.slice(2)]);
     expect(element().querySelectorAll(".nol-teamrun-image-failed, .written-images nol-teamrun-image-preview, .nol-teamrun-image-caption")).toHaveLength(0);
     expect(paragraph.textContent).toContain("Here is");
@@ -2819,10 +2937,10 @@ describe("HistoryMessageComponent", () => {
       .toEqual(["D:\\repo\\out/b c.png", "D:\\repo\\out/chart.png", "D:\\repo\\out/gone.png"]);
     expect(context.parametersOf(MethodName.WrittenImageRead)).toEqual(expect.objectContaining({ chatId: "c1", messageId: SampleData.reply.id }));
 
-    frames[0]!.click();
+    chartFrame.click();
     await fixture.whenStable();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("chart.png"));
-    document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)).click();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("b c.png"));
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull());
@@ -2856,9 +2974,10 @@ describe("HistoryMessageComponent", () => {
 
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
     const frames = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-image-frame")];
-    const paragraph = frames[0]!.closest("p")!.getBoundingClientRect();
-    const wide = frames[0]!.getBoundingClientRect();
-    const tall = frames[1]!.getBoundingClientRect();
+    const wideFrame = Required.of(frames[0]);
+    const paragraph = Required.of(wideFrame.closest("p")).getBoundingClientRect();
+    const wide = wideFrame.getBoundingClientRect();
+    const tall = Required.of(frames[1]).getBoundingClientRect();
     expect(store().selectedProject()).toBeNull();
     expect(frames.map(t => t.closest(".nol-markdown-image"))).toEqual([images()[0], images()[1], images()[5]]);
     expect(wide.width).toBeCloseTo(Math.min(600, paragraph.width), 0);
@@ -2866,20 +2985,20 @@ describe("HistoryMessageComponent", () => {
     expect(wide.height).toBeLessThanOrEqual(24 * rem + 0.5);
     expect(wide.right).toBeLessThanOrEqual(paragraph.right + 0.5);
     expect([tall.width / rem, tall.height / rem]).toEqual([expect.closeTo(8, 1), expect.closeTo(24, 1)]);
-    expect(images().map(t => t.querySelector(".nol-teamrun-image-frame, a") === null ? t.textContent?.trim() : null)).toEqual([null, null, null, null, "html", null]);
+    expect(images().map(t => Object.isNull(t.querySelector(".nol-teamrun-image-frame, a")) ? t.textContent?.trim() : null)).toEqual([null, null, null, null, "html", null]);
     expect(links().map(t => [t.textContent?.trim(), t.getAttribute("href")])).toEqual([["web", "https://example.com/a.png"],
       ["https://example.com/b.png", "https://example.com/b.png"]]);
     expect(element().querySelectorAll(".nol-markdown-image img:not([src^='data:'])")).toHaveLength(0);
     expect(performance.getEntriesByType("resource").filter(t => t.name.startsWith("https://example.com"))).toEqual([]);
     expect(context.count(MethodName.WrittenImageRead)).toBe(0);
 
-    await click(links()[0]!);
-    links()[1]!.dispatchEvent(new MouseEvent("auxclick", { button: 2, bubbles: true, cancelable: true }));
+    await click(Required.of(links()[0]));
+    Required.of(links()[1]).dispatchEvent(new MouseEvent("auxclick", { button: 2, bubbles: true, cancelable: true }));
     const middle = new MouseEvent("auxclick", { button: 1, bubbles: true, cancelable: true });
-    links()[1]!.dispatchEvent(middle);
+    Required.of(links()[1]).dispatchEvent(middle);
     expect([context.links, context.linkGestures]).toEqual([["https://example.com/a.png", "https://example.com/b.png"], [LinkGesture.Plain, LinkGesture.Middle]]);
     expect(middle.defaultPrevented).toBe(true);
-    frames[0]!.click();
+    wideFrame.click();
     await fixture.whenStable();
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim()).toBe("Image"));
     expect(document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)?.disabled).toBe(false);
@@ -2902,19 +3021,19 @@ describe("HistoryMessageComponent", () => {
     const linked = [detail(0, DetailKind.Text, "See [the chart](out/chart.png), [the other](<out/b c.png>), [the code](src/a.ts:42), [the notes](./docs/notes.md#L3-L5), "
       + "[up](../x.ts), [the drive](D:/elsewhere/y.png) and [the docs](https://example.com/docs).")];
     const links = (): HTMLAnchorElement[] => [...element().querySelectorAll<HTMLAnchorElement>("a.nol-markdown-link")];
-    const link = (text: string): HTMLAnchorElement => links().find(t => ShownText.of(t) === text)!;
+    const link = (text: string): HTMLAnchorElement => Required.of(links().find(t => ShownText.of(t) === text));
     const shownName = (): string | null => document.querySelector("nol-teamrun-image-viewer .nol-teamrun-image-viewer-name")?.textContent?.trim() ?? null;
 
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, linked));
     await Wait.until(() => expect(links().map(t => ShownText.of(t))).toEqual(["the chart", "the other", "the code", "the notes", "up", "the drive", "the docs"]),
       MarkdownWait.coldImport);
-    expect(links().map(t => t.querySelector("nol-file-badge") !== null)).toEqual([true, true, true, true, true, true, false]);
+    expect(links().map(t => !Object.isNull(t.querySelector("nol-file-badge")))).toEqual([true, true, true, true, true, true, false]);
     link("the chart").focus();
     await userEvent.keyboard("{Enter}");
     await fixture.whenStable();
     await Wait.until(() => expect(shownName()).toBe("chart.png"));
     await Wait.until(() => expect(document.activeElement?.closest("nol-teamrun-image-dialog")).not.toBeNull());
-    document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)!.click();
+    Required.of(document.querySelector<HTMLButtonElement>(`nol-teamrun-image-viewer button[aria-label="${Resources.nextImageLabel}"]`)).click();
     await Wait.until(() => expect(shownName()).toBe("b c.png"));
     document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     await Wait.until(() => expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull());
@@ -2928,7 +3047,7 @@ describe("HistoryMessageComponent", () => {
     expect(context.links).toEqual(["https://example.com/docs"]);
     expect(context.openedDocuments).toEqual([]);
     expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull();
-    expect(context.shownNotices().map(t => [t.title, t.text, t.severity])).toEqual([["Couldn't open the file", Resources.formatLinkedFileRefused("x.ts"), NotificationSeverity.Error]]);
+    expect(context.shownNotices().map(t => new ShownNotice(t.title, t.text, t.severity))).toEqual([new ShownNotice("Couldn't open the file", Resources.formatLinkedFileRefused("x.ts"), NotificationSeverity.Error)]);
     expect(Resources.formatLinkedFileRefused("x.ts")).toBe("x.ts wasn't opened: a reply's link opens a file in the chat's folder, or elsewhere on this computer by its full path.");
   });
 
@@ -2945,32 +3064,33 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(element().querySelector(".nol-message-attachment")).not.toBeNull(), MarkdownWait.coldImport);
     const button = element().querySelector(".nol-message-attachment");
     if (!(button instanceof HTMLButtonElement))
-      throw new Error("The attached file shows no button.");
+      throw new PartReadError("The attached file shows no button.");
     return button;
   };
-  for (const [title, name, saved, openFailure, folderFailure, exists, shown, notice] of [
-    ["opens a message's attached file with the system's default app when its button is clicked", "notes.txt", stored, null, null, true, [], null],
-    ["shows an attached program in its folder rather than running it", "setup.exe", program, refused, null, true, [program], null],
-    ["tells that an attached file is gone, rather than failing, once the system can neither open it nor show it and Core no longer has it", "notes.txt", stored,
-      unreadable, unreadable, false, [stored], ["Couldn't open the attached file", "notes.txt is no longer in TeamRun's data folder.", NotificationSeverity.Info]],
-    ["reports an attached file the system won't open that its folder could not show while Core still has it", "notes.txt", stored, refused, unreadable, true, [stored],
-      ["Couldn't show the file in its folder", "notes.txt could not be shown in its folder.", NotificationSeverity.Error]],
-    ["reports an attached file its folder could not show when Core can't say whether it still has it", "notes.txt", stored, refused, unreadable, null, [stored],
-      ["Couldn't show the file in its folder", "notes.txt could not be shown in its folder.", NotificationSeverity.Error]]
-  ] as const)
-    it(title, async () => {
-      context.openFileFailure = openFailure;
-      context.showInFolderFailure = folderFailure;
+  for (const file of [
+    new AttachedFileCase("opens a message's attached file with the system's default app when its button is clicked", "notes.txt", stored, null, null, true, [], null),
+    new AttachedFileCase("shows an attached program in its folder rather than running it", "setup.exe", program, refused, null, true, [program], null),
+    new AttachedFileCase("tells that an attached file is gone, rather than failing, once the system can neither open it nor show it and Core no longer has it", "notes.txt", stored,
+      unreadable, unreadable, false, [stored], new ShownNotice("Couldn't open the attached file", "notes.txt is no longer in TeamRun's data folder.", NotificationSeverity.Info)),
+    new AttachedFileCase("reports an attached file the system won't open that its folder could not show while Core still has it", "notes.txt", stored, refused, unreadable, true, [stored],
+      new ShownNotice("Couldn't show the file in its folder", "notes.txt could not be shown in its folder.", NotificationSeverity.Error)),
+    new AttachedFileCase("reports an attached file its folder could not show when Core can't say whether it still has it", "notes.txt", stored, refused, unreadable, null, [stored],
+      new ShownNotice("Couldn't show the file in its folder", "notes.txt could not be shown in its folder.", NotificationSeverity.Error))
+  ])
+    it(file.title, async () => {
+      context.openFileFailure = file.openFailure;
+      context.showInFolderFailure = file.folderFailure;
+      const exists = file.exists;
       if (Object.isNull(exists))
         context.fail(MethodName.AttachmentExists, "Core stopped.");
       else
-        context.answer(MethodName.AttachmentExists, t => JSON.stringify(t) === JSON.stringify(new AttachmentReadParams("c1", saved).toJson()) ? exists : null);
-      const button = await attached(name, saved);
+        context.answer(MethodName.AttachmentExists, t => JSON.stringify(t) === JSON.stringify(new AttachmentReadParams("c1", file.saved).toJson()) ? exists : null);
+      const button = await attached(file.name, file.saved);
 
       await click(button);
 
-      await Wait.until(() => expect([context.openedFiles, context.shownInFolder]).toEqual([[saved], shown]));
-      await Wait.until(() => expect(context.shownNotices().map(t => [t.title, t.text, t.severity])).toEqual(Object.isNull(notice) ? [] : [notice]));
+      await Wait.until(() => expect([context.openedFiles, context.shownInFolder]).toEqual([[file.saved], file.shown]));
+      await Wait.until(() => expect(context.shownNotices().map(t => new ShownNotice(t.title, t.text, t.severity))).toEqual(Object.isNull(file.notice) ? [] : [file.notice]));
     });
 
   it("posts nothing for an attached file it can neither open nor show once its chat is deleted while Core is asked, and Core no longer finds it", async () => {
@@ -2997,7 +3117,7 @@ describe("HistoryMessageComponent", () => {
 
     await userEvent.hover(button);
     await Wait.until(() => expect(document.querySelector(".cdk-overlay-container nol-tooltip")?.textContent?.trim()).toBe(stored));
-    const described = (button.getAttribute("aria-describedby") ?? "").split(" ").map(t => document.getElementById(t)?.textContent?.trim());
+    const described = Required.of(button.getAttribute("aria-describedby")).split(" ").map(t => document.getElementById(t)?.textContent?.trim());
     await userEvent.unhover(button);
 
     expect(described).toContain(stored);
@@ -3020,16 +3140,16 @@ describe("HistoryMessageComponent", () => {
   });
 
   const linkedFile = "D:\\repo\\docs/notes.md";
-  for (const [name, openFailure, folderFailure, opened, shown, error] of [
-    ["opens a file a reply links to with the system's default app", null, null, [linkedFile], [], null],
-    ["shows a file a reply links to that the system won't open in its folder", "The file's kind isn't opened.", null, [linkedFile], [linkedFile], null],
-    ["reports a file a reply links to that the system won't open and its folder could not show", "The file's kind isn't opened.", "The file is gone.", [linkedFile],
-      [linkedFile], "notes.md could not be opened or shown in its folder; it may have been moved or deleted."]
-  ] as const)
-    it(name, async () => {
+  for (const linked of [
+    new LinkedFileCase("opens a file a reply links to with the system's default app", null, null, [linkedFile], [], null),
+    new LinkedFileCase("shows a file a reply links to that the system won't open in its folder", "The file's kind isn't opened.", null, [linkedFile], [linkedFile], null),
+    new LinkedFileCase("reports a file a reply links to that the system won't open and its folder could not show", "The file's kind isn't opened.", "The file is gone.", [linkedFile],
+      [linkedFile], "notes.md could not be opened or shown in its folder; it may have been moved or deleted.")
+  ])
+    it(linked.name, async () => {
       context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
-      context.openFileFailure = openFailure;
-      context.showInFolderFailure = folderFailure;
+      context.openFileFailure = linked.openFailure;
+      context.showInFolderFailure = linked.folderFailure;
       await Wait.until(() => expect(store().loaded()).toBe(true));
       await store().selectConversation("c1");
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "See [the notes](docs/notes.md#L3).")]));
@@ -3037,7 +3157,7 @@ describe("HistoryMessageComponent", () => {
 
       await click(element().querySelector<HTMLElement>("a.nol-markdown-link"));
 
-      await Wait.until(() => expect([context.openedFiles, context.shownInFolder, context.noticeText()]).toEqual([opened, shown, error]));
+      await Wait.until(() => expect([context.openedFiles, context.shownInFolder, context.noticeText()]).toEqual([linked.opened, linked.shown, linked.error]));
       expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull();
     });
 
@@ -3065,31 +3185,31 @@ describe("HistoryMessageComponent", () => {
   const setup = "C:/Users/a/Downloads/setup.exe";
   const script = "/home/a/bin/clean.sh";
   const neverOpened = "only documents and text files open, such as .pdf, .docx, .txt or .md; any other file, a program or a script included, never opens.";
-  for (const [name, target, openFailure, folderFailure, opened, shown, notice] of [
-    ["shows an image a reply links to outside its project, by a slash before its drive, in its folder, never opening it though the system could", `/${saved}`,
-      null, null, [], [saved], null],
-    ["shows a program a reply links to outside its project in its folder, never running it", setup, neverOpened, null, [setup], [setup], null],
-    ["shows a script a reply links to outside its project in its folder, never running it", script, neverOpened, null, [script], [script], null],
-    ["tells that an image a reply links to outside its project could not be shown in its folder", `/${saved}`, null,
+  for (const outside of [
+    new OutsideLinkCase("shows an image a reply links to outside its project, by a slash before its drive, in its folder, never opening it though the system could", `/${saved}`,
+      null, null, [], [saved], null),
+    new OutsideLinkCase("shows a program a reply links to outside its project in its folder, never running it", setup, neverOpened, null, [setup], [setup], null),
+    new OutsideLinkCase("shows a script a reply links to outside its project in its folder, never running it", script, neverOpened, null, [script], [script], null),
+    new OutsideLinkCase("tells that an image a reply links to outside its project could not be shown in its folder", `/${saved}`, null,
       "No file can be read at the path.", [], [saved],
-      ["Couldn't open the file", "portrait.png could not be opened or shown in its folder; it may have been moved or deleted.", NotificationSeverity.Error]],
-    ["tells that a file a reply links to outside its project could not be opened or shown once the system can do neither", setup, neverOpened,
+      new ShownNotice("Couldn't open the file", "portrait.png could not be opened or shown in its folder; it may have been moved or deleted.", NotificationSeverity.Error)),
+    new OutsideLinkCase("tells that a file a reply links to outside its project could not be opened or shown once the system can do neither", setup, neverOpened,
       "No file can be read at the path.", [setup], [setup],
-      ["Couldn't open the file", "setup.exe could not be opened or shown in its folder; it may have been moved or deleted.", NotificationSeverity.Error]]
-  ] as const)
-    it(name, async () => {
+      new ShownNotice("Couldn't open the file", "setup.exe could not be opened or shown in its folder; it may have been moved or deleted.", NotificationSeverity.Error))
+  ])
+    it(outside.name, async () => {
       context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
-      context.openFileFailure = openFailure;
-      context.showInFolderFailure = folderFailure;
+      context.openFileFailure = outside.openFailure;
+      context.showInFolderFailure = outside.folderFailure;
       await Wait.until(() => expect(store().loaded()).toBe(true));
       await store().selectConversation("c1");
-      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, `Done. [The file](${target})`)]));
+      render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, `Done. [The file](${outside.target})`)]));
       await Wait.until(() => expect(element().querySelector("a.nol-markdown-link nol-file-badge")).not.toBeNull(), MarkdownWait.coldImport);
 
       await click(element().querySelector<HTMLElement>("a.nol-markdown-link"));
 
-      await Wait.until(() => expect([context.openedFiles, context.shownInFolder]).toEqual([opened, shown]));
-      await Wait.until(() => expect(context.shownNotices().map(t => [t.title, t.text, t.severity])).toEqual(Object.isNull(notice) ? [] : [notice]));
+      await Wait.until(() => expect([context.openedFiles, context.shownInFolder]).toEqual([outside.opened, outside.shown]));
+      await Wait.until(() => expect(context.shownNotices().map(t => new ShownNotice(t.title, t.text, t.severity))).toEqual(Object.isNull(outside.notice) ? [] : [outside.notice]));
       expect(context.requests.filter(t => t.method === "teamrun.writtenImageRead")).toEqual([]);
       expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull();
     });
@@ -3151,7 +3271,7 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(link("the previews")?.querySelector(".nol-file-badge-glyph")?.textContent).toBe("folder"));
 
     for (const text of ["the previews", "the notes", "the previews"])
-      await click(link(text) ?? null);
+      await click(Required.of(link(text)));
 
     await Wait.until(() => expect([context.shownInFolder, context.openedFiles]).toEqual([[folder, folder], [notes]]));
     expect(context.requests.filter(t => t.method === "teamrun.linkedFolderList").map(t => LinkedPaths.fromJson(t.parameters).paths)).toEqual([[folder, notes], [notes]]);
@@ -3165,7 +3285,7 @@ describe("HistoryMessageComponent", () => {
     context.answer(MethodName.LinkedFolderList, t => {
       asked++;
       if (asked < 3)
-        throw new Error("The runtime is restarting.");
+        throw new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting.");
       return LinkedPaths.fromJson(t).toJson();
     });
     await Wait.until(() => expect(store().loaded()).toBe(true));
@@ -3193,12 +3313,13 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(element().querySelectorAll("a.nol-markdown-link nol-file-badge")).toHaveLength(2), MarkdownWait.coldImport);
     await Wait.until(() => expect(element().querySelector("a.nol-markdown-link .nol-file-badge-glyph")?.textContent).toBe("folder"));
 
-    const measure = (index: number): { inset: number; width: number; height: number } => {
-      const link = element().querySelectorAll<HTMLElement>("a.nol-markdown-link")[index];
-      const badge = link?.querySelector("nol-file-badge")?.getBoundingClientRect() ?? new DOMRect();
-      return { inset: badge.left - (link?.getBoundingClientRect().left ?? 0), width: badge.width, height: badge.height };
+    const measure = (index: number): BadgeBox => {
+      const link = Required.of(element().querySelectorAll<HTMLElement>("a.nol-markdown-link")[index]);
+      const badge = one("nol-file-badge", link).getBoundingClientRect();
+      return new BadgeBox(badge.left - link.getBoundingClientRect().left, badge.width, badge.height);
     };
-    const [marked, plain] = [measure(0), measure(1)];
+    const marked = measure(0);
+    const plain = measure(1);
 
     expect(marked.width).toBeGreaterThan(0);
     expect([marked.width, marked.height]).toEqual([plain.width, plain.height]);
@@ -3206,7 +3327,8 @@ describe("HistoryMessageComponent", () => {
   });
 
   it("marks the folders of a reply's latest paths, never those of an answer that came after the paths changed", async () => {
-    const [early, late] = ["D:\\repo\\early", "D:\\repo\\late"];
+    const early = "D:\\repo\\early";
+    const late = "D:\\repo\\late";
     let release: () => void = () => undefined;
     let asked = 0;
     context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
@@ -3260,7 +3382,7 @@ describe("HistoryMessageComponent", () => {
 
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, linked));
     await Wait.until(() => expect(links()).toHaveLength(2), MarkdownWait.coldImport);
-    await click(links()[0]!);
+    await click(Required.of(links()[0]));
     expect(context.openedDocuments.map(t => [t.name, t.title])).toEqual([[Resources.imageDocumentName, "chart.png"]]);
     expect(document.querySelector("nol-teamrun-image-viewer")).toBeNull();
 
@@ -3326,7 +3448,7 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(element().querySelector(".nol-code-block-copy")).not.toBeNull(), MarkdownWait.coldImport);
 
     expect(element().querySelector(".nol-code-block-run")).toBeNull();
-    (fixture.debugElement.query(By.directive(MessageComponent)).componentInstance as MessageComponent).shellRun.emit(new ShellRun("ls", "bash"));
+    messageView().shellRun.emit(new ShellRun("ls", "bash"));
     await fixture.whenStable();
     expect(context.shownNotices(Resources.chatActionFailedNotice)).toEqual([]);
   });
@@ -3357,17 +3479,21 @@ describe("HistoryMessageComponent", () => {
     } });
     try {
       await Wait.until(() => expect(store().loaded()).toBe(true));
-      const writer = TestBed.inject(ClipboardWriter) as ClipboardWriterFixture;
+      const writer = clipboard();
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "```bash\nls\n```\n\nThen:\n\n```powershell\nGet-ChildItem\n```")]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-code-block-run")).toHaveLength(2), MarkdownWait.coldImport);
       const shown = [...element().querySelectorAll(".nol-code-block-body code")].map(t => t.textContent);
-      const [firstRun, secondRun] = [...element().querySelectorAll<HTMLElement>(".nol-code-block-run")];
-      const [firstCopy, secondCopy] = [...element().querySelectorAll<HTMLElement>(".nol-code-block-copy")];
+      const runButtons = [...element().querySelectorAll<HTMLElement>(".nol-code-block-run")];
+      const copyButtons = [...element().querySelectorAll<HTMLElement>(".nol-code-block-copy")];
+      const firstRun = runButtons[0];
+      const secondRun = runButtons[1];
+      const firstCopy = copyButtons[0];
+      const secondCopy = copyButtons[1];
 
-      await click(firstRun ?? null);
-      await click(secondRun ?? null);
-      await click(firstCopy ?? null);
-      await click(secondCopy ?? null);
+      await click(Required.of(firstRun));
+      await click(Required.of(secondRun));
+      await click(Required.of(firstCopy));
+      await click(Required.of(secondCopy));
 
       expect(shown).toEqual(["ls", "Get-ChildItem"]);
       await Wait.until(() => expect(runs.map(t => t[1])).toEqual(shown));
@@ -3422,7 +3548,7 @@ describe("HistoryMessageComponent", () => {
     starter.sessions = ["session-1", "session-1"];
     const runs = starter.runs;
     const terminals = ChatTerminals.provide(context, store(), null, () => new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows)));
-    const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+    const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
     const blocks = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-code-block")];
     const hosts = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-inline-terminal")];
     try {
@@ -3431,7 +3557,7 @@ describe("HistoryMessageComponent", () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, text)]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-code-block-run")).toHaveLength(2), MarkdownWait.coldImport);
 
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1]));
       await Wait.until(() => expect(hosts()).toHaveLength(1));
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
       fakes.opened[0]?.element.style.setProperty("height", "48px");
@@ -3445,7 +3571,7 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(rect(underSecond).right, rect(blocks()[1]).right);
       AppearanceFixture.expectPixels(rect(underSecond).height, 48);
 
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0]));
       await Wait.until(() => expect(rect(hosts()[0]).bottom).toBeLessThanOrEqual(rect(blocks()[1]).top));
 
       expect([hosts().length, hosts()[0]?.querySelector(".live")?.firstElementChild === fakes.opened[0]?.element, fakes.opened.length, runs.length]).toEqual([1, true, 1, 2]);
@@ -3474,7 +3600,7 @@ describe("HistoryMessageComponent", () => {
         reached.push(`${event.shiftKey ? "Ctrl+Shift+" : event.ctrlKey ? "Ctrl+" : ""}${event.code}`);
     };
     const press = (target: Element | null | undefined, init: KeyboardEventInit): boolean =>
-      target?.dispatchEvent(new KeyboardEvent("keydown", { key: "`", code: "Backquote", bubbles: true, cancelable: true, ...init })) ?? false;
+      Required.of(target).dispatchEvent(new KeyboardEvent("keydown", { key: "`", code: "Backquote", bubbles: true, cancelable: true, ...init }));
     document.addEventListener("keydown", windowKey);
     try {
       await Wait.until(() => expect(store().loaded()).toBe(true));
@@ -3514,11 +3640,11 @@ describe("HistoryMessageComponent", () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "First:\n\n```bash\nnpm test\n```\n\nThen:\n\n```bash\nls\n```")]));
       await Wait.until(() => expect(labels()).toHaveLength(2), MarkdownWait.coldImport);
 
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0]));
       await Wait.until(() => expect(labels()).toEqual(["Run bash command (running)", "Run bash command"]));
       end(new TerminalRunEnd("Command", 0));
       await Wait.until(() => expect(labels()).toEqual(["Run bash command again", "Run bash command"]));
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1]));
       await Wait.until(() => expect(labels()).toEqual(["Run bash command again", "Run bash command again"]));
     }
     finally {
@@ -3532,7 +3658,7 @@ describe("HistoryMessageComponent", () => {
     starter.sessions = ["session-1", "session-1"];
     starter.outputs.set("run-1", FakeRunStarter.outputOf("$ pwd", "/repo"));
     const terminals = ChatTerminals.provide(context, store(), null, () => new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows)));
-    const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+    const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
     const blocks = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-code-block")].filter(t => Object.isNull(t.closest("nol-teamrun-inline-terminal")));
     const hosts = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("nol-teamrun-inline-terminal")];
     try {
@@ -3540,11 +3666,13 @@ describe("HistoryMessageComponent", () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "First:\n\n```bash\nls\n```\n\nThen:\n\n```bash\npwd\n```")]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-code-block-run")).toHaveLength(2), MarkdownWait.coldImport);
 
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[1]));
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
-      await click(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0] ?? null);
+      await click(Required.of(element().querySelectorAll<HTMLElement>(".nol-code-block-run")[0]));
       await Wait.until(() => expect(hosts()).toHaveLength(2));
-      const [live, kept] = hosts();
+      const shownHosts = hosts();
+      const live = shownHosts[0];
+      const kept = shownHosts[1];
       const output = kept?.querySelector<HTMLElement>("nol-code-block.output");
 
       expect([live?.querySelector(".live")?.firstElementChild === fakes.opened[0]?.element, kept?.querySelector(".live")?.childElementCount,
@@ -3565,7 +3693,7 @@ describe("HistoryMessageComponent", () => {
     const starter = new FakeRunStarter();
     starter.sessions = ["session-1", new TerminalRunNotTypedException("session-1", TerminalRunOutcome.Busy), "session-1"];
     const terminals = ChatTerminals.provide(context, store(), null, () => new InlineTerminals(starter, (sessionId, _injector, rows) => fakes.open(sessionId, rows)));
-    const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+    const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
     const runButtons = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>(".nol-code-block-run")];
     try {
       await Wait.until(() => expect(store().loaded()).toBe(true));
@@ -3573,12 +3701,15 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(runButtons()).toHaveLength(2), MarkdownWait.coldImport);
       const second = runButtons()[1]?.closest("nol-code-block");
 
-      await click(runButtons()[0] ?? null);
+      await click(Required.of(runButtons()[0]));
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
-      await click(runButtons()[1] ?? null);
+      await click(Required.of(runButtons()[1]));
       await Wait.until(() => expect(element().querySelector(".busy")).not.toBeNull());
       const busy = element().querySelector<HTMLElement>(".busy");
-      const [question, stop, inNew] = [".busy-text", ".busy-stop", ".busy-new"].map(t => busy?.querySelector<HTMLElement>(t));
+      const busyParts = [".busy-text", ".busy-stop", ".busy-new"].map(t => busy?.querySelector<HTMLElement>(t));
+      const question = busyParts[0];
+      const stop = busyParts[1];
+      const inNew = busyParts[2];
 
       expect([busy?.getAttribute("role"), busy?.getAttribute("aria-label"), question?.textContent?.trim(), stop?.textContent?.trim(), inNew?.textContent?.trim()])
         .toEqual(["group", Resources.shellRunBusy, Resources.shellRunBusy, Resources.shellRunStop, Resources.shellRunNewTerminal]);
@@ -3591,7 +3722,7 @@ describe("HistoryMessageComponent", () => {
       expect(rect(inNew).right).toBeLessThanOrEqual(rect(second).right);
       expect(rect(fakes.opened[0]?.element).bottom).toBeLessThanOrEqual(rect(second).top);
 
-      await click(stop ?? null);
+      await click(Required.of(stop));
       await Wait.until(() => expect(element().querySelector(".busy")).toBeNull());
 
       expect(starter.runs.map(t => [t[1], t[4], t[5]])).toEqual([["npm start", null, null], ["ls", "session-1", TerminalRunBusy.Refuse],
@@ -3648,7 +3779,7 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(element().querySelectorAll(".step-text .nol-code-block-run")).toHaveLength(2), MarkdownWait.coldImport);
 
       const lint = (): HTMLElement | undefined => steps().find(t => t.textContent?.includes("npm run lint") === true);
-      await click(lint()?.querySelector<HTMLElement>(".nol-code-block-run") ?? null);
+      await click(one(".nol-code-block-run", Required.of(lint())));
       await Wait.until(() => expect(fakes.opened).toHaveLength(1));
 
       expect(element().querySelectorAll("nol-teamrun-inline-terminal")).toHaveLength(1);
@@ -3671,7 +3802,7 @@ describe("HistoryMessageComponent", () => {
     await Wait.until(() => expect(store().loaded()).toBe(true));
     await store().selectConversation("c1");
     const space = (step: number): number => AppearanceFixture.measureLook(`space-${step}`);
-    const rect = (target: Element | null): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+    const rect = (target: Element | null): DOMRect => Required.of(target).getBoundingClientRect();
     const part = (selector: string): HTMLElement | null => element().querySelector<HTMLElement>(selector);
 
     render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
@@ -3680,12 +3811,12 @@ describe("HistoryMessageComponent", () => {
     await click(part(".activity-toggle"));
     await Wait.until(() => expect(part(".step-text .nol-teamrun-image-frame img")).not.toBeNull(), MarkdownWait.coldImport);
     fixture.detectChanges();
-    const text = part(".step-text")!;
+    const text = Required.of(part(".step-text"));
     const style = getComputedStyle(text);
-    const paragraph = text.querySelector("p")!;
-    const holder = text.querySelector(".nol-markdown-image")!;
-    const preview = holder.querySelector("nol-teamrun-image-preview")!;
-    const frame = holder.querySelector(".nol-teamrun-image-frame")!;
+    const paragraph = Required.of(text.querySelector("p"));
+    const holder = Required.of(text.querySelector(".nol-markdown-image"));
+    const preview = Required.of(holder.querySelector("nol-teamrun-image-preview"));
+    const frame = Required.of(holder.querySelector(".nol-teamrun-image-frame"));
 
     expect(element().querySelectorAll(".nol-markdown-image")).toHaveLength(1);
     expect(paragraph.textContent).toContain("Here is");
@@ -3702,11 +3833,7 @@ describe("HistoryMessageComponent", () => {
     expect(rect(holder).bottom).toBeLessThanOrEqual(rect(text).bottom + 0.5);
   });
 
-  describe.each([
-    { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
-    { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
-    { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active" }
-  ])("in $look", ({ mode, forcedColors }) => {
+  describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     const note = "The chain stopped after 4 hand-offs. You can change this limit in Settings › TeamRun. Mention a teammate to go on.";
     const textStart = (view: Element): number => {
       const range = document.createRange();
@@ -3750,16 +3877,19 @@ describe("HistoryMessageComponent", () => {
         fixture.destroy();
         render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, text)]));
         await Wait.until(() => expect(element().querySelector(".nol-code-block-run")).not.toBeNull(), MarkdownWait.coldImport);
-        const [wrap, run, copy] = [".nol-code-block-wrap", ".nol-code-block-run", ".nol-code-block-copy"].map(t => box(t));
+        const toolbar = [".nol-code-block-wrap", ".nol-code-block-run", ".nol-code-block-copy"].map(t => box(t));
+        const wrap = Required.of(toolbar[0]);
+        const run = Required.of(toolbar[1]);
+        const copy = Required.of(toolbar[2]);
         const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
 
         expect(personRuns).toBe(0);
-        expect(run!.width).toBeGreaterThan(0);
-        expect(run!.left).toBeGreaterThanOrEqual(wrap!.right);
-        expect(copy!.left).toBeGreaterThanOrEqual(run!.right);
-        expect(Math.abs((copy!.left - run!.right) - (run!.left - wrap!.right)) / rem).toBeLessThan(0.02);
-        expect(Math.abs(middleOf(run!) - middleOf(copy!)) / rem).toBeLessThan(0.02);
-        expect(Math.abs(run!.height - copy!.height) / rem).toBeLessThan(0.02);
+        expect(run.width).toBeGreaterThan(0);
+        expect(run.left).toBeGreaterThanOrEqual(wrap.right);
+        expect(copy.left).toBeGreaterThanOrEqual(run.right);
+        expect(Math.abs((copy.left - run.right) - (run.left - wrap.right)) / rem).toBeLessThan(0.02);
+        expect(Math.abs(middleOf(run) - middleOf(copy)) / rem).toBeLessThan(0.02);
+        expect(Math.abs(run.height - copy.height) / rem).toBeLessThan(0.02);
         await click(element().querySelector(".nol-code-block-run"));
         await Wait.until(() => expect(runs).toEqual([["teamrun.chat/c1", "npm test", "D:\\repo", [TerminalShellKind.Bash]]]));
         expect(context.shownNotices(Resources.chatActionFailedNotice)).toEqual([]);
@@ -3779,20 +3909,22 @@ describe("HistoryMessageComponent", () => {
       store.watch("c1");
       await Wait.until(() => expect(store.tasksOf("c1")).toHaveLength(4));
       render(SampleData.withStatus(SampleData.reply, MessageStatus.AwaitingApproval));
-      const chips = (): string[] => [...element().querySelectorAll(".nol-message-header .nol-chip")].map(t => t.textContent?.trim() ?? "");
+      const chips = (): string[] => [...element().querySelectorAll(".nol-message-header .nol-chip")].map(t => Required.of(t.textContent).trim());
 
       expect(chips()).toEqual([Resources.awaitingApprovalLabel, "2 tasks running"]);
-      const [state, running] = [...element().querySelectorAll<HTMLElement>(".nol-message-header .nol-chip")].map(t => t.getBoundingClientRect());
+      const chipRects = [...element().querySelectorAll<HTMLElement>(".nol-message-header .nol-chip")].map(t => t.getBoundingClientRect());
+      const state = Required.of(chipRects[0]);
+      const running = Required.of(chipRects[1]);
       const model = [...element().querySelectorAll<HTMLElement>(".nol-message-header > *")].map(t => t.getBoundingClientRect());
-      AppearanceFixture.expectPixels((running as DOMRect).left - (state as DOMRect).right, (model[2] as DOMRect).left - (model[1] as DOMRect).right);
-      AppearanceFixture.expectPixels(Math.abs(middleOf(running as DOMRect) - middleOf(box(".nol-message-author"))), 0);
-      expect(getComputedStyle(element().querySelector(".nol-teamrun-running-tasks") as Element).height).toBe(getComputedStyle(element().querySelector(".nol-message-header .nol-chip") as Element).height);
+      AppearanceFixture.expectPixels(running.left - state.right, Required.of(model[2]).left - Required.of(model[1]).right);
+      AppearanceFixture.expectPixels(Math.abs(middleOf(running) - middleOf(box(".nol-message-author"))), 0);
+      expect(getComputedStyle(Required.of(element().querySelector(".nol-teamrun-running-tasks"))).height).toBe(getComputedStyle(Required.of(element().querySelector(".nol-message-header .nol-chip"))).height);
 
-      context.emit(EventName.BackgroundTaskUpdated, (tasks[0] as BackgroundTask).withEnd(BackgroundTaskStatus.Stopped, null, SampleData.timestamp).toJson());
+      context.emit(EventName.BackgroundTaskUpdated, Required.of(tasks[0]).withEnd(BackgroundTaskStatus.Stopped, null, SampleData.timestamp).toJson());
       await fixture.whenStable();
       fixture.detectChanges();
       expect(chips()).toEqual([Resources.awaitingApprovalLabel, "1 task running"]);
-      context.emit(EventName.BackgroundTaskUpdated, (tasks[1] as BackgroundTask).withEnd(BackgroundTaskStatus.Completed, 0, SampleData.timestamp).toJson());
+      context.emit(EventName.BackgroundTaskUpdated, Required.of(tasks[1]).withEnd(BackgroundTaskStatus.Completed, 0, SampleData.timestamp).toJson());
       await fixture.whenStable();
       fixture.detectChanges();
       expect(chips()).toEqual([Resources.awaitingApprovalLabel]);
@@ -3805,14 +3937,20 @@ describe("HistoryMessageComponent", () => {
         planned(PlanStepStatus.Completed, PlanStepStatus.InProgress, PlanStepStatus.Pending), detail(3, DetailKind.Text, "Done.")]));
       await Wait.until(() => expect(element().querySelector(".nol-code-block-copy")).not.toBeNull(), MarkdownWait.coldImport);
       await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
-      const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
-      const style = (target: Element | null | undefined): CSSStyleDeclaration => getComputedStyle(target as Element);
+      const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
+      const style = (target: Element | null | undefined): CSSStyleDeclaration => getComputedStyle(Required.of(target));
       const paragraph = [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === "Here's my plan.");
       const view = paragraph?.closest(".nol-markdown-view");
-      const [code, codeHeader] = [".nol-code-block", ".nol-code-block-header"].map(t => element().querySelector(t));
+      const codeParts = [".nol-code-block", ".nol-code-block-header"].map(t => element().querySelector(t));
+      const code = codeParts[0];
+      const codeHeader = codeParts[1];
       const card = element().querySelector("nol-teamrun-plan-card");
       const header = element().querySelector("nol-teamrun-plan-card .header");
-      const [glyph, name, progress, chevron] = ["glyph", "title", "progress", "chevron"].map(t => element().querySelector(`nol-teamrun-plan-card .${t}`));
+      const headerParts = ["glyph", "title", "progress", "chevron"].map(t => element().querySelector(`nol-teamrun-plan-card .${t}`));
+      const glyph = headerParts[0];
+      const name = headerParts[1];
+      const progress = headerParts[2];
+      const chevron = headerParts[3];
       const border = parseFloat(style(card).borderTopWidth);
       const inset = parseFloat(style(codeHeader).paddingLeft);
       const space = AppearanceFixture.measureLook("space-2");
@@ -3836,7 +3974,8 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(rect(progress).left - rect(name).right, space);
       AppearanceFixture.expectPixels(rect(chevron).left - rect(progress).right, space);
       expect(rect(name).height).toBeLessThan(rect(name).width);
-      expect(name!.scrollWidth).toBeGreaterThan(name!.clientWidth);
+      const titleView = Required.of(name);
+      expect(titleView.scrollWidth).toBeGreaterThan(titleView.clientWidth);
       AppearanceFixture.expectPixels(middleOf(rect(name)), middleOf(rect(glyph)));
       AppearanceFixture.expectPixels(middleOf(rect(progress)), middleOf(rect(glyph)));
       AppearanceFixture.expectPixels(middleOf(rect(chevron)), middleOf(rect(header)));
@@ -3846,13 +3985,16 @@ describe("HistoryMessageComponent", () => {
       await planningChat();
       render(awaitingPlan());
       await Wait.until(() => expect(approveButton()).not.toBeNull());
-      const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+      const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
       const style = (target: Element | null | undefined): CSSStyleDeclaration => {
         if (Object.isNullOrUndefined(target))
-          throw new Error("The plan card has no such part.");
+          throw new PartReadError("The plan card has no such part.");
         return getComputedStyle(target);
       };
-      const [card, header, actions] = ["nol-teamrun-plan-card", "nol-teamrun-plan-card .header", "nol-teamrun-plan-card .actions"].map(t => element().querySelector(t));
+      const cardParts = ["nol-teamrun-plan-card", "nol-teamrun-plan-card .header", "nol-teamrun-plan-card .actions"].map(t => element().querySelector(t));
+      const card = cardParts[0];
+      const header = cardParts[1];
+      const actions = cardParts[2];
       const border = parseFloat(style(card).borderTopWidth);
       const space2 = AppearanceFixture.measureLook("space-2");
       const start = rect(approveButton()).left;
@@ -3880,8 +4022,12 @@ describe("HistoryMessageComponent", () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Running, [detail(0, DetailKind.Text, "Here's my plan."), text,
         planned(PlanStepStatus.Completed, PlanStepStatus.Pending), detail(3, DetailKind.Text, "Done.")]));
       await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
-      const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
-      const [glyph, name, progress, chevron] = ["glyph", "title", "progress", "chevron"].map(t => element().querySelector(`nol-teamrun-plan-card .${t}`));
+      const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
+      const headerParts = ["glyph", "title", "progress", "chevron"].map(t => element().querySelector(`nol-teamrun-plan-card .${t}`));
+      const glyph = headerParts[0];
+      const name = headerParts[1];
+      const progress = headerParts[2];
+      const chevron = headerParts[3];
       const space = AppearanceFixture.measureLook("space-2");
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-text-muted)";
@@ -3892,9 +4038,9 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(rect(progress).left - rect(name).right, space);
       AppearanceFixture.expectPixels(rect(chevron).left - rect(progress).right, space);
       AppearanceFixture.expectPixels(middleOf(rect(progress)), middleOf(rect(glyph)));
-      expect(getComputedStyle(progress!).color).toBe(muted);
+      expect(getComputedStyle(Required.of(progress)).color).toBe(muted);
       if (forcedColors === "none")
-        expect(muted).not.toBe(getComputedStyle(name!).color);
+        expect(muted).not.toBe(getComputedStyle(Required.of(name)).color);
     });
 
     it("opens a reply's plan inside its block, under a header line of the code block's border, its text then its checklist 0.5rem apart with the code block's padding", async () => {
@@ -3904,11 +4050,13 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(element().querySelector(".nol-code-block-copy")).not.toBeNull(), MarkdownWait.coldImport);
       await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
       await click(element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header"));
-      const rect = (target: Element | null | undefined): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
-      const style = (target: Element | null | undefined): CSSStyleDeclaration => getComputedStyle(target as Element);
+      const rect = (target: Element | null | undefined): DOMRect => Required.of(target).getBoundingClientRect();
+      const style = (target: Element | null | undefined): CSSStyleDeclaration => getComputedStyle(Required.of(target));
       const paragraph = (value: string): Element | undefined => [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === value);
       await Wait.until(() => expect(paragraph("Move the cache first.")).toBeDefined(), MarkdownWait.coldImport);
-      const [codeHeader, codeText] = [".nol-code-block-header", ".nol-code-block-body > code"].map(t => element().querySelector(t));
+      const codeParts = [".nol-code-block-header", ".nol-code-block-body > code"].map(t => element().querySelector(t));
+      const codeHeader = codeParts[0];
+      const codeText = codeParts[1];
       const card = element().querySelector("nol-teamrun-plan-card");
       const header = element().querySelector("nol-teamrun-plan-card .header");
       const body = element().querySelector("nol-teamrun-plan-card .body");
@@ -3917,13 +4065,19 @@ describe("HistoryMessageComponent", () => {
       const border = parseFloat(style(card).borderTopWidth);
       const padding = (target: Element | null | undefined): number[] =>
         [style(target).paddingTop, style(target).paddingRight, style(target).paddingBottom, style(target).paddingLeft].map(t => parseFloat(t));
-      const [top, end, bottom, start] = padding(codeText) as [number, number, number, number];
+      const codePadding = padding(codeText);
+      const top = Required.of(codePadding[0]);
+      const end = Required.of(codePadding[1]);
+      const bottom = Required.of(codePadding[2]);
+      const start = Required.of(codePadding[3]);
 
       expect([style(body).borderTopWidth, style(body).borderTopStyle, style(body).borderTopColor, style(header).borderBottomWidth])
         .toEqual([style(codeHeader).borderBottomWidth, style(codeHeader).borderBottomStyle, style(codeHeader).borderBottomColor, "0px"]);
       AppearanceFixture.expectPixels(rect(header).height, rect(codeHeader).height);
       AppearanceFixture.expectPixels(rect(body).top, rect(header).bottom);
-      const [bodyTop, ...bodyRest] = padding(body) as [number, number, number, number];
+      const bodyPadding = padding(body);
+      const bodyTop = Required.of(bodyPadding[0]);
+      const bodyRest = bodyPadding.slice(1);
       expect([bodyTop + parseFloat(style(body).borderTopWidth), ...bodyRest]).toEqual([top, end, bottom, start]);
       expect(style(body).backgroundColor).toMatch(/^rgba\(\d+, \d+, \d+, 0\)$/u);
       AppearanceFixture.expectPixels(rect(markdown).left, rect(card).left + border + start);
@@ -3941,13 +4095,13 @@ describe("HistoryMessageComponent", () => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Running, [detail(0, DetailKind.Text, "Here's my plan."), text,
         planned(PlanStepStatus.Completed, PlanStepStatus.InProgress, PlanStepStatus.Pending), detail(3, DetailKind.Text, "Done.")]));
       await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
-      const header = (): HTMLButtonElement => element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header")!;
+      const header = (): HTMLButtonElement => Required.of(element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header"));
       const boxes = (): number[][] => {
-        const card = element().querySelector("nol-teamrun-plan-card")!.getBoundingClientRect();
-        return [header(), ...["glyph", "title", "progress", "chevron"].map(t => element().querySelector(`nol-teamrun-plan-card .${t}`)!)]
+        const card = Required.of(element().querySelector("nol-teamrun-plan-card")).getBoundingClientRect();
+        return [header(), ...["glyph", "title", "progress", "chevron"].map(t => Required.of(element().querySelector(`nol-teamrun-plan-card .${t}`)))]
           .map(t => t.getBoundingClientRect()).map(t => [t.left - card.left, t.top - card.top, t.width, t.height]);
       };
-      const expectBoxes = (actual: number[][], expected: number[][]): void => actual.forEach((t, i) => t.forEach((u, j) => AppearanceFixture.expectPixels(u, expected[i]![j]!)));
+      const expectBoxes = (actual: number[][], expected: number[][]): void => actual.forEach((t, i) => t.forEach((u, j) => AppearanceFixture.expectPixels(u, Required.of(Required.of(expected[i])[j]))));
       const closed = boxes();
 
       await click(header());
@@ -3972,14 +4126,14 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(store().loaded()).toBe(true));
       await store().selectConversation("c1");
       const space = (step: number): number => AppearanceFixture.measureLook(`space-${step}`);
-      const rect = (target: Element | null): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+      const rect = (target: Element | null): DOMRect => Required.of(target).getBoundingClientRect();
       const part = (selector: string): HTMLElement | null => element().querySelector<HTMLElement>(selector);
 
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed,
         [detail(0, DetailKind.Text, "Here is ![the chart](out/chart.png) inline.\n\nAnd the next paragraph.")]));
       await Wait.until(() => expect(part(".nol-teamrun-image-fallback")?.textContent?.trim()).toBe("the chart"), MarkdownWait.coldImport);
-      const paragraph = part(".nol-markdown-image")!.closest("p")!;
-      const loading = part(".nol-teamrun-image-fallback")!;
+      const paragraph = Required.of(Required.of(part(".nol-markdown-image")).closest("p"));
+      const loading = Required.of(part(".nol-teamrun-image-fallback"));
       expect(context.count(MethodName.WrittenImageRead)).toBe(1);
       expect(part(".nol-teamrun-image-frame")).toBeNull();
       expect(paragraph.textContent?.replace(/\s+/g, " ").trim()).toBe("Here is the chart inline.");
@@ -3990,10 +4144,10 @@ describe("HistoryMessageComponent", () => {
       release();
       await Wait.until(() => expect(part(".nol-teamrun-image-frame img")).not.toBeNull());
       fixture.detectChanges();
-      const holder = part(".nol-markdown-image")!;
-      const preview = holder.querySelector("nol-teamrun-image-preview")!;
-      const frame = holder.querySelector(".nol-teamrun-image-frame")!;
-      const next = [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === "And the next paragraph.")!;
+      const holder = Required.of(part(".nol-markdown-image"));
+      const preview = Required.of(holder.querySelector("nol-teamrun-image-preview"));
+      const frame = Required.of(holder.querySelector(".nol-teamrun-image-frame"));
+      const next = Required.of([...element().querySelectorAll("p")].find(t => t.textContent?.trim() === "And the next paragraph."));
 
       expect(getComputedStyle(holder).display).toBe("inline-block");
       AppearanceFixture.expectPixels(rect(preview).top - rect(holder).top, space(3));
@@ -4016,8 +4170,10 @@ describe("HistoryMessageComponent", () => {
         [detail(0, DetailKind.Text, "See [the code](src/a.ts:42) and [the docs](https://example.com/docs) here.")]));
       const links = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("a.nol-markdown-link")];
       await Wait.until(() => expect(links()).toHaveLength(2), MarkdownWait.coldImport);
-      const [code, docs] = links() as [HTMLElement, HTMLElement];
-      const paragraph = code.closest("p")!;
+      const shownLinks = links();
+      const code = Required.of(shownLinks[0]);
+      const docs = Required.of(shownLinks[1]);
+      const paragraph = Required.of(code.closest("p"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = forcedColors === "active" ? "LinkText" : "var(--nol-link)";
       const look = (view: Element): string[] =>
@@ -4042,8 +4198,8 @@ describe("HistoryMessageComponent", () => {
     it("puts the sending chat's link in a sent message's header one header gap after the teammate's name, centred on its line, at its size, in the link colour", async () => {
       await Wait.until(() => expect(store().loaded()).toBe(true));
       render(sentFrom("c1"));
-      const link = element().querySelector<HTMLElement>(".sender-chat")!;
-      const author = element().querySelector(".nol-message-author")!;
+      const link = Required.of(element().querySelector<HTMLElement>(".sender-chat"));
+      const author = Required.of(element().querySelector(".nol-message-author"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = forcedColors === "active" ? "LinkText" : "var(--nol-link)";
       const look = (view: Element): string[] => [getComputedStyle(view).fontSize, getComputedStyle(view).lineHeight, getComputedStyle(view).fontFamily];
@@ -4069,7 +4225,9 @@ describe("HistoryMessageComponent", () => {
       await openConversation();
       render(awaiting());
       await Wait.until(() => expect(cards()).toHaveLength(1));
-      const [files, approvals, content] = [box("nol-teamrun-edited-files"), box("nol-teamrun-reply-approvals"), box(".nol-message-content")];
+      const files = box("nol-teamrun-edited-files");
+      const approvals = box("nol-teamrun-reply-approvals");
+      const content = box(".nol-message-content");
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       expect(approvals.height).toBeGreaterThan(0);
@@ -4078,7 +4236,7 @@ describe("HistoryMessageComponent", () => {
       expect(approvals.bottom).toBeLessThanOrEqual(box(".nol-message-footer").top + 0.5);
       AppearanceFixture.expectPixels(approvals.left, content.left);
       AppearanceFixture.expectPixels(approvals.width, content.width);
-      AppearanceFixture.expectPixels(cards()[0]?.getBoundingClientRect().width ?? 0, approvals.width);
+      AppearanceFixture.expectPixels(Required.of(cards()[0]).getBoundingClientRect().width, approvals.width);
       for (const row of [box("nol-teamrun-edited-files .header"), box("nol-teamrun-edited-files .file")]) {
         AppearanceFixture.expectPixels(row.left, files.left + AppearanceFixture.measureLook("border-width"));
         AppearanceFixture.expectPixels(row.right, files.right - AppearanceFixture.measureLook("border-width"));
@@ -4092,7 +4250,7 @@ describe("HistoryMessageComponent", () => {
       const asked = new Approval("q1", "m2", ApprovalKind.Question, "AskUserQuestion", "Which platform?", null, SampleData.approval.options, ApprovalStatus.Pending,
         null, at(2), null, question().questions);
       const first = timed(0, DetailKind.Text, "Let me ask first.", 1);
-      const paragraph = (value: string): DOMRect => [...element().querySelectorAll("p")].find(t => t.textContent?.trim() === value)?.getBoundingClientRect() ?? new DOMRect();
+      const paragraph = (value: string): DOMRect => Required.of([...element().querySelectorAll("p")].find(t => t.textContent?.trim() === value)).getBoundingClientRect();
       await openConversation();
       context.emit(EventName.ApprovalUpdated, SampleData.approval.withDecision("no", decidedAt).toJson());
       await Wait.until(() => expect(store().pendingApprovals()).toEqual([]));
@@ -4104,7 +4262,10 @@ describe("HistoryMessageComponent", () => {
       await show(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [first,
         timed(1, DetailKind.Plan, "Plan", 3, new ReplyPlan([], null, "## Ship it\n\nThen tell me.").toJson()), timed(2, DetailKind.Text, "Approve it when ready.", 4)]));
       await Wait.until(() => expect(paragraph("Approve it when ready.").height).toBeGreaterThan(0), MarkdownWait.coldImport);
-      const [before, card, plan, after] = [paragraph("Let me ask first."), box("nol-teamrun-question-card"), box("nol-teamrun-plan-card"), paragraph("Approve it when ready.")];
+      const before = paragraph("Let me ask first.");
+      const card = box("nol-teamrun-question-card");
+      const plan = box("nol-teamrun-plan-card");
+      const after = paragraph("Approve it when ready.");
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       expect([before.height, card.height, plan.height].every(t => t > 0)).toBe(true);
@@ -4154,8 +4315,8 @@ describe("HistoryMessageComponent", () => {
         detail(0, DetailKind.Text, "@Bob yours"), detail(1, DetailKind.Note, note, { source: "handOff" })
       ]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
-      const answer = element().querySelector(".nol-markdown-view")!;
-      const reply = element().querySelector("nol-message")!;
+      const answer = Required.of(element().querySelector(".nol-markdown-view"));
+      const reply = Required.of(element().querySelector("nol-message"));
       const line = element().querySelector(".hand-off-note");
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-text-muted)";
@@ -4163,11 +4324,12 @@ describe("HistoryMessageComponent", () => {
 
       expect([answer.textContent?.trim(), line?.textContent?.trim()]).toEqual(["@Bob yours", note]);
       expect(reply.contains(line)).toBe(false);
-      expect(line!.getBoundingClientRect().top).toBeGreaterThanOrEqual(reply.getBoundingClientRect().bottom);
-      AppearanceFixture.expectPixels(line!.getBoundingClientRect().left, answer.getBoundingClientRect().left);
-      AppearanceFixture.expectPixels(textStart(line!) - textStart(answer), AppearanceFixture.measureLook("space-3") + 2 * AppearanceFixture.measureLook("border-width"));
-      expect(getComputedStyle(line!).color).toBe(getComputedStyle(probe).color);
-      expect(look(line!)).toEqual(look(answer));
+      const shownLine = Required.of(line);
+      expect(shownLine.getBoundingClientRect().top).toBeGreaterThanOrEqual(reply.getBoundingClientRect().bottom);
+      AppearanceFixture.expectPixels(shownLine.getBoundingClientRect().left, answer.getBoundingClientRect().left);
+      AppearanceFixture.expectPixels(textStart(shownLine) - textStart(answer), AppearanceFixture.measureLook("space-3") + 2 * AppearanceFixture.measureLook("border-width"));
+      expect(getComputedStyle(shownLine).color).toBe(getComputedStyle(probe).color);
+      expect(look(shownLine)).toEqual(look(answer));
       expect(element().querySelector(".activity-toggle")).toBeNull();
       probe.remove();
     });
@@ -4179,11 +4341,11 @@ describe("HistoryMessageComponent", () => {
         detail(2, DetailKind.Text, "Hi again.")
       ]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
-      const answer = element().querySelector(".nol-markdown-view")!;
-      const reply = element().querySelector("nol-message")!;
-      const header = element().querySelector(".nol-message-header")!.getBoundingClientRect();
-      const toggle = element().querySelector(".activity-toggle")!.getBoundingClientRect();
-      const line = element().querySelector(".resume-note")!;
+      const answer = Required.of(element().querySelector(".nol-markdown-view"));
+      const reply = Required.of(element().querySelector("nol-message"));
+      const header = Required.of(element().querySelector(".nol-message-header")).getBoundingClientRect();
+      const toggle = Required.of(element().querySelector(".activity-toggle")).getBoundingClientRect();
+      const line = Required.of(element().querySelector(".resume-note"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-text-muted)";
       const look = (view: Element): string[] => [getComputedStyle(view).fontSize, getComputedStyle(view).lineHeight];
@@ -4293,14 +4455,16 @@ describe("HistoryMessageComponent", () => {
       expect(style.backgroundColor).toBe(getComputedStyle(probe).backgroundColor);
       AppearanceFixture.expectPixels(heading.getBoundingClientRect().top - shown.top, Number.parseFloat(style.borderTopWidth) + Number.parseFloat(style.paddingTop));
       AppearanceFixture.expectPixels(heading.getBoundingClientRect().left - shown.left, Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft));
-      AppearanceFixture.expectPixels((parts[0]?.top ?? 0) - heading.getBoundingClientRect().bottom, AppearanceFixture.measureLook("space-1"));
+      AppearanceFixture.expectPixels(Required.of(parts[0]).top - heading.getBoundingClientRect().bottom, AppearanceFixture.measureLook("space-1"));
       expect([...handover.querySelectorAll(".sustain-handover-part")].map(t => t.textContent)[1]).toBe("Claude's last compaction summary, covering messages 1 to 3");
-      for (const [above, below] of [[parts[0], parts[1]], [parts[1], parts[2]]] as const) {
-        AppearanceFixture.expectPixels((below?.top ?? 0) - (above?.bottom ?? 0), AppearanceFixture.measureLook("space-1"));
-        AppearanceFixture.expectPixels(below?.left ?? 0, heading.getBoundingClientRect().left);
+      for (let index = 0; index < 2; index++) {
+        const above = Required.of(parts[index]);
+        const below = Required.of(parts[index + 1]);
+        AppearanceFixture.expectPixels(below.top - above.bottom, AppearanceFixture.measureLook("space-1"));
+        AppearanceFixture.expectPixels(below.left, heading.getBoundingClientRect().left);
       }
-      AppearanceFixture.expectPixels(reads.getBoundingClientRect().top - (parts[2]?.bottom ?? 0), AppearanceFixture.measureLook("space-1"));
-      expect([getComputedStyle(heading).color, getComputedStyle(reads).color, getComputedStyle(handover.querySelector(".sustain-handover-part") ?? handover).color])
+      AppearanceFixture.expectPixels(reads.getBoundingClientRect().top - Required.of(parts[2]).bottom, AppearanceFixture.measureLook("space-1"));
+      expect([getComputedStyle(heading).color, getComputedStyle(reads).color, getComputedStyle(one(".sustain-handover-part", handover)).color])
         .toEqual([tone("text-strong"), tone("text-muted"), tone("text")]);
       expect(Number.parseInt(getComputedStyle(heading).fontWeight, 10)).toBeGreaterThan(Number.parseInt(getComputedStyle(reads).fontWeight, 10));
       probe.remove();
@@ -4343,8 +4507,8 @@ describe("HistoryMessageComponent", () => {
     });
 
     it.each([
-      { kind: "subAgent", name: "x".repeat(200), ending: "ended as completed", text: "Found 3 files.", label: "The sub-agent's summary" },
-      { kind: "command", name: "Run the tests", ending: "exited with code 1", text: "1 failed\n2 passed", label: "The command's last lines" }
+      new WakeCase("subAgent", "x".repeat(200), "ended as completed", "Found 3 files.", "The sub-agent's summary"),
+      new WakeCase("command", "Run the tests", "exited with code 1", "1 failed\n2 passed", "The command's last lines")
     ])("shows a $kind's wake as a closed row at the top of the reply it started, within the answer's width, opening to its text in a region named for it", async ({ kind, name, ending, text, label }) => {
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [
         detail(0, DetailKind.Note, "Woken when a sub-agent or background command of this chat ended.", { source: "wakeReceived", wakeTask: { kind, name, ending, text } }),
@@ -4375,11 +4539,11 @@ describe("HistoryMessageComponent", () => {
         detail(2, DetailKind.Text, "The tests passed.")
       ]));
       await Wait.until(() => expect(element().querySelectorAll(".nol-markdown-view")).toHaveLength(1));
-      const answer = element().querySelector(".nol-markdown-view")!;
-      const reply = element().querySelector("nol-message")!;
-      const header = element().querySelector(".nol-message-header")!.getBoundingClientRect();
-      const toggle = element().querySelector(".activity-toggle")!.getBoundingClientRect();
-      const line = element().querySelector(".wake-note")!;
+      const answer = Required.of(element().querySelector(".nol-markdown-view"));
+      const reply = Required.of(element().querySelector("nol-message"));
+      const header = Required.of(element().querySelector(".nol-message-header")).getBoundingClientRect();
+      const toggle = Required.of(element().querySelector(".activity-toggle")).getBoundingClientRect();
+      const line = Required.of(element().querySelector(".wake-note"));
       const probe = element().appendChild(document.createElement("span"));
       probe.style.color = "var(--nol-text-muted)";
       probe.style.fontFamily = "var(--nol-font-mono)";
@@ -4395,33 +4559,33 @@ describe("HistoryMessageComponent", () => {
       AppearanceFixture.expectPixels(textStart(line) - textStart(answer), AppearanceFixture.measureLook("space-3") + 2 * AppearanceFixture.measureLook("border-width"));
       expect(getComputedStyle(line).color).toBe(getComputedStyle(probe).color);
       expect(look(line)).toEqual(look(answer));
-      expect(getComputedStyle(line.querySelector("code")!).fontFamily).toBe(getComputedStyle(probe).fontFamily);
+      expect(getComputedStyle(Required.of(line.querySelector("code"))).fontFamily).toBe(getComputedStyle(probe).fontFamily);
       probe.remove();
     });
 
-    for (const [shape, message, painted, layer, fill] of [
-      ["a person's bubble, with the bubble's corners", (): Message => SampleData.userMessage, "nol-message.nol-message-bubble .nol-message-content", null, "var(--nol-raised)"],
-      ["a reply's header and content, on a layer behind them reaching past their edges, with the bubble's corners", (): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Completed, steps.slice(0, 1)),
-        "nol-message:not(.nol-message-bubble) .nol-message-main", "::before", "transparent"]
-    ] as const)
-      it(`flashes a found message from its start on ${shape}, from an accent tint, or a Highlight outline in forced colors, to nothing, painting nothing of its own`, async () => {
-        render(message());
+    for (const flashed of [
+      new FlashCase("a person's bubble, with the bubble's corners", (): Message => SampleData.userMessage, "nol-message.nol-message-bubble .nol-message-content", null, "var(--nol-raised)"),
+      new FlashCase("a reply's header and content, on a layer behind them reaching past their edges, with the bubble's corners", (): Message => SampleData.withStatus(SampleData.reply, MessageStatus.Completed, steps.slice(0, 1)),
+        "nol-message:not(.nol-message-bubble) .nol-message-main", "::before", "transparent")
+    ])
+      it(`flashes a found message from its start on ${flashed.shape}, from an accent tint, or a Highlight outline in forced colors, to nothing, painting nothing of its own`, async () => {
+        const layer = flashed.layer;
+        render(flashed.message());
         const probe = document.createElement("div");
-        probe.style.backgroundColor = `color-mix(in srgb, var(--nol-accent) 18%, ${fill})`;
+        probe.style.backgroundColor = `color-mix(in srgb, var(--nol-accent) 18%, ${flashed.fill})`;
         probe.style.outline = "calc(var(--nol-border-width) * 2) solid Highlight";
         element().append(probe);
-        const [tint, highlight] = [getComputedStyle(probe).backgroundColor, getComputedStyle(probe).outlineColor];
+        const tint = getComputedStyle(probe).backgroundColor;
+        const highlight = getComputedStyle(probe).outlineColor;
         probe.remove();
         const paint = (color: string): number[] => {
-          const context = document.createElement("canvas").getContext("2d");
-          if (Object.isNull(context))
-            return [];
+          const context = Required.of(document.createElement("canvas").getContext("2d"));
           context.fillStyle = color;
           context.fillRect(0, 0, 1, 1);
           return Array.from(context.getImageData(0, 0, 1, 1).data);
         };
-        const target = element().querySelector<HTMLElement>(painted)!;
-        const row = element().querySelector<HTMLElement>("nol-message")!;
+        const target = Required.of(element().querySelector<HTMLElement>(flashed.painted));
+        const row = Required.of(element().querySelector<HTMLElement>("nol-message"));
         const drawn = (): CSSStyleDeclaration => getComputedStyle(target, layer);
         const resting = paint(drawn().backgroundColor);
 
@@ -4429,16 +4593,19 @@ describe("HistoryMessageComponent", () => {
           fixture.componentRef.setInput("flashStart", start);
           await fixture.whenStable();
           await new Promise(resolve => requestAnimationFrame(resolve));
-          const shown = target.getAnimations({ subtree: true }).filter(t => t instanceof CSSAnimation && t.animationName.startsWith("nol-message-flash")) as CSSAnimation[];
+          const shown = target.getAnimations({ subtree: true }).filter((t): t is CSSAnimation => t instanceof CSSAnimation && t.animationName.startsWith("nol-message-flash"));
           for (const animation of shown)
             animation.pause();
           return shown;
         };
-        const went = (animation: CSSAnimation | undefined): number => Number(animation?.currentTime) - Number(animation?.effect?.getTiming().delay ?? 0);
+        const went = (animation: CSSAnimation | undefined): number => {
+          const running = Required.of(animation);
+          return Number(running.currentTime) - Number(Required.of(running.effect).getTiming().delay ?? 0);
+        };
         const earlier = await flashFrom(new Date(Date.now() - 400));
         const gone = went(earlier[0]);
         const animations = await flashFrom(new Date());
-        const flash = animations[0] as CSSAnimation;
+        const flash = Required.of(animations[0]);
         flash.effect?.updateTiming({ delay: 0 });
         flash.currentTime = 0;
 
@@ -4450,7 +4617,8 @@ describe("HistoryMessageComponent", () => {
           expect(target.getBoundingClientRect().width).toBeLessThan(row.getBoundingClientRect().width);
         else {
           const margins = [drawn().marginTop, drawn().marginRight, drawn().marginBottom, drawn().marginLeft].map(t => -Number.parseFloat(t));
-          const [block, inline] = [AppearanceFixture.measureLook("space-3"), AppearanceFixture.measureLook("space-4")];
+          const block = AppearanceFixture.measureLook("space-3");
+          const inline = AppearanceFixture.measureLook("space-4");
           margins.forEach((margin, index) => AppearanceFixture.expectPixels(margin, index % 2 === 0 ? block : inline));
         }
         AppearanceFixture.expectPixels(Number.parseFloat(drawn().borderTopLeftRadius), AppearanceFixture.measureLook("radius-medium"));
@@ -4463,7 +4631,7 @@ describe("HistoryMessageComponent", () => {
           expect(getComputedStyle(target, layer ?? "::after").opacity).toBe("0");
         } else {
           expect(flash.animationName).toBe("nol-message-flash");
-          expect(Math.max(...paint(tint).map((channel, index) => Math.abs(channel - (paint(drawn().backgroundColor)[index] ?? 0))))).toBeLessThanOrEqual(1);
+          expect(Math.max(...paint(tint).map((channel, index) => Math.abs(channel - Required.of(paint(drawn().backgroundColor)[index]))))).toBeLessThanOrEqual(1);
           flash.currentTime = Resources.flashMilliseconds;
           expect(paint(drawn().backgroundColor)).toEqual(resting);
         }
@@ -4597,7 +4765,7 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(panel()).toBeNull());
       expect([document.activeElement, statsButton()?.getAttribute("aria-expanded")]).toEqual([statsButton(), "false"]);
       await openStats();
-      const outside = element().querySelector<HTMLElement>(".nol-message-content p") ?? element();
+      const outside = await Wait.until(() => one(".nol-message-content p"), MarkdownWait.coldImport);
       outside.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       outside.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await fixture.whenStable();
@@ -4640,28 +4808,30 @@ describe("HistoryMessageComponent", () => {
       const firstLine = (target: Element): DOMRect => {
         const range = document.createRange();
         range.selectNodeContents(target);
-        return range.getClientRects()[0] ?? new DOMRect();
+        return Required.of(range.getClientRects()[0]);
       };
       const lineMiddleOf = (name: Element): number => {
-        const block = name.closest("p, .nol-message-attachment-name")!;
-        const [top, line] = [rect(block).top, Number.parseFloat(getComputedStyle(block).lineHeight)];
+        const block = Required.of(name.closest("p, .nol-message-attachment-name"));
+        const top = rect(block).top;
+        const line = Number.parseFloat(getComputedStyle(block).lineHeight);
         return top + (Math.floor((middleOf(firstLine(name)) - top) / line) + 0.5) * line;
       };
       const expectMark = (badge: HTMLElement | null, name: Element, gap: string): void => {
         expect(badge?.getAttribute("aria-hidden")).toBe("true");
-        AppearanceFixture.expectPixels(rect(badge!).width, AppearanceFixture.measureLook("icon"));
-        AppearanceFixture.expectPixels(rect(badge!).height, AppearanceFixture.measureLook("icon"));
-        AppearanceFixture.expectPixels(middleOf(rect(badge!)), lineMiddleOf(name));
-        AppearanceFixture.expectPixels(firstLine(name).left - rect(badge!).right, AppearanceFixture.measureLook(gap));
+        const shownBadge = Required.of(badge);
+        AppearanceFixture.expectPixels(rect(shownBadge).width, AppearanceFixture.measureLook("icon"));
+        AppearanceFixture.expectPixels(rect(shownBadge).height, AppearanceFixture.measureLook("icon"));
+        AppearanceFixture.expectPixels(middleOf(rect(shownBadge)), lineMiddleOf(name));
+        AppearanceFixture.expectPixels(firstLine(name).left - rect(shownBadge).right, AppearanceFixture.measureLook(gap));
       };
 
       render(new Message("m5", "c1", 4, MessageAuthor.User, null, MessageStatus.Completed, [detail(0, DetailKind.Text, "Here are the notes.")], null,
         SampleData.timestamp, null, SampleData.timestamp, [new MessageAttachment("notes.txt", "text/plain", 2048, "D:/data/attachments/notes.txt")]));
       await Wait.until(() => expect(element().querySelector(".nol-message-attachment-name")).not.toBeNull(), MarkdownWait.coldImport);
-      const name = element().querySelector(".nol-message-attachment-name")!;
-      const attachment = name.closest("button")!;
+      const name = Required.of(element().querySelector(".nol-message-attachment-name"));
+      const attachment = Required.of(name.closest("button"));
       expectMark(attachment.querySelector("nol-file-badge"), name, "space-2");
-      AppearanceFixture.expectPixels(rect(attachment.querySelector("nol-file-badge")!).left - rect(attachment).left,
+      AppearanceFixture.expectPixels(rect(Required.of(attachment.querySelector("nol-file-badge"))).left - rect(attachment).left,
         Number.parseFloat(getComputedStyle(attachment).paddingInlineStart) + Number.parseFloat(getComputedStyle(attachment).borderInlineStartWidth));
       expect(attachment.getAttribute("aria-label") ?? ShownText.of(attachment)).toContain("notes.txt");
 
@@ -4669,14 +4839,14 @@ describe("HistoryMessageComponent", () => {
         [detail(0, DetailKind.Text, "[src/b.ts](src/b.ts) starts this line, and [the code](src/a.ts:42) sits in it.")]));
       const links = (): HTMLElement[] => [...element().querySelectorAll<HTMLElement>("a.nol-markdown-file-link")];
       await Wait.until(() => expect(links()).toHaveLength(2), MarkdownWait.coldImport);
-      const paragraph = links()[0]!.closest("p")!;
+      const paragraph = Required.of(Required.of(links()[0]).closest("p"));
       for (const link of links()) {
         const badge = link.querySelector<HTMLElement>("nol-file-badge");
-        expectMark(badge, link.querySelector(".nol-markdown-file-text")!, "space-1");
-        AppearanceFixture.expectPixels(rect(badge!).left, rect(link).left);
+        expectMark(badge, Required.of(link.querySelector(".nol-markdown-file-text")), "space-1");
+        AppearanceFixture.expectPixels(rect(Required.of(badge)).left, rect(link).left);
       }
       expect(links().map(t => ShownText.of(t))).toEqual(["src/b.ts", "the code"]);
-      AppearanceFixture.expectPixels(rect(links()[0]!).left, rect(paragraph).left);
+      AppearanceFixture.expectPixels(rect(Required.of(links()[0])).left, rect(paragraph).left);
 
       render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, [detail(0, DetailKind.Text, "Here's my plan."),
         detail(1, DetailKind.Plan, "Move the cache", new ReplyPlan([], null, "Move [the cache](src/cache.ts) first.").toJson())]));
@@ -4684,8 +4854,9 @@ describe("HistoryMessageComponent", () => {
       await click(element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header"));
       const planLink = (): HTMLElement | null => element().querySelector<HTMLElement>("nol-teamrun-plan-card a.nol-markdown-file-link");
       await Wait.until(() => expect(planLink()).not.toBeNull(), MarkdownWait.coldImport);
-      expectMark(planLink()!.querySelector("nol-file-badge"), planLink()!.querySelector(".nol-markdown-file-text")!, "space-1");
-      expect(ShownText.of(planLink()!)).toBe("the cache");
+      const shownPlanLink = Required.of(planLink());
+      expectMark(shownPlanLink.querySelector("nol-file-badge"), Required.of(shownPlanLink.querySelector(".nol-markdown-file-text")), "space-1");
+      expect(ShownText.of(shownPlanLink)).toBe("the cache");
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
     });
   });
@@ -4695,37 +4866,37 @@ describe("HistoryMessageComponent", () => {
       await fixture.whenStable();
       fixture.detectChanges();
     };
-    const parts: readonly { name: string; open: () => Promise<void>; iconOnly?: readonly string[] }[] = [
-      { name: "finished reply with its steps open and the files it edited", open: async () => {
+    const parts: readonly ControlPartCase[] = [
+      new ControlPartCase("finished reply with its steps open and the files it edited", async () => {
         render(SampleData.withStatus(SampleData.reply, MessageStatus.Completed, steps));
         await Wait.until(() => expect(element().querySelector(".nol-markdown-view")?.textContent?.trim()).toBe("Done."), MarkdownWait.coldImport);
         await click(element().querySelector(".activity-toggle"));
         await Wait.until(() => expect([element().querySelector("nol-teamrun-activity-block"), element().querySelector("nol-teamrun-edited-files")]).not.toContain(null));
-      } },
-      { name: "running reply with its plan open", open: async () => {
+      }),
+      new ControlPartCase("running reply with its plan open", async () => {
         render(planReply(planned(PlanStepStatus.Completed, PlanStepStatus.InProgress, PlanStepStatus.Pending)));
         await Wait.until(() => expect(element().textContent).toContain("Done."), MarkdownWait.coldImport);
         await click(element().querySelector<HTMLButtonElement>("nol-teamrun-plan-card .header"));
         await Wait.until(() => expect(element().querySelector("nol-teamrun-plan-card .header")?.getAttribute("aria-expanded")).toBe("true"));
-      } },
-      { name: "waiting reply's request and question", open: async () => {
+      }),
+      new ControlPartCase("waiting reply's request and question", async () => {
         await openConversation();
         render(awaiting());
         context.emit(EventName.ApprovalCreated, question().toJson());
         await Wait.until(() => expect([cards().length, element().querySelectorAll("nol-teamrun-question-card").length]).toEqual([1, 1]));
         await settle();
-      } },
-      { name: "plan waiting for approval", open: async () => {
+      }),
+      new ControlPartCase("plan waiting for approval", async () => {
         await planningChat();
         render(awaitingPlan());
         await Wait.until(() => expect(approveButton()).not.toBeNull());
         await settle();
-      } },
-      { name: "person's message with an attachment and a link", open: async () => {
+      }),
+      new ControlPartCase("person's message with an attachment and a link", async () => {
         render(new Message("m5", "c1", 4, MessageAuthor.User, null, MessageStatus.Completed, [detail(0, DetailKind.Text, "See [the docs](https://example.com/docs).")], null,
           SampleData.timestamp, null, SampleData.timestamp, [new MessageAttachment("notes.txt", "text/plain", 2048, "D:/data/attachments/notes.txt")]));
         await Wait.until(() => expect(element().querySelector(".nol-message-bubble a")).not.toBeNull(), MarkdownWait.coldImport);
-      }, iconOnly: [".nol-file-badge:has(> .material-symbols-rounded)"] }
+      }, [".nol-file-badge:has(> .material-symbols-rounded)"])
     ];
 
     it.each(parts)("keeps every control, state and focus ring in a $name visible under forced colours", async ({ open }) => {
@@ -4768,9 +4939,9 @@ describe("HistoryMessageComponent", () => {
     const own = (text: string = replyText): Message => new Message("m5", "c1", 4, MessageAuthor.User, null, MessageStatus.Completed, [detail(0, DetailKind.Text, text)], null,
       SampleData.timestamp, null, SampleData.timestamp);
     const chips = (): HTMLAnchorElement[] => [...element().querySelectorAll<HTMLAnchorElement>("a.nol-link-reference-chip")];
-    const plainLinks = (): string[] => [...element().querySelectorAll("a.nol-markdown-link:not(.nol-link-reference-chip)")].map(t => t.textContent?.trim() ?? "");
+    const plainLinks = (): string[] => [...element().querySelectorAll("a.nol-markdown-link:not(.nol-link-reference-chip)")].map(t => Required.of(t.textContent).trim());
     const card = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-link-reference-card");
-    const cardText = (selector: string): string[] => [...(card()?.querySelectorAll(selector) ?? [])].map(t => t.textContent?.trim() ?? "");
+    const cardText = (selector: string): string[] => [...Required.of(card()).querySelectorAll(selector)].map(t => Required.of(t.textContent).trim());
     const colorOf = (value: string): string => {
       const probe = document.createElement("span");
       probe.style.color = value;
@@ -4838,12 +5009,12 @@ describe("HistoryMessageComponent", () => {
       await Wait.until(() => expect(chips().map(t => t.textContent?.trim())).toEqual(["octocat/hello-world#42 · Fix the greeting", "octocat/hello-world#7 · Add a README"]),
         MarkdownWait.coldImport);
       const point = (chip: number, type: string): void => {
-        (chips()[chip] ?? one("a.nol-link-reference-chip")).dispatchEvent(new PointerEvent(type));
+        Required.of(chips()[chip]).dispatchEvent(new PointerEvent(type));
       };
       const parts = async (chip: number): Promise<HTMLAnchorElement[]> => {
         point(chip, "pointerenter");
         await Wait.until(() => expect(card()?.querySelector(".nol-link-reference-card-title a") ?? null).not.toBeNull(), MarkdownWait.coldImport);
-        return [...(card()?.querySelectorAll<HTMLAnchorElement>("a.nol-link-reference-card-link") ?? [])];
+        return [...Required.of(card()).querySelectorAll<HTMLAnchorElement>("a.nol-link-reference-card-link")];
       };
       const pages = async (chip: number): Promise<(string | null)[]> => {
         const hrefs = (await parts(chip)).map(t => t.getAttribute("href"));
@@ -4855,11 +5026,14 @@ describe("HistoryMessageComponent", () => {
       const issuePages = [issueUrl, "https://github.com/octocat/hello-world", issueUrl, issueUrl, "https://github.com/octocat", issueUrl];
 
       expect([await pages(0), await pages(1)]).toEqual([pullPages, issuePages]);
-      for (const [chip, count] of [[0, pullPages.length], [1, issuePages.length]] as const)
+      const counts = [pullPages.length, issuePages.length];
+      for (let chip = 0; chip < counts.length; chip++) {
+        const count = Required.of(counts[chip]);
         for (let index = 0; index < count; index++) {
-          (await parts(chip))[index]?.click();
+          Required.of((await parts(chip))[index]).click();
           await Wait.until(() => expect(card()).toBeNull());
         }
+      }
 
       expect(context.links).toEqual([...pullPages, ...issuePages]);
     });
@@ -4911,7 +5085,7 @@ describe("HistoryMessageComponent", () => {
         .toEqual([["https://example.com/a"], [pullUrl, issueUrl], true]);
       expect(context.requests.filter(t => t.method === readMethod).map(t => HostReference.fromJson(t.parameters).number)).toEqual([42, 7]);
       await click(one(".nol-message-copy"));
-      await Wait.until(() => expect((TestBed.inject(ClipboardWriter) as ClipboardWriterFixture).texts).toEqual([replyText]));
+      await Wait.until(() => expect(clipboard().texts).toEqual([replyText]));
     });
 
     it("hands the person's own message to the composer with its GitHub links as typed when they rewind to it", async () => {
@@ -4974,9 +5148,9 @@ describe("HistoryMessageComponent", () => {
     });
 
     describe.each([
-      { look: "light", mode: ThemeMode.Light, forcedColors: "none", merged: "rgb(130, 80, 223)" },
-      { look: "dark", mode: ThemeMode.Dark, forcedColors: "none", merged: "rgb(163, 113, 247)" },
-      { look: "forced colors", mode: ThemeMode.Light, forcedColors: "active", merged: "LinkText" }
+      new ChipLookCase("light", ThemeMode.Light, "none", "rgb(130, 80, 223)"),
+      new ChipLookCase("dark", ThemeMode.Dark, "none", "rgb(163, 113, 247)"),
+      new ChipLookCase("forced colors", ThemeMode.Light, "active", "LinkText")
     ])("in $look", ({ mode, forcedColors, merged }) => {
       beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
@@ -4995,27 +5169,36 @@ describe("HistoryMessageComponent", () => {
       const paragraphOf = (chip: HTMLElement): HTMLElement => {
         const paragraph = chip.closest<HTMLElement>("p");
         if (Object.isNull(paragraph))
-          throw new Error("The chip is in no paragraph.");
+          throw new PartReadError("The chip is in no paragraph.");
         return paragraph;
       };
 
       it("lays a chip out as the kit's tokens say: GitHub's mark, then the state's icon, then the text, a first space apart and centred on the text's line", async () => {
-        const [issueChip] = await shownReply();
+        const issueChip = (await shownReply())[0];
         if (Object.isUndefined(issueChip))
-          throw new Error("The reply has no chip.");
+          throw new PartReadError("The reply has no chip.");
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-        const [chip, mark, icon, text] = [issueChip, one(".nol-link-reference-chip-mark", issueChip), one(".nol-link-reference-chip-icon", issueChip),
+        const chipRects = [issueChip, one(".nol-link-reference-chip-mark", issueChip), one(".nol-link-reference-chip-icon", issueChip),
           one(".nol-link-reference-chip-text", issueChip)].map(t => t.getBoundingClientRect());
+        const chip = chipRects[0];
+        const mark = chipRects[1];
+        const icon = chipRects[2];
+        const text = chipRects[3];
         if (Object.isUndefined(chip) || Object.isUndefined(mark) || Object.isUndefined(icon) || Object.isUndefined(text))
-          throw new Error("The chip lacks a part.");
+          throw new PartReadError("The chip lacks a part.");
         const before = document.createRange();
         before.setStart(paragraphOf(issueChip), 0);
         before.setEndBefore(issueChip);
         const line = before.getBoundingClientRect();
-        const [markSize, iconSize, space] = ["--nol-reference-mark", "--nol-icon", "--nol-space-1"].map(t => remsOf(t));
+        const sizes = ["--nol-reference-mark", "--nol-icon", "--nol-space-1"].map(t => remsOf(t));
+        const markSize = sizes[0];
+        const iconSize = sizes[1];
+        const space = sizes[2];
 
-        for (const [size, expected] of [[mark.width, markSize], [mark.height, markSize], [icon.width, iconSize], [icon.height, iconSize]] as const)
-          expect(size / rem).toBeCloseTo(expected ?? Number.NaN, 2);
+        expect(mark.width / rem).toBeCloseTo(markSize ?? Number.NaN, 2);
+        expect(mark.height / rem).toBeCloseTo(markSize ?? Number.NaN, 2);
+        expect(icon.width / rem).toBeCloseTo(iconSize ?? Number.NaN, 2);
+        expect(icon.height / rem).toBeCloseTo(iconSize ?? Number.NaN, 2);
         expect((icon.left - mark.right) / rem).toBeCloseTo(space ?? Number.NaN, 2);
         expect((text.left - icon.right) / rem).toBeCloseTo(space ?? Number.NaN, 2);
         expect(mark.left).toBeCloseTo(chip.left, 1);
@@ -5023,9 +5206,9 @@ describe("HistoryMessageComponent", () => {
       });
 
       it("cuts a long title with an ellipsis at the kit's chip width within the reply's, and draws the state's icon in its colour and the mark in the text's", async () => {
-        const [, pullChip] = await shownReply();
+        const pullChip = (await shownReply())[1];
         if (Object.isUndefined(pullChip))
-          throw new Error("The reply has no second chip.");
+          throw new PartReadError("The reply has no second chip.");
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
         const textView = one(".nol-link-reference-chip-text", pullChip);
         const chip = pullChip.getBoundingClientRect();
@@ -5046,11 +5229,13 @@ describe("HistoryMessageComponent", () => {
         const bubble = one(".nol-message-bubble");
         const style = getComputedStyle(bubble);
         const outer = bubble.getBoundingClientRect();
-        const inner = { left: outer.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth),
-          right: outer.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth) };
-        const [issueChip, pullChip] = chips();
+        const inner = new PixelSpan(outer.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth),
+          outer.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth));
+        const ownChips = chips();
+        const issueChip = ownChips[0];
+        const pullChip = ownChips[1];
         if (Object.isUndefined(issueChip) || Object.isUndefined(pullChip))
-          throw new Error("The person's message has fewer than two chips.");
+          throw new PartReadError("The person's message has fewer than two chips.");
         const before = document.createRange();
         before.setStart(paragraphOf(issueChip), 0);
         before.setEndBefore(issueChip);
@@ -5058,7 +5243,7 @@ describe("HistoryMessageComponent", () => {
         const parts = [".nol-link-reference-chip-mark", ".nol-link-reference-chip-icon", ".nol-link-reference-chip-text"].map(t => one(t, issueChip).getBoundingClientRect());
 
         for (const chip of [issueChip, pullChip].map(t => t.getBoundingClientRect()))
-          expect([chip.left >= inner.left - 0.5, chip.right <= inner.right + 0.5]).toEqual([true, true]);
+          expect([chip.left >= inner.start - 0.5, chip.right <= inner.end + 0.5]).toEqual([true, true]);
         expect(pullChip.getBoundingClientRect().width / rem).toBeCloseTo(remsOf("--nol-reference-chip-max-width"), 2);
         expect(parts.map(t => Math.abs(middleOf(t) - middleOf(line)) <= 1)).toEqual([true, true, true]);
         expect(getComputedStyle(one(".nol-link-reference-chip-icon", pullChip)).color).toBe(colorOf(merged));
@@ -5074,14 +5259,16 @@ describe("HistoryMessageComponent", () => {
       });
 
       it("draws the card author's picture at the kit's byline avatar size inside the avatar's border, and an author with none by their initial", async () => {
-        const [issueChip, pullChip] = await shownReply();
+        const replyChips = await shownReply();
+        const issueChip = replyChips[0];
+        const pullChip = replyChips[1];
         if (Object.isUndefined(issueChip) || Object.isUndefined(pullChip))
-          throw new Error("The reply has fewer than two chips.");
+          throw new PartReadError("The reply has fewer than two chips.");
         const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
         const avatarOf = (): HTMLElement => {
           const shown = card();
           if (Object.isNull(shown))
-            throw new Error("No card is shown.");
+            throw new PartReadError("No card is shown.");
           return one(".nol-link-reference-card-foot nol-avatar", shown);
         };
         await userEvent.hover(pullChip);
@@ -5089,10 +5276,11 @@ describe("HistoryMessageComponent", () => {
         const pictured = avatarOf();
         const image = one("img.nol-avatar-image", pictured);
         if (!(image instanceof HTMLImageElement))
-          throw new Error("The author's avatar has no image.");
+          throw new PartReadError("The author's avatar has no image.");
         await image.decode();
         const border = Number.parseFloat(getComputedStyle(pictured).borderLeftWidth);
-        const [box, picture] = [pictured.getBoundingClientRect(), image.getBoundingClientRect()];
+        const box = pictured.getBoundingClientRect();
+        const picture = image.getBoundingClientRect();
         await userEvent.unhover(pullChip);
         TestBed.inject(FocusMonitor).focusVia(issueChip, "keyboard");
         await Wait.until(() => expect(cardText(".nol-link-reference-card-author")).toEqual(["octocat"]));
@@ -5101,9 +5289,14 @@ describe("HistoryMessageComponent", () => {
 
         expect([image.src, image.complete, image.naturalWidth, border > 0]).toEqual([avatar, true, 4, forcedColors === "active"]);
         const byline = remsOf("--nol-avatar-byline");
-        for (const [size, expected] of [[box.width / rem, byline], [box.height / rem, byline], [picture.left - box.left, border], [picture.top - box.top, border],
-          [picture.width, box.width - 2 * border], [picture.height, box.height - 2 * border], [plain.width / rem, byline], [plain.height / rem, byline]] as const)
-          expect(size).toBeCloseTo(expected, 1);
+        expect(box.width / rem).toBeCloseTo(byline, 1);
+        expect(box.height / rem).toBeCloseTo(byline, 1);
+        expect(picture.left - box.left).toBeCloseTo(border, 1);
+        expect(picture.top - box.top).toBeCloseTo(border, 1);
+        expect(picture.width).toBeCloseTo(box.width - 2 * border, 1);
+        expect(picture.height).toBeCloseTo(box.height - 2 * border, 1);
+        expect(plain.width / rem).toBeCloseTo(byline, 1);
+        expect(plain.height / rem).toBeCloseTo(byline, 1);
         expect([initial.querySelector("img"), initial.textContent?.trim()]).toEqual([null, "O"]);
       });
     });

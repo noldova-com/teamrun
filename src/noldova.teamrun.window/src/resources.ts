@@ -192,7 +192,6 @@ export class Resources {
   public static readonly browserProfileKeyField: string = "profileKey";
   public static readonly browserInstanceField: string = "instance";
   public static readonly browserModuleId: string = "browser";
-  public static readonly browserLinkProfile: string = "links";
   public static readonly computerUseModuleId: string = "computer-use";
   public static readonly computerUseBorderColorSetMethod: string = "computer-use.borderColorSet";
   public static readonly gitHubReferenceProtocol: string = "https:";
