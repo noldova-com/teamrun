@@ -307,8 +307,9 @@ describe("OrganizationDetailsComponent", () => {
       const opened = [details.getAttribute("role"), details.getAttribute("aria-label"), card("Alice").getAttribute("role"), card("Alice").getAttribute("aria-label"),
         card("Alice").getAttribute("aria-expanded"), texts(".head .name", details), fact("Reports to")];
       await blur();
+      await Wait.until(() => expect(card("Alice").getAttribute("aria-expanded")).toBe("false"));
 
-      expect([opened, card("Alice").getAttribute("aria-expanded")]).toEqual([["dialog", "Alice's details", "group", "Alice", "true", ["Alice"], "You"], "false"]);
+      expect(opened).toEqual(["dialog", "Alice's details", "group", "Alice", "true", ["Alice"], "You"]);
     });
 
     it("opens a card's details once the pointer rests on it, and closes them when it leaves the card and them", async () => {
