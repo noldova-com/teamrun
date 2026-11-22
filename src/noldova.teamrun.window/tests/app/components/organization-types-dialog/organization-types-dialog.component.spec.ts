@@ -7,11 +7,11 @@
  */
 
 import { TestBed } from "@angular/core/testing";
-import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
 import { ErrorCode, EventName, MethodName, NodeType, Organization, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { DialogService } from "@noldova/ui.components.angular";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationTypesDialogComponent } from "../../../../src/app/components/organization-types-dialog/organization-types-dialog.component";
 import { OrganizationScope } from "../../../../src/app/services/organization-scope";

@@ -8,11 +8,12 @@
 
 import { ApplicationRef } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
-import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
 import { MethodName, NodeType, Organization, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
-import { DialogService } from "@noldova/ui.components.angular";
+import { DialogService, ThemeMode } from "@noldova/ui.components.angular";
+import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
+import { userEvent } from "vitest/browser";
 
 import { OrganizationTypeDialogComponent } from "../../../../src/app/components/organization-type-dialog/organization-type-dialog.component";
 import { OrganizationScope } from "../../../../src/app/services/organization-scope";
@@ -72,7 +73,10 @@ describe("OrganizationTypeDialogComponent", () => {
     await settle();
   };
 
+  beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
+
   afterEach(() => {
+    AppearanceFixture.reset();
     OrganizationStoreService.release(context);
   });
 
