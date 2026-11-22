@@ -70,6 +70,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A provider's tool install and the ACP agents' Add and Remove:** a tool install that fails after Install closed the provider dialog, and an Add or Remove that fails after the ACP agents dialog closed, show their failure in a notice rather than nowhere (#153).
 - **Questions a teammate posts:** an answer to a secret question it posts is neither kept nor sent as the next message, as for the questions a turn waits on (#229).
 - **Chat titles:** a long first message that starts with emoji gets a title that ends in whole emoji and an ellipsis, rather than a broken character (#229).
+- **Deleting a chat:** once a chat is deleted, a failure in one of the cleanups after it, such as forgetting its runs, no longer skips the others or shows the delete as failed; and one part of TeamRun failing on an update no longer keeps the update from the parts after it, such as an approval's answer from its waiting run; each failure is logged (#85).
 
 ### Changed
 

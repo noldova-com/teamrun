@@ -120,6 +120,7 @@ import type { IProvidersService } from "../../interfaces/i-providers.service.js"
 import type { IProviderKindsService } from "../../interfaces/i-provider-kinds.service.js";
 import type { IReadingPositionsService } from "../../interfaces/i-reading-positions.service.js";
 import type { IEventSink } from "../../interfaces/i-event-sink.js";
+import type { ILog } from "../../interfaces/i-log.js";
 import type { IAcpAgentsService } from "../../interfaces/i-acp-agents.service.js";
 import type { ISharedMcpServersService } from "../../interfaces/i-shared-mcp-servers.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
@@ -158,6 +159,7 @@ export class RequestDispatcher {
   private readonly acpAgents: IAcpAgentsService | null;
   private readonly organization: IOrganizationService | null;
   private readonly computerUseGrants: IComputerUseGrantsService | null;
+  private readonly log: ILog | null;
 
   public constructor(
     kinds: IProviderKindsService,
@@ -178,7 +180,9 @@ export class RequestDispatcher {
     sharedServers: ISharedMcpServersService | null = null,
     computerUseGrants: IComputerUseGrantsService | null = null,
     acpAgents: IAcpAgentsService | null = null,
-    organization: IOrganizationService | null = null) {
+    organization: IOrganizationService | null = null,
+    log: ILog | null = null) {
+    this.log = log;
     this.acpAgents = acpAgents;
     this.organization = organization;
     this.events = events;
@@ -466,7 +470,7 @@ export class RequestDispatcher {
         const params = ConversationIdParams.fromJson(payload);
         await this.conversations.deleteAsync(params);
         await this.publishDeletedAsync([params.conversationId]);
-        await this.engine.releaseFolderAsync(params.conversationId);
+        await this.cleanUpAsync(() => this.engine.releaseFolderAsync(params.conversationId));
         return null;
       }
       case MethodName.ConversationFolderCount:
@@ -634,9 +638,9 @@ export class RequestDispatcher {
   }
 
   private async publishDeletedAsync(conversationIds: readonly string[]): Promise<void> {
-    this.tasks?.forget(conversationIds);
-    await this.engine.forgetAsync(conversationIds);
-    this.computerUseGrants?.forget(conversationIds);
+    await this.cleanUpAsync(() => this.tasks?.forget(conversationIds));
+    await this.cleanUpAsync(() => this.engine.forgetAsync(conversationIds));
+    await this.cleanUpAsync(() => this.computerUseGrants?.forget(conversationIds));
     for (const conversationId of conversationIds)
       this.publish(new Event(EventName.ConversationDeleted, new ConversationIdParams(conversationId).toJson()));
   }
@@ -733,6 +737,15 @@ export class RequestDispatcher {
     const json = found.toJson();
     this.publish(new Event(EventName.OrganizationChanged, json));
     return json;
+  }
+
+  private async cleanUpAsync(step: () => Promise<void> | void): Promise<void> {
+    try {
+      await step();
+    }
+    catch (error) {
+      this.log?.write(Resources.formatDeleteCleanupFailed(Resources.formatFailureReason(error)));
+    }
   }
 
   private publish(event: Event): void {
