@@ -240,8 +240,8 @@ export class RequestDispatcherTests {
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeDelete, new NodeTypeIdParams(RequestDispatcherTests.mine, team.id).toJson()));
 
     Assert.areEqual("Team|Squad|groups|#00ff00", [team.name, squad.name, String(squad.icon), String(squad.color)].join("|"));
-    Assert.areEqual("Department+Team,Department+Squad", named.join(","));
-    Assert.areEqual("Department", changes().at(-1)?.nodeTypes.map(t => t.name).join(","));
+    Assert.areEqual("Team,Squad", named.join(","));
+    Assert.areEqual(0, changes().at(-1)?.nodeTypes.length);
     Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
   }
 

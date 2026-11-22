@@ -217,7 +217,7 @@ export class OrganizationTests {
     Assert.areEqual("Team", value.typeOf("d1")?.name);
     Assert.isNull(value.typeOf("gone"));
     Assert.areEqual("$.input.nodeTypes", Assert.throws(() => Organization.fromJson({ ...json, nodeTypes: null }, "$.input"), JsonException).path);
-    Assert.areEqual("$.input.nodeTypes[1].icon", Assert.throws(() => Organization.fromJson({ ...json, nodeTypes: [...nodeTypes.map(t => t.toJson()),
+    Assert.areEqual("$.input.nodeTypes.1.icon", Assert.throws(() => Organization.fromJson({ ...json, nodeTypes: [...nodeTypes.map(t => t.toJson()),
       { ...team.toJson(), icon: "No" }] }, "$.input"), JsonException).path);
   }
 
