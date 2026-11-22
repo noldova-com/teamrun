@@ -196,6 +196,7 @@ export { OrganizationService } from "../services/organization/organization.servi
 export { OrganizationMessagesService } from "../services/organization/organization-messages.service.js";
 export { OrganizationMessagesMigration } from "../models/migrations/organization-messages-migration.js";
 export { TeammateLastRepliesMigration } from "../models/migrations/teammate-last-replies-migration.js";
+export { TeammatePlacementsMigration } from "../models/migrations/teammate-placements-migration.js";
 export { SharedMcpServersService } from "../services/shared-mcp-servers/shared-mcp-servers.service.js";
 export { AcpAgentsService } from "../services/acp-agents/acp-agents.service.js";
 export { ComputerUseGrantsService } from "../services/computer-use-grants/computer-use-grants.service.js";

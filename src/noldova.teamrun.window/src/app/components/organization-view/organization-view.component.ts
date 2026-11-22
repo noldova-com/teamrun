@@ -70,7 +70,8 @@ export class OrganizationViewComponent {
   protected readonly directReports: Signal<readonly Teammate[]> = computed(() =>
     OrganizationNode.directReportsOf(this.organization.organization(), this.store.teammates()));
   protected readonly headcount: Signal<string> = computed(() =>
-    Resources.formatOrganizationHeadcount(this.store.teammates().length, OrganizationNode.departmentsOf(this.organization.organization()).length));
+    Resources.formatOrganizationHeadcount(this.store.teammates().length - this.organization.organization().unplaced(this.store.teammates().map(t => t.id)).length,
+      OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
     const first = this.tree()[0];
     const key = this.focusKey();

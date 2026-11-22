@@ -554,26 +554,30 @@ export declare enum MethodName {
    */
   TeammateDelete = "TeammateDelete",
   /**
-   * Lists the organization: its departments and which teammate is in which. Parameters: `null`. Result: `Organization`.
+   * Lists the organization: its departments and where each placed teammate sits. Parameters: `null`. Result: `Organization`.
    */
   OrganizationList = "OrganizationList",
   /**
-   * Creates a department, last among its siblings, and publishes `OrganizationChanged`. Parameters: `DepartmentCreateParams`.
-   * Result: `Department`; a parent that isn't a department fails with `NotFound`.
+   * Creates a department, last among the departments under its parent, and publishes `OrganizationChanged`; a leader given is
+   * placed in it first, from wherever it was, and leads it, in the same transaction. Parameters: `DepartmentCreateParams`.
+   * Result: `Department`; a parent or leader that doesn't exist fails with `NotFound`, and a leader the department would sit under
+   * fails with `InvalidParams`.
    */
   DepartmentCreate = "DepartmentCreate",
   /**
    * Renames a department or sets or clears its leader, and publishes `OrganizationChanged`. Parameters: `DepartmentUpdateParams`.
-   * Result: `Department`; a leader who isn't a member of the department fails with `InvalidParams`.
+   * Result: `Department`; a leader who isn't a member is placed in it first, last among its teammates, and a leader the department
+   * sits under fails with `InvalidParams`.
    */
   DepartmentUpdate = "DepartmentUpdate",
   /**
    * Moves a department under another parent, or to another place among its siblings, and publishes `OrganizationChanged`.
-   * Parameters: `DepartmentMoveParams`. Result: `Department`; a move under itself or one of its own departments fails with `InvalidParams`.
+   * Parameters: `DepartmentMoveParams`. Result: `Department`; a parent that doesn't exist fails with `NotFound`, and a move under
+   * itself or anything under it fails with `InvalidParams`.
    */
   DepartmentMove = "DepartmentMove",
   /**
-   * Deletes a department, moving its members and departments to its parent, and publishes `OrganizationChanged`.
+   * Deletes a department, moving its teammates and departments to its parent, and publishes `OrganizationChanged`.
    * Parameters: `DepartmentIdParams`. Result: `null`.
    */
   DepartmentDelete = "DepartmentDelete",
@@ -582,6 +586,13 @@ export declare enum MethodName {
    * Parameters: `DepartmentMemberSetParams`. Result: `null`.
    */
   DepartmentMemberSet = "DepartmentMemberSet",
+  /**
+   * Places a teammate under the person, a department or another teammate at an order among the teammates there, or takes it
+   * out of the organization, and publishes `OrganizationChanged`. A teammate that leaves a department stops leading it; what
+   * sits under a teammate that leaves the organization moves to its parent.
+   * Parameters: `TeammatePlaceParams`. Result: `null`.
+   */
+  TeammatePlace = "TeammatePlace",
   /**
    * Reads the Organization view's layout: its collapsed departments and what its cards show.
    * Parameters: none. Result: the layout's JSON object, or `null` when none is kept.
@@ -2201,8 +2212,6 @@ export declare class Resources {
    * Name of the last-update timestamp field of a model: `updatedAt`.
    */
   public static readonly updatedAtField: string;
-  /** Name of a department's parent field: `parentId`. */
-  public static readonly parentIdField: string;
   /** Name of a department's leader field: `leaderId`. */
   public static readonly leaderIdField: string;
   /** Name of a department's order field among its siblings: `order`. */
@@ -2211,8 +2220,10 @@ export declare class Resources {
   public static readonly departmentIdField: string;
   /** Name of an organization's departments field: `departments`. */
   public static readonly departmentsField: string;
-  /** Name of an organization's members field: `members`. */
-  public static readonly membersField: string;
+  /** Name of a department's or placement's parent field: `parent`. */
+  public static readonly parentField: string;
+  /** Name of an organization's placements field: `placements`. */
+  public static readonly placementsField: string;
   /** What a department name may be: 1 to 100 characters with no line break or other control character. */
   public static readonly departmentNamePattern: RegExp;
   /** Why a department name is refused: it is blank, longer than 100 characters, or holds a line break or other control character. */
@@ -2225,12 +2236,18 @@ export declare class Resources {
   public static readonly emptyDepartmentUpdate: string;
   /** Why an organization with two departments of one id is refused. */
   public static readonly duplicateDepartment: string;
-  /** Why an organization with a department whose parent isn't one of its departments is refused. */
-  public static readonly unknownParentDepartment: string;
-  /** Why an organization with a teammate in a department that isn't one of its departments is refused. */
-  public static readonly unknownMemberDepartment: string;
-  /** Why an organization with a teammate in two departments is refused. */
-  public static readonly teammateInTwoDepartments: string;
+  /** Why a parent that names no id for a teammate or department, or an id for the person, is refused. */
+  public static readonly organizationParentIdRequired: string;
+  /** Why a teammate or department under itself, directly or through others, is refused. */
+  public static readonly organizationNodeUnderItself: string;
+  /** Why a place's order that isn't a whole number from 0 is refused. */
+  public static readonly invalidOrganizationOrder: string;
+  /** Why a parent that is neither the person, a placed teammate nor one of the organization's departments is refused. */
+  public static readonly unknownOrganizationParent: string;
+  /** Why an organization that places a teammate twice is refused. */
+  public static readonly teammatePlacedTwice: string;
+  /** Why moving the person is refused. */
+  public static readonly personCannotMove: string;
   /**
    * Name of a draft's revision field: `revision`.
    */
@@ -11862,14 +11879,14 @@ export declare class TeammateIdParams {
   public toJson(): JsonObject;
 }
 
-/** A department of the organization: it has a name, an optional leader, and sits under the person or another department. */
+/** A department of the organization: it has a name, an optional leader, and sits under the person, a teammate or another department. */
 export declare class Department {
   /** id. */
   public readonly id: string;
   /** The name, 1 to 100 characters on one line. */
   public readonly name: string;
-  /** The department it sits under, or null when it sits under the person. */
-  public readonly parentId: string | null;
+  /** What it sits under. */
+  public readonly parent: OrganizationParent;
   /** The teammate who leads it, always one of its members, or null. */
   public readonly leaderId: string | null;
   /** Its place among its siblings, from 0. */
@@ -11885,7 +11902,7 @@ export declare class Department {
   public constructor(
     id: string,
     name: string,
-    parentId: string | null,
+    parent: OrganizationParent,
     leaderId: string | null,
     order: number,
     createdAt: string,
@@ -11909,13 +11926,15 @@ export declare class Department {
    * @throws ArgumentException when it isn't a whole number from 0.
    */
   public static validateOrder(order: number): void;
+  /** The department it sits under, or null when it sits under the person or a teammate. */
+  public get parentId(): string | null;
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): Department;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
 
-/** A teammate's place in a department; a teammate is in at most one. */
+/** A teammate's place directly in a department, as `Organization.members` lists it. */
 export declare class DepartmentMember {
   /** teammate Id. */
   public readonly teammateId: string;
@@ -11931,51 +11950,153 @@ export declare class DepartmentMember {
   public toJson(): JsonObject;
 }
 
-/** The organization under the person: its departments, and the teammates in them; a teammate in none shows under "No department". */
+/**
+ * The organization under the person, as a tree: departments and teammates sit under the person, a teammate or a department,
+ * each with one parent and none under itself. A teammate with no place isn't in the organization.
+ */
 export declare class Organization {
-  /** The organization with no departments. */
+  /** The organization with no departments and no placed teammates. */
   public static readonly empty: Organization;
   /** The departments, by their order among their siblings, then by when they were created. */
   public readonly departments: readonly Department[];
-  /** The teammates in a department. */
-  public readonly members: readonly DepartmentMember[];
+  /** The placed teammates, by their order among their siblings, then by id. */
+  public readonly placements: readonly TeammatePlacement[];
   /**
    * Creates a validated immutable value.
-   * @throws ArgumentException when two departments share an id, a parent or a member's department isn't one of the departments,
-   * or a teammate is in two departments.
+   * @throws ArgumentException when two departments share an id, a teammate is placed twice, a parent is neither the person,
+   * a placed teammate nor one of the departments, or a teammate or department sits under itself.
    */
   public constructor(
     departments: readonly Department[],
-    members: readonly DepartmentMember[]);
+    placements: readonly TeammatePlacement[]);
+  /** The teammates placed directly in a department, as department memberships. */
+  public get members(): readonly DepartmentMember[];
+  /** The leaders: each department's leader, in the departments' order, then each placed teammate with a teammate or department under it. */
+  public get leaders(): readonly string[];
   /**
-   * Returns the departments under a parent, in their order.
-   * @param parentId The parent department's id, or null for those under the person.
+   * Returns the departments directly under a parent, in their order.
+   * @param parent The parent.
    * @returns The departments.
    */
-  public childrenOf(parentId: string | null): readonly Department[];
+  public departmentsUnder(parent: OrganizationParent): readonly Department[];
   /**
-   * Returns the department a teammate is in.
+   * Returns the teammates placed directly under a parent, in their order.
+   * @param parent The parent.
+   * @returns The placements.
+   */
+  public placementsUnder(parent: OrganizationParent): readonly TeammatePlacement[];
+  /**
+   * Returns what sits directly under a parent: its departments in their order, then its teammates in theirs.
+   * @param parent The parent.
+   * @returns Each child as a parent value.
+   */
+  public childrenOf(parent: OrganizationParent): readonly OrganizationParent[];
+  /**
+   * Returns what a teammate or department sits under.
+   * @param node The teammate or department.
+   * @returns Its parent, or null for the person, an unplaced teammate or an unknown department.
+   */
+  public parentOf(node: OrganizationParent): OrganizationParent | null;
+  /**
+   * Returns the way from the top of the organization down to a teammate or department, the person left out.
+   * @param node The teammate or department.
+   * @returns Its ancestors from the top, then the node itself.
+   */
+  public pathOf(node: OrganizationParent): readonly OrganizationParent[];
+  /**
+   * Returns the teammates that have no place in the organization.
+   * @param teammateIds Every teammate's id, in the order to list them.
+   * @returns The unplaced ids, in that order.
+   */
+  public unplaced(teammateIds: readonly string[]): readonly string[];
+  /**
+   * Returns the department a teammate sits in: the nearest department above it, through teammates it sits under.
    * @param teammateId The teammate's id.
-   * @returns The department's id, or null when the teammate is in none.
+   * @returns The department's id, or null when no department is above it.
    */
   public departmentOf(teammateId: string): string | null;
   /**
-   * Returns the teammate a teammate reports to: its department's leader, or for a leader, or in a department with
-   * none, the nearest leader of a parent department.
+   * Returns the teammate a teammate reports to: the teammate it sits under, or its department's leader, or for a leader,
+   * or in a department with none, the nearest teammate or leader above.
    * @param teammateId The teammate's id.
-   * @returns The leader's id, or null when the teammate reports to the person.
+   * @returns The manager's id, or null when the teammate reports to the person.
    */
   public managerOf(teammateId: string): string | null;
+  /**
+   * Says why a teammate or department can't move under a parent, as views check a drop before they send it.
+   * @param node The teammate or department to move.
+   * @param parent Where it would go.
+   * @returns `Resources.personCannotMove`, `Resources.unknownOrganizationParent` or `Resources.organizationNodeUnderItself`,
+   * or null when the move is allowed.
+   */
+  public moveError(node: OrganizationParent, parent: OrganizationParent): string | null;
   /**
    * Returns the teammates a message to a target goes to, each once.
    * @param target The target.
    * @param teammateIds Every teammate's id, in the order to list everyone.
-   * @returns The ids: the teammate when it's one of them; a department's leader, then its other direct members; each
-   * department's leader, in the departments' order, then each teammate in no department; or every teammate.
+   * @returns The ids of the teammates in the organization, never an unplaced one: the teammate; a department's leader,
+   * then every other teammate whose `departmentOf` is that department; the leaders, as `leaders` lists them, then each
+   * teammate placed directly under the person; or every placed teammate.
    */
   public recipientsOf(target: OrganizationTarget, teammateIds: readonly string[]): readonly string[];
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): Organization;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** What a node of the organization's tree is. */
+export declare enum OrganizationNodeKind {
+  /** The person, at the top. */
+  Person = "Person",
+  /** A teammate. */
+  Teammate = "Teammate",
+  /** A department. */
+  Department = "Department"
+}
+
+/** A node of the organization's tree, as a parent or a child: the person, a teammate or a department. */
+export declare class OrganizationParent {
+  /** The person, at the top of the organization. */
+  public static readonly person: OrganizationParent;
+  /** What the node is. */
+  public readonly kind: OrganizationNodeKind;
+  /** The teammate's or department's id, or null for the person. */
+  public readonly id: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when a teammate or department names no id, the person names one, or the id is blank.
+   */
+  public constructor(kind: OrganizationNodeKind, id: string | null);
+  /** Returns a teammate node. */
+  public static teammate(teammateId: string): OrganizationParent;
+  /** Returns a department node. */
+  public static department(departmentId: string): OrganizationParent;
+  /** Returns a department node, or the person for null. */
+  public static departmentOrPerson(departmentId: string | null): OrganizationParent;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): OrganizationParent;
+  /** Returns whether both name the same node. */
+  public equals(other: OrganizationParent): boolean;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A teammate's place in the organization: what it sits under, and its order among the teammates there. */
+export declare class TeammatePlacement {
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** What it sits under. */
+  public readonly parent: OrganizationParent;
+  /** Its order among the teammates under the same parent, from 0. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id is blank, the teammate is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(teammateId: string, parent: OrganizationParent, order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): TeammatePlacement;
   /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
@@ -12146,16 +12267,22 @@ export declare class OrganizationMessageSendParams {
   public toJson(): JsonObject;
 }
 
-/** Parameters for creating a department. */
+/** Parameters for creating a department, last among the departments under its parent, with an optional first member who leads it. */
 export declare class DepartmentCreateParams {
   /** The name. */
   public readonly name: string;
-  /** The department it goes under, or null for the person. */
-  public readonly parentId: string | null;
-  /** Creates a validated immutable value. */
+  /** What it goes under. */
+  public readonly parent: OrganizationParent;
+  /** The teammate placed in it first, from wherever it was, as its leader, or null. */
+  public readonly leaderId: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the name is invalid or the leader id is blank.
+   */
   public constructor(
     name: string,
-    parentId: string | null);
+    parent: OrganizationParent,
+    leaderId?: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentCreateParams;
   /** Returns the wire representation. */
@@ -12191,13 +12318,35 @@ export declare class DepartmentUpdateParams {
   public toJson(): JsonObject;
 }
 
+/** Parameters for placing a teammate in the organization, or taking it out. */
+export declare class TeammatePlaceParams {
+  /** The teammate's id. */
+  public readonly teammateId: string;
+  /** What it goes under, or null to take it out of the organization. */
+  public readonly parent: OrganizationParent | null;
+  /** Its place among the teammates under the parent, from 0; a place past the last puts it last. */
+  public readonly order: number;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id is blank, the teammate is its own parent, or the order isn't a whole number from 0.
+   */
+  public constructor(
+    teammateId: string,
+    parent: OrganizationParent | null,
+    order: number);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): TeammatePlaceParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
 /** Parameters for moving a department under another parent or to another place among its siblings. */
 export declare class DepartmentMoveParams {
   /** department Id. */
   public readonly departmentId: string;
-  /** The department it goes under, or null for the person. */
-  public readonly parentId: string | null;
-  /** Its place among its new siblings, from 0; a place past the last puts it last. */
+  /** What it goes under. */
+  public readonly parent: OrganizationParent;
+  /** Its place among the departments under its new parent, from 0; a place past the last puts it last. */
   public readonly order: number;
   /**
    * Creates a validated immutable value.
@@ -12205,7 +12354,7 @@ export declare class DepartmentMoveParams {
    */
   public constructor(
     departmentId: string,
-    parentId: string | null,
+    parent: OrganizationParent,
     order: number);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentMoveParams;

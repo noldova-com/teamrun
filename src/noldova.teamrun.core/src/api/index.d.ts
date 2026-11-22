@@ -154,6 +154,7 @@ import type {
   DepartmentCreateParams,
   DepartmentIdParams,
   DepartmentMemberSetParams,
+  TeammatePlaceParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
   Organization,
@@ -208,8 +209,10 @@ export declare enum ChangeEntity {
   AcpAgent = "AcpAgent",
   /** A `Department`. */
   Department = "Department",
-  /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id. */
+  /** A `DepartmentMember`: a teammate in a department, keyed by the teammate's id, as the feed kept it before the tree. */
   DepartmentMember = "DepartmentMember",
+  /** A `TeammatePlacement`: a teammate's place in the organization, keyed by the teammate's id. */
+  TeammatePlacement = "TeammatePlacement",
   /** An `OrganizationMessage` with each recipient's state. */
   OrganizationMessage = "OrganizationMessage"
 }
@@ -2212,6 +2215,7 @@ export interface IConversationEngine {
    * The person's message to a teammate's Organization chat keeps, on its text detail, the line `Resources.formatOrganizationRole` builds
    * from the organization in the send's transaction, naming the teammate's place and who it reports to, with the teammate's id; that
    * teammate's reply gets the line before the message's text, attachments and mention names, and another teammate's reply gets the message alone.
+   * A teammate outside the organization, with no placement, gets no line.
    * @param params The message, attachment inputs, resolved mentions and responder selection.
    * @returns The stored message and zero or more pending replies, updated through events.
    * @throws ServiceException named `ErrorCode.NotFound` when the conversation, its project, the
@@ -3058,24 +3062,36 @@ export declare class Resources {
   public static readonly departmentsMigrationId: string;
   /** The departments table. */
   public static readonly departmentsTable: string;
-  /** The table of which teammate is in which department; a teammate has at most one row. */
+  /** The table of which teammate was in which department, until `TeammatePlacementsMigration` moves it to `teammatePlacements`. */
   public static readonly departmentMembersTable: string;
-  /** The department id column of `departmentMembers`. */
-  public static readonly departmentIdColumn: string;
   /** Selects every department's JSON. */
   public static readonly selectDepartments: string;
-  /** Selects every teammate's department. */
-  public static readonly selectDepartmentMembers: string;
   /** Inserts a department. */
   public static readonly insertDepartment: string;
   /** Updates a department's parent and JSON. */
   public static readonly updateDepartment: string;
   /** Deletes a department. */
   public static readonly deleteDepartment: string;
-  /** Puts a teammate in a department. */
-  public static readonly insertDepartmentMember: string;
-  /** Takes a teammate out of its department. */
-  public static readonly deleteDepartmentMember: string;
+  /** The teammate placements migration's fixed id: `20261123090000_TeammatePlacements`. */
+  public static readonly teammatePlacementsMigrationId: string;
+  /** The table of each placed teammate's place in the organization, as its JSON; a teammate has at most one row. */
+  public static readonly teammatePlacementsTable: string;
+  /** Copies each department membership to a placement under its department, numbered from 0 in the order the rows were added. */
+  public static readonly copyDepartmentMembersToPlacements: string;
+  /** Places each teammate in no department under the person, numbered from 0 in the order the teammates were created. */
+  public static readonly placeUnplacedTeammatesUnderPerson: string;
+  /** Drops the `departmentMembers` table. */
+  public static readonly dropDepartmentMembers: string;
+  /** Rewrites each department's JSON to hold its `parent` node in place of `parentId`. */
+  public static readonly moveDepartmentParentsIntoJson: string;
+  /** Selects every placement's JSON. */
+  public static readonly selectTeammatePlacements: string;
+  /** Inserts a placement. */
+  public static readonly insertTeammatePlacement: string;
+  /** Updates a placement's JSON. */
+  public static readonly updateTeammatePlacement: string;
+  /** Takes a teammate out of the organization. */
+  public static readonly deleteTeammatePlacement: string;
   /** The organization messages migration's fixed id: `20261121090000_OrganizationMessages`. */
   public static readonly organizationMessagesMigrationId: string;
   /** The organization messages table. */
@@ -4743,11 +4759,17 @@ export declare class Resources {
   /** Why a teammate whose account can't reply, or is deleted, gets no outside message. */
   public static formatAccountCannotReply(teammate: string, account: string | null): string;
 
-  /** Why a teammate outside a department can't lead it. */
-  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string;
+  /** Why a teammate that has no place in the organization can't be a parent. */
+  public static formatTeammateNotPlaced(id: string): string;
 
-  /** Why a department can't move under itself or one of its own departments. */
+  /** Why a department can't move under itself or anything under it. */
   public static formatDepartmentUnderItself(department: string): string;
+
+  /** Why a teammate can't move under itself or anything under it. */
+  public static formatTeammateUnderItself(teammate: string): string;
+
+  /** Why a teammate can't lead a department that sits under it. */
+  public static formatDepartmentUnderLeader(teammate: string, department: string): string;
 
   /**
    * Unknown shared MCP server diagnostic.
@@ -10148,20 +10170,23 @@ export declare class AttachmentStore {
 /** The organization under the person: departments, their leaders and their members. */
 export interface IOrganizationService {
   /**
-   * Returns the organization: every department, and which teammate is in which.
+   * Returns the organization: every department, and every placed teammate's place.
    * @param transaction The transaction to read in, or none.
    */
   listAsync(transaction?: SqlTransaction): Promise<Organization>;
 
   /**
-   * Creates a department last among its siblings and records it in the change feed.
-   * @throws ServiceException `NotFound` when the parent isn't a department.
+   * Creates a department last among the departments under its parent and records it in the change feed; a leader given is placed
+   * in it first, from wherever it was, as `placeAsync` places, and leads it, all in one transaction.
+   * @throws ServiceException `NotFound` for a parent department or leader that doesn't exist or a parent teammate with no place,
+   * `InvalidParams` when the department would sit under its leader.
    */
   createAsync(params: DepartmentCreateParams): Promise<Department>;
 
   /**
-   * Renames a department or sets or clears its leader, and records it in the change feed.
-   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
+   * Renames a department or sets or clears its leader, and records it in the change feed; a leader who isn't a member is placed in
+   * it first, last among its teammates.
+   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the department sits under the leader.
    */
   updateAsync(params: DepartmentUpdateParams): Promise<Department>;
 
@@ -10173,17 +10198,27 @@ export interface IOrganizationService {
   moveAsync(params: DepartmentMoveParams): Promise<Department>;
 
   /**
-   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
-   * or to no department when it sits under the person; its leadership goes with it.
+   * Deletes a department in one transaction: its departments take its place under its parent, and its teammates move to its parent
+   * after the teammates already there; its leadership goes with it.
    * @throws ServiceException `NotFound` for an unknown department.
    */
   deleteAsync(params: DepartmentIdParams): Promise<void>;
 
   /**
-   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
+   * Puts a teammate in a department, last among its teammates, or with no department last among the teammates directly under the
+   * person, as `placeAsync` does; a teammate already there stays where it is.
    * @throws ServiceException `NotFound` for an unknown teammate or department.
    */
   setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /**
+   * Places a teammate under a parent at an order among the teammates there, numbering the siblings it left and joined from 0 again,
+   * or takes it out of the organization, and records each change in the change feed. A teammate that no longer sits directly in a
+   * department it leads stops leading it; what sits under a teammate taken out moves to its parent.
+   * @throws ServiceException `NotFound` for an unknown teammate, parent department or unplaced parent teammate, `InvalidParams`
+   * when the parent is the teammate or under it.
+   */
+  placeAsync(params: TeammatePlaceParams): Promise<void>;
 
   /**
    * Reads the Organization view's layout, or `null` when none is kept.
@@ -10277,7 +10312,7 @@ export declare class OrganizationMessagesService implements IOrganizationMessage
   public reconcileAsync(): Promise<void>;
 }
 
-/** Keeps the organization in the `departments` and `departmentMembers` tables, recording each change in the change feed. */
+/** Keeps the organization in the `departments` and `teammatePlacements` tables, recording each change in the change feed. */
 export declare class OrganizationService implements IOrganizationService {
   /** Creates the service over the database. */
   public constructor(context: DatabaseContext);
@@ -10288,16 +10323,10 @@ export declare class OrganizationService implements IOrganizationService {
    */
   public listAsync(transaction?: SqlTransaction): Promise<Organization>;
 
-  /**
-   * Creates a department last among its siblings and records it in the change feed.
-   * @throws ServiceException `NotFound` when the parent isn't a department.
-   */
+  /** See {@link IOrganizationService.createAsync}. */
   public createAsync(params: DepartmentCreateParams): Promise<Department>;
 
-  /**
-   * Renames a department or sets or clears its leader, and records it in the change feed.
-   * @throws ServiceException `NotFound` for an unknown department or leader, `InvalidParams` when the leader isn't one of its members.
-   */
+  /** See {@link IOrganizationService.updateAsync}. */
   public updateAsync(params: DepartmentUpdateParams): Promise<Department>;
 
   /**
@@ -10307,18 +10336,14 @@ export declare class OrganizationService implements IOrganizationService {
    */
   public moveAsync(params: DepartmentMoveParams): Promise<Department>;
 
-  /**
-   * Deletes a department in one transaction: its departments take its place under its parent, and its members move to its parent,
-   * or to no department when it sits under the person; its leadership goes with it.
-   * @throws ServiceException `NotFound` for an unknown department.
-   */
+  /** See {@link IOrganizationService.deleteAsync}. */
   public deleteAsync(params: DepartmentIdParams): Promise<void>;
 
-  /**
-   * Puts a teammate in a department or in none; a teammate who leads its department stops leading it.
-   * @throws ServiceException `NotFound` for an unknown teammate or department.
-   */
+  /** See {@link IOrganizationService.setMemberAsync}. */
   public setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /** See {@link IOrganizationService.placeAsync}. */
+  public placeAsync(params: TeammatePlaceParams): Promise<void>;
 
   /**
    * Reads the Organization view's layout, or `null` when none is kept.
@@ -11439,6 +11464,18 @@ export declare class TeammateLastRepliesMigration extends SqlMigration {
   public constructor();
 
   /** Creates the partial index. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/**
+ * Moves the organization to a tree: adds the `teammatePlacements` table, copies each department membership to a placement under
+ * its department, drops `departmentMembers`, and rewrites each department's JSON to hold its parent node.
+ */
+export declare class TeammatePlacementsMigration extends SqlMigration {
+  /** Uses the fixed teammate placements migration id. */
+  public constructor();
+
+  /** Creates the table keyed to `teammates` and moves the data. */
   public override apply(builder: MigrationBuilder): void;
 }
 

@@ -11,7 +11,7 @@ import { ChangeEntity, OrganizationMessagesService, Resources, SignInCheck } fro
 import {
   AuthStatus, Chat, ConversationIdParams, type Department, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, DetailKind, ErrorCode,
   EventName, Harness, MessageAuthor, MessageIdParams, MessageListParams, MessageSendParams, MessageStatus, MethodName, type OrganizationMessage, OrganizationMessageSendParams,
-  OrganizationTarget, ProviderIdParams, Request, type Teammate, TeammateCreateParams, TeammateIdParams
+  OrganizationParent, OrganizationTarget, ProviderIdParams, Request, type Teammate, TeammateCreateParams, TeammateIdParams, TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -160,11 +160,13 @@ export class OrganizationMessagesServiceTests {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
     const out = await host.createProviderAsync("fake", "Spare");
-    const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null));
+    const bob = await OrganizationMessagesServiceTests.placedAsync(host,
+      await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null)));
     host.adapter.signInCheck = new SignInCheck(AuthStatus.LoggedOut, null, null, null);
     await host.providers.checkAsync(new ProviderIdParams(out.id));
     const gone = await host.createProviderAsync("fake", "Gone");
-    const cid = await host.teammates.createAsync(new TeammateCreateParams("Cid", null, gone.id, Harness.Provider, null, null));
+    const cid = await OrganizationMessagesServiceTests.placedAsync(host,
+      await host.teammates.createAsync(new TeammateCreateParams("Cid", null, gone.id, Harness.Provider, null, null)));
     await host.providers.deleteAsync(new ProviderIdParams(gone.id));
 
     const sent = await host.organizationMessages.sendAsync(new OrganizationMessageSendParams(OrganizationTarget.everyone, "Status?"));
@@ -249,7 +251,8 @@ export class OrganizationMessagesServiceTests {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationMessagesServiceTests.teammateAsync(host, "Ada");
     const out = await host.createProviderAsync("fake", "Spare");
-    await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null));
+    await OrganizationMessagesServiceTests.placedAsync(host,
+      await host.teammates.createAsync(new TeammateCreateParams("Bob", null, out.id, Harness.Provider, null, null)));
     host.adapter.signInCheck = new SignInCheck(AuthStatus.LoggedOut, null, null, null);
     await host.providers.checkAsync(new ProviderIdParams(out.id));
     const send = async (target: OrganizationTarget, text: string, answer: string): Promise<OrganizationMessage> => {
@@ -284,12 +287,20 @@ export class OrganizationMessagesServiceTests {
 
   private static async teammateAsync(host: CoreHost, name: string): Promise<Teammate> {
     const provider = await host.providerOfAsync();
-    return await host.teammates.createAsync(new TeammateCreateParams(name, null, provider.id, Harness.Provider, null, null));
+    return await OrganizationMessagesServiceTests.placedAsync(host,
+      await host.teammates.createAsync(new TeammateCreateParams(name, null, provider.id, Harness.Provider, null, null)));
+  }
+
+  private static async placedAsync(host: CoreHost, teammate: Teammate): Promise<Teammate> {
+    const organization = await host.organization.listAsync();
+    await host.organization.placeAsync(new TeammatePlaceParams(teammate.id, OrganizationParent.person,
+      organization.placementsUnder(OrganizationParent.person).length));
+    return teammate;
   }
 
   private static async departmentAsync(host: CoreHost, name: string, parentId: string | null, members: readonly Teammate[],
     leader: Teammate | null): Promise<Department> {
-    const department = await host.organization.createAsync(new DepartmentCreateParams(name, parentId));
+    const department = await host.organization.createAsync(new DepartmentCreateParams(name, OrganizationParent.departmentOrPerson(parentId)));
     for (const member of members)
       await host.organization.setMemberAsync(new DepartmentMemberSetParams(member.id, department.id));
     if (!Object.isNull(leader))

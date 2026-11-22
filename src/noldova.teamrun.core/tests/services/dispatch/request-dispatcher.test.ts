@@ -27,8 +27,8 @@ import { MessageDelivery, WaitingMessage, WaitingMessageAddParams, WaitingMessag
 import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, ChatPlanFirstParams, ConversationMember, ConversationMemberParams, EventName, Harness,
   Teammate, TeammateCreateParams, TeammateUpdateParams, TeammateIdParams, DefaultTeammate, DefaultTeammateSetParams, ProjectsLayoutSaveParams,
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
-import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization }
-  from "@noldova/teamrun.protocol";
+import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization,
+  OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
 import { OrganizationLayoutSaveParams, OrganizationMessage, OrganizationMessageSendParams, OrganizationTarget } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
 import {
@@ -182,20 +182,23 @@ export class RequestDispatcherTests {
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
     const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
 
-    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Design", null).toJson()));
-    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Web", null).toJson()));
+    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Design", OrganizationParent.person).toJson()));
+    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams("Web", OrganizationParent.person).toJson()));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(ada.id, design.id).toJson()));
     const led = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentUpdate,
       new DepartmentUpdateParams(design.id, "Product", ada.id).toJson()));
-    const moved = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMove, new DepartmentMoveParams(web.id, design.id, 0).toJson()));
+    const moved = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMove, new DepartmentMoveParams(web.id, OrganizationParent.department(design.id), 0).toJson()));
     const listed = Organization.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
+    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.DepartmentMove,
+      new DepartmentMoveParams(design.id, OrganizationParent.department(web.id), 0).toJson()));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentDelete, new DepartmentIdParams(web.id).toJson()));
-    const refused = await host.dispatcher.dispatch(new Request("r", MethodName.DepartmentUpdate, new DepartmentUpdateParams(design.id, undefined, bob.id).toJson()));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.TeammatePlace, new TeammatePlaceParams(bob.id, OrganizationParent.teammate(ada.id), 0).toJson()));
 
     Assert.areEqual(`Product,${ada.id},${design.id}`, `${led.name},${led.leaderId},${moved.parentId}`);
     Assert.areEqual(JSON.stringify(listed.toJson()), JSON.stringify(changes()[4]?.toJson()));
-    Assert.areEqual(6, changes().length);
+    Assert.areEqual(7, changes().length);
     Assert.areEqual(1, changes().at(-1)?.departments.length);
+    Assert.areEqual(ada.id, changes().at(-1)?.managerOf(bob.id));
     Assert.areEqual(ErrorCode.InvalidParams, refused.info?.name);
     Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
   }
@@ -206,7 +209,7 @@ export class RequestDispatcherTests {
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
 
@@ -235,6 +238,7 @@ export class RequestDispatcherTests {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
+    await host.organization.placeAsync(new TeammatePlaceParams(ada.id, OrganizationParent.person, 0));
 
     const sent = OrganizationMessage.fromJson(await RequestDispatcherTests.succeed(host, MethodName.OrganizationMessageSend,
       new OrganizationMessageSendParams(OrganizationTarget.teammate(ada.id), "Hi").toJson()));

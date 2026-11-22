@@ -10,8 +10,10 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationTarget,
-  Teammate, TeammateLastReply } from "@noldova/teamrun.protocol";
+import {
+  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationParent, OrganizationTarget, Teammate,
+  TeammateLastReply, TeammatePlacement
+} from "@noldova/teamrun.protocol";
 import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
@@ -38,11 +40,12 @@ describe("OrganizationBoardComponent", () => {
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
   const sample = new Organization([
-    new Department("design", "Design", null, "alice", 0, "c", "u"),
-    new Department("build", "Build", null, null, 1, "c", "u"),
-    new Department("ui", "UI", "design", "reviewer", 0, "c", "u")
-  ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build"),
-    new DepartmentMember("carol", "build"), new DepartmentMember("reviewer", "ui")]);
+    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+  ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+    new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+    new TeammatePlacement("carol", OrganizationParent.department("build"), 1), new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
   const reply = (status: MessageStatus): Message => new Message("r1", "c9", 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started,
     null, [], "bob", "bob");
   const element = (): HTMLElement => {
@@ -128,7 +131,7 @@ describe("OrganizationBoardComponent", () => {
   it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and no move or remove while editing", async () => {
     await create();
     fixture.componentRef.setInput("directReports", [carol]);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()));
     await settle();
 
@@ -234,7 +237,7 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+      ["teamrun.departmentCreate", { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });
@@ -290,7 +293,7 @@ describe("OrganizationBoardComponent", () => {
     it("draws a direct report in no department on the leaders' line, after them, at a leader's width, inset and top", async () => {
       await create();
       fixture.componentRef.setInput("directReports", [carol]);
-      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()));
       await settle();
       const leader = box(one(".leaders > .leader:nth-child(2)"));

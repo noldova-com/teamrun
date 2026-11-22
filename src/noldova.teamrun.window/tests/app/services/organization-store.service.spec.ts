@@ -7,7 +7,9 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
-import { Chat, Department, DepartmentMember, EventName, MethodName, Organization, OrganizationChat, TeammateIdParams } from "@noldova/teamrun.protocol";
+import {
+  Chat, Department, EventName, MethodName, Organization, OrganizationChat, OrganizationParent, TeammateIdParams, TeammatePlacement
+} from "@noldova/teamrun.protocol";
 
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
@@ -16,7 +18,7 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationStoreService", () => {
   const organizationOf = (...names: readonly string[]): Organization =>
-    new Organization(names.map((t, i) => new Department(t, t, null, null, i, "c", "u")), []);
+    new Organization(names.map((t, i) => new Department(t, t, OrganizationParent.person, null, i, "c", "u")), []);
   const namesOf = (store: OrganizationStoreService): string => store.organization().departments.map(t => t.name).join(",");
   let context: FakeWindowPartContext;
 
@@ -39,7 +41,8 @@ describe("OrganizationStoreService", () => {
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => Organization.empty.toJson());
     const store = OrganizationStoreService.of(context);
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
-    const changed = new Organization([new Department("d1", "Design", null, "t1", 0, "c", "u")], [new DepartmentMember("t1", "d1")]);
+    const changed = new Organization([new Department("d1", "Design", OrganizationParent.person, "t1", 0, "c", "u")],
+      [new TeammatePlacement("t1", OrganizationParent.department("d1"), 0)]);
 
     context.emit(EventName.OrganizationChanged, changed.toJson());
 
@@ -142,11 +145,11 @@ describe("OrganizationStoreService", () => {
 
     expect([done, store.actionError()]).toEqual([new Array<boolean>(8).fill(true), null]);
     expect(asked).toEqual([
-      `${MethodName.DepartmentCreate} {"name":"Design","parentId":null}`,
+      `${MethodName.DepartmentCreate} {"name":"Design","parent":{"kind":"Person","id":null},"leaderId":null}`,
       `${MethodName.DepartmentUpdate} {"departmentId":"d1","name":"Craft"}`,
       `${MethodName.DepartmentUpdate} {"departmentId":"d1","leaderId":"t1"}`,
       `${MethodName.DepartmentUpdate} {"departmentId":"d1","leaderId":null}`,
-      `${MethodName.DepartmentMove} {"departmentId":"d1","parentId":"d2","order":1}`,
+      `${MethodName.DepartmentMove} {"departmentId":"d1","parent":{"kind":"Department","id":"d2"},"order":1}`,
       `${MethodName.DepartmentDelete} {"departmentId":"d1"}`,
       `${MethodName.DepartmentMemberSet} {"teammateId":"t1","departmentId":"d2"}`,
       `${MethodName.DepartmentMemberSet} {"teammateId":"t1","departmentId":null}`

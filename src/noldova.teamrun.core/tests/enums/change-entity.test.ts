@@ -23,6 +23,7 @@ export class ChangeEntityTests {
     Assert.areEqual("AcpAgent", ChangeEntity.AcpAgent);
     Assert.areEqual("Department", ChangeEntity.Department);
     Assert.areEqual("DepartmentMember", ChangeEntity.DepartmentMember);
+    Assert.areEqual("TeammatePlacement", ChangeEntity.TeammatePlacement);
     Assert.areEqual("OrganizationMessage", ChangeEntity.OrganizationMessage);
   }
 

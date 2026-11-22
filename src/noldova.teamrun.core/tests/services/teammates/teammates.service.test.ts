@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import { ChangeOperation } from "@noldova/context.data";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChangeEntity, type IOrganizationService, Resources, TeammatesService } from "@noldova/teamrun.core";
-import { ComposerDefaultSaveParams, DepartmentCreateParams, DepartmentMemberSetParams, DepartmentUpdateParams, ContextUsage, ConversationIdParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, ErrorCode, Harness, Message, MessageAuthor,
+import { ComposerDefaultSaveParams, DepartmentCreateParams, OrganizationParent, DepartmentMemberSetParams, DepartmentUpdateParams, ContextUsage, ConversationIdParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, ErrorCode, Harness, Message, MessageAuthor,
   MessageSendParams, MessageStatus, ObservedSettings, Provenance, ProviderIdParams, ReplyUsage, RequestedSettings, TeammateCreateParams, TeammateFallback, TeammateIdParams,
   TeammateMention, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 
@@ -53,7 +54,7 @@ export class TeammatesServiceTests {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const created = await host.teammates.createAsync(new TeammateCreateParams("Ada", "Review", provider.id, Harness.Provider, "model", "low", "priority", "plan"));
-    const window = TeammateUpdateParams.changing(created, { model: "other", effort: "low" })!;
+    const window = TeammatesServiceTests.required(TeammateUpdateParams.changing(created, { model: "other", effort: "low" }));
     const teammate = TeammateUpdateParams.of(created.id, { effort: "high" }, provider.id);
 
     await host.teammates.updateAsync(teammate);
@@ -70,12 +71,13 @@ export class TeammatesServiceTests {
     const first = await host.createProviderAsync();
     const second = await host.createProviderAsync("fake", "Home");
     const created = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, first.id, Harness.Provider, "model", "low", "priority", "plan"));
-    const chosen = TeammateUpdateParams.changing(created, { model: "first-only", speed: null })!;
+    const chosen = TeammatesServiceTests.required(TeammateUpdateParams.changing(created, { model: "first-only", speed: null }));
 
-    await host.teammates.updateAsync(TeammateUpdateParams.changing(created, { providerId: second.id, model: null, effort: null, speed: null, mode: null })!);
+    await host.teammates.updateAsync(TeammatesServiceTests.required(
+      TeammateUpdateParams.changing(created, { providerId: second.id, model: null, effort: null, speed: null, mode: null })));
     const refusal = await Assert.throwsAsync(() => host.teammates.updateAsync(chosen), ServiceException);
-    const moved = (await host.teammates.findAsync(created.id))!;
-    const later = await host.teammates.updateAsync(TeammateUpdateParams.changing(moved, { model: "second-model" })!);
+    const moved = TeammatesServiceTests.required(await host.teammates.findAsync(created.id));
+    const later = await host.teammates.updateAsync(TeammatesServiceTests.required(TeammateUpdateParams.changing(moved, { model: "second-model" })));
 
     Assert.areEqual(JSON.stringify([ErrorCode.Conflict, Resources.formatTeammateProviderChanged("Ada"), [created.id]]),
       JSON.stringify([refusal.info.name, refusal.info.message, refusal.info.arguments]));
@@ -180,7 +182,7 @@ export class TeammatesServiceTests {
     const ask = async (): Promise<string> => {
       const sent = await host.engine.sendAsync(new MessageSendParams(conversation.id, "@Alice check", null, null, [], [alice.id]));
       await host.engine.waitForIdle();
-      return sent.replies[0]!.id;
+      return TeammatesServiceTests.required(sent.replies[0]).id;
     };
     const listed = async (): Promise<string> => (await host.messages.listTeammateUsageAsync()).map(t => t.messageId).join("|");
 
@@ -235,7 +237,7 @@ export class TeammatesServiceTests {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(ada.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, ada.id));
     const organization = host.organization;
@@ -246,6 +248,7 @@ export class TeammatesServiceTests {
       moveAsync: t => organization.moveAsync(t),
       deleteAsync: t => organization.deleteAsync(t),
       setMemberAsync: t => organization.setMemberAsync(t),
+      placeAsync: t => organization.placeAsync(t),
       readLayoutAsync: t => organization.readLayoutAsync(t),
       saveLayoutAsync: t => organization.saveLayoutAsync(t),
       removeTeammateAsync: async (teammateId, transaction) => {
@@ -396,5 +399,11 @@ export class TeammatesServiceTests {
     Assert.areEqual(tester.id, (await host.teammates.findAsync(planner.id))?.usageHandOffs.join("|"));
     Assert.areEqual([`${reviewer.id}:${ChangeOperation.Delete}`, `${builder.id}:${ChangeOperation.Update}`].join(","),
       changes.filter(t => t.entity === ChangeEntity.Teammate).map(t => `${t.entityId}:${t.operation}`).join(","));
+  }
+
+  private static required<T>(value: T | null | undefined): T {
+    if (Object.isNullOrUndefined(value))
+      throw new Error("A value the test needs is missing.");
+    return value;
   }
 }

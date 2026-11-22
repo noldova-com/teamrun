@@ -35,7 +35,7 @@ export class TeammateLastRepliesMigrationTests {
     const indexes = async (connection: SqlConnection): Promise<string> =>
       (await connection.queryAsync(new SqlQuery(TeammateLastRepliesMigrationTests.selectIndexes))).map(t => t.readString("name")).join(",");
     {
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, MigrationCatalog.all.slice(0, -1));
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof TeammateLastRepliesMigration)));
       Assert.isFalse((await indexes(legacy.database.connection)).includes(TeammateLastRepliesMigrationTests.index));
     }
     await using current = await DatabaseContext.openAsync(directory.path);

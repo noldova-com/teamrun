@@ -44,6 +44,7 @@ import {
   MessageStatus,
   ObservedSettings,
   type OrganizationChat,
+  OrganizationParent,
   Provenance,
   type ProviderMode,
   type McpToolCallParams,
@@ -471,6 +472,8 @@ export class ConversationEngine implements IConversationEngine, IOrganizationSen
     if (Object.isNull(chat) || !Object.isNull(sender))
       return null;
     const organization = await this.organization.listAsync(transaction);
+    if (Object.isNull(organization.parentOf(OrganizationParent.teammate(chat.teammateId))))
+      return null;
     const teammates = await this.teammates.listAsync(transaction);
     const department = organization.departments.find(t => t.id === organization.departmentOf(chat.teammateId));
     const place = Object.isUndefined(department) ? Resources.organizationNoDepartment

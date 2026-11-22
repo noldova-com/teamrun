@@ -11,8 +11,10 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageDetail, MessageIdParams, MessageStatus, MethodName, Organization,
-  OrganizationMessage, OrganizationMessageSendParams, OrganizationRecipient, OrganizationRecipientState, OrganizationTarget } from "@noldova/teamrun.protocol";
+import {
+  Department, DetailKind, EventName, Message, MessageAuthor, MessageDetail, MessageIdParams, MessageStatus, MethodName, Organization, OrganizationMessage,
+  OrganizationMessageSendParams, OrganizationParent, OrganizationRecipient, OrganizationRecipientState, OrganizationTarget, TeammatePlacement
+} from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
@@ -33,8 +35,10 @@ import { Wait } from "../../../fixtures/wait.fixture";
 describe("OrganizationMessagesComponent", () => {
   const design = OrganizationTarget.department("d1");
   const toAlice = OrganizationTarget.teammate("alice");
-  const organization = new Organization([new Department("d1", "Design", null, "alice", 0, "c", "u"), new Department("d2", "Docs", null, null, 1, "c", "u")],
-    [new DepartmentMember("alice", "d1"), new DepartmentMember("bob", "d1"), new DepartmentMember("offline", "d2")]);
+  const organization = new Organization([new Department("d1", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("d2", "Docs", OrganizationParent.person, null, 1, "c", "u")],
+    [new TeammatePlacement("alice", OrganizationParent.department("d1"), 0), new TeammatePlacement("bob", OrganizationParent.department("d1"), 1),
+      new TeammatePlacement("offline", OrganizationParent.department("d2"), 0)]);
   const recipient = (teammateId: string, name: string, state: OrganizationRecipientState, messageId: string | null = null, reason: string | null = null) =>
     new OrganizationRecipient(teammateId, name, state, Object.isNull(messageId) ? null : `chat-${teammateId}`, messageId, reason);
   const aliceMessage = new OrganizationMessage("o1", toAlice, "Ready?", "2026-11-20T09:00:00.000Z",

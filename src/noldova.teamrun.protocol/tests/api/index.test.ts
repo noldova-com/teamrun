@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 
 import * as api from "@noldova/teamrun.protocol";
@@ -35,6 +36,10 @@ export class ProtocolApiTests {
     Assert.isDefined(api.DepartmentMoveParams);
     Assert.isDefined(api.DepartmentIdParams);
     Assert.isDefined(api.DepartmentMemberSetParams);
+    Assert.isDefined(api.TeammatePlaceParams);
+    Assert.isDefined(api.OrganizationNodeKind);
+    Assert.isDefined(api.OrganizationParent);
+    Assert.isDefined(api.TeammatePlacement);
     Assert.isDefined(api.OrganizationTargetKind);
     Assert.isDefined(api.OrganizationRecipientState);
     Assert.isDefined(api.OrganizationTarget);
@@ -245,7 +250,7 @@ export class ProtocolApiTests {
       [api.ConversationMember, api.ChatMember]
     ];
 
-    Assert.areEqual(pairs.length, pairs.filter(([earlier, current]) => earlier === current && current !== undefined).length);
+    Assert.areEqual(pairs.length, pairs.filter(([earlier, current]) => earlier === current && !Object.isUndefined(current)).length);
     Assert.areEqual(api.Resources.invalidChatResponder, api.Resources.invalidConversationResponder);
     Assert.areEqual(api.Resources.panelChatMismatch, api.Resources.panelConversationMismatch);
     Assert.areEqual("chatId,shownChatId,chat", [api.Resources.conversationIdField, api.Resources.shownConversationIdField, api.Resources.conversationField].join(","));
@@ -253,8 +258,8 @@ export class ProtocolApiTests {
 
   @TestMethod
   public readsEachEarlierChatFieldFromItsNewName(): void {
-    const earlier = (type: { prototype: object }, name: string, field: string): unknown =>
-      Object.getOwnPropertyDescriptor(type.prototype, name)?.get?.call({ [field]: "c1" });
+    const earlier = (prototype: object, name: string, field: string): unknown =>
+      Object.getOwnPropertyDescriptor(prototype, name)?.get?.call({ [field]: "c1" });
     const models = [
       api.AttachmentReadParams, api.BackgroundTask, api.BackgroundTaskOutputPayload, api.BackgroundTasksClearedPayload, api.ChatIdParams, api.ChatMember,
       api.ChatMemberParams, api.ChatMoveParams, api.ChatPosition, api.ChatRenameParams, api.ChatResponderParams, api.ChatRewindParams, api.ChatRewoundPayload,
@@ -262,8 +267,8 @@ export class ProtocolApiTests {
       api.MessageSendParams, api.PanelRequestedPayload, api.TeammateUsage, api.WrittenImageReadParams
     ];
 
-    Assert.areEqual(models.map(() => "c1").join(","), models.map(t => String(earlier(t, "conversationId", "chatId"))).join(","));
-    Assert.areEqual("c1", earlier(api.WindowFocusedParams, "shownConversationId", "shownChatId"));
-    Assert.areEqual("c1", earlier(api.ChatRewindResult, "conversation", "chat"));
+    Assert.areEqual(models.map(() => "c1").join(","), models.map(t => String(earlier(t.prototype, "conversationId", "chatId"))).join(","));
+    Assert.areEqual("c1", earlier(api.WindowFocusedParams.prototype, "shownConversationId", "shownChatId"));
+    Assert.areEqual("c1", earlier(api.ChatRewindResult.prototype, "conversation", "chat"));
   }
 }

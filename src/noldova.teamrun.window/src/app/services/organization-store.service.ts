@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { Conversation, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, EventName, MethodName,
-  Organization, TeammateIdParams } from "@noldova/teamrun.protocol";
+  Organization, OrganizationParent, TeammateIdParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { EngineResync } from "./engine-resync";
@@ -71,7 +71,7 @@ export class OrganizationStoreService {
   }
 
   public async createDepartment(name: string, parentId: string | null): Promise<boolean> {
-    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(name, parentId).toJson());
+    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(name, OrganizationParent.departmentOrPerson(parentId)).toJson());
   }
 
   public async renameDepartment(departmentId: string, name: string): Promise<boolean> {
@@ -83,7 +83,7 @@ export class OrganizationStoreService {
   }
 
   public async moveDepartment(departmentId: string, parentId: string | null, order: number): Promise<boolean> {
-    return this.act(MethodName.DepartmentMove, new DepartmentMoveParams(departmentId, parentId, order).toJson());
+    return this.act(MethodName.DepartmentMove, new DepartmentMoveParams(departmentId, OrganizationParent.departmentOrPerson(parentId), order).toJson());
   }
 
   public async deleteDepartment(departmentId: string): Promise<boolean> {

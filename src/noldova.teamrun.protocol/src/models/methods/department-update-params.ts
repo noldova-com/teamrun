@@ -44,7 +44,7 @@ export class DepartmentUpdateParams {
   }
 
   public applyTo(department: Department, updatedAt: string): Department {
-    return new Department(department.id, this.name ?? department.name, department.parentId,
+    return new Department(department.id, this.name ?? department.name, department.parent,
       Object.isUndefined(this.leaderId) ? department.leaderId : this.leaderId, department.order, department.createdAt, updatedAt);
   }
 

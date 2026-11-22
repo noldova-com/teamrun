@@ -7,7 +7,7 @@
  */
 
 import "@noldova/context.core";
-import { type Department, NameOrder, type Organization, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, NameOrder, type Organization, OrganizationParent, type Teammate } from "@noldova/teamrun.protocol";
 
 export class OrganizationNode {
   public readonly department: Department;
@@ -40,7 +40,8 @@ export class OrganizationNode {
 
   public static treeOf(organization: Organization, teammates: readonly Teammate[]): readonly OrganizationNode[] {
     const byId = new Map(teammates.map(t => [t.id, t]));
-    const nodesOf = (parentId: string | null): readonly OrganizationNode[] => organization.childrenOf(parentId).map(department => {
+    const under = (parentId: string | null): readonly Department[] => organization.departmentsUnder(OrganizationParent.departmentOrPerson(parentId));
+    const nodesOf = (parentId: string | null): readonly OrganizationNode[] => under(parentId).map(department => {
       const leader = Object.isNull(department.leaderId) ? null : byId.get(department.leaderId) ?? null;
       const members = organization.members.filter(t => t.departmentId === department.id && t.teammateId !== department.leaderId)
         .flatMap(t => byId.get(t.teammateId) ?? []);
@@ -50,11 +51,12 @@ export class OrganizationNode {
   }
 
   public static directReportsOf(organization: Organization, teammates: readonly Teammate[]): readonly Teammate[] {
-    const placed = new Set(organization.members.map(t => t.teammateId));
-    return NameOrder.sort(teammates.filter(t => !placed.has(t.id)), t => t.name);
+    const placed = new Set(organization.placements.map(t => t.teammateId));
+    return NameOrder.sort(teammates.filter(t => placed.has(t.id) && Object.isNull(organization.departmentOf(t.id))), t => t.name);
   }
 
   public static departmentsOf(organization: Organization, parentId: string | null = null): readonly Department[] {
-    return organization.childrenOf(parentId).flatMap(t => [t, ...OrganizationNode.departmentsOf(organization, t.id)]);
+    return organization.departmentsUnder(OrganizationParent.departmentOrPerson(parentId))
+      .flatMap(t => [t, ...OrganizationNode.departmentsOf(organization, t.id)]);
   }
 }

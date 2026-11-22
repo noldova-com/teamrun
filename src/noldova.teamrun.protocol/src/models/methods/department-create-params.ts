@@ -12,33 +12,40 @@ import { JsonReader, type JsonObject } from "@noldova/context.json";
 
 import { Resources } from "../../resources.js";
 import { Department } from "../department.js";
+import { OrganizationParent } from "../organization-parent.js";
 
 export class DepartmentCreateParams {
   public readonly name: string;
-  public readonly parentId: string | null;
+  public readonly parent: OrganizationParent;
+  public readonly leaderId: string | null;
 
   public constructor(
     name: string,
-    parentId: string | null) {
+    parent: OrganizationParent,
+    leaderId: string | null = null) {
     Department.validateName(name);
-    if (!Object.isNull(parentId))
-      ArgumentException.throwIfNullOrWhitespace(parentId, Resources.parentIdField);
+    if (!Object.isNull(leaderId))
+      ArgumentException.throwIfNullOrWhitespace(leaderId, Resources.leaderIdField);
 
     this.name = name;
-    this.parentId = parentId;
+    this.parent = parent;
+    this.leaderId = leaderId;
   }
 
   public static fromJson(value: unknown, path?: string): DepartmentCreateParams {
     const reader = JsonReader.fromValue(value, path);
+    const parent = reader.readObject(Resources.parentField);
     return new DepartmentCreateParams(
       Department.readName(reader),
-      reader.readNullableString(Resources.parentIdField));
+      OrganizationParent.fromJson(parent.toJson(), parent.path),
+      reader.hasField(Resources.leaderIdField) ? reader.readNullableString(Resources.leaderIdField) : null);
   }
 
   public toJson(): JsonObject {
     return {
       [Resources.nameField]: this.name,
-      [Resources.parentIdField]: this.parentId
+      [Resources.parentField]: this.parent.toJson(),
+      [Resources.leaderIdField]: this.leaderId
     };
   }
 }

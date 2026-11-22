@@ -11,8 +11,10 @@ import { By } from "@angular/platform-browser";
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammateWork } from "@noldova/teamrun.protocol";
+import {
+  Department, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, OrganizationParent,
+  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
+} from "@noldova/teamrun.protocol";
 import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
@@ -39,11 +41,12 @@ describe("OrganizationViewComponent", () => {
   let saves: JsonValue[];
 
   const sample = new Organization([
-    new Department("design", "Design", null, "alice", 0, "c", "u"),
-    new Department("build", "Build", null, null, 1, "c", "u"),
-    new Department("ui", "UI", "design", "reviewer", 0, "c", "u")
-  ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build"),
-    new DepartmentMember("reviewer", "ui")]);
+    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+  ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+    new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+    new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
   const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
   const one = (selector: string, root: ParentNode = element()): HTMLElement => {
@@ -152,10 +155,11 @@ describe("OrganizationViewComponent", () => {
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
   });
 
-  it("follows each change to the organization as it comes, the teammates in no department as your direct reports", async () => {
+  it("follows each change to the organization as it comes, the teammates placed under you as your direct reports, and none once no one is placed", async () => {
     await create();
-    context.emit(EventName.OrganizationChanged, new Organization([new Department("build", "Build", null, "offline", 0, "c", "u")],
-      [new DepartmentMember("offline", "build")]).toJson());
+    context.emit(EventName.OrganizationChanged, new Organization([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u")],
+      [new TeammatePlacement("offline", OrganizationParent.department("build"), 0), new TeammatePlacement("alice", OrganizationParent.person, 0),
+        new TeammatePlacement("bob", OrganizationParent.person, 1), new TeammatePlacement("reviewer", OrganizationParent.person, 2)]).toJson());
     await settle();
 
     expect([tree(), reports(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Alice", "Bob", "Code Reviewer"],
@@ -164,13 +168,26 @@ describe("OrganizationViewComponent", () => {
     context.emit(EventName.OrganizationChanged, Organization.empty.toJson());
     await settle();
 
-    expect([tree(), reports(), texts(".empty"), texts(".owner .role")]).toEqual([[], ["Alice", "Bob", "Code Reviewer", "Offline"], [], ["Owner · 4 direct reports"]]);
+    expect([tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([[], [], ["0 teammates in 0 departments"], ["Owner · 0 direct reports"]]);
+  });
+
+  it("leaves a teammate with no placement out of the organization: no card, no direct report and no place in the headcount", async () => {
+    await create(() => {
+      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u")],
+        [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
+    });
+
+    expect([texts(".top .headcount"), reports(), texts(".chart nol-teamrun-organization-card .name").includes("Offline"), texts(".owner .role")])
+      .toEqual([["3 teammates in 1 department"], ["Code Reviewer"], false, ["Owner · 2 direct reports"]]);
   });
 
   it("shows the teammates in no department under you as your direct reports, first, with no group of their own, so the headcount counts what the tree shows", async () => {
     await create(() => {
-      organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
-        [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
+      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+        new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+        [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
     });
 
     expect([texts(".top .headcount"), reports(), tree(), all(".chart nol-teamrun-organization-card").length, texts(".owner .role"),
@@ -196,8 +213,10 @@ describe("OrganizationViewComponent", () => {
   it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you counts them", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => {
-      organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
-        [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design")]);
+      organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+        new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+        [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
       context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" }));
     });
 
@@ -242,14 +261,15 @@ describe("OrganizationViewComponent", () => {
     expect([shape(department("UI")), shape(department("Build"))])
       .toEqual([["UI", "1", "1 idle", ["Code Reviewer"], [], [], []], ["Build", "1", "1 stopped", [], [], [], ["1 member hidden"]]]);
 
-    organization = new Organization([new Department("top", "Top", null, null, 0, "c", "u"), new Department("ui", "UI", "top", "reviewer", 0, "c", "u")],
-      [new DepartmentMember("reviewer", "ui")]);
+    organization = new Organization([new Department("top", "Top", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("ui", "UI", OrganizationParent.department("top"), "reviewer", 0, "c", "u")],
+      [new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
     expect(shape(department("Top"))).toEqual(["Top", "0", undefined, [], [], [], ["1 member hidden"]]);
 
-    organization = new Organization([new Department("ui", "UI", null, null, 0, "c", "u")], []);
+    organization = new Organization([new Department("ui", "UI", OrganizationParent.person, null, 0, "c", "u")], []);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
@@ -823,7 +843,7 @@ describe("OrganizationViewComponent", () => {
       one(".chart .add-department").click();
       await Wait.until(() => expect(asked).toHaveLength(1));
 
-      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { name: "New department", parentId: null }]]]);
+      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]]]);
     });
 
     it("says why a change failed until it is dismissed", async () => {
@@ -961,8 +981,11 @@ describe("OrganizationViewComponent", () => {
 
     it("lays a direct report out first in the row under you, its card at a department card's width and top, hung off the same line", async () => {
       await create(() => {
-        organization = new Organization([new Department("design", "Design", null, "alice", 0, "c", "u"), new Department("build", "Build", null, null, 1, "c", "u")],
-          [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build")]);
+        organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+          new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+          [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
+            new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+            new TeammatePlacement("offline", OrganizationParent.department("build"), 0), new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
       });
       element().style.width = "100rem";
       element().style.height = "76rem";

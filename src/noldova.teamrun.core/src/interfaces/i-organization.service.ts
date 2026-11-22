@@ -10,7 +10,7 @@ import type { SqlTransaction } from "@noldova/context.data.sql";
 import type { JsonObject } from "@noldova/context.json";
 import type {
   Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization,
-  OrganizationLayoutSaveParams
+  OrganizationLayoutSaveParams, TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 
 export interface IOrganizationService {
@@ -20,6 +20,7 @@ export interface IOrganizationService {
   moveAsync(params: DepartmentMoveParams): Promise<Department>;
   deleteAsync(params: DepartmentIdParams): Promise<void>;
   setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+  placeAsync(params: TeammatePlaceParams): Promise<void>;
   readLayoutAsync(transaction?: SqlTransaction): Promise<JsonObject | null>;
   saveLayoutAsync(params: OrganizationLayoutSaveParams): Promise<JsonObject>;
   removeTeammateAsync(teammateId: string, transaction: SqlTransaction): Promise<boolean>;

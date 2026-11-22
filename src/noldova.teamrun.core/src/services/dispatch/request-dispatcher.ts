@@ -23,6 +23,7 @@ import {
   TeammateCreateParams,
   TeammateUpdateParams,
   TeammateIdParams,
+  TeammatePlaceParams,
   SharedMcpProviderSetParams,
   SharedMcpServerDefinition,
   SharedMcpServerIdParams,
@@ -257,6 +258,7 @@ export class RequestDispatcher {
       case MethodName.DepartmentMove:
       case MethodName.DepartmentDelete:
       case MethodName.DepartmentMemberSet:
+      case MethodName.TeammatePlace:
       case MethodName.OrganizationLayoutRead:
       case MethodName.OrganizationLayoutSave:
         return await this.organizeAsync(RequestDispatcher.require(this.organization, method), method, payload);
@@ -661,6 +663,9 @@ export class RequestDispatcher {
         break;
       case MethodName.DepartmentDelete:
         await organization.deleteAsync(DepartmentIdParams.fromJson(payload));
+        break;
+      case MethodName.TeammatePlace:
+        await organization.placeAsync(TeammatePlaceParams.fromJson(payload));
         break;
       default:
         await organization.setMemberAsync(DepartmentMemberSetParams.fromJson(payload));

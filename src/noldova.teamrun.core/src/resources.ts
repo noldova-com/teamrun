@@ -477,14 +477,26 @@ export class Resources {
   public static readonly departmentsMigrationId: string = "20261120120000_Departments";
   public static readonly departmentsTable: string = "departments";
   public static readonly departmentMembersTable: string = "departmentMembers";
-  public static readonly departmentIdColumn: string = "departmentId";
   public static readonly selectDepartments: string = "SELECT json FROM departments ORDER BY createdAt, rowid";
-  public static readonly selectDepartmentMembers: string = "SELECT teammateId, departmentId FROM departmentMembers ORDER BY rowid";
   public static readonly insertDepartment: string = "INSERT INTO departments (id, parentId, json, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)";
   public static readonly updateDepartment: string = "UPDATE departments SET parentId = ?, json = ?, updatedAt = ? WHERE id = ?";
   public static readonly deleteDepartment: string = "DELETE FROM departments WHERE id = ?";
-  public static readonly insertDepartmentMember: string = "INSERT INTO departmentMembers (teammateId, departmentId) VALUES (?, ?)";
-  public static readonly deleteDepartmentMember: string = "DELETE FROM departmentMembers WHERE teammateId = ?";
+  public static readonly teammatePlacementsMigrationId: string = "20261123090000_TeammatePlacements";
+  public static readonly teammatePlacementsTable: string = "teammatePlacements";
+  public static readonly copyDepartmentMembersToPlacements: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT teammateId, "
+    + "json_object('teammateId', teammateId, 'parent', json_object('kind', 'Department', 'id', departmentId), "
+    + "'order', ROW_NUMBER() OVER (PARTITION BY departmentId ORDER BY rowid) - 1) FROM departmentMembers";
+  public static readonly placeUnplacedTeammatesUnderPerson: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT id, "
+    + "json_object('teammateId', id, 'parent', json_object('kind', 'Person', 'id', NULL), 'order', ROW_NUMBER() OVER (ORDER BY createdAt, rowid) - 1) "
+    + "FROM teammates WHERE id NOT IN (SELECT teammateId FROM departmentMembers)";
+  public static readonly dropDepartmentMembers: string = "DROP TABLE departmentMembers";
+  public static readonly moveDepartmentParentsIntoJson: string = "UPDATE departments SET json = json_remove(json_set(json, '$.parent', "
+    + "CASE WHEN parentId IS NULL THEN json_object('kind', 'Person', 'id', NULL) ELSE json_object('kind', 'Department', 'id', parentId) END), "
+    + "'$.parentId')";
+  public static readonly selectTeammatePlacements: string = "SELECT json FROM teammatePlacements ORDER BY rowid";
+  public static readonly insertTeammatePlacement: string = "INSERT INTO teammatePlacements (teammateId, json) VALUES (?, ?)";
+  public static readonly updateTeammatePlacement: string = "UPDATE teammatePlacements SET json = ? WHERE teammateId = ?";
+  public static readonly deleteTeammatePlacement: string = "DELETE FROM teammatePlacements WHERE teammateId = ?";
   public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
   public static readonly organizationMessagesTable: string = "organizationMessages";
   public static readonly selectOrganizationMessages: string = "SELECT json FROM organizationMessages ORDER BY createdAt, rowid";
@@ -2010,12 +2022,20 @@ export class Resources {
       : `${teammate}'s account ${account} can't reply: it is turned off, signed out or of a kind TeamRun lacks.`;
   }
 
-  public static formatDepartmentLeaderNotMember(teammate: string, department: string): string {
-    return `${teammate} can't lead ${department} without being one of its members.`;
+  public static formatTeammateNotPlaced(id: string): string {
+    return `Teammate not in the organization: ${id}.`;
   }
 
   public static formatDepartmentUnderItself(department: string): string {
-    return `${department} can't move under itself or one of its own departments.`;
+    return `${department} can't move under itself or anything under it.`;
+  }
+
+  public static formatTeammateUnderItself(teammate: string): string {
+    return `${teammate} can't move under itself or anything under it.`;
+  }
+
+  public static formatDepartmentUnderLeader(teammate: string, department: string): string {
+    return `${teammate} can't lead ${department}, which sits under ${teammate}.`;
   }
 
   public static formatSharedMcpServerNotFound(id: string): string {

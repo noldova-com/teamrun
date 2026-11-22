@@ -55,9 +55,11 @@ import {
   MessageDetail,
   ObservedSettings,
   OrganizationChat,
+  OrganizationParent,
   SubAgent,
   SubAgentStatus,
-  TeammateCreateParams
+  TeammateCreateParams,
+  TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
@@ -515,6 +517,7 @@ export class ConversationEngineTests {
     const benProvider = await host.createProviderAsync("fake", "Ben");
     const grok = await host.teammates.createAsync(new TeammateCreateParams("Grok", null, grokProvider.id, Harness.Provider, null, null));
     const ben = await host.teammates.createAsync(new TeammateCreateParams("Ben", null, benProvider.id, Harness.Provider, null, null));
+    await host.organization.placeAsync(new TeammatePlaceParams(grok.id, OrganizationParent.person, 0));
     const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, grok.id));
 
     const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok @Ben look", null, null,
@@ -530,6 +533,22 @@ export class ConversationEngineTests {
     Assert.areEqual("true true true true", [grokProvider, benProvider]
       .flatMap(t => [promptOf(t.id).includes("@Ben look"), promptOf(t.id).includes(JSON.stringify(saved?.path ?? "missing"))]).join(" "));
     Assert.areEqual("@Grok @Ben look", (await host.messages.findAsync(result.sent.id))?.details[0]?.text);
+  }
+
+  @TestMethod
+  public async givesNoOrganizationRoleLineToATeammateOutsideTheOrganization(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const provider = await host.createProviderAsync("fake", "Grok");
+    const grok = await host.teammates.createAsync(new TeammateCreateParams("Grok", null, provider.id, Harness.Provider, null, null));
+    const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, grok.id));
+
+    const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok look", null, null, [], [grok.id]));
+    await host.engine.waitForIdle();
+
+    Assert.isFalse((host.adapter.requests[0]?.prompt ?? "missing").includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment,
+      Resources.organizationReportsToPerson)));
+    Assert.isTrue((host.adapter.requests[0]?.prompt ?? String.empty).includes("look"));
+    Assert.isNull((await host.messages.findAsync(result.sent.id))?.details[0]?.payload ?? null);
   }
 
   @TestMethod

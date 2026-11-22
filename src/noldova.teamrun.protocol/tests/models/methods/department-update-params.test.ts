@@ -9,7 +9,7 @@
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Department, DepartmentUpdateParams } from "@noldova/teamrun.protocol";
+import { Department, DepartmentUpdateParams, OrganizationParent } from "@noldova/teamrun.protocol";
 
 @TestClass
 export class DepartmentUpdateParamsTests {
@@ -36,7 +36,7 @@ export class DepartmentUpdateParamsTests {
 
   @TestMethod
   public appliesItsChangesAndKeepsTheRest(): void {
-    const department = new Department("d1", "Design", "d0", "t1", 3, "c", "u");
+    const department = new Department("d1", "Design", OrganizationParent.department("d0"), "t1", 3, "c", "u");
 
     const renamed = new DepartmentUpdateParams("d1", "Product", undefined).applyTo(department, "later");
     const cleared = new DepartmentUpdateParams("d1", undefined, null).applyTo(department, "later");

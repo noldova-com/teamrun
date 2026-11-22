@@ -17,6 +17,7 @@ export enum MethodName {
   DepartmentMove = "DepartmentMove",
   DepartmentDelete = "DepartmentDelete",
   DepartmentMemberSet = "DepartmentMemberSet",
+  TeammatePlace = "TeammatePlace",
   OrganizationLayoutRead = "OrganizationLayoutRead",
   OrganizationLayoutSave = "OrganizationLayoutSave",
   OrganizationMessageSend = "OrganizationMessageSend",

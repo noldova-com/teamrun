@@ -10,8 +10,10 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, PlanUsage, PlanWindow, PlanWindowName,
-  TeammateLastReply } from "@noldova/teamrun.protocol";
+import {
+  Department, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName,
+  TeammateLastReply, TeammatePlacement
+} from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { page, userEvent } from "vitest/browser";
@@ -37,12 +39,12 @@ describe("OrganizationDetailsComponent", () => {
   let clock: FakeClock;
 
   const organization = new Organization([
-    new Department("design", "Design", null, "alice", 0, "c", "u"),
-    new Department("build", "Build", null, null, 1, "c", "u"),
-    new Department("ui", "UI", "design", "reviewer", 0, "c", "u"),
-    new Department("tools", "Tools", "ui", null, 0, "c", "u")
-  ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "tools"), new DepartmentMember("offline", "build"),
-    new DepartmentMember("reviewer", "ui")]);
+    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u"),
+    new Department("tools", "Tools", OrganizationParent.department("ui"), null, 0, "c", "u")
+  ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("tools"), 0), new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+    new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
   const element = (): HTMLElement => {
     const native: unknown = fixture.nativeElement;
     if (!(native instanceof HTMLElement))
@@ -159,7 +161,7 @@ describe("OrganizationDetailsComponent", () => {
 
   it("says a teammate in no department, a card under you in the tree, reports to you", async () => {
     await create(context => context.answer(MethodName.OrganizationList, () => new Organization(organization.departments,
-      organization.members.filter(t => t.teammateId !== "offline")).toJson()));
+      [...organization.placements.filter(t => t.teammateId !== "offline"), new TeammatePlacement("offline", OrganizationParent.person, 0)]).toJson()));
 
     await focus("Offline");
 

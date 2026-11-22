@@ -9,8 +9,10 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { Department, DepartmentMember, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams,
-  Teammate } from "@noldova/teamrun.protocol";
+import {
+  Department, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, OrganizationParent, Teammate,
+  TeammatePlacement
+} from "@noldova/teamrun.protocol";
 import { ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
@@ -38,11 +40,12 @@ describe("OrganizationFocusComponent", () => {
 
   const carol = new Teammate("carol", "Carol", null, "a1", Harness.Provider, null, null, "t", "t");
   const sample = new Organization([
-    new Department("design", "Design", null, "alice", 0, "c", "u"),
-    new Department("build", "Build", null, null, 1, "c", "u"),
-    new Department("ui", "UI", "design", "reviewer", 0, "c", "u")
-  ], [new DepartmentMember("alice", "design"), new DepartmentMember("bob", "design"), new DepartmentMember("offline", "build"),
-    new DepartmentMember("carol", "build"), new DepartmentMember("reviewer", "ui")]);
+    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+  ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
+    new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+    new TeammatePlacement("carol", OrganizationParent.department("build"), 1), new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
   const waiting = new Message("r1", "c9", 1, MessageAuthor.Provider, null, MessageStatus.AwaitingApproval, [], SampleData.provenance, started, started, null, [],
     "bob", "bob");
   const element = (): HTMLElement => {
@@ -130,7 +133,7 @@ describe("OrganizationFocusComponent", () => {
   it("outlines a teammate in no department as a top-level row of its own, first, counted under Organization, which focuses it under Organization alone", async () => {
     await create();
     fixture.componentRef.setInput("directReports", [carol]);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()));
     await settle();
 
@@ -244,7 +247,7 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { name: "New department", parentId: null }]
+      ["teamrun.departmentCreate", { name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
   });
 
@@ -359,7 +362,7 @@ describe("OrganizationFocusComponent", () => {
     it("sets a direct report's row right under Organization, its dot where a top-level department's icon sits, at a person's row height and spacing", async () => {
       await create();
       fixture.componentRef.setInput("directReports", [carol]);
-      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.members.filter(t => t.teammateId !== "carol")),
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(new Organization(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()));
       await settle();
       const dot = box(one(".dot", row("Carol")));
@@ -402,11 +405,14 @@ describe("OrganizationFocusComponent", () => {
       AppearanceFixture.expectPixels(outline.width, 16 * rem() + (host.width - 51 * rem() - space(4)) / 1000);
       AppearanceFixture.expectPixels(focus.left - outline.right, space(4));
       AppearanceFixture.expectPixels(focus.right, host.right);
-      for (const edge of ["left", "top", "right"] as const)
-        AppearanceFixture.expectPixels(canvas[edge], focus[edge]);
-      for (const [actual, expected] of [[conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem()], [conversation.left, focus.left],
-        [conversation.right, focus.right], [conversation.bottom, focus.bottom]] as const)
-        AppearanceFixture.expectPixels(actual, expected);
+      AppearanceFixture.expectPixels(canvas.left, focus.left);
+      AppearanceFixture.expectPixels(canvas.top, focus.top);
+      AppearanceFixture.expectPixels(canvas.right, focus.right);
+      AppearanceFixture.expectPixels(conversation.top - canvas.bottom, space(4));
+      AppearanceFixture.expectPixels(conversation.height, 17 * rem());
+      AppearanceFixture.expectPixels(conversation.left, focus.left);
+      AppearanceFixture.expectPixels(conversation.right, focus.right);
+      AppearanceFixture.expectPixels(conversation.bottom, focus.bottom);
       AppearanceFixture.expectPixels(plane.width, 60 * rem());
       expect(getComputedStyle(one(".outline")).borderTopWidth).toBe("1px");
       AppearanceFixture.expectPixels(box(one(".orow.root")).left - outline.left, space(1) + 1);
