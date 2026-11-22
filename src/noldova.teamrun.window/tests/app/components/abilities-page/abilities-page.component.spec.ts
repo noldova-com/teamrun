@@ -47,7 +47,7 @@ describe("AbilitiesPageComponent", () => {
       throw new Error("The page has no element.");
     return native;
   };
-  const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => t.textContent?.trim().replace(/\s+/gu, " ") ?? "");
+  const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => Required.of(t.textContent).trim().replace(/\s+/gu, " "));
   const row = (ability: ProviderAbility): HTMLElement => {
     const found = element().querySelector<HTMLElement>(`.nol-teamrun-ability[data-ability="${ability}"]`);
     if (Object.isNull(found))
