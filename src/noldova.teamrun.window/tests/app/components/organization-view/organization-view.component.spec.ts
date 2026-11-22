@@ -11,7 +11,8 @@ import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import {
   Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageSender, MessageSendingPayload, MessageStatus,
   MethodName, Organization, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate,
@@ -342,7 +343,7 @@ describe("OrganizationViewComponent", () => {
     let fails = true;
     await create(context => context.answer(MethodName.OrganizationList, () => {
       if (fails)
-        throw new Error("The database is locked.");
+        throw new RuntimeRequestException(FailureCode.Internal, "The database is locked.");
       return [sample.toJson()];
     }), false);
     await Wait.until(() => expect(texts(".failure .error")).toHaveLength(1));

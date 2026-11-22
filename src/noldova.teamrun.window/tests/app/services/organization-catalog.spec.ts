@@ -7,6 +7,8 @@
  */
 
 import type { JsonValue } from "@noldova/context.json";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import { Department, EventName, MethodName, Organization, OrganizationIdParams, OrganizationParent, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { OrganizationCatalog } from "../../../src/app/services/organization-catalog";
@@ -168,7 +170,7 @@ describe("OrganizationCatalog", () => {
 
     const failed = catalog.reload();
     context.emit(EventName.OrganizationChanged, organizationOf("Newer").toJson());
-    failing.reject(new Error("Too late."));
+    failing.reject(new RuntimeRequestException(FailureCode.Internal, "Too late."));
     await failed;
     answer = () => late.promise;
     const released = catalog.reload();

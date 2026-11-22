@@ -2702,7 +2702,7 @@ describe("ProjectsViewComponent", () => {
       await Wait.until(() => expect(context.count(MethodName.OrganizationChatOpen)).toBe(1));
       await settle();
 
-      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("Error: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("Error: No chat.")]]);
+      expect([opened(), context.lines.filter(t => t === Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat."))]).toEqual([[], [Resources.formatOrganizationChatNotOpened("RuntimeRequestException: No chat.")]]);
     });
 
     it("lists a teammate placed in two organizations under each, and opens from each row that organization's own Organization chat for it", async () => {
@@ -2958,7 +2958,7 @@ describe("ProjectsViewComponent", () => {
 
       await choose(organizationRow(organization.name), Resources.setOrganizationFolderLabel);
 
-      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("Error: Taken.")));
+      await Wait.until(() => expect(context.lines).toContain(Resources.formatOrganizationActionFailed("RuntimeRequestException: Taken.")));
     });
 
     const teammateMenu = async (name: string): Promise<string[]> => {
