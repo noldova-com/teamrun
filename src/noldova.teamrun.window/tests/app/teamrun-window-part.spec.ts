@@ -58,6 +58,7 @@ import { TimeFormatService } from "../../src/app/services/time-format.service";
 import { UsageFormatterService } from "../../src/app/services/usage-formatter.service";
 import { TeamRunWindowPart } from "../../src/app/teamrun-window-part";
 import { Resources } from "../../src/resources";
+import { DeferredResponse } from "../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../fixtures/fake-window-part-context.fixture";
 import { RecordingWindowPartContext } from "../fixtures/recording-window-part-context.fixture";
 import { RootPaint } from "../fixtures/root-paint.fixture";
@@ -148,11 +149,26 @@ describe("TeamRun's window part", () => {
     expect([context.dialogs, context.keptDocuments]).toEqual([[], []]);
   });
 
-  it("opens no organization from Show organization when none can be read, as when the list fails", async () => {
-    const context = new RecordingWindowPartContext();
+  it("opens My organization's tab from Show organization when the list can't be read, so its view says why and offers Retry", async () => {
+    const context = new FakeWindowPartContext().fail(MethodName.OrganizationList, "The runtime is gone.");
     await createPart().activateAsync(context);
 
-    expect([await context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null), context.openedDocuments]).toEqual([null, []]);
+    expect([await context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null), context.openedDocuments])
+      .toEqual([null, [{ name: "teamrun.organization", instance: "my-organization", title: "Organization", options: undefined }]]);
+  });
+
+  it("opens the organization the newest listing names when a resync reloads the list while Show organization waits for it", async () => {
+    const first = new DeferredResponse();
+    const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [], []).toJson()])];
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => answers.shift() ?? Promise.resolve([]));
+    await createPart().activateAsync(context);
+
+    const running = context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null);
+    context.emit(EventName.StateResyncRequested, null);
+    first.resolve([new Organization("labs", "Labs", null, 0, SampleData.timestamp, SampleData.timestamp, [], []).toJson()]);
+    await running;
+
+    expect(context.openedDocuments).toEqual([{ name: "teamrun.organization", instance: "team", title: "Team", options: undefined }]);
   });
 
   it("leaves Organization, Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {

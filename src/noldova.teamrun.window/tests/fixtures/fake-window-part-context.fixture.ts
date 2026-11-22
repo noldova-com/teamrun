@@ -9,7 +9,7 @@
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { FailureCode, type SettingScope } from "@noldova/desktop.protocol";
-import { FileSaveOutcome } from "@noldova/desktop.window";
+import { FileSaveOutcome, RuntimeRequestException } from "@noldova/desktop.window";
 import { AttachmentShare, type ErrorCode, type EventName, type MethodName } from "@noldova/teamrun.protocol";
 
 import { RecordingWindowPartContext } from "./recording-window-part-context.fixture";
@@ -53,19 +53,19 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
 
   public fail(method: MethodName, message: string): this {
     return this.answer(method, () => {
-      throw new Error(message);
+      throw new RuntimeRequestException(FailureCode.Internal, message);
     });
   }
 
   public disconnect(method: MethodName, message: string): this {
     return this.answer(method, () => {
-      throw Object.assign(new Error(message), { code: FailureCode.Disconnected });
+      throw new RuntimeRequestException(FailureCode.Disconnected, message);
     });
   }
 
   public refuse(method: MethodName, code: ErrorCode, message: string, ...ids: readonly string[]): this {
     return this.answer(method, () => {
-      throw Object.assign(new Error(message), { code, details: { error: code, arguments: [...ids] } });
+      throw new RuntimeRequestException(code, message, { error: code, arguments: [...ids] });
     });
   }
 
@@ -107,7 +107,7 @@ export class FakeWindowPartContext extends RecordingWindowPartContext {
     this.requests.push({ method, parameters });
     const handler = this.handlers.get(method);
     if (Object.isUndefined(handler))
-      throw new Error(`No answer scripted for ${method}`);
+      throw new RuntimeRequestException(FailureCode.UnknownMethod, `No answer scripted for ${method}`);
     return handler(parameters);
   }
 
