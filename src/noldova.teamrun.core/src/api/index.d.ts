@@ -10303,7 +10303,7 @@ export interface IOrganizationService {
 
   /**
    * Deletes a node type, and records the organization's change in the change feed.
-   * @throws ServiceException `NotFound` for an unknown organization or type, and `Conflict`, naming the departments, when any has it.
+   * @throws ServiceException `NotFound` for an unknown organization or type, and `Conflict`, saying how many departments have it, with their ids, when any does.
    */
   deleteNodeTypeAsync(params: NodeTypeIdParams): Promise<void>;
 
