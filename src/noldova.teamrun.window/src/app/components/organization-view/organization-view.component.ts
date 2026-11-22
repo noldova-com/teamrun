@@ -61,7 +61,7 @@ export class OrganizationViewComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly lines: typeof FlowLineShape = FlowLineShape;
   protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
-  protected readonly messages: Signal<ElementRef<HTMLElement> | undefined> = viewChild("messages", { read: ElementRef });
+  protected readonly messagesPanel: Signal<ElementRef<HTMLElement> | undefined> = viewChild("messages", { read: ElementRef });
   protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly below: OverlaySide = OverlaySide.below;

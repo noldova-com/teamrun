@@ -69,7 +69,7 @@ LICENSE file in the root directory of this source tree.
 <section class="focus" [attr.aria-label]="resources.organizationFocusUnitLabel">
   <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
     <div #plane class="focus-plane">
-      <nol-teamrun-flow-overlay [container]="plane" [layout]="cardsLayout" [chat]="conversation()?.nativeElement ?? null" [flows]="flows.flows()" (arrived)="flows.arrive($event)"
+      <nol-teamrun-flow-overlay [container]="plane" [layout]="cardsLayout" [chat]="chatPanel()?.nativeElement ?? null" [flows]="flows.flows()" (arrived)="flows.arrive($event)"
         (finished)="flows.finish($event)" />
       <div class="crumbs">
         @for (crumb of crumbs(); track $index) {

@@ -63,7 +63,7 @@ LICENSE file in the root directory of this source tree.
       <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
         @if (mode() === modes.Board) {
           <nol-teamrun-organization-board [tree]="root().subDepartments" [reports]="reports()" [managers]="root().managers" [editing]="editing()" [target]="target()"
-            [chat]="messages()?.nativeElement ?? null" (chosen)="chosen.set($event)" />
+            [chat]="messagesPanel()?.nativeElement ?? null" (chosen)="chosen.set($event)" />
         } @else {
           <div class="tree" #flowArea>
             <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />

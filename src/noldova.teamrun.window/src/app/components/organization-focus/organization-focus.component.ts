@@ -62,7 +62,7 @@ export class OrganizationFocusComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
   protected readonly cardsLayout: FlowLayout = FlowLayout.Cards;
-  protected readonly conversation: Signal<ElementRef<HTMLElement> | undefined> = viewChild("conversation", { read: ElementRef });
+  protected readonly chatPanel: Signal<ElementRef<HTMLElement> | undefined> = viewChild("conversation", { read: ElementRef });
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
