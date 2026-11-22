@@ -18,7 +18,8 @@ import {
   Event,
   EventName,
   type BackgroundTaskIdParams,
-  type BackgroundTaskListParams
+  type BackgroundTaskListParams,
+  Resources as ProtocolResources
 } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
@@ -83,7 +84,9 @@ export class BackgroundTasksService implements IBackgroundTasksService {
     const task = this.find(messageId, taskId);
     if (Object.isNull(task) || !task.isRunning || text.length === 0)
       return;
-    this.pending.set(task.id, `${this.pending.get(task.id) ?? String.empty}${text}`);
+    const pending = `${this.pending.get(task.id) ?? String.empty}${text}`;
+    const limit = ProtocolResources.maximumBackgroundTaskOutput;
+    this.pending.set(task.id, pending.length > limit ? pending.slice(pending.length - limit) : pending);
     this.flushTimer ??= setTimeout(() => this.flush(), this.outputInterval);
   }
 
