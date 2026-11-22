@@ -267,7 +267,7 @@ describe("OrganizationViewComponent", () => {
       .toEqual([1, [1, 0]]);
   });
 
-  it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you reaches them", async () => {
+  it("shows the teammates in no department under you in the Tree, after the leaders on the Board and right under Organization in Focus, with no group for them in any view, and its message to everyone who reports to you reaches them", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => {
       organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
@@ -279,6 +279,7 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".chart nol-teamrun-organization-board .leaders > nol-teamrun-organization-card .name"),
       texts(".chart nol-teamrun-organization-board .leaders > .report .name")]).toEqual([["Alice", "Code Reviewer", "Offline"], ["Code Reviewer", "Offline"]]);
+    const board = element().textContent ?? "";
     await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
     await userEvent.click(one(".message-leaders"));
     await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual([Resources.organizationLeadersChat]));
@@ -288,6 +289,11 @@ describe("OrganizationViewComponent", () => {
     await settle();
     expect([texts(".chart nol-teamrun-organization-focus .orow .label").slice(0, 4), texts(".chart nol-teamrun-organization-focus .orow.report .label")])
       .toEqual([["Organization", "Code Reviewer", "Offline", "Design"], ["Code Reviewer", "Offline"]]);
+    const focus = element().textContent ?? "";
+    await pickView("Tree");
+    const tree = element().textContent ?? "";
+
+    expect([reports(), [board, focus, tree].map(t => /no department/iu.test(t))]).toEqual([["Code Reviewer", "Offline"], [false, false, false]]);
   });
 
   it("collapses a department to a count of the members and nested departments' people it hides, keeps that on the server, and opens it again", async () => {

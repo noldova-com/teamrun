@@ -168,6 +168,24 @@ describe("OrganizationDetailsComponent", () => {
     expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([["Reports to you"], "You"]);
   });
 
+  it("names the teammate a card under another teammate outside any department reports to, without saying it reports to you", async () => {
+    const placed = (t: TeammatePlacement): TeammatePlacement => {
+      switch (t.teammateId) {
+        case "offline":
+          return new TeammatePlacement("offline", OrganizationParent.person, 0);
+        case "bob":
+          return new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0);
+        default:
+          return t;
+      }
+    };
+    await create(context => context.answer(MethodName.OrganizationList, () => [SampleData.organizationOf(organization.departments, organization.placements.map(placed)).toJson()]));
+
+    await focus("Bob");
+
+    expect([texts(".head .place", popover()), facts().find(t => t[0] === "Reports to")?.[1]]).toEqual([[], "Offline"]);
+  });
+
   it("says when a teammate has no model of its own, no usage with a percent, and nothing said yet, and that a stopped one runs nothing", async () => {
     await create(context => context.answer(MethodName.PlanUsageList, () =>
       [new PlanUsage("codex", "a1", [new PlanWindow(PlanWindowName.FiveHour, null, null, null, null, true)], SampleData.timestamp).toJson()]));

@@ -12,7 +12,9 @@ import type { JsonValue } from "@noldova/context.json";
 import { CommandContribution, ContentPadding, DockSide, DocumentContribution, type IDocumentOptions, SettingsPageContribution, SettingsRow, StatusBarSide, TopBarActionContribution, TopBarActionState, TopBarSide,
   ViewContribution, WindowPartTokens } from "@noldova/desktop.window";
 import { GitFolder, GitFolderProvidedException } from "@noldova/git.window";
-import { BackgroundTask, BackgroundTaskStatus, Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName } from "@noldova/teamrun.protocol";
+import {
+  BackgroundTask, BackgroundTaskStatus, Conversation, ConversationListParams, EventName, MessageDelivery, MessageStatus, MethodName, Organization
+} from "@noldova/teamrun.protocol";
 import { OwnersProvidedException, TerminalOwners, TerminalStartFolder } from "@noldova/terminal.window";
 import { DefaultTheme, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture } from "@noldova/ui.components.angular/testing";
@@ -116,7 +118,9 @@ describe("TeamRun's window part", () => {
   });
 
   it("registers the commands that Settings' buttons and the View menu run, each opening its document as one tab in the middle, and the same tab again while it's open", async () => {
-    const context = new RecordingWindowPartContext();
+    const organizationOf = (id: string, name: string, order: number): Organization =>
+      new Organization(id, name, null, order, SampleData.timestamp, SampleData.timestamp, [], []);
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organizationOf("labs", "Labs", 1).toJson(), organizationOf("team", "Team", 0).toJson()]);
     await createPart().activateAsync(context);
     const shows = context.commands.slice(0, 6);
 
@@ -130,16 +134,25 @@ describe("TeamRun's window part", () => {
     ]);
     expect(await Promise.all(shows.map(t => t.runAsync(null)))).toEqual([null, null, null, null, null, null]);
     await shows[1]?.runAsync(null);
+    await shows[0]?.runAsync(null);
     expect(context.openedDocuments).toEqual([
-      { name: "teamrun.organization", instance: "my-organization", title: "Organization", options: undefined },
       { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
       { name: "teamrun.providers", instance: "providers", title: "Providers", options: undefined },
       { name: "teamrun.mcpServers", instance: "mcpServers", title: "MCP servers", options: undefined },
       { name: "teamrun.computerUseGrants", instance: "computerUseGrants", title: "Computer use", options: undefined },
       { name: "teamrun.outsideConnection", instance: "outsideConnection", title: "Outside sessions", options: undefined },
-      { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined }
+      { name: "teamrun.organization", instance: "team", title: "Team", options: undefined },
+      { name: "teamrun.teammates", instance: "teammates", title: "Teammates", options: undefined },
+      { name: "teamrun.organization", instance: "team", title: "Team", options: undefined }
     ]);
     expect([context.dialogs, context.keptDocuments]).toEqual([[], []]);
+  });
+
+  it("opens no organization from Show organization when none can be read, as when the list fails", async () => {
+    const context = new RecordingWindowPartContext();
+    await createPart().activateAsync(context);
+
+    expect([await context.commands.find(t => t.name === "teamrun.showOrganization")?.runAsync(null), context.openedDocuments]).toEqual([null, []]);
   });
 
   it("leaves Organization, Teammates, Providers, MCP servers, Computer use and Outside sessions out of the docks a layout reset fills, and out of a saved layout's views, declaring them as documents only", async () => {

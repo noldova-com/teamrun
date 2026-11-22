@@ -27,6 +27,7 @@ import { Resources } from "../resources";
 import { PagesViewComponent } from "./components/pages/pages-view/pages-view.component";
 import { AbilitySettingsRows } from "./services/ability-settings-rows";
 import { BackgroundTaskStoreService } from "./services/background-task-store.service";
+import { OrganizationCatalog } from "./services/organization-catalog";
 import { OrganizationFlowService } from "./services/organization-flow.service";
 import { OrganizationLayoutService } from "./services/organization-layout.service";
 import { OrganizationStoreService } from "./services/organization-store.service";
@@ -96,8 +97,12 @@ export class TeamRunWindowPart implements IWindowPart {
       () => import("./components/activity-view/activity-view.component").then(t => t.ActivityViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Bottom, true,
       () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
-    context.registerCommand(TeamRunWindowPart.opening(context, Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon,
-      Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle));
+    context.registerCommand(new CommandContribution(Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon, null, async () => {
+      const organization = await OrganizationCatalog.of(context).firstAsync();
+      if (!Object.isNull(organization))
+        context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
+      return null;
+    }));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,

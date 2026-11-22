@@ -53,6 +53,12 @@ export class OrganizationCatalog {
     OrganizationCatalog.catalogs.delete(context);
   }
 
+  public async firstAsync(): Promise<Organization | null> {
+    if (this.organizationsSignal().length === 0)
+      await this.reload();
+    return this.organizationsSignal().at(0) ?? null;
+  }
+
   public async reload(): Promise<void> {
     const generation = ++this.generation;
     const changes = new Map<string, Organization | null>();
