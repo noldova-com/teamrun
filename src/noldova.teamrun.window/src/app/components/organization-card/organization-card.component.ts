@@ -9,7 +9,7 @@
 import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { type Conversation, type Department, OrganizationNodeKind, OrganizationParent, type Project, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
+import { type Conversation, type Department, OrganizationParent, type Project, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
   MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
@@ -184,11 +184,8 @@ export class OrganizationCardComponent {
     });
   }
 
-  private nameOf(parent: OrganizationParent | null): string | null {
-    if (Object.isNull(parent) || parent.kind === OrganizationNodeKind.Person)
-      return Resources.organizationRemoveReportsToYou;
-    return parent.kind === OrganizationNodeKind.Teammate ? this.store.teammate(parent.id)?.name ?? null
-      : this.organization.organization().departments.find(t => t.id === parent.id)?.name ?? null;
+  private nameOf(parent: OrganizationParent | null): string {
+    return [...this.store.teammates(), ...this.organization.organization().departments].find(t => t.id === parent?.id)?.name ?? Resources.organizationRemoveReportsToYou;
   }
 
   private async openChat(): Promise<Conversation | null> {

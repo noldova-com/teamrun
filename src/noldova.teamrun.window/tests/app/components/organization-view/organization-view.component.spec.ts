@@ -1107,7 +1107,9 @@ describe("OrganizationViewComponent", () => {
 
     it("takes a unit member, a unit leader, a teammate with reports and a direct report out of the organization from their cards once you confirm, saying where the reports go", async () => {
       await editAsync();
-      context.emit(EventName.OrganizationChanged, SampleData.organizationOf(sample.departments, [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf([...sample.departments,
+        new Department("lab", "Lab", "department", OrganizationParent.teammate("offline"), null, 0, "c", "u"),
+        new Department("kit", "Kit", "department", OrganizationParent.teammate("reviewer"), null, 0, "c", "u")], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
         new TeammatePlacement("bob", OrganizationParent.department("design"), 1), new TeammatePlacement("offline", OrganizationParent.person, 0),
         new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 0)]).toJson());
       await settle();
@@ -1124,14 +1126,16 @@ describe("OrganizationViewComponent", () => {
       const member = await removeAsync("Bob", ".nol-teamrun-confirm");
       const leader = await removeAsync("Alice", ".nol-teamrun-confirm");
       const direct = await removeAsync("Offline", ".nol-teamrun-confirm");
+      const report = await removeAsync("Code Reviewer", ".nol-teamrun-confirm");
       const placed = (id: string): RecordedRequest => new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id, parent: null, order: Resources.organizationLastOrder });
 
       expect([label, cancelled, asked0]).toEqual(["Remove Bob from the organization",
         ["Remove teammate", "Remove Bob from My organization? Bob keeps its chats and can be added back.", "Remove"], 0]);
-      expect([member[1], leader[1], direct[1]]).toEqual(["Remove Bob from My organization? Bob keeps its chats and can be added back.",
+      expect([member[1], leader[1], direct[1], report[1]]).toEqual(["Remove Bob from My organization? Bob keeps its chats and can be added back.",
         "Remove Alice from My organization? Alice keeps its chats and can be added back. The teammates and units under Alice will report to Design.",
-        "Remove Offline from My organization? Offline keeps its chats and can be added back."]);
-      expect(asked).toEqual([placed("bob"), placed("alice"), placed("offline")]);
+        "Remove Offline from My organization? Offline keeps its chats and can be added back. The teammates and units under Offline will report to you.",
+        "Remove Code Reviewer from My organization? Code Reviewer keeps its chats and can be added back. The teammates and units under Code Reviewer will report to Alice."]);
+      expect(asked).toEqual([placed("bob"), placed("alice"), placed("offline"), placed("reviewer")]);
     });
 
     it("leaves a teammate taken out of the organization off the Tree, the Board, Focus and the To choices, and adds it back from Add teammate", async () => {
