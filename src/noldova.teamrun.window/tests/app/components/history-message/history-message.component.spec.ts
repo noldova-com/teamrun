@@ -77,12 +77,14 @@ import { AppearanceFixture, type ClipboardWriterFixture, FixtureTheme } from "@n
 import { page, userEvent } from "vitest/browser";
 
 import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
+import { CodedError } from "../../../fixtures/coded-error.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeClock } from "../../../fixtures/fake-clock.fixture";
 import { FakeInlineTerminals, FakeRunStarter } from "../../../fixtures/fake-inline-terminals.fixture";
 import { MarkdownWait } from "../../../fixtures/markdown-wait.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { ShownText } from "../../../fixtures/shown-text.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -2645,7 +2647,7 @@ describe("HistoryMessageComponent", () => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
       if (data === undefined)
-        throw Object.assign(new Error("The image file is gone or changed."), { code: ErrorCode.NotFound });
+        throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("\\") + 1), "image/png", 4, data).toJson();
     });
     context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
@@ -2778,7 +2780,7 @@ describe("HistoryMessageComponent", () => {
       const path = WrittenImageReadParams.fromJson(parameters).path;
       const data = contents.get(path);
       if (data === undefined)
-        throw Object.assign(new Error("The image file is gone or changed."), { code: ErrorCode.NotFound });
+        throw new CodedError("The image file is gone or changed.", ErrorCode.NotFound);
       return new AttachmentContent(path.slice(path.lastIndexOf("/") + 1), "image/png", 4, data).toJson();
     });
     context.answer(MethodName.MessagePage, () => new MessagePage([SampleData.userMessage], false, false, 1).toJson());
@@ -2978,7 +2980,7 @@ describe("HistoryMessageComponent", () => {
     context.answer(MethodName.AttachmentExists, () => {
       asked++;
       context.emit(EventName.ConversationDeleted, new ConversationIdParams("c1").toJson());
-      throw Object.assign(new Error("No chat c1."), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: ["c1"] } });
+      throw new RefusedError("No chat c1.", ErrorCode.NotFound, "c1");
     });
     const button = await attached("notes.txt", stored);
     const decided = vi.spyOn(store(), "isDeleted");

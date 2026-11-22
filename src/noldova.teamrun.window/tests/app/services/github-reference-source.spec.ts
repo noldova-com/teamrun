@@ -7,8 +7,10 @@
  */
 
 import type { Signal } from "@angular/core";
+import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
 import { DeviceCode, HostAccount, HostItem, HostPerson, HostReference, HostSignIn, ReferenceKind, ReferenceState } from "@noldova/git.hosting.protocol";
 import { GitFolderParams, GitRemote, GitStatus, RemoteTransport } from "@noldova/git.protocol";
 import type { LinkReference } from "@noldova/ui.components.angular";
@@ -16,6 +18,7 @@ import type { LinkReference } from "@noldova/ui.components.angular";
 import { GitHubReferenceSource } from "../../../src/app/services/github-reference-source";
 import { DeferredResponse } from "../../fixtures/deferred-response.fixture";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { PartReadError } from "../../fixtures/part-read-error.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
 describe("GitHubReferenceSource", () => {
@@ -39,19 +42,19 @@ describe("GitHubReferenceSource", () => {
 
   const shown = (item: Signal<LinkReference | null>): readonly (string | null)[] | null => {
     const value = item();
-    return value === null ? null : [value.reference, value.state?.label ?? null, value.title];
+    return Object.isNull(value) ? null : [value.reference, value.state?.label ?? null, value.title];
   };
   const reads = (): readonly number[] => context.requests.filter(t => t.method === readMethod).map(t => numberOf(t.parameters));
   const source = (): GitHubReferenceSource => {
     const found = GitHubReferenceSource.of(context);
-    if (found === null)
-      throw new Error("No source is registered for the context.");
+    if (Object.isNull(found))
+      throw new PartReadError("No source is registered for the context.");
     return found;
   };
   const find = (url: string): Signal<LinkReference | null> => {
     const item = source().find(url);
-    if (item === null)
-      throw new Error(`${url} isn't a GitHub item.`);
+    if (Object.isNull(item))
+      throw new PartReadError(`${url} isn't a GitHub item.`);
     return item;
   };
 
@@ -105,7 +108,7 @@ describe("GitHubReferenceSource", () => {
       if (number === 1)
         throw new Error("GitHub answered 502.");
       if (number === 2)
-        throw Object.assign(new Error("The runtime is gone."), { code: FailureCode.Disconnected });
+        throw new RuntimeRequestException(FailureCode.Disconnected, "The runtime is gone.");
       if (number === 3)
         return { title: "No more than a title" };
       return number === 4 ? Promise.reject(new Error("The GitHub module isn't running.")) : Promise.reject("The GitHub module stopped.");

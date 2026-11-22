@@ -73,6 +73,7 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -350,7 +351,7 @@ describe("ProjectsViewComponent", () => {
     context.answer(MethodName.ProjectList, () => [SampleData.listed(SampleData.project)]);
     context.answer(MethodName.ConversationListMembers, t => {
       if (ConversationIdParams.fromJson(t).conversationId === second.id)
-        throw Object.assign(new Error(`Conversation ${second.id} was not found.`), { code: ErrorCode.NotFound, details: { error: ErrorCode.NotFound, arguments: [second.id] } });
+        throw new RefusedError(`Conversation ${second.id} was not found.`, ErrorCode.NotFound, second.id);
       return [];
     });
 
