@@ -98,7 +98,7 @@ export class OrganizationFocusComponent {
     const focus = this.focus();
     const department = focus.department;
     if (!Object.isNull(focus.teammate))
-      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, this.departmentNames().get(focus.teammate.id) ?? focus.departmentName, focus.teammate.model);
+      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, this.reportsToOf(focus.teammate) ?? focus.departmentName, focus.teammate.model);
     const counts = this.countsOf(this.cards());
     const under = this.cards().filter(t => this.managers().has(t.id)).length;
     return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length - under, counts, under)

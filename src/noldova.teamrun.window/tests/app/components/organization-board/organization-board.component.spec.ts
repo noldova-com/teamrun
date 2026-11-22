@@ -162,6 +162,20 @@ describe("OrganizationBoardComponent", () => {
       [["Reports to Carol"]]]);
   });
 
+  it("lists a three-level chain outside departments beside your direct reports by name, each saying whom it reports to", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => !["bob", "carol", "offline"].includes(t.teammateId)),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0)]), ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".leaders > .report .name"), all(".leaders > .report").map(t => texts(".reports-to", t))])
+      .toEqual([["Bob", "Carol", "Offline"], [["Reports to Offline"], [], ["Reports to Carol"]]]);
+  });
+
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
     await create();
     const build = (): HTMLElement => one(".lane:nth-child(3)");

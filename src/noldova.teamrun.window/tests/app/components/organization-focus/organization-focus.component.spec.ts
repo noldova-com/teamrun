@@ -181,6 +181,24 @@ describe("OrganizationFocusComponent", () => {
     expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Carol")]).toEqual([["Offline"], true]);
   });
 
+  it("outlines a three-level chain outside departments as top-level rows by name, each saying whom it reports to there and when focused", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => !["bob", "carol", "offline"].includes(t.teammateId)),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0)]), ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 2 under them · ")])
+      .toEqual([["Bob", "Carol", "Offline"], [["Reports to Offline"], [], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Bob", "Carol", "Offline"], true]);
+
+    await click(one(".obtn", row("Bob")));
+    expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Offline")]).toEqual([["Bob"], true]);
+  });
+
   it("opens on the leaders when nothing is focused", async () => {
     await create();
     expect(unit()).toEqual([["Organization"], ["Organization"], ["Organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["Organization"]]);

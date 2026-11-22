@@ -89,7 +89,8 @@ export class OrganizationViewComponent {
     return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.root().subDepartments, this.reports(), key).target)
       ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
-  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments, this.reports()));
+  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments,
+    [...this.root().directReports, ...this.reports().filter(t => this.root().managers.has(t.id))]));
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.choices().map(t => new SelectOption(t.key, t.label)));
   protected readonly targetKey: Signal<string> = computed(() => {
     const target = this.target();

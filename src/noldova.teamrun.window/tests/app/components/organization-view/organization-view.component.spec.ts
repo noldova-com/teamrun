@@ -875,6 +875,15 @@ describe("OrganizationViewComponent", () => {
       expect([await pickAsync("Offline"), heading()]).toEqual([["All leaders and your direct reports", "Everyone", "Alice", "Bob", "Offline"], ["Chat with Offline"]]);
     });
 
+    it("offers your direct reports by name, then the teammates under them by name", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([], [new TeammatePlacement("offline", OrganizationParent.person, 0),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 1), new TeammatePlacement("alice", OrganizationParent.teammate("reviewer"), 0)]);
+      });
+
+      expect(await pickAsync("Alice")).toEqual(["All leaders and your direct reports", "Everyone", "Code Reviewer", "Offline", "Alice"]);
+    });
+
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
       await create();
       await pickAsync("Bob");

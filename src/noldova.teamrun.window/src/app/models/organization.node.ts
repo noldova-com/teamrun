@@ -101,9 +101,9 @@ export class OrganizationNode {
     for (const report of reports) {
       for (const [id, manager] of report.managers)
         managers.set(id, manager);
-      if (!Object.isNull(report.teammate))
+      for (const manager of report.self)
         for (const person of report.directReports)
-          managers.set(person.id, report.teammate);
+          managers.set(person.id, manager);
     }
     return managers;
   }
