@@ -92,7 +92,7 @@ describe("OrganizationNode", () => {
       new Department("build", "Build", "gone", OrganizationParent.person, null, 1, "c", "u")], []);
     const root = OrganizationNode.treeOf(organization, []);
 
-    expect([root.type, ...root.departments.map(t => t.type?.name ?? null)]).toEqual([null, "Department", null]);
+    expect([root.type, ...root.departments.map(t => t.type)]).toEqual([null, SampleData.departmentType, null]);
   });
 
   it("lifts the reports of a teammate it doesn't know to that teammate's place", () => {

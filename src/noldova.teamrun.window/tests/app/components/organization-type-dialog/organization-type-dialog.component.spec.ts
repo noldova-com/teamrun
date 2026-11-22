@@ -31,7 +31,12 @@ describe("OrganizationTypeDialogComponent", () => {
   let created: string[];
   let closes: number;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => {
+    const native: unknown = fixture.nativeElement;
+    if (!(native instanceof HTMLElement))
+      throw new Error("The fixture has no element.");
+    return native;
+  };
   const one = <T extends HTMLElement>(selector: string, root: ParentNode = element()): T => {
     const found = root.querySelector<T>(selector);
     if (Object.isNull(found))
