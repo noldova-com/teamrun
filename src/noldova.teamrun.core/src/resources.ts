@@ -529,6 +529,12 @@ export class Resources {
   public static readonly organizationMessagesTable: string = "organizationMessages";
   public static readonly organizationMessagesDropMigrationId: string = "20261124090000_OrganizationMessagesDrop";
   public static readonly dropOrganizationMessages: string = "DROP TABLE organizationMessages";
+  public static readonly uniqueIndexNamesMigrationId: string = "20261125090000_UniqueIndexNames";
+  public static readonly renameUniqueIndexes: readonly string[] = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_projects_rootPath\" ON \"projects\" (\"rootPath\")", "DROP INDEX IF EXISTS IX_projects_rootPath",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")", "DROP INDEX IF EXISTS IX_messages_chatId_sequence",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_teammates_name\" ON \"teammates\" (\"name\")", "DROP INDEX IF EXISTS IX_teammates_name",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_sharedMcpServers_name\" ON \"sharedMcpServers\" (\"name\")", "DROP INDEX IF EXISTS IX_sharedMcpServers_name"];
   public static readonly teammateLastRepliesMigrationId: string = "20261122090000_TeammateLastReplies";
   public static readonly createTeammateLastReplyIndex: string =
     "CREATE INDEX IX_messages_teammateId_endedAt ON messages (json_extract(json, '$.teammateId'), json_extract(json, '$.endedAt')) "

@@ -23,7 +23,7 @@ export class TeammatesMigrationTests {
     migration.apply(builder);
     const statements = builder.toOperations().map(t => t.render(new SQLiteDialect()));
     Assert.areEqual(4, statements.length);
-    Assert.isTrue(statements.includes("CREATE UNIQUE INDEX \"IX_teammates_name\" ON \"teammates\" (\"name\")"));
+    Assert.isTrue(statements.includes("CREATE UNIQUE INDEX \"UX_teammates_name\" ON \"teammates\" (\"name\")"));
     Assert.isTrue(statements[2]?.includes("PRIMARY KEY (\"conversationId\", \"teammateId\")") ?? false);
     Assert.isTrue(statements[2]?.includes("FOREIGN KEY (\"teammateId\") REFERENCES \"teammates\" (\"id\")") ?? false);
     using directory = new TemporaryDataDirectory();

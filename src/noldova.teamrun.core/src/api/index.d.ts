@@ -11488,6 +11488,18 @@ export declare class OrganizationMessagesDropMigration extends SqlMigration {
   public override apply(builder: MigrationBuilder): void;
 }
 
+/**
+ * Names the unique indexes `UX_<table>_<columns>`, as context 0.0.12's `createUniqueIndex` does: a database made before it holds them as `IX_`, so each is
+ * created under its `UX_` name, when missing, before its `IX_` one is dropped; no row changes.
+ */
+export declare class UniqueIndexNamesMigration extends SqlMigration {
+  /** Uses the fixed unique index names migration id. */
+  public constructor();
+
+  /** Creates each unique index under its `UX_` name and drops its `IX_` one. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
 /** Adds the `departments` and `departmentMembers` tables; a teammate has at most one membership row. */
 export declare class DepartmentsMigration extends SqlMigration {
   /** Uses the fixed departments migration id. */

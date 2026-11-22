@@ -71,7 +71,7 @@ export class ChatNamesMigrationTests {
       "DROP INDEX IX_messages_conversationId_status",
       "DROP INDEX IX_conversationTeammates_teammateId",
       "CREATE INDEX \"IX_chats_projectId\" ON \"chats\" (\"projectId\")",
-      "CREATE UNIQUE INDEX \"IX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")",
+      "CREATE UNIQUE INDEX \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")",
       "CREATE INDEX \"IX_messages_chatId_status\" ON \"messages\" (\"chatId\", \"status\")",
       "CREATE INDEX \"IX_chatTeammates_teammateId\" ON \"chatTeammates\" (\"teammateId\")",
       Resources.createChangesTable,
@@ -129,10 +129,10 @@ export class ChatNamesMigrationTests {
     Assert.areEqual("chatTeammates,chatWakes,chats", await names("SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE '%hat%' OR name LIKE '%onversation%') ORDER BY name"));
     Assert.areEqual("chatId,chatId,chatId,chatId", (await Promise.all(["messages", "drafts", "readingPositions", "chatTeammates"]
       .map(t => names(`SELECT name FROM pragma_table_info('${t}') WHERE name IN ('chatId', 'conversationId')`)))).join(","));
-    Assert.areEqual("IX_backgroundTasks_chatId,IX_chatTeammates_teammateId,IX_chatWakes_state,IX_chats_projectId,IX_messages_chatId_sequence,IX_messages_chatId_status,IX_runOutputs_chatId,IX_sustainAttempts_chatId,IX_waitingMessages_chatId",
+    Assert.areEqual("IX_backgroundTasks_chatId,IX_chatTeammates_teammateId,IX_chatWakes_state,IX_chats_projectId,IX_messages_chatId_status,IX_runOutputs_chatId,IX_sustainAttempts_chatId,IX_waitingMessages_chatId",
       await names("SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'IX_%' AND (name LIKE '%hat%' OR name LIKE '%onversation%') ORDER BY name"));
-    Assert.areEqual("CREATE UNIQUE INDEX \"IX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")",
-      (await connection.queryAsync(new SqlQuery("SELECT sql FROM sqlite_master WHERE name = 'IX_messages_chatId_sequence'")))[0]?.readString("sql"));
+    Assert.areEqual("CREATE UNIQUE INDEX \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")",
+      (await connection.queryAsync(new SqlQuery("SELECT sql FROM sqlite_master WHERE name = 'UX_messages_chatId_sequence'")))[0]?.readString("sql"));
     Assert.areEqual(0, (await connection.queryAsync(new SqlQuery("PRAGMA foreign_key_check"))).length);
     await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO drafts (chatId, json, revision, updatedAt) VALUES ('missing', '{}', 1, 't')")), Error);
     Assert.areEqual(JSON.stringify(chat.toJson()), ChatNamesMigrationTests.read(await json("SELECT json FROM chats"), Chat));
@@ -154,19 +154,19 @@ export class ChatNamesMigrationTests {
   }
 
   @TestMethod
-  public async migratesADatabaseWhoseUniqueIndexesAreNamedUx(): Promise<void> {
+  public async migratesADatabaseMadeBeforeUniqueIndexesWereNamedUx(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatNamesMigration));
       await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
-      await legacy.database.connection.executeAsync(new SqlQuery("DROP INDEX IX_messages_conversationId_sequence"));
-      await legacy.database.connection.executeAsync(new SqlQuery("CREATE UNIQUE INDEX UX_messages_conversationId_sequence ON messages (conversationId, sequence)"));
+      await legacy.database.connection.executeAsync(new SqlQuery("DROP INDEX UX_messages_conversationId_sequence"));
+      await legacy.database.connection.executeAsync(new SqlQuery("CREATE UNIQUE INDEX IX_messages_conversationId_sequence ON messages (conversationId, sequence)"));
     }
     await using current = await DatabaseContext.openAsync(directory.path);
     const indexes = await current.database.connection.queryAsync(new SqlQuery("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'messages' AND name LIKE '%sequence' ORDER BY name"));
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
-    Assert.areEqual("IX_messages_chatId_sequence", indexes.map(t => t.readString("name")).join(","));
+    Assert.areEqual("UX_messages_chatId_sequence", indexes.map(t => t.readString("name")).join(","));
   }
 
   private static read(json: string, model: IStoredModelType): string {
