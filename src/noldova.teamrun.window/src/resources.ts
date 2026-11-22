@@ -1303,6 +1303,7 @@ export class Resources {
   public static readonly organizationAddTeammateNone: string = "No teammate has that name.";
   public static readonly organizationDeleteIcon: string = "delete";
   public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationLeaveUnitIcon: string = "group_remove";
   public static readonly organizationNowRunningIcon: string = "progress_activity";
   public static readonly organizationNowIdleIcon: string = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
@@ -1323,7 +1324,9 @@ export class Resources {
   public static readonly organizationMessageIcon: string = "chat";
   public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteLabel: string = "Delete";
-  public static readonly organizationRemoveMemberTitle: string = "Remove member";
+  public static readonly organizationRemoveMemberTitle: string = "Move out of unit";
+  public static readonly organizationLeaveUnitLabel: string = "Move out";
+  public static readonly organizationRemoveReportsToYou: string = "you";
   public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationRemoveTeammate: string = "Remove teammate";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
@@ -1948,7 +1951,16 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveNamed(name: string): string {
-    return `Remove ${name}`;
+    return `Remove ${name} from the organization`;
+  }
+
+  public static formatOrganizationLeaveUnitNamed(name: string, unit: string): string {
+    return `Move ${name} out of ${unit}`;
+  }
+
+  public static formatOrganizationRemoveFrom(teammate: string, organization: string, reportsTo: string | null): string {
+    const reports = Object.isNull(reportsTo) ? String.empty : ` The teammates and units under ${teammate} will report to ${reportsTo}.`;
+    return `Remove ${teammate} from ${organization}? ${teammate} keeps its chats and can be added back.${reports}`;
   }
 
   public static formatOrganizationMoveLabel(name: string): string {
@@ -1956,7 +1968,7 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
-    return `Remove ${teammate} from ${department}? ${teammate} will report to you.`;
+    return `Move ${teammate} out of ${department}? ${teammate} will report to you.`;
   }
 
   public static formatOrganizationHidden(count: number): string {

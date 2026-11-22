@@ -99,7 +99,7 @@ LICENSE file in the root directory of this source tree.
         @if (editing() && focus().teammate; as teammate) {
           @if (removable() && focus().department?.department; as department) {
             <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, department)"><span nolButtonIcon
-              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationLeaveUnitIcon }}</span>{{ resources.organizationRemoveMemberTitle }}</button>
           }
         }
       </div>

@@ -138,7 +138,7 @@ export class OrganizationFocusComponent {
 
   protected removeTeammate(teammate: Teammate, department: Department): void {
     this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, department.name),
-      Resources.organizationRemoveLabel, null, true), () => {
+      Resources.organizationLeaveUnitLabel, null, true), () => {
       this.go(OrganizationTarget.department(department.id));
       void this.organization.setMember(teammate.id, null);
     });

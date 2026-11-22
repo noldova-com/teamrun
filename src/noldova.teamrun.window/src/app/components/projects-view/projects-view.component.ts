@@ -100,8 +100,6 @@ export class ProjectsViewComponent {
   protected readonly organizations: Signal<readonly OrganizationExplorer[]> = computed(() =>
     this.catalog.organizations().map(t => OrganizationExplorer.of(t, this.store.teammates())));
 
-  protected readonly hasOrganization: Signal<boolean> = computed(() => this.organizations().length > 0);
-
   private readonly organizationChats: Signal<ReadonlyMap<string, Conversation>> = computed(() => {
     const chats = new Map<string, Conversation>();
     for (const projectId of [null, ...this.store.projects().map(t => t.id)])

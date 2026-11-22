@@ -2074,10 +2074,6 @@ export class Resources {
     return `Organization ${id} doesn't exist.`;
   }
 
-  public static formatLastOrganization(name: string): string {
-    return `${name} is the only organization; create another before deleting it.`;
-  }
-
   public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string {
     return `${organizationId}/${teammateId}`;
   }

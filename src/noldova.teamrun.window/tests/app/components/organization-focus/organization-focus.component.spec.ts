@@ -399,7 +399,7 @@ describe("OrganizationFocusComponent", () => {
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-confirm");
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "bob", departmentId: null }]]));
-    expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["deleteRemove teammate"]], 0]);
+    expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["group_removeMove out of unit"]], 0]);
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
 
