@@ -18,4 +18,8 @@ export class ImageViewerData {
     this.images = images.includes(image) ? [...images] : [image];
     this.index = this.images.indexOf(image);
   }
+
+  public imageAt(index: number): ViewedImage {
+    return this.images[index] ?? this.image;
+  }
 }

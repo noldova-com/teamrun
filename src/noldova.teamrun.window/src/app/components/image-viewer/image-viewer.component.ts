@@ -53,7 +53,7 @@ export class ImageViewerComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly index: WritableSignal<number> = linkedSignal(() => this.data().index);
-  protected readonly current: Signal<ViewedImage> = computed(() => this.data().images[this.index()]!);
+  protected readonly current: Signal<ViewedImage> = computed(() => this.data().imageAt(this.index()));
   protected readonly loaded: WritableSignal<HTMLImageElement | null> = signal(null);
   protected readonly loadedSize: Signal<ImageDimensions | null> = computed(() => {
     const image = this.loaded();
@@ -152,7 +152,7 @@ export class ImageViewerComponent {
       event.preventDefault();
       event.stopPropagation();
       const viewport = this.viewport().nativeElement;
-      viewport.scrollBy(pan[0] * viewport.clientWidth * Resources.imagePanFraction, pan[1] * viewport.clientHeight * Resources.imagePanFraction);
+      viewport.scrollBy(pan.x * viewport.clientWidth * Resources.imagePanFraction, pan.y * viewport.clientHeight * Resources.imagePanFraction);
       return;
     }
     if (event.key === Resources.imagePreviousKey || event.key === Resources.imageNextKey) {
@@ -190,7 +190,7 @@ export class ImageViewerComponent {
   private keepFocus(fallback: ElementRef<HTMLButtonElement>): void {
     const focused = this.host.ownerDocument.activeElement;
     afterNextRender(() => {
-      if (focused instanceof HTMLButtonElement && focused.disabled)
+      if (focused?.matches(Resources.imageDisabledButtonSelector) === true)
         fallback.nativeElement.focus();
     }, { injector: this.injector });
   }
