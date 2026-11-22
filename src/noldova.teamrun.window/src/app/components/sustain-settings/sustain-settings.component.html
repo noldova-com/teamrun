@@ -17,7 +17,7 @@ LICENSE file in the root directory of this source tree.
   @if (unavailable() === null && sustain()) {
     <span class="nol-teamrun-muted nol-teamrun-sustain-hint">{{ resources.sustainHint }}</span>
     <nol-configuration-table class="nol-teamrun-fallbacks" [heading]="resources.fallbackOrderTitle" [explanation]="resources.fallbackOrderHint">
-      <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-add-fallback" [variant]="secondary" [disabled]="disabled() || listedProviders().length === 0"
+      <button type="button" nol-button nolConfigurationTableAction class="nol-teamrun-add-fallback" [variant]="secondary" [disabled]="disabled() || !canAdd()"
         (click)="add()">{{ resources.addFallbackLabel }}</button>
       <table nolConfigurationTable>
         <thead>
