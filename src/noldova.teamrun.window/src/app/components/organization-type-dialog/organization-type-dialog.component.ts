@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, effect, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, type WritableSignal } from "@angular/core";
+import { Component, computed, effect, ElementRef, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, viewChild, type WritableSignal } from "@angular/core";
 import type { NodeType } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, ColorChooserComponent, DialogComponent, type DialogService, FieldMessageComponent, IconChooserComponent,
   TextFieldComponent } from "@noldova/ui.components.angular";
@@ -21,6 +21,8 @@ import type { OrganizationStoreService } from "../../services/organization-store
   styleUrl: "../settings-dialog.css"
 })
 export class OrganizationTypeDialogComponent {
+  private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("field", { read: ElementRef });
+
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly name: WritableSignal<string> = signal(String.empty);
@@ -45,17 +47,16 @@ export class OrganizationTypeDialogComponent {
     });
   }
 
-  public static open(dialogs: DialogService, organization: OrganizationStoreService, type: NodeType | null): OrganizationTypeDialogComponent | null {
+  public static open(dialogs: DialogService, organization: OrganizationStoreService, type: NodeType | null): OrganizationTypeDialogComponent | undefined {
     const dialog = dialogs.open(OrganizationTypeDialogComponent, ".nol-teamrun-type-name");
     dialog.componentRef?.setInput("organization", organization);
     dialog.componentRef?.setInput("type", type);
     dialog.componentInstance?.closed.subscribe(() => dialog.close());
-    return dialog.componentInstance ?? null;
+    return dialog.componentInstance;
   }
 
-  protected edit(event: Event): void {
-    if (event.target instanceof HTMLInputElement)
-      this.name.set(event.target.value);
+  protected edit(): void {
+    this.name.set(this.nameField().nativeElement.value);
   }
 
   protected async save(event: Event): Promise<void> {

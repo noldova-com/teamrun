@@ -1329,6 +1329,13 @@ describe("OrganizationViewComponent", () => {
         [new RecordedRequest(MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "team", parent: { kind: "Person", id: null }, leaderId: null })]]);
     });
 
+    it("shows You as the place of a teammate the organization places nowhere", async () => {
+      await editAsync();
+      await changeTo(typed([SampleData.departmentType], organization.departments, organization.placements.filter(t => t.teammateId !== "bob")));
+
+      expect(one(".move-choice .nol-select-value", card("Bob")).textContent?.trim()).toBe("You");
+    });
+
     it("sets a department's type from its Type choice among the organization's types", async () => {
       await editAsync();
       await changeTo(typed([SampleData.departmentType, team]));

@@ -10,8 +10,8 @@ LICENSE file in the root directory of this source tree.
   <form id="nol-teamrun-type-form" class="nol-teamrun-form" novalidate (submit)="save($event)">
     <label class="nol-teamrun-field">
       <span class="nol-teamrun-field-label">{{ resources.organizationTypeNameLabel }}</span>
-      <input nol-text-field class="nol-teamrun-type-name" name="name" [attr.aria-label]="resources.organizationTypeNameLabel" [value]="name()"
-        [disabled]="saving()" (input)="edit($event)">
+      <input #field nol-text-field class="nol-teamrun-type-name" name="name" [attr.aria-label]="resources.organizationTypeNameLabel" [value]="name()"
+        [disabled]="saving()" (input)="edit()">
     </label>
     <div class="nol-teamrun-field">
       <span class="nol-teamrun-field-label">{{ resources.organizationTypeIconLabel }}</span>

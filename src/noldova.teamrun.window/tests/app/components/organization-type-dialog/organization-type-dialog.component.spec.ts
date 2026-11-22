@@ -25,8 +25,9 @@ import { Wait } from "../../../fixtures/wait.fixture";
 describe("OrganizationTypeDialogComponent", () => {
   const team = new NodeType("team", "Team", "groups", "teal", SampleData.timestamp, SampleData.timestamp);
   const squad = new NodeType("squad", "Squad", "apartment", "#1a2b3c", SampleData.timestamp, SampleData.timestamp);
+  const plain = new NodeType("plain", "Plain", null, null, SampleData.timestamp, SampleData.timestamp);
   const organization = new Organization(ProtocolResources.defaultOrganizationId, "My organization", null, 0, SampleData.timestamp, SampleData.timestamp,
-    [SampleData.departmentType, team], [], []);
+    [SampleData.departmentType, team, plain], [], []);
   let context: FakeWindowPartContext;
   let store: OrganizationStoreService;
   let created: string[];
@@ -63,7 +64,7 @@ describe("OrganizationTypeDialogComponent", () => {
     configure(context);
     TestBed.configureTestingModule({});
     store = new OrganizationStoreService(context, new OrganizationScope());
-    await Wait.until(() => expect(store.organization().nodeTypes.map(t => t.id)).toEqual(["department", "team"]));
+    await Wait.until(() => expect(store.organization().nodeTypes.map(t => t.id)).toEqual(["department", "team", "plain"]));
     created = [];
     closes = 0;
     const dialog = OrganizationTypeDialogComponent.open(TestBed.inject(DialogService), store, type);
@@ -114,6 +115,20 @@ describe("OrganizationTypeDialogComponent", () => {
 
     expect([shown, context.parametersOf(MethodName.NodeTypeUpdate), created]).toEqual([["Edit type", "Team", "true"],
       { organizationId: "my-organization", typeId: "team", name: "Squad", color: "red" }, []]);
+  });
+
+  it("sends only the icon given to a type with no icon or color, and stays open saying why when the runtime refuses it", async () => {
+    await create(plain, t => t.fail(MethodName.NodeTypeUpdate, "The runtime is busy."));
+
+    await userEvent.type(one(".nol-teamrun-type-icon .nol-icon-chooser-search"), "groups");
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-type-icon [role=option][aria-label=groups]")).not.toBeNull());
+    await userEvent.click(one(".nol-teamrun-type-icon [role=option][aria-label=groups]"));
+    await settle();
+    save().click();
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-dialog-error")?.textContent?.trim()).toBe("The runtime is busy."));
+    await settle();
+
+    expect([context.parametersOf(MethodName.NodeTypeUpdate), closes, save().disabled]).toEqual([{ organizationId: "my-organization", typeId: "plain", icon: "groups" }, 0, false]);
   });
 
   it("closes without asking the runtime when nothing about the type changed", async () => {
