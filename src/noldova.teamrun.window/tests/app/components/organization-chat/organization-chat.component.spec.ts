@@ -15,7 +15,8 @@ import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
   AttachmentInput, Conversation, ConversationIdParams, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
-  MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
+  MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams,
+  WaitingMessageIdParams, WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
@@ -368,6 +369,25 @@ describe("OrganizationChatComponent", () => {
       .toEqual([[["org-alice", "alice", "Status?"]], ["org-bob"]]);
   });
 
+  it("keeps the text when a replying recipient's chat refuses to queue the message, and queues it only there on the retry", async () => {
+    kept = [chatOf("alice"), chatOf("bob")];
+    running = [reply("org-alice", MessageStatus.Running)];
+    await create(OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Replying", "No reply yet"]));
+    context.fail(MethodName.WaitingMessageAdd, "The chat is gone.");
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+    await fixture.whenStable();
+    const failed = [queued().length, box()?.value];
+    context.answer(MethodName.WaitingMessageAdd, t => new WaitingMessage("w1", WaitingMessageAddParams.fromJson(t).delivery, WaitingMessageAddParams.fromJson(t).message,
+      SampleData.timestamp).toJson());
+    await sendNow();
+    await Wait.until(() => expect(box()?.value).toBe(""));
+
+    expect([failed, queued().map(t => t.message.chatId), sent().map(t => t.chatId)]).toEqual([[1, "Status?"], ["org-alice", "org-alice"], ["org-bob"]]);
+  });
+
   it("shows each recipient's reply that ended in that recipient's own chat before the panel opened, read from the chat, whatever the teammate replied elsewhere", async () => {
     organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
@@ -507,6 +527,36 @@ describe("OrganizationChatComponent", () => {
       expect([before, stopBox.right <= sendBox.left, stopBox.top + stopBox.height / 2 - (sendBox.top + sendBox.height / 2), cancelled().sort(), sent().map(t => t.chatId),
         box()?.value, element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled])
         .toEqual([null, true, 0, ["org-alice", "org-bob"], ["org-alice", "org-bob"], "", true]);
+    });
+
+    it("removes the message it queued for a recipient already replying before it stops that reply, so no new reply starts there after Stop", async () => {
+      running = [reply("org-alice", MessageStatus.Running)];
+      await create(OrganizationTarget.department("d1"));
+      answerReplies();
+      context.answer(MethodName.WaitingMessageAdd, t => {
+        const params = WaitingMessageAddParams.fromJson(t);
+        const waiting = new WaitingMessage("w1", params.delivery, params.message, SampleData.timestamp);
+        context.emit(EventName.WaitingMessagesChanged, new WaitingMessagesPayload(params.message.chatId, [waiting]).toJson());
+        return waiting.toJson();
+      }).answer(MethodName.WaitingMessageRemove, () => {
+        context.emit(EventName.WaitingMessagesChanged, new WaitingMessagesPayload("org-alice", []).toJson());
+        return null;
+      });
+      const order = (): string[] => context.requests.map(t => t.method).filter(t => [MethodName.WaitingMessageRemove, MethodName.ConversationCancel]
+        .some(u => t === FakeWindowPartContext.qualify(u)));
+      await type("Status?");
+      await sendNow();
+      await Wait.until(() => expect(queued()).toHaveLength(1));
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Replying", "Replying"]));
+
+      await stop();
+      await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Stopped", "Stopped"]));
+      await Wait.until(() => expect(stopButton()).toBeNull());
+      const removed = context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.WaitingMessageRemove))
+        .map(t => WaitingMessageIdParams.fromJson(t.parameters).id);
+
+      expect([removed, order().at(0), cancelled().sort(), sent().map(t => t.chatId), ChatStoreService.of(context).waitingOf("org-alice")])
+        .toEqual([["w1"], FakeWindowPartContext.qualify(MethodName.WaitingMessageRemove), ["org-alice", "org-bob"], ["org-bob"], []]);
     });
 
     it("sends to no recipient not yet started when Stop comes between sends, stops the reply already started, and takes a new message at once", async () => {
