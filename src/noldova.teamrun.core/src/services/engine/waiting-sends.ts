@@ -20,7 +20,9 @@ import type { ILog } from "../../interfaces/i-log.js";
 import type { IMessagesService } from "../../interfaces/i-messages.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
 import { Guid } from "../../models/guid.js";
+import { KeptWaitingFiles } from "../../models/kept-waiting-files.js";
 import { TurnSteer } from "../../models/turn-steer.js";
+import { WaitingEdit } from "../../models/waiting-edit.js";
 import { Resources } from "../../resources.js";
 import type { DatabaseContext } from "../database-context.js";
 import { AttachmentStore } from "./attachment-store.js";
@@ -79,7 +81,7 @@ export class WaitingSends {
     this.lastWaitingTime = Math.max(Date.now(), this.lastWaitingTime + 1);
     const checked = new WaitingMessage(Guid.createVersion7().toString(), params.delivery, params.message, new Date(this.lastWaitingTime).toISOString(), null,
       fromOutside);
-    const added = checked.withMessage(this.keepWaitingFiles(checked.id, params.message)[0]);
+    const added = checked.withMessage(this.keepWaitingFiles(checked.id, params.message).message);
     await this.waiting.addAsync(added);
     await this.publishWaitingAsync(conversation.id);
     await this.deliverStoredAsync(added);
@@ -92,17 +94,16 @@ export class WaitingSends {
   }
 
   public async editWaitingAsync(params: WaitingMessageEditParams, fromOutside: boolean): Promise<WaitingMessage> {
-    const [current, edited, kept] = await this.context.database.connection.runInTransactionAsync(async (transaction)
-      : Promise<readonly [WaitingMessage, WaitingMessage, readonly MessageAttachment[]]> => {
+    const { current, edited, kept } = await this.context.database.connection.runInTransactionAsync(async (transaction): Promise<WaitingEdit> => {
       const found = await this.requireWaitingAsync(params.id, transaction);
       if (params.message.chatId !== found.chatId)
         throw new ServiceException(ErrorCode.InvalidParams, Resources.formatWaitingMessageOtherChat(found.id, params.message.chatId),
           [found.id, params.message.chatId]);
       await this.refuseUnfitWaitingAsync(params.message, transaction);
-      const [message, files] = this.keepWaitingFiles(found.id, params.message);
-      const changed = found.withMessage(message, found.fromOutside || fromOutside);
+      const kept = this.keepWaitingFiles(found.id, params.message);
+      const changed = found.withMessage(kept.message, found.fromOutside || fromOutside);
       await this.waiting.updateAsync(changed, transaction);
-      return [found, changed, files];
+      return new WaitingEdit(found, changed, kept.files);
     });
     this.removeWaitingFiles(current.id, () => this.attachments.removeWaitingFiles(current.chatId, current.id, kept));
     await this.publishWaitingAsync(edited.chatId);
@@ -200,10 +201,10 @@ export class WaitingSends {
     }
   }
 
-  private keepWaitingFiles(id: string, message: MessageSendParams): [MessageSendParams, readonly MessageAttachment[]] {
+  private keepWaitingFiles(id: string, message: MessageSendParams): KeptWaitingFiles {
     const kept = this.attachments.saveWaiting(message.chatId, id, message.attachments);
-    return [new MessageSendParams(message.chatId, message.text, message.requested, message.providerId, kept.map(t => new AttachmentInput(t.name, t.mediaType, null, t.path)),
-      message.mentionedTeammateIds, message.responderTeammateId, message.senderToken, message.wakeWhenDone), kept];
+    return new KeptWaitingFiles(new MessageSendParams(message.chatId, message.text, message.requested, message.providerId, kept.map(t => new AttachmentInput(t.name, t.mediaType, null, t.path)),
+      message.mentionedTeammateIds, message.responderTeammateId, message.senderToken, message.wakeWhenDone), kept);
   }
 
   private async refuseUnfitWaitingAsync(message: MessageSendParams, transaction?: SqlTransaction): Promise<void> {
