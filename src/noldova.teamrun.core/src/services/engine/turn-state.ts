@@ -20,7 +20,7 @@ export class TurnState {
   public readonly runs: Map<string, ActiveRun> = new Map();
   public readonly replyRuns: Map<ReplyWork, ReplyRun> = new Map();
   public readonly runWaits: Map<ReplyWork, Set<() => void>> = new Map();
-  public readonly sessions: { scope: string; member: string; session: ITurnToolSession; tools: TurnTools; run: ReplyRun; sender: string; reply: Message; mode: ProviderMode | null;
+  public readonly sessions: { scope: string; member: string; session: ITurnToolSession; tools: TurnTools; run: ReplyRun; sender: string | null; reply: Message; mode: ProviderMode | null;
     stopped: boolean; stops: AbortController }[] = [];
   public closing: boolean = false;
 }

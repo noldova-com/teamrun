@@ -94,7 +94,7 @@ export class McpToolCalls {
     return this.sessions.find(t => t.session.id === session)?.sender ?? null;
   }
 
-  public async openToolsAsync(reply: Message, run: ReplyRun, sender: string, folder: WorkFolder, requested: RequestedSettings): Promise<TurnTools | null> {
+  public async openToolsAsync(reply: Message, run: ReplyRun, sender: string | null, folder: WorkFolder, requested: RequestedSettings): Promise<TurnTools | null> {
     if (Object.isNull(this.tools))
       return null;
     const token = await this.members.issueAsync(reply.conversationId, reply.teammateId);
