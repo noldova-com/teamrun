@@ -49,7 +49,7 @@
     "@noldova/desktop.cli": "0.0.13",
     "@noldova/desktop.protocol": "0.0.13",
     "@noldova/desktop.runtime": "0.0.13",
-    "@noldova/terminal.protocol": "0.0.6"
+    "@noldova/terminal.protocol": "0.0.7"
   },
   "devDependencies": {
     "@noldova/computer-use": "0.0.2",

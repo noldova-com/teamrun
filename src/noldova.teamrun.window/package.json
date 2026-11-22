@@ -42,7 +42,7 @@
     "@noldova/git.hosting.protocol": "0.0.6",
     "@noldova/git.protocol": "0.0.6",
     "@noldova/git.window": "0.0.6",
-    "@noldova/terminal.window": "0.0.6",
+    "@noldova/terminal.window": "0.0.7",
     "@noldova/ui.components.angular": ">=0.0.26 <0.1.0"
   },
   "peerDependenciesMeta": {

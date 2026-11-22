@@ -4,7 +4,7 @@
   "displayName": "TeamRun",
   "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
   "parts": ["runtime", "window", "cli"],
-  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.6" },
+  "dependencies": { "checkpoints": "0.0.3", "terminal": "0.0.7" },
   "optionalDependencies": { "browser": "0.0.3", "computer-use": "0.0.2", "git": "0.0.6", "git-github": "0.0.6" },
   "noldovaDesktop": ">=0.0.13 <0.1.0",
   "contributes": {
