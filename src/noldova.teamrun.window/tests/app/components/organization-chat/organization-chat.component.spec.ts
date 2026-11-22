@@ -340,6 +340,7 @@ describe("OrganizationChatComponent", () => {
       await type("By Enter");
       box()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       await Wait.until(() => expect(queued()).toHaveLength(1));
+      await Wait.until(() => expect(box()?.value).toBe(""));
       await type("By the button");
       await Wait.until(() => expect(main()?.disabled).toBe(false));
       main()?.click();
