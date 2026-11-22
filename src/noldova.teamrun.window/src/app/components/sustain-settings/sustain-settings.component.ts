@@ -78,6 +78,14 @@ export class SustainSettingsComponent {
     const reading = new Set([...this.kinds()].filter(([, kind]) => kind.reportsLimits).map(([id]) => id));
     return NameOrder.sort([...this.providers().values()].filter(t => reading.has(t.id)), t => this.providerLabel(t.id));
   });
+  protected readonly nextEntry: Signal<TeammateFallback | undefined> = computed(() => {
+    const entries = [new TeammateFallback(this.providerId(), this.model(), this.effort()), ...this.fallbacks()];
+    const listed = this.listedProviders();
+    return [...listed.filter(t => t.id !== this.providerId()), ...listed.filter(t => t.id === this.providerId())]
+      .flatMap(t => [null, ...(this.catalogs().get(t.id)?.choices ?? []).map(u => u.id)].map(u => new TeammateFallback(t.id, u)))
+      .find(t => !entries.some(u => u.providerId === t.providerId && u.model === t.model));
+  });
+  protected readonly canAdd: Signal<boolean> = computed(() => !Object.isUndefined(this.nextEntry()));
   protected readonly unreadKinds: Signal<readonly SelectGroup[]> = computed(() => {
     const kinds = this.store().kinds().filter(t => !t.reportsLimits);
     return kinds.length === 0 ? [] : [new SelectGroup(Resources.sustainUnreadKindsGroup, kinds.map(t => new SelectOption(t.id, t.displayName, null, true)))];
@@ -142,11 +150,11 @@ export class SustainSettingsComponent {
   }
 
   protected add(): void {
-    const listed = this.listedProviders();
-    const chosen = [...listed.filter(t => t.id !== this.providerId()), ...listed].slice(0, 1);
-    const entries = chosen.map(t => new TeammateFallback(t.id));
-    this.added.set(new Set([...this.added(), ...entries]));
-    this.fallbacks.set([...this.fallbacks(), ...entries]);
+    const entry = this.nextEntry();
+    if (Object.isUndefined(entry))
+      return;
+    this.added.set(new Set([...this.added(), entry]));
+    this.fallbacks.set([...this.fallbacks(), entry]);
   }
 
   protected changeProvider(index: number, providerId: string): void {
