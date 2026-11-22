@@ -28,6 +28,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Pages:** a page's More button now looks pressed while its menu is open, and idle again once the menu closes (#22).
 - **Organization:** Show organization opens the first organization you have, under its name, also once My organization is deleted; a teammate placed under another teammate outside any department now says in its details that it reports to that teammate, not to you (#401).
 - **Grok's model and effort:** a Grok reply now runs on the model and reasoning effort you chose, rather than Grok's own defaults, and a Plan or Ask chat's Grok starts without its own sub-agents again (#467).
 - **Grok after an approved plan:** in an Ask chat, once you approve a Grok reply's plan, TeamRun stops that Grok turn and goes on in the same reply with a new one in Ask, so the chat stays read-only, rather than going on in Default, where it could change files; in other chats Grok takes the chat's own mode from its next turn; when Grok refuses the switch, the reply says so (#447).

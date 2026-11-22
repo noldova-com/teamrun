@@ -23,6 +23,7 @@ import { AccessibilityFixture } from "../../../../fixtures/accessibility.fixture
 import { EmulatedMediaFixture } from "../../../../fixtures/emulated-media.fixture";
 import { PagesWindow, PagesWindowContext } from "../../../../fixtures/pages-window.fixture";
 import type { RecordingWebView } from "../../../../fixtures/recording-web-view.fixture";
+import { Required } from "../../../../fixtures/required.fixture";
 import { Wait } from "../../../../fixtures/wait.fixture";
 
 describe("PageDocumentComponent", () => {
@@ -800,6 +801,29 @@ describe("PageDocumentComponent", () => {
       if (forcedColors === "none")
         expect([".nol-teamrun-page-name", ".nol-teamrun-page-authors"].map(t => getComputedStyle(element().querySelector(t) ?? element()).color))
           .toEqual(["text-strong", "text-muted"].map(t => AppearanceFixture.readColor(FixtureTheme.theme, mode, t)));
+    });
+
+    it("draws More pressed while its menu is open and idle once it closes, keeping its square", async () => {
+      await openAsync();
+      await settle();
+      const more = (): HTMLButtonElement => Required.of(button("more"));
+      const size = (): DOMRect => more().getBoundingClientRect();
+      const idle = getComputedStyle(more()).backgroundColor;
+      const square = size();
+      const pressed = resolved("backgroundColor", forcedColors === "active" ? "Highlight" : "var(--nol-toolbar-hover)");
+
+      more().click();
+      await Wait.until(() => expect(document.querySelector(".cdk-overlay-container nol-menu")).not.toBeNull());
+      await settle();
+
+      expect([more().getAttribute("aria-expanded"), getComputedStyle(more()).backgroundColor, size().width, size().height])
+        .toEqual(["true", pressed, square.width, square.height]);
+      AppearanceFixture.expectPixels(square.width, square.height);
+      expect(idle).not.toBe(pressed);
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(document.querySelector(".cdk-overlay-container nol-menu")).toBeNull());
+      await settle();
+      expect([getComputedStyle(more()).backgroundColor, size().width, size().height]).toEqual([idle, square.width, square.height]);
     });
 
     it.each([40, 16])("at %drem wide, sets the title and its version line on one row in the title field, the version line right after the title, and cuts the title first", async width => {
