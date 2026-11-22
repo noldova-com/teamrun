@@ -194,12 +194,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
       all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
-      .toEqual([["Organization"], ["4 teammates in 3 units"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
+      .toEqual([["My organization"], ["4 teammates in 3 units"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "2 idle", ["Alice"], ["Bob"], [["UI", "1", "1 idle", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 stopped", [], ["Offline"], [], []]
     ]);
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
+  });
+
+  it("names the organization its document instance names in its title, and follows a rename", async () => {
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [SampleData.departmentType], [], []);
+    await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
+    const mine = texts(".top .title");
+
+    fixture.componentRef.setInput("instance", "o2");
+    await Wait.until(() => expect(texts(".top .title")).toEqual(["Second"]));
+    context.emit(EventName.OrganizationChanged, new Organization("o2", "Studio", null, 1, "c", "u2", [SampleData.departmentType], [], []).toJson());
+    await settle();
+
+    expect([mine, texts(".top .title")]).toEqual([["My organization"], ["Studio"]]);
   });
 
   it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
