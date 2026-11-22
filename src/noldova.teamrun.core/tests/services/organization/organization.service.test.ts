@@ -312,6 +312,41 @@ export class OrganizationServiceTests {
   }
 
   @TestMethod
+  public async takesADirectReportOutAndMovesAnotherTeammatesReportsUpToItsParentInTheirOrder(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const boss = await OrganizationServiceTests.teammateAsync(host, "Boss");
+    const dee = await OrganizationServiceTests.teammateAsync(host, "Dee");
+    const ann = await OrganizationServiceTests.teammateAsync(host, "Ann");
+    const bo = await OrganizationServiceTests.teammateAsync(host, "Bo");
+    const cy = await OrganizationServiceTests.teammateAsync(host, "Cy");
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, OrganizationParent.person, 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, dee.id, OrganizationParent.person, 1));
+    for (const [order, report] of [ann, bo, cy].entries())
+      await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, report.id, OrganizationParent.teammate(boss.id), order));
+
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, dee.id, null, 0));
+    const direct = await OrganizationServiceTests.mineAsync(host);
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, null, 0));
+    const organization = await OrganizationServiceTests.mineAsync(host);
+
+    Assert.areEqual("Person:0,,Teammate:0,Teammate:1,Teammate:2", [boss, dee, ann, bo, cy].map(t => OrganizationServiceTests.parentOf(direct, t)).join(","));
+    Assert.areEqual(",,Person:0,Person:1,Person:2", [boss, dee, ann, bo, cy].map(t => OrganizationServiceTests.parentOf(organization, t)).join(","));
+    Assert.areEqual(2, (await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement)).split(",").filter(t => t === "Delete").length);
+  }
+
+  @TestMethod
+  public async placesNoOneInANewOrganizationOrForANewTeammate(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    await OrganizationServiceTests.teammateAsync(host, "Ada");
+
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+    await OrganizationServiceTests.teammateAsync(host, "Bea");
+
+    Assert.areEqual("My organization:0,Studio:0", (await host.organization.listAsync()).map(t => `${t.name}:${t.placements.length}`).join(","));
+    Assert.areEqual(0, studio.placements.length);
+  }
+
+  @TestMethod
   public async movesADepartmentUnderATeammateButNotUnderOneInsideIt(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const boss = await OrganizationServiceTests.teammateAsync(host, "Boss");

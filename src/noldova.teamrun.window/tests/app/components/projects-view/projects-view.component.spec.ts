@@ -2745,6 +2745,18 @@ describe("ProjectsViewComponent", () => {
       probe.remove();
     });
 
+    it("drops a teammate taken out of an organization from its rows and keeps its Organization chat", async () => {
+      conversations = [SampleData.conversation, organizationChatOf("o9", nova, labs.id), grokChat];
+      await createOrganization();
+      const before = names().slice(-3);
+
+      context.emit(EventName.OrganizationChanged, new Organization(labs.id, labs.name, null, labs.order, SampleData.timestamp, SampleData.timestamp,
+        [SampleData.departmentType], labs.departments, []).toJson());
+      await Wait.until(() => expect(names().includes("Nova")).toBe(false));
+
+      expect([before, names().slice(-2), context.requests.filter(t => t.method.toLowerCase().includes("delete"))]).toEqual([["Labs", "Research", "Nova"], ["Labs", "Research"], []]);
+    });
+
     it("collapses the group from its title, saving it", async () => {
       await createOrganization();
       part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), ".nol-section-header-toggle").click();

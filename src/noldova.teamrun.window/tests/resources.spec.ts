@@ -122,12 +122,12 @@ describe("Resources", () => {
       .toEqual([["Team name", "Delete Team", "Remove Team"], ["Unit name", "Delete unit", "Remove unit"]]);
   });
 
-  it("asks before deleting a department or removing a member, saying where what it held goes", () => {
+  it("asks before deleting a department or moving a member out of its unit, saying where what it held goes", () => {
     expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
       Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
       "Delete Design? Its units move up to report to you, and its members leave every unit.",
       "Delete Web? Its units and members move to Build.",
-      "Remove Alice from Design? Alice will report to you."
+      "Move Alice out of Design? Alice will report to you."
     ]);
   });
 
