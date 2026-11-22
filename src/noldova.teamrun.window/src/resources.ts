@@ -10,7 +10,7 @@ import type { FocusOrigin } from "@angular/cdk/a11y";
 import { GitHubNames } from "@noldova/git.github.protocol";
 import { CheckState, ReviewDecision } from "@noldova/git.hosting.protocol";
 import { GitNames } from "@noldova/git.protocol";
-import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
+import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, type NodeType, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
 import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
@@ -2163,8 +2163,8 @@ export class Resources {
     return `Message ${name}`;
   }
 
-  public static formatOrganizationDepartmentOption(name: string): string {
-    return `${name} (department)`;
+  public static formatOrganizationDepartmentOption(name: string, type: NodeType | null): string {
+    return Object.isNull(type) ? name : `${name} (${type.name})`;
   }
 
   public static formatOrganizationLeaderOption(name: string, department: string): string {

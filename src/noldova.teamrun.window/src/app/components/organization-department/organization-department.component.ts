@@ -28,11 +28,13 @@ import { OrganizationDepartmentDialogComponent } from "../organization-departmen
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationDropDirective } from "../organization-drop.directive";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationTypeDialogComponent } from "../organization-type-dialog/organization-type-dialog.component";
+import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
   imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, NgTemplateOutlet, OrganizationCardComponent, OrganizationDetailsComponent,
-    OrganizationDropDirective, OrganizationTeammateSearchComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
+    OrganizationDropDirective, OrganizationTeammateSearchComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
@@ -99,6 +101,19 @@ export class OrganizationDepartmentComponent {
       return;
     }
     void this.organization.renameDepartment(department.id, name);
+  }
+
+  protected readonly typeOptions: Signal<readonly SelectOption[]> = computed(() => [
+    ...this.organization.organization().nodeTypes.map(t => new SelectOption(t.id, t.name)),
+    new SelectOption(Resources.organizationNewTypeValue, Resources.organizationNewTypeOption)
+  ]);
+
+  protected chooseType(department: Department, value: string): void {
+    if (value !== Resources.organizationNewTypeValue) {
+      void this.organization.setDepartmentType(department.id, value);
+      return;
+    }
+    OrganizationTypeDialogComponent.open(this.dialogs, this.organization, null)?.created.subscribe(t => void this.organization.setDepartmentType(department.id, t.id));
   }
 
   protected setLeader(value: string): void {
