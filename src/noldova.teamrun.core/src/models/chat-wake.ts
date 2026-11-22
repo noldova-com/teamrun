@@ -21,6 +21,8 @@ export class ChatWake {
   public readonly sourceMessageId: string;
   public readonly watchedChatId: string;
   public readonly watchedIds: readonly string[];
+  /** The first of the watched replies, which names a reply wake's sender. */
+  public readonly firstWatchedId: string;
   public readonly state: ChatWakeState;
   public readonly text: string | null;
   public readonly hop: number | null;
@@ -33,7 +35,8 @@ export class ChatWake {
     ArgumentException.throwIfNullOrWhitespace(chatId, Resources.chatIdParameterName);
     ArgumentException.throwIfNullOrWhitespace(sourceMessageId, Resources.sourceMessageIdParameterName);
     ArgumentException.throwIfNullOrWhitespace(watchedChatId, Resources.watchedChatIdParameterName);
-    if (watchedIds.length === 0)
+    const [first, ...rest] = watchedIds;
+    if (Object.isUndefined(first))
       throw new ArgumentException(Resources.wakeWatchesNothing, Resources.watchedIdsParameterName);
 
     this.id = id;
@@ -41,7 +44,8 @@ export class ChatWake {
     this.chatId = chatId;
     this.sourceMessageId = sourceMessageId;
     this.watchedChatId = watchedChatId;
-    this.watchedIds = [...watchedIds];
+    this.watchedIds = [first, ...rest];
+    this.firstWatchedId = first;
     this.state = state;
     this.text = text;
     this.hop = hop;

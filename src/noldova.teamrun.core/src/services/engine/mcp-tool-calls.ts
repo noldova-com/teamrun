@@ -7,13 +7,14 @@
  */
 
 import "@noldova/context.core";
-import type { JsonObject, JsonValue } from "@noldova/context.json";
+import type { JsonObject } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import { ErrorCode, type IMcpToolHost, type McpToolCallParams, type McpToolListParams, McpServer, type Message, MessageIdParams, type RequestedSettings,
   Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import type { IEngineCallbacks } from "../../interfaces/i-engine-callbacks.js";
 import type { ITurnToolSessions } from "../../interfaces/i-turn-tool-sessions.js";
+import { JsonObjects } from "../../models/json-objects.js";
 import { McpEndpoint } from "../../models/mcp-endpoint.js";
 import type { MemberToken } from "../../models/member-token.js";
 import { ToolReach } from "../../models/tool-reach.js";
@@ -171,12 +172,9 @@ export class McpToolCalls {
 
   private static isReadOnly(tool: JsonObject): boolean {
     const annotations = tool["annotations"];
-    return McpToolCalls.isJsonObject(annotations) && annotations["readOnlyHint"] === true;
+    return JsonObjects.is(annotations) && annotations["readOnlyHint"] === true;
   }
 
-  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return Object.isObject(value) && !Array.isArray(value);
-  }
 
   private static turnStopped(): JsonObject {
     return McpServer.toolError(ProtocolResources.formatMcpToolFailure(Resources.unavailableFailure, Resources.turnStoppedCode, Resources.mcpTurnStopped));

@@ -27,6 +27,7 @@ import {
   McpToolListParams,
   Message,
   MessageIdParams,
+  MessageListParams,
   MessageSendParams,
   MessageStatus,
   ObservedSettings,
@@ -739,6 +740,28 @@ export class McpToolCallsTests {
     Assert.areEqual("0,2", McpToolCallsTests.callsOf(tools).join(","));
     Assert.isTrue(tools.opened.every(t => t.ends === 1));
     Assert.areEqual(JSON.stringify([conversation.id, conversation.id]), JSON.stringify(tools.openings.map(t => t.conversationId)));
+  }
+
+  @TestMethod
+  public async failsAWakesFollowAsNotFoundWhenItsChatIsGoneBeforeItsToolsOpenAndLeavesNoRun(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await McpToolCallsTests.hostAsync(tools);
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const findAsync = host.conversations.findAsync.bind(host.conversations);
+    host.conversations.findAsync = async (id, transaction) => id === conversation.id ? null : await findAsync(id, transaction);
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    const thrown = await McpToolCallsTests.rejection(host.engine.waitForIdle());
+    host.conversations.findAsync = findAsync;
+    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+
+    Assert.areEqual(ErrorCode.NotFound, thrown.info.name);
+    Assert.areEqual(1, tools.opened.length);
+    Assert.areEqual(MessageStatus.Failed, reply?.status);
+    Assert.areEqual(Resources.formatConversationNotFound(conversation.id), reply?.details.at(-1)?.text);
+    Assert.areEqual(0, host.engine.activeRunCount);
   }
 
   @TestMethod
