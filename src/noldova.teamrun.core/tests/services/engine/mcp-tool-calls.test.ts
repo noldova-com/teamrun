@@ -750,17 +750,25 @@ export class McpToolCallsTests {
     await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
     await host.engine.waitForIdle();
     const findAsync = host.conversations.findAsync.bind(host.conversations);
-    host.conversations.findAsync = async (id, transaction) => id === conversation.id ? null : await findAsync(id, transaction);
+    const insertAsync = host.messages.insertAsync.bind(host.messages);
+    let gone = false;
+    host.conversations.findAsync = async (id, transaction) => gone && id === conversation.id ? null : await findAsync(id, transaction);
+    host.messages.insertAsync = async (message, transaction): Promise<void> => {
+      await insertAsync(message, transaction);
+      gone = true;
+    };
 
     await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
-    const thrown = await McpToolCallsTests.rejection(host.engine.waitForIdle());
+    await host.engine.waitForIdle();
     host.conversations.findAsync = findAsync;
-    const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).at(-1);
+    host.messages.insertAsync = insertAsync;
+    const replies = await host.messages.listAsync(new MessageListParams(conversation.id, null));
+    const wake = replies.at(-1);
 
-    Assert.areEqual(ErrorCode.NotFound, thrown.info.name);
+    Assert.areEqual(3, replies.length);
+    Assert.areEqual(MessageStatus.Failed, wake?.status);
+    Assert.areEqual(Resources.formatConversationNotFound(conversation.id), wake?.details.at(-1)?.text);
     Assert.areEqual(1, tools.opened.length);
-    Assert.areEqual(MessageStatus.Failed, reply?.status);
-    Assert.areEqual(Resources.formatConversationNotFound(conversation.id), reply?.details.at(-1)?.text);
     Assert.areEqual(0, host.engine.activeRunCount);
   }
 
