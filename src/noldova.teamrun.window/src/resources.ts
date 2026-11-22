@@ -1283,6 +1283,10 @@ export class Resources {
   public static readonly organizationTypeNameLabel: string = "Type name";
   public static readonly organizationTypeIconLabel: string = "Icon";
   public static readonly organizationTypeColorLabel: string = "Icon color";
+  public static readonly organizationTypesTitle: string = "Types";
+  public static readonly organizationNoTypes: string = "No types yet. Add one here, or when you add a unit.";
+  public static readonly organizationEditTypeIcon: string = "edit";
+  public static readonly organizationTypesIcon: string = "category";
   public static readonly organizationDragType: string = "application/x-noldova-organization-node";
   public static readonly organizationDragEffect: "move" = "move";
   public static readonly organizationDraggable: string = "true";
@@ -2161,6 +2165,10 @@ export class Resources {
 
   public static formatOrganizationMessageNamed(name: string): string {
     return `Message ${name}`;
+  }
+
+  public static formatOrganizationEditType(name: string): string {
+    return `Edit ${name}`;
   }
 
   public static formatOrganizationDepartmentOption(name: string, type: NodeType | null): string {

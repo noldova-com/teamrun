@@ -38,6 +38,7 @@ import { OrganizationChatComponent } from "../organization-chat/organization-cha
 import { OrganizationChatsComponent } from "../organization-chats/organization-chats.component";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
+import { OrganizationTypesDialogComponent } from "../organization-types-dialog/organization-types-dialog.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
@@ -112,6 +113,10 @@ export class OrganizationViewComponent {
 
   protected toggleEditing(): void {
     this.editing.update(t => !t);
+  }
+
+  protected openTypes(): void {
+    OrganizationTypesDialogComponent.open(this.dialogs, this.organization);
   }
 
   protected addDepartment(): void {
