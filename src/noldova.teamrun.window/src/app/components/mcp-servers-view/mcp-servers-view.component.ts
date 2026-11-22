@@ -50,7 +50,7 @@ import { SharedMcpServerDialogComponent } from "../shared-mcp-server-dialog/shar
     NgTemplateOutlet, PanelCardComponent, SwitchComponent, TooltipDirective],
   providers: [ChatStoreService.provider],
   templateUrl: "./mcp-servers-view.component.html",
-  styleUrls: ["../settings-view.css", "./mcp-servers-view.component.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css", "./mcp-servers-view.component.css"]
 })
 export class McpServersViewComponent {
   protected readonly resources: typeof Resources = Resources;

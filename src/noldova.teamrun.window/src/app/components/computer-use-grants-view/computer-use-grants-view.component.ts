@@ -32,7 +32,7 @@ import { TimeFormatService } from "../../services/time-format.service";
     ConfigurationTableShareDirective, IconButtonComponent, TooltipDirective],
   providers: [ChatStoreService.provider],
   templateUrl: "./computer-use-grants-view.component.html",
-  styleUrls: ["../settings-view.css"]
+  styleUrls: ["../settings-view.css", "../failure-row.css"]
 })
 export class ComputerUseGrantsViewComponent {
   protected readonly resources: typeof Resources = Resources;

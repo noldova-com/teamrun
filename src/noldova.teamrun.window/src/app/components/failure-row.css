@@ -1,0 +1,24 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.nol-teamrun-error {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-1);
+  color: var(--nol-error);
+}
+
+.nol-teamrun-error-text {
+  flex: auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nol-teamrun-dismiss {
+  flex: none;
+}

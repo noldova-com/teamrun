@@ -20,23 +20,6 @@
   padding: var(--nol-document-padding-block) var(--nol-content-padding-inline);
 }
 
-.nol-teamrun-error {
-  display: flex;
-  align-items: center;
-  gap: var(--nol-space-1);
-  color: var(--nol-error);
-}
-
-.nol-teamrun-error-text {
-  flex: auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.nol-teamrun-dismiss {
-  flex: none;
-}
-
 .nol-teamrun-name {
   display: inline-flex;
   align-items: center;

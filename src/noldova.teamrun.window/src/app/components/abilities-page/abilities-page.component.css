@@ -25,20 +25,3 @@
 .nol-teamrun-ability-description {
   overflow-wrap: anywhere;
 }
-
-.nol-teamrun-error {
-  display: flex;
-  align-items: center;
-  gap: var(--nol-space-1);
-  color: var(--nol-error);
-}
-
-.nol-teamrun-error-text {
-  flex: auto;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.nol-teamrun-retry-kinds {
-  flex: none;
-}

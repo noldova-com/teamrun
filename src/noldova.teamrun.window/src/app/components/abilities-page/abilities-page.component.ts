@@ -14,9 +14,9 @@ import { AbilityAnswer, ProviderAbilities, type ProviderAbility, type ProviderKi
 import { ButtonComponent, ButtonVariant, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
-import type { IAbilityGroupView } from "../../interfaces/i-ability-group-view";
-import type { IAbilityRow } from "../../interfaces/i-ability-row";
 import { AbilityGroup } from "../../models/ability-group";
+import { AbilityGroupView } from "../../models/ability-group-view";
+import { AbilityRow } from "../../models/ability-row";
 import { AbilitySettingsRows } from "../../services/ability-settings-rows";
 import { ChatStoreService } from "../../services/chat-store.service";
 
@@ -25,7 +25,7 @@ import { ChatStoreService } from "../../services/chat-store.service";
   imports: [ButtonComponent, SelectComponent],
   providers: [ChatStoreService.provider],
   templateUrl: "./abilities-page.component.html",
-  styleUrl: "./abilities-page.component.css"
+  styleUrls: ["../failure-row.css", "./abilities-page.component.css"]
 })
 export class AbilitiesPageComponent {
   protected readonly resources: typeof Resources = Resources;
@@ -38,11 +38,11 @@ export class AbilitiesPageComponent {
   protected readonly kinds: Signal<readonly ProviderKind[]> = computed(() => this.store.kinds().filter(t => !Object.isNull(t.abilities)));
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.kinds().map(t => new SelectOption(t.id, t.displayName)));
   protected readonly kind: Signal<ProviderKind | undefined> = computed(() => AbilitySettingsRows.kindOf(this.kinds(), this.chosen()));
-  protected readonly groups: Signal<readonly IAbilityGroupView[]> = computed(() => {
+  protected readonly groups: Signal<readonly AbilityGroupView[]> = computed(() => {
     const kind = this.kind();
     const abilities = kind?.abilities;
     return Object.isNullOrUndefined(kind) || Object.isNullOrUndefined(abilities) ? []
-      : AbilityGroup.all.map(t => ({ title: t.title, rows: t.abilities.map(u => AbilitiesPageComponent.rowOf(abilities, u, kind.displayName)) }));
+      : AbilityGroup.all.map(t => new AbilityGroupView(t.title, t.abilities.map(u => AbilitiesPageComponent.rowOf(abilities, u, kind.displayName))));
   });
 
   protected async retryKinds(): Promise<void> {
@@ -55,13 +55,11 @@ export class AbilitiesPageComponent {
     this.rows?.choose(id);
   }
 
-  private static rowOf(abilities: ProviderAbilities, ability: ProviderAbility, displayName: string): IAbilityRow {
+  private static rowOf(abilities: ProviderAbilities, ability: ProviderAbility, displayName: string): AbilityRow {
     const cell = abilities.cellOf(ability);
     const works = cell.answer === AbilityAnswer.Works;
     const reason = cell.reasonFor(displayName);
-    return {
-      ability, settingId: Resources.formatAbilitySettingId(ability), name: ProviderAbilities.names[ability], answer: cell.answerLabel, works,
-      description: works || Object.isNull(reason) ? cell.sourceNote : Resources.formatAbilityReason(reason)
-    };
+    return new AbilityRow(ability, Resources.formatAbilitySettingId(ability), ProviderAbilities.names[ability], cell.answerLabel, works,
+      works || Object.isNull(reason) ? cell.sourceNote : Resources.formatAbilityReason(reason));
   }
 }

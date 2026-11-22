@@ -16,7 +16,7 @@ LICENSE file in the root directory of this source tree.
         @if (store.kindsFailed()) {
           <div class="nol-teamrun-error nol-teamrun-kinds-failed" role="alert">
             <span class="nol-teamrun-error-text">{{ resources.kindsUnavailableForAbilities }}</span>
-            <button type="button" nol-button class="nol-teamrun-retry-kinds" [variant]="text" [attr.aria-disabled]="store.loadingKinds()"
+            <button type="button" nol-button class="nol-teamrun-dismiss nol-teamrun-retry-kinds" [variant]="text" [attr.aria-disabled]="store.loadingKinds()"
               (click)="retryKinds()">{{ resources.retryLabel }}</button>
           </div>
         } @else if (options().length === 0) {
