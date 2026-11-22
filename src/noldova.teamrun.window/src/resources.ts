@@ -1933,7 +1933,7 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
-    return `Remove ${teammate} from ${department}? ${teammate} stays on the team, in no department.`;
+    return `Remove ${teammate} from ${department}? ${teammate} will report to you.`;
   }
 
   public static formatOrganizationHidden(count: number): string {

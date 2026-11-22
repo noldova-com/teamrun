@@ -29,6 +29,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization:** removing a member from a department now says the teammate will report to you, where it goes, rather than that it stays in no department (#137).
 - **Default teammate:** its row in Teammates now names its model and effort, such as GPT-5 and Extra high, rather than their ids, also when no teammate in the list chooses a model or effort on its provider (#214).
 - **Pages:** an error from opening a page in the browser, saving it or copying its path now goes away when you switch chats, rather than staying over the other chat's pages, and one that comes after you switched isn't shown (#216).
 - **Pages:** a page's More button now looks pressed while its menu is open, and idle again once the menu closes (#22).
