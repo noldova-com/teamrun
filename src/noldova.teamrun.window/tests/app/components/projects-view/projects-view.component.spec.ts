@@ -92,7 +92,7 @@ describe("ProjectsViewComponent", () => {
   const nova = teammateOf("nova", "Nova");
   const zed = teammateOf("zed", "Zed");
   const departmentOf = (id: string, name: string, parentId: string | null, leaderId: string | null, order: number): Department =>
-    new Department(id, name, OrganizationParent.departmentOrPerson(parentId), leaderId, order, "c", "u");
+    new Department(id, name, "department", OrganizationParent.departmentOrPerson(parentId), leaderId, order, "c", "u");
   const placementOf = (teammateId: string, departmentId: string | null, order: number): TeammatePlacement =>
     new TeammatePlacement(teammateId, OrganizationParent.departmentOrPerson(departmentId), order);
   const organization = SampleData.organizationOf([
@@ -2763,8 +2763,8 @@ describe("ProjectsViewComponent", () => {
 
     it("lists a teammate under a teammate with that teammate's department, a department under a teammate by its own path, and an empty organization beside a full one", async () => {
       const team = new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [
-        new Department("ops", "Ops", OrganizationParent.person, null, 0, "c", "u"),
-        new Department("design", "Design", OrganizationParent.teammate(grok.id), null, 0, "c", "u")
+        new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u"),
+        new Department("design", "Design", "department", OrganizationParent.teammate(grok.id), null, 0, "c", "u")
       ], [
         new TeammatePlacement(grok.id, OrganizationParent.person, 0),
         new TeammatePlacement(zed.id, OrganizationParent.teammate(grok.id), 0),

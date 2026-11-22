@@ -38,7 +38,7 @@ export class OrganizationUpdateParamsTests {
 
   @TestMethod
   public appliesItsNameAndFolderAndKeepsTheRest(): void {
-    const department = new Department("d1", "Design", OrganizationParent.person, null, 0, "c", "u");
+    const department = new Department("d1", "Design", "department", OrganizationParent.person, null, 0, "c", "u");
     const organization = new Organization("o1", "My organization", null, 2, "c", "u", [department], [new TeammatePlacement("t1", OrganizationParent.person, 0)]);
     const updated = new OrganizationUpdateParams("o1", "Studio", "/work/studio").applyTo(organization, "later");
 

@@ -303,6 +303,10 @@ export class Resources {
   public static readonly parentField: string = "parent";
   public static readonly placementsField: string = "placements";
   public static readonly leaderIdField: string = "leaderId";
+  public static readonly typeIdField: string = "typeId";
+  public static readonly nodeTypesField: string = "nodeTypes";
+  public static readonly iconField: string = "icon";
+  public static readonly colorField: string = "color";
   public static readonly orderField: string = "order";
   public static readonly departmentIdField: string = "departmentId";
   public static readonly departmentsField: string = "departments";
@@ -566,6 +570,13 @@ export class Resources {
   public static readonly emptyOrganizationUpdate: string = "An organization update must change its name, its folder or both.";
   public static readonly emptyDepartmentUpdate: string = "A department update must change its name, its leader or both.";
   public static readonly duplicateDepartment: string = "Each department of an organization has its own id.";
+  public static readonly invalidNodeTypeName: string = "A node type's name must be 1 to 100 characters on one line, with no line break or other control character, and not only spaces.";
+  public static readonly nodeTypeIconPattern: RegExp = /^[a-z0-9_]{1,64}$/u;
+  public static readonly invalidNodeTypeIcon: string = "A node type's icon is a Material Symbols name of 1 to 64 lowercase letters, digits or underscores, or null.";
+  public static readonly nodeTypeColorPattern: RegExp = /^(#[0-9a-f]{6}|[a-z][a-z0-9-]{0,63})$/u;
+  public static readonly invalidNodeTypeColor: string = "A node type's color is a kit color's name, a #rrggbb color in lowercase, or null.";
+  public static readonly duplicateNodeType: string = "Each node type of an organization has its own id and its own name.";
+  public static readonly unknownNodeType: string = "A department's type is one of its organization's node types.";
   public static readonly organizationParentIdRequired: string = "A teammate or department parent names its id; the person names none.";
   public static readonly organizationNodeUnderItself: string = "A teammate or department can't be under itself.";
   public static readonly invalidOrganizationOrder: string = "A place's order among its siblings is a whole number from 0.";

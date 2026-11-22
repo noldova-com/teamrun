@@ -45,9 +45,9 @@ describe("OrganizationViewComponent", () => {
   let saves: JsonValue[];
 
   const sample = SampleData.organizationOf([
-    new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
-    new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u"),
-    new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+    new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u"),
+    new Department("build", "Build", "department", OrganizationParent.person, null, 1, "c", "u"),
+    new Department("ui", "UI", "department", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
   ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
     new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
     new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
@@ -189,7 +189,7 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
-    const second = new Organization("o2", "Second", null, 1, "c", "u", [new Department("ops", "Ops", OrganizationParent.person, null, 0, "c", "u")],
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u")],
       [new TeammatePlacement("alice", OrganizationParent.department("ops"), 0)]);
     const names = (): (string | undefined)[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(t => texts(":scope > .department .department-name", t)[0]);
     await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
@@ -208,15 +208,15 @@ describe("OrganizationViewComponent", () => {
   it("follows each change to the organization as it comes, the teammates placed under you as your direct reports, and none once no one is placed", async () => {
     await create();
     const underYou = (ids: readonly string[]): TeammatePlacement[] => ids.map((t, i) => new TeammatePlacement(t, OrganizationParent.person, i));
-    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u")],
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", "department", OrganizationParent.person, "offline", 0, "c", "u")],
       [new TeammatePlacement("offline", OrganizationParent.department("build"), 0), ...underYou(["alice", "bob", "reviewer"])]).toJson());
     await settle();
 
     expect([tree(), reports(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Alice", "Bob", "Code Reviewer"],
       ["Owner · 4 direct reports"]]);
 
-    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u"),
-      new Department("lab", "Lab", OrganizationParent.teammate("bob"), "reviewer", 0, "c", "u")], [new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", "department", OrganizationParent.person, "offline", 0, "c", "u"),
+      new Department("lab", "Lab", "department", OrganizationParent.teammate("bob"), "reviewer", 0, "c", "u")], [new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
       ...underYou(["bob"]), new TeammatePlacement("reviewer", OrganizationParent.department("lab"), 0)]).toJson());
     await settle();
     const nested = texts(".owner .role");
@@ -229,7 +229,7 @@ describe("OrganizationViewComponent", () => {
 
   it("leaves a teammate with no placement out of the organization: no card, no direct report and no place in the headcount", async () => {
     await create(() => {
-      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u")],
+      organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
           new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
     });
@@ -240,8 +240,8 @@ describe("OrganizationViewComponent", () => {
 
   it("shows the teammates placed in no department under you as your direct reports, first, with no group of their own, and no teammate the organization doesn't hold, so the headcount and the To choices count what the tree shows", async () => {
     await create(() => {
-      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
-        new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+      organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u"),
+        new Department("build", "Build", "department", OrganizationParent.person, null, 1, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
           new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
     });
@@ -270,8 +270,8 @@ describe("OrganizationViewComponent", () => {
   it("shows the teammates in no department under you in the Tree, after the leaders on the Board and right under Organization in Focus, with no group for them in any view, and its message to everyone who reports to you reaches them", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => {
-      organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
-        new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+      organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u"),
+        new Department("build", "Build", "department", OrganizationParent.person, null, 1, "c", "u")],
         [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
           new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
       context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" }));
@@ -323,15 +323,15 @@ describe("OrganizationViewComponent", () => {
     expect([shape(department("UI")), shape(department("Build"))])
       .toEqual([["UI", "1", "1 idle", ["Code Reviewer"], [], [], []], ["Build", "1", "1 stopped", [], [], [], ["1 member hidden"]]]);
 
-    organization = SampleData.organizationOf([new Department("top", "Top", OrganizationParent.person, null, 0, "c", "u"),
-      new Department("ui", "UI", OrganizationParent.department("top"), "reviewer", 0, "c", "u")],
+    organization = SampleData.organizationOf([new Department("top", "Top", "department", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("ui", "UI", "department", OrganizationParent.department("top"), "reviewer", 0, "c", "u")],
       [new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0)]);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
     expect(shape(department("Top"))).toEqual(["Top", "0", undefined, [], [], [], ["1 member hidden"]]);
 
-    organization = SampleData.organizationOf([new Department("ui", "UI", OrganizationParent.person, null, 0, "c", "u")], []);
+    organization = SampleData.organizationOf([new Department("ui", "UI", "department", OrganizationParent.person, null, 0, "c", "u")], []);
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
@@ -939,7 +939,7 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-cancel");
       const cancelled = asked.length;
       context.emit(EventName.OrganizationChanged, SampleData.organizationOf([...organization.departments,
-        new Department("lab", "Lab", OrganizationParent.teammate("offline"), null, 0, "c", "u")], organization.placements).toJson());
+        new Department("lab", "Lab", "department", OrganizationParent.teammate("offline"), null, 0, "c", "u")], organization.placements).toJson());
       await settle();
       remove("Lab").click();
       const underTeammate = await dialogAsync();
@@ -1441,8 +1441,8 @@ describe("OrganizationViewComponent", () => {
 
     it("lays your direct reports in a grid centred under you, above the departments, each card in a column of a member's width", async () => {
       await create(() => {
-        organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
-          new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
+        organization = SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "alice", 0, "c", "u"),
+          new Department("build", "Build", "department", OrganizationParent.person, null, 1, "c", "u")],
           [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
             new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
             new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
@@ -1677,7 +1677,7 @@ describe("OrganizationViewComponent", () => {
 
     it("hangs a teammate's reports and departments under its card at any depth, each card centred over its own, a department in a row below", async () => {
       await create(() => {
-        organization = SampleData.organizationOf([new Department("ui", "UI", OrganizationParent.teammate("bob"), null, 0, "c", "u")],
+        organization = SampleData.organizationOf([new Department("ui", "UI", "department", OrganizationParent.teammate("bob"), null, 0, "c", "u")],
           [new TeammatePlacement("alice", OrganizationParent.person, 0), new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0),
             new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 1), new TeammatePlacement("offline", OrganizationParent.teammate("bob"), 0)]);
       });

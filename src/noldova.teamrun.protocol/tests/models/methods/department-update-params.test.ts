@@ -36,7 +36,7 @@ export class DepartmentUpdateParamsTests {
 
   @TestMethod
   public appliesItsChangesAndKeepsTheRest(): void {
-    const department = new Department("d1", "Design", OrganizationParent.department("d0"), "t1", 3, "c", "u");
+    const department = new Department("d1", "Design", "department", OrganizationParent.department("d0"), "t1", 3, "c", "u");
 
     const renamed = new DepartmentUpdateParams("o1", "d1", "Product", undefined).applyTo(department, "later");
     const cleared = new DepartmentUpdateParams("o1", "d1", undefined, null).applyTo(department, "later");

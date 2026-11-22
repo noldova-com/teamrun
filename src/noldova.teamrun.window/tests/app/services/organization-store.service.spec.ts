@@ -18,7 +18,7 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationStoreService", () => {
   const organizationOf = (id: string, ...names: readonly string[]): Organization =>
-    new Organization(id, id, null, 0, "c", "u", names.map((t, i) => new Department(t, t, OrganizationParent.person, null, i, "c", "u")), []);
+    new Organization(id, id, null, 0, "c", "u", names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const namesOf = (store: OrganizationStoreService): string => store.organization().departments.map(t => t.name).join(",");
   let context: FakeWindowPartContext;
 
@@ -116,8 +116,8 @@ describe("OrganizationStoreService", () => {
   });
 
   it("refuses a move under itself or under a node it doesn't know before sending it, in the server's words", async () => {
-    const organization = new Organization("my-organization", "my-organization", null, 0, "c", "u", [new Department("d1", "d1", OrganizationParent.person, null, 0, "c", "u"),
-      new Department("d2", "d2", OrganizationParent.department("d1"), null, 0, "c", "u")], [new TeammatePlacement("t1", OrganizationParent.department("d2"), 0)]);
+    const organization = new Organization("my-organization", "my-organization", null, 0, "c", "u", [new Department("d1", "d1", "department", OrganizationParent.person, null, 0, "c", "u"),
+      new Department("d2", "d2", "department", OrganizationParent.department("d1"), null, 0, "c", "u")], [new TeammatePlacement("t1", OrganizationParent.department("d2"), 0)]);
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organization.toJson()]);
     const store = new OrganizationStoreService(context, new OrganizationScope());
     await Wait.until(() => expect(namesOf(store)).toBe("d1,d2"));

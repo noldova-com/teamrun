@@ -18,7 +18,7 @@ import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationCatalog", () => {
   const organizationOf = (...names: readonly string[]): Organization =>
-    SampleData.organizationOf(names.map((t, i) => new Department(t, t, OrganizationParent.person, null, i, "c", "u")), []);
+    SampleData.organizationOf(names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const named = (id: string, order: number, createdAt: string): Organization =>
     new Organization(id, id, null, order, createdAt, createdAt, [], []);
   const namesOf = (catalog: OrganizationCatalog): string =>
