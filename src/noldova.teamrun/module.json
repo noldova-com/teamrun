@@ -37,7 +37,7 @@
       "teamrun.conversationRewound", "teamrun.conversationDeleted", "teamrun.signInLink", "teamrun.planUsageUpdated", "teamrun.backgroundTaskUpdated",
       "teamrun.backgroundTaskOutput", "teamrun.backgroundTasksCleared", "teamrun.projectsLayoutUpdated", "teamrun.projectFolderChanged", "teamrun.composerDefaultUpdated",
       "teamrun.panelRequested", "teamrun.windowReloadRequested", "teamrun.waitingMessagesChanged", "teamrun.organizationChanged", "teamrun.organizationRemoved", "teamrun.organizationLayoutUpdated",
-      "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
+      "teamrun.messageSending", "teamrun.messageSendAbandoned", "teamrun.pageShown", "teamrun.pageUpdated", "teamrun.pageStopped"
     ],
     "commands": [
       "teamrun.showOrganization", "teamrun.showTeammates", "teamrun.showProviders", "teamrun.showMcpServers", "teamrun.showComputerUseGrants", "teamrun.showOutsideSessions", "teamrun.newConversation", "teamrun.openProject", "teamrun.openBrowser", "teamrun.searchConversations", "teamrun.focusComposer", "teamrun.openChatPage",

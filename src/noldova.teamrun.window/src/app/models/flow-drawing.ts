@@ -21,4 +21,13 @@ export class FlowDrawing {
   public get offsetPath(): string {
     return `path("${this.route.path}")`;
   }
+
+  public get key(): string {
+    const box = this.route.target;
+    return `${this.flow.id} ${this.flow.stage} ${this.route.path} ${box.left} ${box.top} ${box.width} ${box.height}`;
+  }
+
+  public static sameAll(drawings: readonly FlowDrawing[], others: readonly FlowDrawing[]): boolean {
+    return drawings.map(t => t.key).join(" | ") === others.map(t => t.key).join(" | ");
+  }
 }

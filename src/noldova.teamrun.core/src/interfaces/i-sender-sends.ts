@@ -13,4 +13,6 @@ import type { SendAsk } from "../models/send-ask.js";
 export interface ISenderSends {
   describeSendAsync(params: MessageSendParams): Promise<SendAsk | null>;
   sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult>;
+  announceSend(params: MessageSendParams): string | null;
+  abandonSend(sendId: string): void;
 }

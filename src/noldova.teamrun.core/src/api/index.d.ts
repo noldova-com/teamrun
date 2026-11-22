@@ -804,6 +804,19 @@ export interface ISenderSends {
    * @throws ServiceException as `sendAsync` does, and named `ErrorCode.Conflict` when who the send starts no longer reads `starts`.
    */
   sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult>;
+  /**
+   * Publishes `MessageSending` for a teammate's send that is starting: from the chat and teammate whose turn holds the send's
+   * sender token, to the send's chat. Nothing is published for a send with no sender token, a turn that ended, or a turn no
+   * teammate answers.
+   * @param params The send, with its sender token.
+   * @returns The send's new id, which `abandonSend` takes, or `null` when nothing was published.
+   */
+  announceSend(params: MessageSendParams): string | null;
+  /**
+   * Publishes `MessageSendAbandoned` for a send `announceSend` announced that ended without a message.
+   * @param sendId The id `announceSend` returned.
+   */
+  abandonSend(sendId: string): void;
 }
 
 /**
@@ -9648,6 +9661,14 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
    * @inheritdoc
    */
   public sendAllowedAsync(params: MessageSendParams, starts: string | null): Promise<MessageSendResult>;
+  /**
+   * @inheritdoc
+   */
+  public announceSend(params: MessageSendParams): string | null;
+  /**
+   * @inheritdoc
+   */
+  public abandonSend(sendId: string): void;
 
   /**
    * @inheritdoc

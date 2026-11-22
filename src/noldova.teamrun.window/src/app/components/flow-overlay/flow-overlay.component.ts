@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { afterRenderEffect, Component, effect, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, type WritableSignal } from "@angular/core";
+import { afterEveryRender, Component, effect, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, type WritableSignal } from "@angular/core";
 
 import "@noldova/context.core";
 
@@ -25,7 +25,6 @@ import { TreeFlowLines } from "../../models/tree-flow-lines";
 })
 export class FlowOverlayComponent {
   private readonly drawn: WritableSignal<readonly FlowDrawing[]> = signal([]);
-  private readonly resizes: WritableSignal<number> = signal(0);
 
   public readonly container: InputSignal<HTMLElement> = input.required<HTMLElement>();
   public readonly flows: InputSignal<readonly OrganizationFlow[]> = input<readonly OrganizationFlow[]>([]);
@@ -37,20 +36,23 @@ export class FlowOverlayComponent {
   protected readonly drawings: Signal<readonly FlowDrawing[]> = this.drawn.asReadonly();
 
   public constructor() {
-    afterRenderEffect({
-      read: () => {
-        this.resizes();
-        this.drawn.set(this.draw(this.container(), this.flows()));
-      }
-    });
+    afterEveryRender({ read: () => this.redraw() });
     effect(onCleanup => {
-      const observer = new ResizeObserver(() => this.resizes.update(t => t + 1));
+      const observer = new ResizeObserver(() => this.redraw());
       observer.observe(this.container());
       onCleanup(() => observer.disconnect());
     });
   }
 
+  private redraw(): void {
+    const drawings = this.draw(this.container(), this.flows());
+    if (!FlowDrawing.sameAll(this.drawn(), drawings))
+      this.drawn.set(drawings);
+  }
+
   private draw(container: HTMLElement, flows: readonly OrganizationFlow[]): readonly FlowDrawing[] {
+    if (flows.length === 0)
+      return [];
     const nodes = TreeFlowLines.nodesIn(container);
     return flows.flatMap(t => {
       const route = FlowRoute.between(nodes, t.fromKey, t.toKey);

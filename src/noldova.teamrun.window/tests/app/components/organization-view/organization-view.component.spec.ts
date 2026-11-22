@@ -13,9 +13,9 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageSender, MessageStatus, MethodName, Organization,
-  OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate, TeammateIdParams, TeammateLastReply,
-  TeammatePlacement, TeammateWork
+  Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageSender, MessageSendingPayload, MessageStatus,
+  MethodName, Organization, OrganizationChat, OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate,
+  TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
 } from "@noldova/teamrun.protocol";
 import { DefaultTheme, SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -621,6 +621,76 @@ describe("OrganizationViewComponent", () => {
     expect(AppearanceFixture.contrast(`rgb(${seen.join(", ")})`, background)).toBeGreaterThanOrEqual(3);
   });
 
+  it("draws a teammate's send from its start to the teammate of the Organization chat it goes to, from its card up to the middle of its head's edge above it, and none to a chat with no Organization teammate or one the window doesn't know", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    const organizationChat = new Conversation("org-alice", null, "alice", SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
+      null, new OrganizationChat("my-organization", "alice"));
+    const plain = new Conversation("plain", null, "Plain", SampleData.timestamp, SampleData.timestamp);
+    await create(t => t.answer(MethodName.ConversationList, u => Object.isNull(ConversationListParams.fromJson(u).projectId) ? [organizationChat.toJson(), plain.toJson()] : []));
+    await Wait.until(() => expect(ChatStoreService.of(context).conversation("plain")).not.toBeNull());
+    const sending = async (sendId: string, toChatId: string): Promise<void> => {
+      context.emit(EventName.MessageSending, new MessageSendingPayload(sendId, "c7", "bob", toChatId).toJson());
+      await settle();
+    };
+    await sending("s1", "plain");
+    await sending("s2", "nowhere");
+    const none = routes();
+    await sending("s3", "org-alice");
+    const tree = one(".tree");
+    const area = tree.getBoundingClientRect();
+    const scale = area.width / TreeFlowLines.layoutWidthOf(tree);
+    const local = (box: DOMRect): DOMRect => new DOMRect((box.left - area.left) / scale, (box.top - area.top) / scale, box.width / scale, box.height / scale);
+    const bob = local(one("[data-flow-node=bob]").getBoundingClientRect());
+    const alice = local(one("[data-flow-node=alice]").getBoundingClientRect());
+    const points = (one(".nol-teamrun-flow-overlay path").getAttribute("d") ?? "").split(/[ML]/u).map(t => t.trim()).filter(t => t !== "")
+      .map(t => t.split(" ").map(Number));
+    const start = points.at(0) ?? [];
+    const end = points.at(-1) ?? [];
+    const round = (value: number): number => Math.round(value * 100) / 100;
+
+    expect([none, routes(), start.join(" "), end.join(" "), bob.top - alice.bottom > 0])
+      .toEqual([[], ["route writing"], `${round(bob.left + bob.width / 2)} ${round(bob.top)}`,
+        `${round(alice.left + alice.width / 2)} ${round(alice.bottom)}`, true]);
+  });
+
+  it("draws a send from a card that renders after it starts, and draws it again from where the card moves while the tree keeps its size", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    const organizationChat = new Conversation("org-reviewer", null, "reviewer", SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false,
+      false, null, new OrganizationChat("my-organization", "reviewer"));
+    await create(t => t.answer(MethodName.ConversationList, u => Object.isNull(ConversationListParams.fromJson(u).projectId) ? [organizationChat.toJson()] : []));
+    await Wait.until(() => expect(ChatStoreService.of(context).conversation("org-reviewer")).not.toBeNull());
+    const placed = (bob: boolean, designIndex: number): Organization => SampleData.organizationOf([
+      new Department("design", "Design", OrganizationParent.person, "alice", designIndex, "c", "u"),
+      new Department("build", "Build", OrganizationParent.person, null, 1 - designIndex, "c", "u"),
+      new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+    ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+      new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0), ...bob ? [new TeammatePlacement("bob", OrganizationParent.department("design"), 1)] : []]);
+    const change = async (next: Organization): Promise<void> => {
+      context.emit(EventName.OrganizationChanged, next.toJson());
+      await settle();
+    };
+    const round = (value: number): number => Math.round(value * 100) / 100;
+    const fromBob = (): boolean => {
+      const tree = one(".tree");
+      const area = tree.getBoundingClientRect();
+      const scale = area.width / TreeFlowLines.layoutWidthOf(tree);
+      const bob = one("[data-flow-node=bob]").getBoundingClientRect();
+      const start = `M ${round((bob.left - area.left + bob.width / 2) / scale)} ${round((bob.top - area.top) / scale)} `;
+      return one(".nol-teamrun-flow-overlay path").getAttribute("d")?.startsWith(start) ?? false;
+    };
+    await change(placed(false, 0));
+    context.emit(EventName.MessageSending, new MessageSendingPayload("s1", "c7", "bob", "org-reviewer").toJson());
+    await settle();
+    const before = routes();
+    await change(placed(true, 0));
+    const rendered = [routes(), fromBob()];
+    const size = one(".tree").getBoundingClientRect();
+    await change(placed(true, 1));
+    const moved = one(".tree").getBoundingClientRect();
+
+    expect([before, rendered, [moved.width, moved.height], fromBob()]).toEqual([[], [["route writing"], true], [size.width, size.height], true]);
+  });
+
   it("draws no message on the Board, none while its setting is off, and none while motion is reduced", async () => {
     await create(t => t.changeSetting(Resources.organizationMessageFlowSetting, false));
     await flow(asked, answer("r1", asked, "bob", MessageStatus.Running));
@@ -648,7 +718,7 @@ describe("OrganizationViewComponent", () => {
     const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
     await create();
-    const flows = OrganizationFlowService.of(context, signal(false), clock);
+    const flows = OrganizationFlowService.of(context, signal(false), clock, () => null);
     const drawn = (): number => all(".nol-teamrun-flow-overlay path, .nol-teamrun-flow-overlay span").length;
     const sendAndEnd = async (id: string): Promise<number[]> => {
       await flow(asked, answer(id, asked, "bob", MessageStatus.Running), answer(id, asked, "bob", MessageStatus.Completed));

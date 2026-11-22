@@ -22,6 +22,7 @@ import { AbilityChecks } from "../../fixtures/ability-checks/ability-checks.fixt
 import { TurnAbilityProbes } from "../../fixtures/ability-checks/turn-ability-probes.fixture.js";
 import { CodexModelListRecording } from "../../fixtures/codex-model-list.recording.js";
 import { CodexTestHost } from "../../fixtures/codex-test-host.fixture.js";
+import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingMcpEndpoint } from "../../fixtures/recording-mcp-endpoint.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
@@ -1918,10 +1919,8 @@ export class CodexAdapterTests {
       await adapter.runTurn(CodexAdapterTests.toolRequest(host, "role-payload", result.nativeSessionId, second), later, new AbortController().signal);
       during = tokens.find(first.lastIssued);
       await listener.taskStarts[0]?.stop();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.find(first.lastIssued));
-      }, "The first turn's token was not withdrawn.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => Object.isNull(tokens.find(first.lastIssued)), "The first turn's token was not withdrawn.");
     }
     finally { await adapter.shutdown(); }
 
@@ -2073,10 +2072,8 @@ export class CodexAdapterTests {
       await Wait.until(() => listener.taskEnds.length === 1, "The listener did not see a task end.");
       await adapter.listOwnMcpServers(null);
       outcome = (await resuming).outcome;
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.find(first.lastIssued));
-      }, "The first turn's token was not withdrawn.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => Object.isNull(tokens.find(first.lastIssued)), "The first turn's token was not withdrawn.");
     }
     finally { await adapter.shutdown(); }
 
@@ -2103,10 +2100,8 @@ export class CodexAdapterTests {
       opened = (await adapter.runTurn(CodexAdapterTests.toolRequest(host, "echo", held, second, compacts), new RecordingTurnListener(),
         new AbortController().signal)).nativeSessionId;
       await listener.taskStarts[0]?.stop();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.find(first.lastIssued));
-      }, "The first turn's token was not withdrawn.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => Object.isNull(tokens.find(first.lastIssued)), "The first turn's token was not withdrawn.");
     }
     finally { await adapter.shutdown(); }
 
@@ -2134,10 +2129,8 @@ export class CodexAdapterTests {
       await Wait.until(() => replacing.taskStarts.length === 1, "The replacing listener did not see a task start.");
       during = tokens.find(first.lastIssued);
       await listener.taskStarts[0]?.stop();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.ownerOf(first.lastIssued));
-      }, "The first turn's token kept its owner.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "No wait was due within the idle limit.");
+      await Wait.until(() => Object.isNull(tokens.ownerOf(first.lastIssued)), "The first turn's token kept its owner.");
       live = second.isLive(second.lastIssued);
       await replacing.taskStarts[0]?.stop();
     }
@@ -2199,14 +2192,9 @@ export class CodexAdapterTests {
       reached = [firstOfA.lastIssued, firstOfB.lastIssued].map(t => tokens.find(t));
       await listenerOfA.taskStarts[0]?.stop();
       await listenerOfB.taskStarts[0]?.stop();
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.find(firstOfA.lastIssued));
-      }, "The first turn of A kept its token.");
-      await Wait.until(() => {
-        host.idleTimer.advance(host.timings.idleLimit);
-        return Object.isNull(tokens.find(firstOfB.lastIssued));
-      }, "The first turn of B kept its token.");
+      await IdleLimit.elapseAsync(host.idleTimer, host.timings.idleLimit, "A's and B's first turns were not both kept idle.", 2);
+      await Wait.until(() => Object.isNull(tokens.find(firstOfA.lastIssued)), "The first turn of A kept its token.");
+      await Wait.until(() => Object.isNull(tokens.find(firstOfB.lastIssued)), "The first turn of B kept its token.");
     }
     finally { await adapter.shutdown(); }
 

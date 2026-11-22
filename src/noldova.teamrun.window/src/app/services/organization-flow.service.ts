@@ -11,18 +11,24 @@ import { computed, type FactoryProvider, inject, type Signal, signal, type Writa
 import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
-import { EventName, Message, MessageAuthor, MessageStatus } from "@noldova/teamrun.protocol";
+import { EventName, Message, MessageAuthor, MessageSendAbandonedPayload, MessageSendingPayload, MessageStatus } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { OrganizationFlowStage } from "../enums/organization-flow-stage";
 import { OrganizationFlow } from "../models/organization-flow";
+import { OrganizationSend } from "../models/organization-send";
+import { ChatStoreService } from "./chat-store.service";
 import { ClockService } from "./clock.service";
 import { MotionPreferenceService } from "./motion-preference.service";
 
 export class OrganizationFlowService {
   public static readonly provider: FactoryProvider = {
     provide: OrganizationFlowService,
-    useFactory: (): OrganizationFlowService => OrganizationFlowService.of(inject(WindowPartTokens.context), inject(MotionPreferenceService).reduced, inject(ClockService))
+    useFactory: (): OrganizationFlowService => {
+      const chats = inject(ChatStoreService);
+      return OrganizationFlowService.of(inject(WindowPartTokens.context), inject(MotionPreferenceService).reduced, inject(ClockService),
+        t => chats.conversation(t)?.organizationChat?.teammateId ?? null);
+    }
   };
 
   private static readonly services: WeakMap<IWindowPartContext, OrganizationFlowService> = new WeakMap();
@@ -31,31 +37,37 @@ export class OrganizationFlowService {
   private static readonly sentDuration: number = Resources.organizationFlowPulseDuration + Resources.organizationFlowGlowDuration;
 
   private readonly reduced: Signal<boolean>;
+  private readonly receiverOf: (chatId: string) => string | null;
   private readonly enabledSignal: WritableSignal<boolean> = signal(true);
   private readonly allSignal: WritableSignal<readonly OrganizationFlow[]> = signal([]);
   private readonly writers: Map<string, string> = new Map();
   private readonly started: Set<string> = new Set();
+  private readonly sends: Map<string, OrganizationSend> = new Map();
+  private readonly delivered: Set<string> = new Set();
   private readonly clock: ClockService;
   private readonly endings: Map<string, () => void> = new Map();
   private readonly subscriptions: readonly (() => void)[];
 
   public readonly flows: Signal<readonly OrganizationFlow[]> = computed(() => this.isShown() ? this.allSignal() : []);
 
-  private constructor(context: IWindowPartContext, reduced: Signal<boolean>, clock: ClockService) {
+  private constructor(context: IWindowPartContext, reduced: Signal<boolean>, clock: ClockService, receiverOf: (chatId: string) => string | null) {
     this.reduced = reduced;
     this.clock = clock;
+    this.receiverOf = receiverOf;
     this.subscriptions = [
       context.onSettingChanged(Resources.organizationMessageFlowSetting, t => this.applyEnabled(t)),
+      context.onEvent(Resources.formatQualifiedName(EventName.MessageSending), t => this.sending(MessageSendingPayload.fromJson(t))),
+      context.onEvent(Resources.formatQualifiedName(EventName.MessageSendAbandoned), t => this.abandon(MessageSendAbandonedPayload.fromJson(t).sendId)),
       ...[EventName.MessageCreated, EventName.MessageUpdated].map(t => context.onEvent(Resources.formatQualifiedName(t), u => this.follow(Message.fromJson(u))))
     ];
     this.applyEnabled(context.readSetting(Resources.organizationMessageFlowSetting));
   }
 
-  public static of(context: IWindowPartContext, reduced: Signal<boolean>, clock: ClockService): OrganizationFlowService {
+  public static of(context: IWindowPartContext, reduced: Signal<boolean>, clock: ClockService, receiverOf: (chatId: string) => string | null): OrganizationFlowService {
     const found = OrganizationFlowService.services.get(context);
     if (!Object.isUndefined(found))
       return found;
-    const service = new OrganizationFlowService(context, reduced, clock);
+    const service = new OrganizationFlowService(context, reduced, clock, receiverOf);
     OrganizationFlowService.services.set(context, service);
     return service;
   }
@@ -93,14 +105,46 @@ export class OrganizationFlowService {
   }
 
   private endAfter(id: string, duration: number): void {
+    this.endings.get(id)?.();
     this.endings.set(id, this.clock.after(duration, () => {
       this.endings.delete(id);
       this.allSignal.update(t => t.filter(u => u.id !== id || u.stage === OrganizationFlowStage.Writing));
     }));
   }
 
+  private sending(payload: MessageSendingPayload): void {
+    const receiver = this.receiverOf(payload.toChatId);
+    if (!this.isShown() || Object.isNull(receiver) || receiver === payload.teammateId)
+      return;
+    const send = new OrganizationSend(Resources.formatOrganizationFlowSendId(payload.sendId), payload.teammateId, payload.toChatId);
+    this.sends.set(payload.sendId, send);
+    OrganizationFlowService.forgetOldest(this.sends);
+    this.put(new OrganizationFlow(send.flowId, payload.teammateId, receiver, OrganizationFlowStage.Writing));
+  }
+
+  private abandon(sendId: string): void {
+    const send = this.sends.get(sendId);
+    if (Object.isUndefined(send))
+      return;
+    this.sends.delete(sendId);
+    this.settle(send.flowId, OrganizationFlowStage.Abandoned, Resources.organizationFlowFadeDuration);
+  }
+
+  private deliver(message: Message): void {
+    const writer = message.sender?.teammateId ?? null;
+    for (const [sendId, send] of this.sends)
+      if (send.teammateId === writer && send.toChatId === message.chatId) {
+        this.sends.delete(sendId);
+        this.delivered.add(message.id);
+        OrganizationFlowService.forgetOldest(this.delivered);
+        this.settle(send.flowId, OrganizationFlowStage.Sent, OrganizationFlowService.sentDuration);
+        return;
+      }
+  }
+
   private follow(message: Message): void {
     this.remember(message);
+    this.deliver(message);
     if (Object.isNull(message.inReplyTo) || Object.isNull(message.teammateId) || message.author !== MessageAuthor.Provider)
       return;
     const writer = this.writers.get(message.inReplyTo);
@@ -114,7 +158,7 @@ export class OrganizationFlowService {
     }
     if (message.status === MessageStatus.Pending && writer === Resources.organizationFlowPersonKey)
       this.put(new OrganizationFlow(inbound, writer, message.teammateId, OrganizationFlowStage.Writing));
-    else if (OrganizationFlowService.underway.includes(message.status) && this.start(inbound)) {
+    else if (OrganizationFlowService.underway.includes(message.status) && !this.delivered.has(message.inReplyTo) && this.start(inbound)) {
       this.put(new OrganizationFlow(inbound, writer, message.teammateId, OrganizationFlowStage.Sent));
       this.endAfter(inbound, OrganizationFlowService.sentDuration);
     }
@@ -150,7 +194,7 @@ export class OrganizationFlowService {
     return true;
   }
 
-  private static forgetOldest(kept: Map<string, string> | Set<string>): void {
+  private static forgetOldest(kept: Map<string, unknown> | Set<string>): void {
     for (const id of [...kept.keys()].slice(0, Math.max(0, kept.size - Resources.organizationFlowRemembered)))
       kept.delete(id);
   }
