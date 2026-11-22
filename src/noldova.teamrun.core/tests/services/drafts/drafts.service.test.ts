@@ -9,6 +9,7 @@
 import fs, { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { basename, dirname, join } from "node:path";
+import { mock } from "node:test";
 
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
@@ -20,6 +21,7 @@ import {
   ProjectIdParams, ProjectOpenParams
 } from "@noldova/teamrun.protocol";
 
+import { BusyFileError } from "../../fixtures/busy-file-error.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { HeldFolderStat } from "../../fixtures/held-folder-stat.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
@@ -36,19 +38,20 @@ export class DraftsServiceTests {
 
     const first = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
     Assert.areEqual(1, first.revision);
-    Assert.areEqual(join(host.directory.path, "attachments", "draft-files", conversation.id), dirname(first.attachments[0]!.path));
-    Assert.areEqual("a", readFileSync(first.attachments[0]!.path, "utf8"));
+    Assert.areEqual(join(host.directory.path, "attachments", "draft-files", conversation.id), dirname(DraftsServiceTests.pathOf(first, 0)));
+    Assert.areEqual("a", readFileSync(DraftsServiceTests.pathOf(first, 0), "utf8"));
     Assert.areEqual(JSON.stringify(first.toJson()), JSON.stringify((await host.drafts.readAsync(id))?.toJson()));
 
-    const kept = first.attachments[0]!;
+    const [kept] = first.attachments;
+    Assert.isDefined(kept);
     const second = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look again",
       [new AttachmentInput(kept.name, kept.mediaType, null, kept.path), DraftsServiceTests.upload("b.txt", "b")]));
     Assert.areEqual(2, second.revision);
-    Assert.areEqual(kept.path, second.attachments[0]!.path);
+    Assert.areEqual(kept.path, DraftsServiceTests.pathOf(second, 0));
     Assert.areEqual(2, readdirSync(dirname(kept.path)).length);
 
     const third = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Only b",
-      [new AttachmentInput("b.txt", "text/plain", null, second.attachments[1]!.path)]));
+      [new AttachmentInput("b.txt", "text/plain", null, DraftsServiceTests.pathOf(second, 1))]));
     Assert.isFalse(existsSync(kept.path));
     Assert.areEqual(1, readdirSync(dirname(kept.path)).length);
 
@@ -132,17 +135,18 @@ export class DraftsServiceTests {
     const conversation = await host.createConversationAsync();
     const prepared = host.attachments.prepare(DraftsServiceTests.upload("a.txt", "a"));
     const [sent] = host.attachments.save([DraftsServiceTests.upload("b.txt", "b")]);
+    Assert.isDefined(sent);
 
     const saved = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [
       new AttachmentInput(prepared.name, prepared.mediaType, null, prepared.path),
-      new AttachmentInput(sent!.name, sent!.mediaType, null, sent!.path)]));
+      new AttachmentInput(sent.name, sent.mediaType, null, sent.path)]));
     const store = new AttachmentStore(host.directory.path);
     const read = await new DraftsService(host.context, store, host.log).readAsync(new ConversationIdParams(conversation.id));
 
     const folder = join(host.directory.path, "attachments", "draft-files", conversation.id);
     Assert.areEqual(folder + "," + folder, saved.attachments.map(t => dirname(t.path)).join(","));
     Assert.isFalse(existsSync(prepared.path));
-    Assert.isTrue(existsSync(sent!.path));
+    Assert.isTrue(existsSync(sent.path));
     Assert.areEqual(saved.attachments.map(t => t.path).join(","), read?.attachments.map(t => t.path).join(","));
     Assert.areEqual("a,b", read?.attachments.map(t => readFileSync(t.path, "utf8")).join(","));
     Assert.areEqual(0, read?.missing.length);
@@ -166,26 +170,27 @@ export class DraftsServiceTests {
     const kept = await host.createConversationAsync();
     const saved = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
     const held = await host.drafts.saveAsync(new DraftSaveParams(kept.id, "Keep", [DraftsServiceTests.upload("b.txt", "b")]));
-    const original = fs.rmSync;
-    fs.rmSync = () => { throw Object.assign(new Error("Simulated busy file"), { code: "EBUSY" }); };
+    const remove = mock.method(fs, "rmSync", (): void => {
+      throw new BusyFileError("Simulated busy file", null);
+    });
     syncBuiltinESMExports();
     try {
       await host.drafts.discardAsync(new DraftDiscardParams(conversation.id, saved.revision));
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
-    writeFileSync(join(dirname(held.attachments[0]!.path), "left-by-a-crash.txt"), "c");
+    writeFileSync(join(dirname(DraftsServiceTests.pathOf(held, 0)), "left-by-a-crash.txt"), "c");
 
     Assert.isNull(await host.drafts.readAsync(new ConversationIdParams(conversation.id)));
-    Assert.isTrue(existsSync(saved.attachments[0]!.path));
+    Assert.isTrue(existsSync(DraftsServiceTests.pathOf(saved, 0)));
     Assert.areEqual(`The draft files of the chat ending in "${conversation.id.slice(-12)}" were not removed: EBUSY.`, host.log.lines.join("\n"));
     await host.drafts.sweepAsync();
 
     Assert.areEqual(1, host.log.lines.length);
-    Assert.isFalse(existsSync(dirname(saved.attachments[0]!.path)));
-    Assert.areEqual(basename(held.attachments[0]!.path), readdirSync(dirname(held.attachments[0]!.path)).join(","));
+    Assert.isFalse(existsSync(dirname(DraftsServiceTests.pathOf(saved, 0))));
+    Assert.areEqual(basename(DraftsServiceTests.pathOf(held, 0)), readdirSync(dirname(DraftsServiceTests.pathOf(held, 0))).join(","));
   }
 
   @TestMethod
@@ -193,24 +198,26 @@ export class DraftsServiceTests {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
     const first = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
-    const original = fs.rmSync;
+    const remove = mock.method(fs, "rmSync", (): void => {
+      throw new BusyFileError("Simulated busy file", null);
+    });
     try {
-      fs.rmSync = () => { throw Object.assign(new Error("Simulated busy file"), { code: "EBUSY" }); };
       syncBuiltinESMExports();
       await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed", [DraftsServiceTests.upload("b.txt", "b")]));
-      fs.rmSync = () => { throw "busy"; };
-      syncBuiltinESMExports();
+      remove.mock.mockImplementation((): void => {
+        throw "busy";
+      });
       await host.drafts.sweepAsync();
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 
     const tail = conversation.id.slice(-12);
     Assert.areEqual(`The draft files of the chat ending in "${tail}" were not removed: EBUSY.\n`
       + `The draft files of the chat ending in "${tail}" were not removed: string.`, host.log.lines.join("\n"));
-    Assert.isTrue(existsSync(first.attachments[0]!.path));
+    Assert.isTrue(existsSync(DraftsServiceTests.pathOf(first, 0)));
   }
 
   @TestMethod
@@ -219,15 +226,16 @@ export class DraftsServiceTests {
     const conversation = await host.createConversationAsync();
     await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
     await host.context.database.connection.executeAsync(new SqlQuery("CREATE TRIGGER failDraftUpdate BEFORE UPDATE ON drafts BEGIN SELECT RAISE(ABORT, 'boom'); END"));
-    const original = fs.rmSync;
-    fs.rmSync = () => { throw Object.assign(new Error("Simulated busy file"), { code: "EBUSY" }); };
+    const remove = mock.method(fs, "rmSync", (): void => {
+      throw new BusyFileError("Simulated busy file", null);
+    });
     syncBuiltinESMExports();
     try {
       const error = await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed", [DraftsServiceTests.upload("b.txt", "b")])), Error);
       Assert.isTrue(error.message.includes("boom"));
     }
     finally {
-      fs.rmSync = original;
+      remove.mock.restore();
       syncBuiltinESMExports();
     }
 
@@ -246,7 +254,7 @@ export class DraftsServiceTests {
 
     await host.drafts.sweepAsync();
 
-    Assert.isTrue(existsSync(saved.attachments[0]!.path));
+    Assert.isTrue(existsSync(DraftsServiceTests.pathOf(saved, 0)));
     Assert.isFalse(existsSync(stray));
     Assert.areEqual(`The draft of the chat ending in "${conversation.id.slice(-12)}" was not read, so its files were kept: JsonException.`, host.log.lines.join("\n"));
   }
@@ -264,8 +272,8 @@ export class DraftsServiceTests {
 
     await host.drafts.sweepAsync();
 
-    Assert.isTrue(existsSync(saved.attachments[0]!.path));
-    Assert.isTrue(existsSync(kept.attachments[0]!.path));
+    Assert.isTrue(existsSync(DraftsServiceTests.pathOf(saved, 0)));
+    Assert.isTrue(existsSync(DraftsServiceTests.pathOf(kept, 0)));
     Assert.isFalse(existsSync(stray));
     Assert.areEqual([first.id, second.id].map(t => `The draft of the chat ending in "${t.slice(-12)}" was not read, so its files were kept: ERR_SQLITE_ERROR.`).sort().join("\n"),
       [...host.log.lines].sort().join("\n"));
@@ -282,11 +290,11 @@ export class DraftsServiceTests {
       [], saved.revision, saved.updatedAt);
     await host.context.database.connection.executeAsync(new SqlQuery("UPDATE drafts SET json = ? WHERE chatId = ?",
       [JSON.stringify(moved.toJson()), conversation.id]));
-    writeFileSync(join(dirname(saved.attachments[0]!.path), "left-by-a-crash.txt"), "c");
+    writeFileSync(join(dirname(DraftsServiceTests.pathOf(saved, 0)), "left-by-a-crash.txt"), "c");
 
     await host.drafts.sweepAsync();
 
-    Assert.areEqual(basename(saved.attachments[0]!.path), readdirSync(dirname(saved.attachments[0]!.path)).join(","));
+    Assert.areEqual(basename(DraftsServiceTests.pathOf(saved, 0)), readdirSync(dirname(DraftsServiceTests.pathOf(saved, 0))).join(","));
   }
 
   @TestMethod
@@ -303,7 +311,7 @@ export class DraftsServiceTests {
       conversationId = (await conversations.createAsync(new ConversationCreateParams(project.id, null))).id;
       const saved = await new DraftsService(context, new AttachmentStore(directory.path), log).saveAsync(
         new DraftSaveParams(conversationId, "Keep me", [DraftsServiceTests.upload("a.txt", "a")]));
-      path = saved.attachments[0]!.path;
+      path = DraftsServiceTests.pathOf(saved, 0);
     }
     await using reopened = await DatabaseContext.openAsync(directory.path);
 
@@ -334,15 +342,15 @@ export class DraftsServiceTests {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
     const saved = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
-    const gone = join(dirname(saved.attachments[0]!.path), "gone.txt");
+    const gone = join(dirname(DraftsServiceTests.pathOf(saved, 0)), "gone.txt");
 
     const exception = await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed",
       [DraftsServiceTests.upload("b.txt", "b"), new AttachmentInput("gone.txt", "text/plain", null, gone)])), ServiceException);
 
     Assert.areEqual(ErrorCode.NotFound, exception.info.name);
     Assert.areEqual(JSON.stringify(saved.toJson()), JSON.stringify((await host.drafts.readAsync(new ConversationIdParams(conversation.id)))?.toJson()));
-    Assert.areEqual(1, readdirSync(dirname(saved.attachments[0]!.path)).length);
-    rmSync(saved.attachments[0]!.path);
+    Assert.areEqual(1, readdirSync(dirname(DraftsServiceTests.pathOf(saved, 0))).length);
+    rmSync(DraftsServiceTests.pathOf(saved, 0));
     const read = await host.drafts.readAsync(new ConversationIdParams(conversation.id));
     Assert.areEqual(0, read?.attachments.length);
     Assert.areEqual("a.txt", read?.missing.join(","));
@@ -353,20 +361,21 @@ export class DraftsServiceTests {
     await using host = await CoreHost.createAsync();
     const conversation = await host.createConversationAsync();
     const saved = await host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
-    const original = fs.writeFileSync;
-    fs.writeFileSync = () => { throw new Error("Simulated disk write failure"); };
+    const write = mock.method(fs, "writeFileSync", (): void => {
+      throw new Error("Simulated disk write failure");
+    });
     syncBuiltinESMExports();
     try {
       await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed",
         [DraftsServiceTests.upload("b.txt", "b"), DraftsServiceTests.upload("c.txt", "c")])), Error);
     }
     finally {
-      fs.writeFileSync = original;
+      write.mock.restore();
       syncBuiltinESMExports();
     }
 
     Assert.areEqual(JSON.stringify(saved.toJson()), JSON.stringify((await host.drafts.readAsync(new ConversationIdParams(conversation.id)))?.toJson()));
-    Assert.areEqual(1, readdirSync(dirname(saved.attachments[0]!.path)).length);
+    Assert.areEqual(1, readdirSync(dirname(DraftsServiceTests.pathOf(saved, 0))).length);
   }
 
   @TestMethod
@@ -379,7 +388,7 @@ export class DraftsServiceTests {
     await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed", [DraftsServiceTests.upload("b.txt", "b")])), Error);
 
     Assert.areEqual(JSON.stringify(saved.toJson()), JSON.stringify((await host.drafts.readAsync(new ConversationIdParams(conversation.id)))?.toJson()));
-    Assert.areEqual(basename(saved.attachments[0]!.path), readdirSync(dirname(saved.attachments[0]!.path)).join(","));
+    Assert.areEqual(basename(DraftsServiceTests.pathOf(saved, 0)), readdirSync(dirname(DraftsServiceTests.pathOf(saved, 0))).join(","));
     const fresh = await host.createConversationAsync();
     await host.context.database.connection.executeAsync(new SqlQuery("CREATE TRIGGER failDraftInsert BEFORE INSERT ON drafts BEGIN SELECT RAISE(ABORT, 'boom'); END"));
     await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(fresh.id, "First", [DraftsServiceTests.upload("c.txt", "c")])), Error);
@@ -397,7 +406,7 @@ export class DraftsServiceTests {
     await Assert.throwsAsync(() => host.drafts.saveAsync(new DraftSaveParams(conversation.id, "Changed", [DraftsServiceTests.upload("b.txt", "b")])), Error);
 
     Assert.areEqual(JSON.stringify(saved.toJson()), JSON.stringify((await host.drafts.readAsync(new ConversationIdParams(conversation.id)))?.toJson()));
-    Assert.areEqual(basename(saved.attachments[0]!.path), readdirSync(dirname(saved.attachments[0]!.path)).join(","));
+    Assert.areEqual(basename(DraftsServiceTests.pathOf(saved, 0)), readdirSync(dirname(DraftsServiceTests.pathOf(saved, 0))).join(","));
   }
 
   @TestMethod
@@ -410,7 +419,7 @@ export class DraftsServiceTests {
     await Assert.throwsAsync(() => host.drafts.discardAsync(new DraftDiscardParams(conversation.id, saved.revision)), Error);
 
     Assert.areEqual(JSON.stringify(saved.toJson()), JSON.stringify((await host.drafts.readAsync(new ConversationIdParams(conversation.id)))?.toJson()));
-    Assert.areEqual("a", readFileSync(saved.attachments[0]!.path, "utf8"));
+    Assert.areEqual("a", readFileSync(DraftsServiceTests.pathOf(saved, 0), "utf8"));
   }
 
   @TestMethod
@@ -422,7 +431,7 @@ export class DraftsServiceTests {
     await host.conversations.deleteAsync(new ConversationIdParams(conversation.id));
 
     Assert.areEqual(0, (await host.context.database.connection.queryAsync(new SqlQuery("SELECT chatId FROM drafts"))).length);
-    Assert.isFalse(existsSync(dirname(saved.attachments[0]!.path)));
+    Assert.isFalse(existsSync(dirname(DraftsServiceTests.pathOf(saved, 0))));
   }
 
   @TestMethod
@@ -432,14 +441,16 @@ export class DraftsServiceTests {
     await host.drafts.saveAsync(new DraftSaveParams((await host.createConversationAsync(project)).id, "Look", [DraftsServiceTests.upload("a.txt", "a")]));
     await host.drafts.saveAsync(new DraftSaveParams((await host.createConversationAsync(project)).id, "Look", [DraftsServiceTests.upload("b.txt", "a")]));
     const [first, second] = await host.conversations.listAsync(new ConversationListParams(project.id));
+    Assert.isDefined(first);
+    Assert.isDefined(second);
     await host.context.database.connection.executeAsync(new SqlQuery(
-      `CREATE TRIGGER failSecondDraft BEFORE DELETE ON drafts WHEN old.chatId = '${second!.id}' BEGIN SELECT RAISE(ABORT, 'boom'); END`));
+      `CREATE TRIGGER failSecondDraft BEFORE DELETE ON drafts WHEN old.chatId = '${second.id}' BEGIN SELECT RAISE(ABORT, 'boom'); END`));
 
     await Assert.throwsAsync(() => host.projects.forgetAsync(new ProjectIdParams(project.id)), Error);
 
-    for (const conversation of [first!, second!]) {
+    for (const conversation of [first, second]) {
       const draft = await host.drafts.readAsync(new ConversationIdParams(conversation.id));
-      Assert.areEqual("a", readFileSync(draft!.attachments[0]!.path, "utf8"));
+      Assert.areEqual("a", readFileSync(DraftsServiceTests.pathOf(draft, 0), "utf8"));
     }
     await host.context.database.connection.executeAsync(new SqlQuery("DROP TRIGGER failSecondDraft"));
     await host.projects.forgetAsync(new ProjectIdParams(project.id));
@@ -451,6 +462,13 @@ export class DraftsServiceTests {
     await connection.executeAsync(new SqlQuery("CREATE TABLE commitGuards (id INTEGER PRIMARY KEY)"));
     await connection.executeAsync(new SqlQuery("CREATE TABLE commitGuarded (guardId INTEGER REFERENCES commitGuards (id) DEFERRABLE INITIALLY DEFERRED)"));
     await connection.executeAsync(new SqlQuery("CREATE TRIGGER failDraftCommit AFTER UPDATE ON drafts BEGIN INSERT INTO commitGuarded VALUES (1); END"));
+  }
+
+  private static pathOf(draft: Draft | null, index: number): string {
+    Assert.isNotNull(draft);
+    const attachment = draft.attachments[index];
+    Assert.isDefined(attachment);
+    return attachment.path;
   }
 
   private static upload(name: string, text: string): AttachmentInput {

@@ -13,6 +13,7 @@ import fs, {
 import { open, stat } from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { basename, dirname, join, sep } from "node:path";
+import { mock } from "node:test";
 
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
@@ -82,14 +83,15 @@ export class AttachmentStoreTests {
     new AttachmentStore(directory.path);
     Assert.isFalse(existsSync(abandoned.path));
     Assert.isTrue(existsSync(saved[0]!.path));
-    const original = fs.writeFileSync;
-    fs.writeFileSync = () => { throw new Error("Simulated disk write failure"); };
+    const write = mock.method(fs, "writeFileSync", (): void => {
+      throw new Error("Simulated disk write failure");
+    });
     syncBuiltinESMExports();
     try {
       Assert.throws(() => store.prepare(input), Error);
     }
     finally {
-      fs.writeFileSync = original;
+      write.mock.restore();
       syncBuiltinESMExports();
     }
     Assert.areEqual(0, readdirSync(join(directory.path, "attachments", "drafts")).length);
@@ -598,28 +600,37 @@ export class AttachmentStoreTests {
   }
 
   private static throughLink<T>(link: string, target: string | Error, touched: unknown[], action: () => T): T {
-    const names = ["lstatSync", "readlinkSync", "statSync", "realpathSync", "existsSync", "openSync", "readdirSync", "mkdirSync", "rmSync"] as const;
-    const originals = names.map(t => [t, fs[t]] as const);
-    for (const [name, original] of originals)
-      Object.assign(fs, { [name]: new Proxy(original, { apply: (callee, self, args: unknown[]): unknown => {
-        if (name === "lstatSync" && args[0] === link)
-          return { isSymbolicLink: (): boolean => true };
-        if (name === "readlinkSync" && args[0] === link) {
-          if (target instanceof Error)
-            throw target;
-          return target;
-        }
-        if (name !== "lstatSync" && name !== "readlinkSync")
-          touched.push(args[0]);
-        return Reflect.apply(callee, self, args);
-      } }) });
+    const touching = <A extends unknown[], R>(original: (...args: A) => R): ((...args: A) => R) => (...args: A): R => {
+      touched.push(args[0]);
+      return original(...args);
+    };
+    const lstat = fs.lstatSync;
+    const readlink = fs.readlinkSync;
+    const mocks = [
+      mock.method(fs, "lstatSync", (...args: Parameters<typeof lstat>): ReturnType<typeof lstat> | { isSymbolicLink: () => boolean } =>
+        args[0] === link ? { isSymbolicLink: (): boolean => true } : lstat(...args)),
+      mock.method(fs, "readlinkSync", (...args: Parameters<typeof readlink>): ReturnType<typeof readlink> => {
+        if (args[0] !== link)
+          return readlink(...args);
+        if (target instanceof Error)
+          throw target;
+        return target;
+      }),
+      mock.method(fs, "statSync", touching(fs.statSync)),
+      mock.method(fs, "realpathSync", touching(fs.realpathSync)),
+      mock.method(fs, "existsSync", touching(fs.existsSync)),
+      mock.method(fs, "openSync", touching(fs.openSync)),
+      mock.method(fs, "readdirSync", touching(fs.readdirSync)),
+      mock.method(fs, "mkdirSync", touching(fs.mkdirSync)),
+      mock.method(fs, "rmSync", touching(fs.rmSync))
+    ];
     syncBuiltinESMExports();
     try {
       return action();
     }
     finally {
-      for (const [name, original] of originals)
-        Object.assign(fs, { [name]: original });
+      for (const restored of mocks)
+        restored.mock.restore();
       syncBuiltinESMExports();
     }
   }
@@ -629,17 +640,18 @@ export class AttachmentStoreTests {
   }
 
   private static refusalWhile(name: "openSync" | "readSync" | "realpathSync", change: (first: unknown) => void, action: () => unknown): ServiceException {
-    const original = fs[name];
-    Object.assign(fs, { [name]: new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
+    const changing = <A extends unknown[], R>(original: (...args: A) => R): ((...args: A) => R) => (...args: A): R => {
       change(args[0]);
-      return Reflect.apply(target, self, args);
-    } }) });
+      return original(...args);
+    };
+    const mocked = name === "openSync" ? mock.method(fs, "openSync", changing(fs.openSync))
+      : name === "readSync" ? mock.method(fs, "readSync", changing(fs.readSync)) : mock.method(fs, "realpathSync", changing(fs.realpathSync));
     syncBuiltinESMExports();
     try {
       return Assert.throws(action, ServiceException);
     }
     finally {
-      Object.assign(fs, { [name]: original });
+      mocked.mock.restore();
       syncBuiltinESMExports();
     }
   }

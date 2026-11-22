@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import fsPromises from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
+import { mock } from "node:test";
 import { JsonException, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as CoreResources, ForkRequest, McpEndpoint, SessionTokens, SharedMcpFailureKind, SharedMcpValues, type TurnDetail, TurnOutcome, TurnRequest,
@@ -1359,17 +1360,17 @@ export class GrokAdapterTests {
 
   private static async abortingWhileReading<T>(path: string, controller: AbortController, action: () => Promise<T>): Promise<T> {
     const original = fsPromises.readFile;
-    fsPromises.readFile = new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
+    const read = mock.method(fsPromises, "readFile", (...args: Parameters<typeof original>): ReturnType<typeof original> => {
       if (args[0] === path)
         controller.abort();
-      return Reflect.apply(target, self, args);
-    } });
+      return original(...args);
+    });
     syncBuiltinESMExports();
     try {
       return await action();
     }
     finally {
-      fsPromises.readFile = original;
+      read.mock.restore();
       syncBuiltinESMExports();
     }
   }

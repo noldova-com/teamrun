@@ -58,7 +58,7 @@ describe("PackageTestEntry's reporter", () => {
 
 const folders: string[] = [];
 
-const runFilesAsync = async (environment: NodeJS.ProcessEnv): Promise<EntryRun> => {
+const runFilesAsync = async (environment: NodeJS.ProcessEnv, unloadable: readonly string[] = []): Promise<EntryRun> => {
   const folder = mkdtempSync(path.join(tmpdir(), "package-test-entry-"));
   folders.push(folder);
   const testing = import.meta.resolve("@noldova/context.testing");
@@ -72,6 +72,8 @@ const runFilesAsync = async (environment: NodeJS.ProcessEnv): Promise<EntryRun> 
       ""
     ].join("\n"));
   }
+  for (const name of unloadable)
+    writeFileSync(path.join(folder, `${name}.test.js`), `throw new Error("${name}.test.js was loaded.");\n`);
   const result = path.join(folder, "result.json");
   const exitCode = await new PackageTestEntry(["@noldova/teamrun.sample", folder], { ...environment, [PackageTestEntry.RESULT_VARIABLE]: result,
     [PackageTestEntry.SKIP_DETAILS_VARIABLE]: "true" }).runAsync();
@@ -98,6 +100,21 @@ describe("PackageTestEntry with isolated test files", () => {
 
     assert.equal(exitCode, 0);
     assert.deepEqual(files, ["@noldova/teamrun.sample/second.test.js"]);
+  });
+
+  it("loads no test file but the one it runs alone", async () => {
+    const { exitCode, files } = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.sample/second.test.js" }, ["fourth"]);
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(files, ["@noldova/teamrun.sample/second.test.js"]);
+  });
+
+  it("fails without a result when the file to run alone belongs to no package it is given or doesn't exist", async () => {
+    const unknown = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.other/second.test.js" });
+    const missing = await runFilesAsync({ [PackageTestEntry.ALONE_VARIABLE]: "@noldova/teamrun.sample/fifth.test.js" });
+
+    assert.deepEqual([unknown.exitCode, unknown.files], [1, []]);
+    assert.deepEqual([missing.exitCode, missing.files], [1, []]);
   });
 
   it("leaves the isolated files to their own processes when it claims test files", async () => {

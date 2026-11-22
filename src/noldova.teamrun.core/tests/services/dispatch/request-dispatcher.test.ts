@@ -13,7 +13,7 @@ import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException, JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AppLook, ApprovalAsk, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
+import { AppLook, ApprovalAsk, ConversationEngine, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
   from "@noldova/teamrun.core";
 import { AcpAgentIdParams, AcpAgentListing, AcpLocalCommandAddParams, ComputerUseGrant, ComputerUseGrantIdParams, ProviderContextWindows, ProviderSignInCommand,
   type ITeammateChanges, TeammateFallback } from "@noldova/teamrun.protocol";
@@ -112,6 +112,27 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 import { FakeProviderKindInstallation } from "../../fixtures/fake-provider-kind-installation.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
+
+class RecordingEngine extends ConversationEngine {
+  public readonly forgotten: string[] = [];
+  public readonly planning: string[] = [];
+
+  public static of(host: CoreHost): RecordingEngine {
+    return new RecordingEngine(host.context, host.projects, host.conversations, host.messages, host.approvals, host.providers, host.teammates, host.registry,
+      host.events, host.attachments, undefined, host.log, undefined, host.tasks, host.planUsage, null, host.checkpoints, host.sharedServers, null, null, undefined,
+      undefined, host.timer);
+  }
+
+  public override async forgetAsync(conversationIds: readonly string[]): Promise<void> {
+    this.forgotten.push([...conversationIds].sort().join(","));
+    await super.forgetAsync(conversationIds);
+  }
+
+  public override async planFirstAsync(conversationId: string): Promise<void> {
+    this.planning.push(conversationId);
+    await super.planFirstAsync(conversationId);
+  }
+}
 
 @TestClass
 export class RequestDispatcherTests {
@@ -1418,13 +1439,7 @@ export class RequestDispatcherTests {
   @TestMethod
   public async hasTheEngineForgetADeletedChatAndEachChatOfAForgottenProject(): Promise<void> {
     await using host = await CoreHost.createAsync();
-    const forgotten: string[] = [];
-    const engine = new Proxy(host.engine, { get: (target, name, receiver): unknown => name === "forgetAsync"
-      ? (conversationIds: readonly string[]): Promise<void> => {
-        forgotten.push([...conversationIds].sort().join(","));
-        return target.forgetAsync(conversationIds);
-      }
-      : Reflect.get(target, name, receiver) });
+    const engine = RecordingEngine.of(host);
     const dispatcher = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, engine, host.teammates, host.events);
     const project = await host.openProjectAsync();
@@ -1436,19 +1451,13 @@ export class RequestDispatcherTests {
 
     Assert.isFalse(deletion.hasErrors);
     Assert.isFalse(forgetting.hasErrors);
-    Assert.areEqual(JSON.stringify([deleted.id, kept.map(t => t.id).sort().join(",")]), JSON.stringify(forgotten));
+    Assert.areEqual(JSON.stringify([deleted.id, kept.map(t => t.id).sort().join(",")]), JSON.stringify(engine.forgotten));
   }
 
   @TestMethod
   public async hasTheEngineTellTheProvidersOnlyWhenAChatsPlanFirstTurnsOn(): Promise<void> {
     await using host = await CoreHost.createAsync();
-    const planning: string[] = [];
-    const engine = new Proxy(host.engine, { get: (target, name, receiver): unknown => name === "planFirstAsync"
-      ? (conversationId: string): Promise<void> => {
-        planning.push(conversationId);
-        return target.planFirstAsync(conversationId);
-      }
-      : Reflect.get(target, name, receiver) });
+    const engine = RecordingEngine.of(host);
     const dispatcher = new RequestDispatcher(host.kinds, host.providers, host.projects, host.conversations, host.messages,
       host.approvals, engine, host.teammates, host.events);
     const conversation = await host.createConversationAsync();
@@ -1457,7 +1466,7 @@ export class RequestDispatcherTests {
     const off = await dispatcher.dispatch(new Request("r2", MethodName.ConversationSetPlanFirst, new ChatPlanFirstParams(conversation.id, false).toJson()));
 
     Assert.isFalse(on.hasErrors || off.hasErrors);
-    Assert.areEqual(JSON.stringify([conversation.id]), JSON.stringify(planning));
+    Assert.areEqual(JSON.stringify([conversation.id]), JSON.stringify(engine.planning));
     Assert.isFalse((await host.conversations.findAsync(conversation.id))?.planFirst ?? true);
   }
 

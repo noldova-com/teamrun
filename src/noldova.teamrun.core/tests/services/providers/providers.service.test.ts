@@ -9,6 +9,7 @@
 import fs, { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { dirname, join, resolve, sep } from "node:path";
+import { mock } from "node:test";
 
 import { ChangeOperation } from "@noldova/context.data";
 import { SqlQuery } from "@noldova/context.data.sql";
@@ -171,18 +172,18 @@ export class ProvidersServiceTests {
     const leaf = join(host.directory.path, "profiles", "fake", "Work");
     const denied = Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
     const original = fs.mkdirSync;
-    fs.mkdirSync = new Proxy(original, { apply: (target, self, args: unknown[]): unknown => {
+    const make = mock.method(fs, "mkdirSync", (...args: Parameters<typeof original>): ReturnType<typeof original> => {
       if (args[0] === leaf)
         throw denied;
-      return Reflect.apply(target, self, args);
-    } });
+      return original(...args);
+    });
     syncBuiltinESMExports();
     let thrown: Error;
     try {
       thrown = await Assert.throwsAsync(() => host.providers.createAsync(new ProviderCreateParams("fake", "Work", null)), Error);
     }
     finally {
-      fs.mkdirSync = original;
+      make.mock.restore();
       syncBuiltinESMExports();
     }
 

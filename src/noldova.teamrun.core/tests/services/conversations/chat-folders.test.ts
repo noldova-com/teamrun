@@ -10,12 +10,14 @@ import { execFileSync } from "node:child_process";
 import fs, { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
+import { mock } from "node:test";
 
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChatFolders, Resources } from "@noldova/teamrun.core";
 import { ErrorCode } from "@noldova/teamrun.protocol";
 
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
 import { GitRepository } from "../../fixtures/git-repository.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 
@@ -197,10 +199,10 @@ export class ChatFoldersTests {
     const target = join(directory.path, "project");
     mkdirSync(join(target, "src"), { recursive: true });
     writeFileSync(join(target, "src", "kept.txt"), "kept");
-    const full = Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+    const full = new CodedError("ENOSPC: no space left on device", "ENOSPC");
     const original = fs.promises.cp;
-    fs.promises.cp = new Proxy(original, { apply: (copy, self, args: unknown[]): unknown =>
-      args[1] === join(target, "src", "deep", "c.txt") ? Promise.reject(full) : Reflect.apply(copy, self, args) });
+    const copy = mock.method(fs.promises, "cp", (...args: Parameters<typeof original>): Promise<void> =>
+      args[1] === join(target, "src", "deep", "c.txt") ? Promise.reject(full) : original(...args));
     syncBuiltinESMExports();
     const copies: string[] = [];
     let thrown: Error;
@@ -208,7 +210,7 @@ export class ChatFoldersTests {
       thrown = await Assert.throwsAsync(() => folders.copyToAsync("c1", target, copies), Error);
     }
     finally {
-      fs.promises.cp = original;
+      copy.mock.restore();
       syncBuiltinESMExports();
     }
     const listed = copies.map(t => relative(target, t)).join(",");

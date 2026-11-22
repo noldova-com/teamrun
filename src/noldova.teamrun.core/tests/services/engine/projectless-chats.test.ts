@@ -9,6 +9,7 @@
 import fs, { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { join, parse, relative } from "node:path";
+import { mock } from "node:test";
 
 import { JsonReader } from "@noldova/context.json";
 import { SqlQuery } from "@noldova/context.data.sql";
@@ -42,7 +43,10 @@ import {
   WrittenImageReadParams
 } from "@noldova/teamrun.protocol";
 
+import { BusyFileError } from "../../fixtures/busy-file-error.fixture.js";
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { HeldCopy } from "../../fixtures/held-copy.fixture.js";
 
 @TestClass
 export class ProjectlessChatsTests {
@@ -56,7 +60,7 @@ export class ProjectlessChatsTests {
 
     Assert.isNull(chat.projectId);
     Assert.areEqual(join(host.directory.path, "chats", chat.id), chat.folder);
-    Assert.isTrue(existsSync(join(chat.folder!, ".git", "HEAD")));
+    Assert.isTrue(existsSync(join(ProjectlessChatsTests.folderOf(chat), ".git", "HEAD")));
     Assert.areEqual(0, await host.conversations.countFolderFilesAsync(new ConversationIdParams(chat.id)));
     Assert.isNull(inProject.folder);
     Assert.areEqual(chat.id, (await host.conversations.listAsync(new ConversationListParams(null))).map(t => t.id).join(","));
@@ -94,13 +98,13 @@ export class ProjectlessChatsTests {
   public async runsEachTurnInTheChatsFolderMakingItAgainWhenItIsGone(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    rmSync(chat.folder!, { recursive: true });
+    rmSync(ProjectlessChatsTests.folderOf(chat), { recursive: true });
 
     await host.engine.sendAsync(await ProjectlessChatsTests.paramsAsync(host, chat.id, "Hello"));
     await host.engine.waitForIdle();
 
     Assert.areEqual(chat.folder, host.adapter.requests[0]?.workingDirectory);
-    Assert.isTrue(existsSync(join(chat.folder!, ".git", "HEAD")));
+    Assert.isTrue(existsSync(join(ProjectlessChatsTests.folderOf(chat), ".git", "HEAD")));
     Assert.areEqual(`${chat.id} ${chat.folder}`, `${host.checkpoints.captures[0]?.folder.identity} ${host.checkpoints.captures[0]?.folder.path}`);
   }
 
@@ -146,19 +150,20 @@ export class ProjectlessChatsTests {
   public async readsAnImageAReplyDrewFromTheChatsFolder(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    mkdirSync(join(chat.folder!, "out"));
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "out"));
     const png = Buffer.concat([Buffer.from("89504e470d0a1a0a0000000d49484452000000020000000300", "hex"), Buffer.alloc(4)]);
-    writeFileSync(join(chat.folder!, "out", "drawn.png"), png);
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "out", "drawn.png"), png);
     const message = new Message("reply", chat.id, 0, MessageAuthor.User, null, MessageStatus.Completed,
       [new MessageDetail(0, DetailKind.Text, "Drew ![chart](out/drawn.png).", null, "t")], null, "t", null, "t");
     await host.messages.insertAsync(message);
-    const [path] = new WrittenImageReader().markdownImagePathsOf(message, chat.folder!);
-    rmSync(join(chat.folder!, ".git"), { recursive: true });
+    const [path] = new WrittenImageReader().markdownImagePathsOf(message, ProjectlessChatsTests.folderOf(chat));
+    Assert.isDefined(path);
+    rmSync(join(ProjectlessChatsTests.folderOf(chat), ".git"), { recursive: true });
 
-    const read = await ProjectlessChatsTests.succeedAsync(host, MethodName.WrittenImageRead, new WrittenImageReadParams(chat.id, "reply", path!).toJson());
+    const read = await ProjectlessChatsTests.succeedAsync(host, MethodName.WrittenImageRead, new WrittenImageReadParams(chat.id, "reply", path).toJson());
 
     Assert.areEqual(png.toString("base64"), AttachmentContent.fromJson(read).data);
-    Assert.isFalse(existsSync(join(chat.folder!, ".git")));
+    Assert.isFalse(existsSync(join(ProjectlessChatsTests.folderOf(chat), ".git")));
   }
 
   @TestMethod
@@ -167,8 +172,8 @@ export class ProjectlessChatsTests {
     const project = await host.openProjectAsync();
     mkdirSync(project.rootPath, { recursive: true });
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    mkdirSync(join(chat.folder!, "src"));
-    writeFileSync(join(chat.folder!, "src", "main.ts"), "code");
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "src"));
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "src", "main.ts"), "code");
 
     const moved = Conversation.fromJson(await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationMove,
       new ConversationMoveParams(chat.id, project.id).toJson()));
@@ -179,7 +184,7 @@ export class ProjectlessChatsTests {
     Assert.isNull(moved.folder);
     Assert.areEqual("code", readFileSync(join(project.rootPath, "src", "main.ts"), "utf8"));
     Assert.isFalse(existsSync(join(project.rootPath, ".git")));
-    Assert.isFalse(existsSync(chat.folder!));
+    Assert.isFalse(existsSync(ProjectlessChatsTests.folderOf(chat)));
     Assert.areEqual(`${chat.id} ${chat.folder}`, `${host.checkpoints.deletes[0]?.folder.identity} ${host.checkpoints.deletes[0]?.folder.path}`);
     Assert.areEqual(project.rootPath, host.adapter.requests[0]?.workingDirectory);
     Assert.areEqual(0, await host.conversations.countFolderFilesAsync(new ConversationIdParams(chat.id)));
@@ -192,8 +197,8 @@ export class ProjectlessChatsTests {
     mkdirSync(project.rootPath, { recursive: true });
     writeFileSync(join(project.rootPath, "a.txt"), "theirs");
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
-    writeFileSync(join(chat.folder!, "b.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "b.txt"), "ours");
 
     const refused = await host.dispatcher.dispatch(new Request("r1", MethodName.ConversationMove, new ConversationMoveParams(chat.id, project.id).toJson()));
 
@@ -214,12 +219,12 @@ export class ProjectlessChatsTests {
     mkdirSync(project.rootPath, { recursive: true });
     mkdirSync(other.rootPath, { recursive: true });
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
     using copy = ProjectlessChatsTests.holdCopy(join(project.rootPath, "a.txt"));
 
     const moving = host.dispatcher.dispatch(new Request("r1", MethodName.ConversationMove, new ConversationMoveParams(chat.id, project.id).toJson()));
     await copy.reached;
-    const listed = await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationList, new ConversationListParams(null).toJson()) as { id: string }[];
+    const listed = await ProjectlessChatsTests.listAsync(host, MethodName.ConversationList);
     const movedElsewhere = await host.dispatcher.dispatch(new Request("r2", MethodName.ConversationMove, new ConversationMoveParams(chat.id, other.id).toJson()));
     const deleted = await host.dispatcher.dispatch(new Request("r3", MethodName.ConversationDelete, new ConversationIdParams(chat.id).toJson()));
     copy.release();
@@ -240,9 +245,9 @@ export class ProjectlessChatsTests {
     mkdirSync(project.rootPath, { recursive: true });
     writeFileSync(join(project.rootPath, "kept.txt"), "theirs");
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
-    mkdirSync(join(chat.folder!, "src"));
-    writeFileSync(join(chat.folder!, "src", "b.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "src"));
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "src", "b.txt"), "ours");
     using copy = ProjectlessChatsTests.holdCopy(join(project.rootPath, "src", "b.txt"));
 
     const moving = host.dispatcher.dispatch(new Request("r1", MethodName.ConversationMove, new ConversationMoveParams(chat.id, project.id).toJson()));
@@ -274,9 +279,9 @@ export class ProjectlessChatsTests {
     mkdirSync(project.rootPath, { recursive: true });
     writeFileSync(join(project.rootPath, "kept.txt"), "theirs");
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
-    mkdirSync(join(chat.folder!, "src"));
-    writeFileSync(join(chat.folder!, "src", "b.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "src"));
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "src", "b.txt"), "ours");
     const refused = await ProjectlessChatsTests.withFailingCopy(join(project.rootPath, "src", "b.txt"),
       () => host.dispatcher.dispatch(new Request("r1", MethodName.ConversationMove, new ConversationMoveParams(chat.id, project.id).toJson())));
     const left = readdirSync(project.rootPath).join(",");
@@ -298,9 +303,9 @@ export class ProjectlessChatsTests {
     const project = await host.openProjectAsync();
     mkdirSync(project.rootPath, { recursive: true });
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
-    mkdirSync(join(chat.folder!, "src"));
-    writeFileSync(join(chat.folder!, "src", "b.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "src"));
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "src", "b.txt"), "ours");
     const stuck = join(project.rootPath, "a.txt");
     using copy = ProjectlessChatsTests.holdCopy(join(project.rootPath, "src", "b.txt"));
     using removal = ProjectlessChatsTests.failRemoval(stuck);
@@ -323,9 +328,11 @@ export class ProjectlessChatsTests {
     await using host = await CoreHost.createAsync();
     const project = await host.openProjectAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "ours");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "ours");
     host.adapter.holdUntilAbort = true;
     const sent = await host.engine.sendAsync(await ProjectlessChatsTests.paramsAsync(host, chat.id, "Wait"));
+    const [reply] = sent.replies;
+    Assert.isDefined(reply);
     await host.adapter.requested(1);
     try {
       const move = await Assert.throwsAsync(() => host.conversations.moveAsync(new ConversationMoveParams(chat.id, project.id)), ServiceException);
@@ -333,10 +340,10 @@ export class ProjectlessChatsTests {
 
       Assert.areEqual(`${ErrorCode.Conflict} ${ErrorCode.Conflict}`, `${move.info.name} ${deletion.info.name}`);
       Assert.isFalse(existsSync(join(project.rootPath, "a.txt")));
-      Assert.isTrue(existsSync(join(chat.folder!, "a.txt")));
+      Assert.isTrue(existsSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt")));
     }
     finally {
-      await host.engine.cancelAsync(new MessageIdParams(sent.replies[0]!.id));
+      await host.engine.cancelAsync(new MessageIdParams(reply.id));
       await host.engine.waitForIdle();
     }
   }
@@ -345,9 +352,9 @@ export class ProjectlessChatsTests {
   public async countsTheFilesOfAChatsFolderAndNoneForAChatInAProject(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
-    writeFileSync(join(chat.folder!, "a.txt"), "a");
-    mkdirSync(join(chat.folder!, "src"));
-    writeFileSync(join(chat.folder!, "src", "b.txt"), "b");
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "a.txt"), "a");
+    mkdirSync(join(ProjectlessChatsTests.folderOf(chat), "src"));
+    writeFileSync(join(ProjectlessChatsTests.folderOf(chat), "src", "b.txt"), "b");
 
     const count = await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationFolderCount, new ConversationIdParams(chat.id).toJson());
     const none = await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationFolderCount, new ConversationIdParams((await host.createConversationAsync()).id).toJson());
@@ -363,71 +370,68 @@ export class ProjectlessChatsTests {
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
     await host.createConversationAsync();
 
-    const listed = await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationList, new ConversationListParams(null).toJson());
-    const empty = await ProjectlessChatsTests.succeedAsync(host, MethodName.ConversationListEmpty, new ConversationListParams(null).toJson());
+    const listed = await ProjectlessChatsTests.listAsync(host, MethodName.ConversationList);
+    const empty = await ProjectlessChatsTests.listAsync(host, MethodName.ConversationListEmpty);
 
-    Assert.areEqual(chat.id, (listed as readonly { readonly id: string }[]).map(t => t.id).join(","));
-    Assert.areEqual(chat.id, (empty as readonly { readonly id: string }[]).map(t => t.id).join(","));
+    Assert.areEqual(chat.id, listed.map(t => t.id).join(","));
+    Assert.areEqual(chat.id, empty.map(t => t.id).join(","));
   }
 
   private static async paramsAsync(host: CoreHost, conversationId: string, text: string): Promise<MessageSendParams> {
     return new MessageSendParams(conversationId, text, new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id);
   }
 
-  private static holdCopy(path: string): { readonly reached: Promise<void>; readonly release: () => void } & Disposable {
-    let reach!: () => void;
-    let release!: () => void;
-    const reached = new Promise<void>(resolve => {
-      reach = resolve;
-    });
-    const released = new Promise<void>(resolve => {
-      release = resolve;
-    });
+  private static folderOf(chat: Conversation): string {
+    const folder = chat.folder;
+    Assert.isNotNull(folder);
+    return folder;
+  }
+
+  private static async listAsync(host: CoreHost, method: MethodName): Promise<readonly Conversation[]> {
+    const listed = await ProjectlessChatsTests.succeedAsync(host, method, new ConversationListParams(null).toJson());
+    return JsonReader.fromValue({ chats: listed }).readObjectArray("chats").map(t => Conversation.fromJson(t.toJson()));
+  }
+
+  private static holdCopy(path: string): HeldCopy {
     const original = fs.promises.cp;
-    fs.promises.cp = new Proxy(original, { apply: async (copy, self, args: unknown[]): Promise<unknown> => {
-      if (args[1] === path) {
-        reach();
-        await released;
-      }
-      return await Reflect.apply(copy, self, args) as unknown;
-    } });
+    const held = new HeldCopy(path, () => {
+      copy.mock.restore();
+      syncBuiltinESMExports();
+    });
+    const copy = mock.method(fs.promises, "cp", async (...args: Parameters<typeof original>): Promise<void> => {
+      await held.passAsync(args[1]);
+      await original(...args);
+    });
     syncBuiltinESMExports();
-    return {
-      reached,
-      release,
-      [Symbol.dispose]: () => {
-        fs.promises.cp = original;
-        syncBuiltinESMExports();
-      }
-    };
+    return held;
   }
 
   private static async withFailingCopy<T>(path: string, action: () => Promise<T>): Promise<T> {
-    const full = Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
+    const full = new CodedError("ENOSPC: no space left on device", "ENOSPC");
     const original = fs.promises.cp;
-    fs.promises.cp = new Proxy(original, { apply: (copy, self, args: unknown[]): unknown =>
-      args[1] === path ? Promise.reject(full) : Reflect.apply(copy, self, args) });
+    const copy = mock.method(fs.promises, "cp", (...args: Parameters<typeof original>): Promise<void> =>
+      args[1] === path ? Promise.reject(full) : original(...args));
     syncBuiltinESMExports();
     try {
       return await action();
     }
     finally {
-      fs.promises.cp = original;
+      copy.mock.restore();
       syncBuiltinESMExports();
     }
   }
 
-  private static failRemoval(path: string): Disposable {
+  private static failRemoval(path: string): DisposableStack {
     const original = fs.promises.rm;
-    fs.promises.rm = new Proxy(original, { apply: (remove, self, args: unknown[]): unknown =>
-      args[0] === path ? Promise.reject(Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" })) : Reflect.apply(remove, self, args) });
+    const remove = mock.method(fs.promises, "rm", (...args: Parameters<typeof original>): Promise<void> =>
+      args[0] === path ? Promise.reject(new BusyFileError("EBUSY: resource busy or locked", null)) : original(...args));
     syncBuiltinESMExports();
-    return {
-      [Symbol.dispose]: () => {
-        fs.promises.rm = original;
-        syncBuiltinESMExports();
-      }
-    };
+    const restored = new DisposableStack();
+    restored.defer(() => {
+      remove.mock.restore();
+      syncBuiltinESMExports();
+    });
+    return restored;
   }
 
   private static async succeedAsync(host: CoreHost, method: MethodName, payload: unknown): Promise<unknown> {
