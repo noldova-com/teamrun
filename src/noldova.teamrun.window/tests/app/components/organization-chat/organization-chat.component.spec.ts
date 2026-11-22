@@ -26,6 +26,7 @@ import { OrganizationCatalog } from "../../../../src/app/services/organization-c
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { Resources } from "../../../../src/resources";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
@@ -103,7 +104,7 @@ describe("OrganizationChatComponent", () => {
     await Wait.until(() => expect(element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled).toBe(false));
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
   };
-  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
+  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => Required.of(t.textContent).trim());
   const type = async (text: string): Promise<void> => {
     const box = element().querySelector<HTMLTextAreaElement>("nol-teamrun-composer textarea");
     if (Object.isNull(box))
@@ -199,6 +200,25 @@ describe("OrganizationChatComponent", () => {
     expect(texts("[role=alert]")).toEqual([]);
   });
 
+  it("forgets a teammate's chat failing to open once another target is chosen while it opens", async () => {
+    let refuse: (error: Error) => void = () => undefined;
+    openAnswer = () => new Promise<JsonValue>((_, reject) => {
+      refuse = reject;
+    });
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(opened).toEqual(["alice"]));
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    refuse(new Error("There is no teammate alice."));
+    await fixture.whenStable();
+    const shown = texts("[role=alert]");
+    fixture.componentRef.setInput("target", OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(opened).toEqual(["alice", "alice"]));
+
+    expect(shown).toEqual([]);
+  });
+
   it("says why a send to a group failed until a send reaches every recipient", async () => {
     openAnswer = () => Promise.reject(new Error("The runtime is busy."));
     await create(OrganizationTarget.department("d1"));
@@ -246,7 +266,7 @@ describe("OrganizationChatComponent", () => {
     await sendNow();
     await Wait.until(() => expect(sent()).toHaveLength(3));
     await fixture.whenStable();
-    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey) ?? "{}"))];
+    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(Required.of(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey))))];
 
     refused = [];
     await sendNow();

@@ -123,13 +123,15 @@ export class OrganizationChatComponent {
     const pending = this.opening.get(key);
     if (!Object.isUndefined(pending))
       return pending;
+    const target = this.target();
     const opening = this.organizations.requestOrganizationChat(teammateId).then(chat => {
       this.opening.delete(key);
       this.opened.update(t => new Map(t).set(key, chat.id));
       return chat.id;
     }, (error: unknown) => {
       this.opening.delete(key);
-      this.errorSignal.set(OrganizationStoreService.messageOf(error));
+      if (this.target().equals(target))
+        this.errorSignal.set(OrganizationStoreService.messageOf(error));
       return null;
     });
     this.opening.set(key, opening);
