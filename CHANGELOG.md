@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
 - **Explorer:** an Organizations group lists each organization, whose name opens its own Organization view, then the teammates it places in no department and each of its departments by its path, such as `DevOps › Infra`, with its teammates; a teammate's row opens its Organization chat in that organization and shows when it waits or works, and Organization chats no longer show under Chats, Pinned or a project, even one pinned or moved there before (#402).

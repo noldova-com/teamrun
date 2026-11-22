@@ -57,6 +57,13 @@ describe("Resources", () => {
       .toEqual(["Sign-in didn't finish: the terminal closed before cursor-agent login ended.", Resources.signInUnfinished]);
   });
 
+  it.each([
+    { count: 1, expected: "Goes to 1 teammate" },
+    { count: 3, expected: "Goes to 3 teammates" }
+  ])("says a message to several goes to $count teammate(s)", ({ count, expected }) => {
+    expect(Resources.formatOrganizationReach(count)).toBe(expected);
+  });
+
   it("names an Organization chat after whom it talks to", () => {
     expect(Resources.formatOrganizationChat("Ada")).toBe("Chat with Ada");
   });
