@@ -9,7 +9,7 @@
 import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { type Department, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
   MenuTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -31,6 +31,7 @@ import { TeammateStatusStoreService } from "../../services/teammate-status-store
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
+import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
@@ -85,7 +86,7 @@ export class OrganizationFocusComponent {
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
     const here = this.key();
-    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)),
+    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.name, OrganizationTarget.department(t.id), false)),
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
     return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationTargetKey.of(t.target) === here));
   });
@@ -108,7 +109,7 @@ export class OrganizationFocusComponent {
   }
 
   protected addDepartment(): void {
-    void this.organization.createDepartment(Resources.organizationNewDepartment, null);
+    OrganizationDepartmentDialogComponent.open(this.dialogs, this.chats, this.organization, OrganizationParent.person);
   }
 
   protected rename(department: Department, event: Event): void {
@@ -129,7 +130,7 @@ export class OrganizationFocusComponent {
   }
 
   protected deleteDepartment(department: Department): void {
-    this.confirm(OrganizationEdits.deleteRequest(department, this.rows().map(t => t.node)), () => void this.organization.deleteDepartment(department.id));
+    this.confirm(OrganizationEdits.deleteRequest(department, [...this.rows().map(t => t.node), ...this.chats.teammates()]), () => void this.organization.deleteDepartment(department.id));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {
@@ -182,6 +183,6 @@ export class OrganizationFocusComponent {
   }
 
   private static flatten(nodes: readonly OrganizationNode[], depth: number): readonly OrganizationOutlineRow[] {
-    return nodes.flatMap(t => [new OrganizationOutlineRow(t, depth), ...OrganizationFocusComponent.flatten(t.children, depth + 1)]);
+    return nodes.flatMap(t => [new OrganizationOutlineRow(t, depth), ...OrganizationFocusComponent.flatten(t.subDepartments, depth + 1)]);
   }
 }

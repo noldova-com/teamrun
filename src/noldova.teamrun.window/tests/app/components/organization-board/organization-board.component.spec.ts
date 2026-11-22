@@ -87,7 +87,7 @@ describe("OrganizationBoardComponent", () => {
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
       OrganizationStoreService.provider, { provide: ClockService, useValue: clock }] });
     fixture = TestBed.createComponent(OrganizationBoardComponent);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]));
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(sample, [data.alice, data.bob, data.unavailable, data.reviewer, carol]).subDepartments);
     fixture.autoDetectChanges();
     await Wait.until(() => expect([texts(".ask .name"), texts(".ask-text")]).toEqual([["Bob", "Offline"], ["Ship the header now?"]]));
     await settle();
@@ -128,12 +128,11 @@ describe("OrganizationBoardComponent", () => {
       ["nol-teamrun-organization-card", "Carol"]]);
   });
 
-  it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and no move or remove while editing", async () => {
+  it("puts a teammate in no department beside the leaders, as your direct report, with no column of its own, and only a move while editing", async () => {
     await create();
     fixture.componentRef.setInput("directReports", [carol]);
-    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
-      sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
-      ChatStoreService.of(context).teammates()));
+    fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+      ChatStoreService.of(context).teammates()).subDepartments);
     await settle();
 
     expect([texts(".leaders > .leader .name"), texts(".leaders > .report .name"), texts(".lane-name"), texts("nol-teamrun-organization-card .name", one(".lane:nth-child(3)")),
@@ -143,7 +142,7 @@ describe("OrganizationBoardComponent", () => {
     fixture.componentRef.setInput("editing", true);
     await settle();
 
-    expect([all(".move-choice, .remove", one(".leaders > .report")).length, all(".lane").length]).toEqual([0, 3]);
+    expect([all(".move-choice", one(".leaders > .report")).length, all(".remove", one(".leaders > .report")).length, all(".lane").length]).toEqual([1, 0, 3]);
   });
 
   it("sorts a column by name, and by status again, on its own, and by status for a sort it doesn't know", async () => {
@@ -222,8 +221,8 @@ describe("OrganizationBoardComponent", () => {
     expect([all(".lanes nol-teamrun-organization-card").map(t => [t.querySelector(".name")?.textContent?.trim(), all(".head input", t).length,
       all(".move-choice, .remove", t).length]),
     all(".leaders nol-teamrun-organization-card").map(t => [t.querySelector(".name")?.textContent?.trim(), all(".head input", t).length]),
-    all(".leaders nol-teamrun-organization-card .move-choice, .leaders nol-teamrun-organization-card .remove").length])
-      .toEqual([[["Bob", 0, 2], ["Offline", 0, 2], ["Carol", 0, 2]], [["Alice", 0], ["Code Reviewer", 0]], 0]);
+    all(".leaders nol-teamrun-organization-card .move-choice").length, all(".leaders nol-teamrun-organization-card .remove").length])
+      .toEqual([[["Bob", 0, 2], ["Offline", 0, 2], ["Carol", 0, 2]], [["Alice", 0], ["Code Reviewer", 0]], 2, 0]);
     for (const value of ["  Craft  ", "   ", "UI"]) {
       const field = at(fields(), value === "UI" ? 1 : 0);
       field.value = value;
@@ -234,11 +233,19 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(menuItems().map(t => t.textContent?.trim())).toEqual(["Carol", "Code Reviewer", "Offline"]));
     at(menuItems(), 0).click();
     one(".add-department").click();
+    await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
+    const name = one("nol-dialog .nol-teamrun-department-name", document.body);
+    if (!(name instanceof HTMLInputElement))
+      throw new Error("The dialog has no name field.");
+    name.value = "Lab";
+    name.dispatchEvent(new Event("input"));
+    await fixture.whenStable();
+    one("nol-dialog .nol-teamrun-save", document.body).click();
 
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });
@@ -294,9 +301,8 @@ describe("OrganizationBoardComponent", () => {
     it("draws a direct report in no department on the leaders' line, after them, at a leader's width, inset and top", async () => {
       await create();
       fixture.componentRef.setInput("directReports", [carol]);
-      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments,
-        sample.placements.map(t => t.teammateId === "carol" ? new TeammatePlacement("carol", OrganizationParent.person, 0) : t)),
-        ChatStoreService.of(context).teammates()));
+      fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
+        ChatStoreService.of(context).teammates()).subDepartments);
       await settle();
       const leader = box(one(".leaders > .leader:nth-child(2)"));
       const report = box(one(".leaders > .report"));

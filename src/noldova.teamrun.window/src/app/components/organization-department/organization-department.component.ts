@@ -6,28 +6,32 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { NgTemplateOutlet } from "@angular/common";
 import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
-import { type Department, NameOrder, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
-  MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
+import { type Department, NameOrder, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
   from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
-import { ConfirmRequest } from "../../models/confirm-request";
-import type { OrganizationNode } from "../../models/organization.node";
+import { OrganizationEdits } from "../../models/organization-edits";
+import { OrganizationPlaceChoice } from "../../models/organization-place-choice";
+import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
+import { OrganizationDropDirective } from "../organization-drop.directive";
+import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 
 @Component({
   selector: "nol-teamrun-organization-department",
-  imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-    OrganizationCardComponent, OrganizationDetailsComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
+  imports: [ButtonComponent, CanvasItemDirective, IconButtonComponent, NgTemplateOutlet, OrganizationCardComponent, OrganizationDetailsComponent,
+    OrganizationDropDirective, OrganizationTeammateSearchComponent, PopoverTriggerDirective, SelectComponent, TextFieldComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, TeammateStatusStoreService.provider],
   host: { class: "nol-teamrun-organization-department" },
   templateUrl: "./organization-department.component.html",
@@ -43,6 +47,7 @@ export class OrganizationDepartmentComponent {
 
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
   public readonly editing: InputSignal<boolean> = input(false);
+  public readonly department: InputSignal<Department | null> = input<Department | null>(null);
 
   public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
 
@@ -61,14 +66,21 @@ export class OrganizationDepartmentComponent {
   });
   protected readonly leaderOptions: Signal<readonly SelectOption[]> = computed(() => {
     const node = this.node();
-    const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];
-    return [new SelectOption(String.empty, Resources.organizationNoLeader), ...NameOrder.sort(people, t => t.name).map(t => new SelectOption(t.id, t.name))];
+    const people = NameOrder.sort(Object.isNull(node.leader) ? node.members : [node.leader, ...node.members], t => t.name);
+    const others = NameOrder.sort(this.store.teammates().filter(t => !people.some(u => u.id === t.id)), t => t.name);
+    return [new SelectOption(String.empty, Resources.organizationNoLeader), ...[...people, ...others].map(t => new SelectOption(t.id, t.name))];
   });
-  protected readonly candidates: Signal<readonly Teammate[]> = computed(() => {
-    const id = this.node().id;
-    const members = this.organization.organization().members;
-    return NameOrder.sort(this.store.teammates().filter(t => !members.some(u => u.teammateId === t.id && u.departmentId === id)), t => t.name);
-  });
+  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
+  protected readonly placeChoices: Signal<readonly OrganizationPlaceChoice[]> = computed(() =>
+    OrganizationPlaceChoice.of(OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()), this.node().key));
+  protected readonly placeOptions: Signal<readonly SelectOption[]> = computed(() => this.placeChoices().map(t => new SelectOption(t.key, t.label)));
+  protected placeKeyOf(department: Department): string {
+    return OrganizationPlaceChoice.keyOf(department.parent);
+  }
+
+  protected keyOf(teammate: Teammate): OrganizationParent {
+    return OrganizationParent.teammate(teammate.id);
+  }
 
   protected toggle(): void {
     this.layout.toggleDepartment(this.node().id);
@@ -88,15 +100,18 @@ export class OrganizationDepartmentComponent {
     void this.organization.setLeader(this.node().id, value.length === 0 ? null : value);
   }
 
-  protected add(teammateId: string): void {
-    void this.organization.setMember(teammateId, this.node().id);
+  protected move(department: Department, key: string): void {
+    for (const choice of this.placeChoices().filter(t => t.key === key))
+      void this.organization.moveDepartment(department.id, choice.parent);
+  }
+
+  protected addDepartment(): void {
+    OrganizationDepartmentDialogComponent.open(this.dialogs, this.store, this.organization, this.node().key);
   }
 
   protected confirmDelete(department: Department): void {
-    const parent = this.organization.organization().departments.find(t => t.id === department.parentId)?.name ?? null;
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
-    dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.organizationDeleteDepartmentTitle,
-      Resources.formatOrganizationDeleteDepartment(department.name, parent), Resources.organizationDeleteLabel, null, true));
+    dialog.componentRef?.setInput("request", OrganizationEdits.deleteRequest(department, [...this.organization.organization().departments, ...this.store.teammates()]));
     dialog.componentInstance?.answered.subscribe(confirmed => {
       dialog.close();
       if (confirmed)

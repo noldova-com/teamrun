@@ -23,11 +23,11 @@ describe("OrganizationFocus", () => {
     [OrganizationTargetKey.of(focus.target), focus.path.map(t => t.id), focus.teammate?.id ?? null, focus.departmentName];
 
   it("focuses a member of a department with no leader, with that department's name", () => {
-    expect(shape(OrganizationFocus.resolve(tree, [], "Teammate:cy"))).toEqual(["Teammate:cy", ["build"], "cy", "Build"]);
+    expect(shape(OrganizationFocus.resolve(tree.subDepartments, [], "Teammate:cy"))).toEqual(["Teammate:cy", ["build"], "cy", "Build"]);
   });
 
   it("opens on the leaders, with no department name, for a teammate it doesn't know", () => {
-    expect(shape(OrganizationFocus.resolve(tree, [], "Teammate:nobody"))).toEqual([OrganizationTargetKey.of(OrganizationTarget.leaders), [], null, ""]);
+    expect(shape(OrganizationFocus.resolve(tree.subDepartments, [], "Teammate:nobody"))).toEqual([OrganizationTargetKey.of(OrganizationTarget.leaders), [], null, ""]);
   });
 
   it("focuses a direct report in no department under Organization alone, saying it reports to you, and opens on the leaders for the old No department", () => {
@@ -35,9 +35,9 @@ describe("OrganizationFocus", () => {
     const organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "ada", 0, "c", "u")],
       [new TeammatePlacement("ada", OrganizationParent.department("design"), 0), new TeammatePlacement("eve", OrganizationParent.person, 0)]);
     const placed = OrganizationNode.treeOf(organization, [ada, eve]);
-    const reports = OrganizationNode.directReportsOf(organization, [ada, eve]);
+    const reports = placed.directReports;
 
-    expect([shape(OrganizationFocus.resolve(placed, reports, "Teammate:eve")), shape(OrganizationFocus.resolve(placed, reports, "Department:no-department"))]).toEqual([
+    expect([shape(OrganizationFocus.resolve(placed.subDepartments, reports, "Teammate:eve")), shape(OrganizationFocus.resolve(placed.subDepartments, reports, "Department:no-department"))]).toEqual([
       ["Teammate:eve", [], "eve", "Reports to you"], [OrganizationTargetKey.of(OrganizationTarget.leaders), [], null, ""]
     ]);
   });

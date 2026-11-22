@@ -33,10 +33,10 @@ LICENSE file in the root directory of this source tree.
   <button type="button" nol-icon-button class="tune" [icon]="resources.organizationCardsShowIcon"
     [label]="resources.formatOrganizationCardMenu(teammate().name)" [nolMenuTriggerFor]="fieldsMenu"></button>
 </div>
-@if (editsIn(); as department) {
+@if (editing()) {
   <div class="move">
-    <span class="move-label" aria-hidden="true">{{ resources.organizationMemberIn }}</span>
-    <nol-select class="move-choice" [label]="resources.formatOrganizationMoveLabel(teammate().name)" [options]="departmentOptions()" [value]="department.id"
+    <span class="move-label" aria-hidden="true">{{ resources.organizationDetailsReportsTo }}</span>
+    <nol-select class="move-choice" [label]="resources.formatOrganizationMoveLabel(teammate().name)" [options]="placeOptions()" [value]="placeKey()"
       (valueChange)="move($event)" />
   </div>
 }

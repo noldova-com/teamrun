@@ -9,7 +9,7 @@
 import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { type Conversation, type Department, type Project, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
+import { type Conversation, type Department, OrganizationParent, type Project, type Teammate, type TeammateLastReply } from "@noldova/teamrun.protocol";
 import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective,
   MeterComponent, PopoverTriggerDirective, SelectComponent, SelectOption } from "@noldova/ui.components.angular";
 
@@ -20,6 +20,7 @@ import { TeammateStatus } from "../../enums/teammate-status";
 import { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationCardNow } from "../../models/organization-card-now";
 import { OrganizationCardUsage } from "../../models/organization-card-usage";
+import { OrganizationPlaceChoice } from "../../models/organization-place-choice";
 import { OrganizationRunningReply } from "../../models/organization-running-reply";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatPlacement } from "../../services/chat-placement";
@@ -109,8 +110,11 @@ export class OrganizationCardComponent {
     this.projectsLayout.ordered(this.store.projects()).filter(t => t.id !== this.chat()?.projectId));
 
   protected readonly editsIn: Signal<Department | null> = computed(() => this.editing() ? this.department() : null);
-  protected readonly departmentOptions: Signal<readonly SelectOption[]> = computed(() =>
-    OrganizationNode.departmentsOf(this.organization.organization()).map(t => new SelectOption(t.id, t.name)));
+  protected readonly placeChoices: Signal<readonly OrganizationPlaceChoice[]> = computed(() =>
+    OrganizationPlaceChoice.of(OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()), OrganizationParent.teammate(this.teammate().id)));
+  protected readonly placeOptions: Signal<readonly SelectOption[]> = computed(() => this.placeChoices().map(t => new SelectOption(t.key, t.label)));
+  protected readonly placeKey: Signal<string> = computed(() =>
+    OrganizationPlaceChoice.keyOf(this.organization.organization().parentOf(OrganizationParent.teammate(this.teammate().id)) ?? OrganizationParent.person));
 
   public constructor() {
     effect(onCleanup => {
@@ -148,8 +152,9 @@ export class OrganizationCardComponent {
     await this.placement.detachFolder(chat);
   }
 
-  protected move(departmentId: string): void {
-    void this.organization.setMember(this.teammate().id, departmentId);
+  protected move(key: string): void {
+    for (const choice of this.placeChoices().filter(t => t.key === key))
+      void this.organization.placeTeammate(this.teammate().id, choice.parent);
   }
 
   protected confirmRemove(department: Department): void {

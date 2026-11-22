@@ -9,6 +9,7 @@
 import { type Department, NameOrder, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
+import type { INamedParent } from "../interfaces/i-named-parent";
 import { ConfirmRequest } from "./confirm-request";
 import type { OrganizationNode } from "./organization.node";
 
@@ -18,8 +19,8 @@ export class OrganizationEdits {
     return NameOrder.sort(teammates.filter(t => !inside.has(t.id)), t => t.name);
   }
 
-  public static deleteRequest(department: Department, nodes: readonly OrganizationNode[]): ConfirmRequest {
-    const parent = nodes.find(t => t.department?.id === department.parentId)?.name ?? null;
+  public static deleteRequest(department: Department, parents: readonly INamedParent[]): ConfirmRequest {
+    const parent = parents.find(t => t.id === department.parent.id)?.name ?? null;
     return new ConfirmRequest(Resources.organizationDeleteDepartmentTitle, Resources.formatOrganizationDeleteDepartment(department.name, parent),
       Resources.organizationDeleteLabel, null, true);
   }

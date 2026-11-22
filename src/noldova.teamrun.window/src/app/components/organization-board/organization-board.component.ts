@@ -9,7 +9,7 @@
 import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
-import { type Department, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
   SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
@@ -28,6 +28,7 @@ import { OrganizationStoreService } from "../../services/organization-store.serv
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
+import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
@@ -137,11 +138,11 @@ export class OrganizationBoardComponent {
   }
 
   protected addDepartment(): void {
-    void this.organization.createDepartment(Resources.organizationNewDepartment, null);
+    OrganizationDepartmentDialogComponent.open(this.dialogs, this.chats, this.organization, OrganizationParent.person);
   }
 
   protected deleteDepartment(department: Department): void {
-    this.confirm(OrganizationEdits.deleteRequest(department, this.departments()), () => void this.organization.deleteDepartment(department.id));
+    this.confirm(OrganizationEdits.deleteRequest(department, [...this.departments(), ...this.chats.teammates()]), () => void this.organization.deleteDepartment(department.id));
   }
 
   private confirm(request: ConfirmRequest, action: () => void): void {
@@ -155,6 +156,6 @@ export class OrganizationBoardComponent {
   }
 
   private static flatten(nodes: readonly OrganizationNode[]): readonly OrganizationNode[] {
-    return nodes.flatMap(t => [t, ...OrganizationBoardComponent.flatten(t.children)]);
+    return nodes.flatMap(t => [t, ...OrganizationBoardComponent.flatten(t.subDepartments)]);
   }
 }

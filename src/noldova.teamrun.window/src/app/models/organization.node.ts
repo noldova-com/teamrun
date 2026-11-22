@@ -7,56 +7,94 @@
  */
 
 import "@noldova/context.core";
-import { type Department, NameOrder, type Organization, OrganizationParent, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, NameOrder, type Organization, OrganizationNodeKind, OrganizationParent, type Teammate } from "@noldova/teamrun.protocol";
+
+import { Resources } from "../../resources";
 
 export class OrganizationNode {
-  public readonly department: Department;
+  private static readonly fewestColumns: number = 4;
+  public readonly key: OrganizationParent;
+  public readonly department: Department | null;
+  public readonly teammate: Teammate | null;
   public readonly leader: Teammate | null;
+  public readonly departments: readonly OrganizationNode[];
+  public readonly reports: readonly OrganizationNode[];
   public readonly members: readonly Teammate[];
-  public readonly children: readonly OrganizationNode[];
+  public readonly directReports: readonly Teammate[];
   public readonly headcount: number;
   public readonly total: number;
   public readonly hidden: number;
+  private readonly self: readonly Teammate[];
+  private readonly people: readonly Teammate[];
 
-  private constructor(department: Department, leader: Teammate | null, members: readonly Teammate[],
-    children: readonly OrganizationNode[]) {
+  private constructor(key: OrganizationParent, department: Department | null, teammate: Teammate | null, leader: Teammate | null,
+    departments: readonly OrganizationNode[], reports: readonly OrganizationNode[]) {
+    this.key = key;
     this.department = department;
+    this.teammate = teammate;
     this.leader = leader;
-    this.members = members;
-    this.children = children;
-    this.headcount = (Object.isNull(leader) ? 0 : 1) + members.length;
-    const nested = children.reduce((sum, t) => sum + t.total, 0);
+    this.departments = departments;
+    this.reports = reports;
+    this.self = Object.isNull(teammate) ? [] : [teammate];
+    this.people = [...this.self, ...reports.flatMap(t => t.people)];
+    this.members = NameOrder.sort(reports.flatMap(t => t.people), t => t.name);
+    this.directReports = reports.flatMap(t => t.self);
+    this.headcount = (Object.isNull(leader) ? 0 : 1) + this.members.length;
+    const nested = [...departments, ...reports.flatMap(t => t.subDepartments)].reduce((sum, t) => sum + t.total, 0);
     this.total = this.headcount + nested;
-    this.hidden = members.length + nested;
+    this.hidden = this.total - (Object.isNull(leader) ? 0 : 1);
   }
 
   public get id(): string {
-    return this.department.id;
+    return this.key.id ?? Resources.organizationPersonId;
   }
 
   public get name(): string {
-    return this.department.name;
+    return this.department?.name ?? this.teammate?.name ?? Resources.organizationOwnerName;
   }
 
-  public static treeOf(organization: Organization, teammates: readonly Teammate[]): readonly OrganizationNode[] {
-    const byId = new Map(teammates.map(t => [t.id, t]));
-    const under = (parentId: string | null): readonly Department[] => organization.departmentsUnder(OrganizationParent.departmentOrPerson(parentId));
-    const nodesOf = (parentId: string | null): readonly OrganizationNode[] => under(parentId).map(department => {
-      const leader = Object.isNull(department.leaderId) ? null : byId.get(department.leaderId) ?? null;
-      const members = organization.members.filter(t => t.departmentId === department.id && t.teammateId !== department.leaderId)
-        .flatMap(t => byId.get(t.teammateId) ?? []);
-      return new OrganizationNode(department, leader, NameOrder.sort(members, t => t.name), nodesOf(department.id));
+  public get children(): readonly OrganizationNode[] {
+    return [...this.departments, ...this.reports];
+  }
+
+  public get subDepartments(): readonly OrganizationNode[] {
+    return [...this.departments, ...this.reports.flatMap(t => t.subDepartments)];
+  }
+
+  public get columns(): number {
+    return Math.max(1, Math.min(this.reports.length, Math.max(OrganizationNode.fewestColumns, Math.ceil(Math.sqrt(this.reports.length)))));
+  }
+
+  public static treeOf(organization: Organization, teammates: readonly Teammate[]): OrganizationNode {
+    const nodesUnder = (parent: OrganizationParent): readonly OrganizationNode[] => organization.childrenOf(parent).flatMap(key => {
+      if (key.kind === OrganizationNodeKind.Department)
+        return organization.departments.filter(t => key.equals(OrganizationParent.department(t.id))).map(t => departmentNode(t));
+      const teammate = teammates.find(t => key.equals(OrganizationParent.teammate(t.id)));
+      return Object.isUndefined(teammate) ? nodesUnder(key) : [OrganizationNode.of(key, null, teammate, null, nodesUnder(key))];
     });
-    return nodesOf(null);
+    const departmentNode = (department: Department): OrganizationNode => {
+      const key = OrganizationParent.department(department.id);
+      const children = nodesUnder(key);
+      const leaderNode = children.find(t => !Object.isNull(t.teammate) && t.teammate.id === department.leaderId) ?? null;
+      const rest = children.filter(t => t !== leaderNode);
+      return OrganizationNode.of(key, department, null, leaderNode?.teammate ?? null, [...rest, ...leaderNode?.children ?? []]);
+    };
+    return OrganizationNode.of(OrganizationParent.person, null, null, null, nodesUnder(OrganizationParent.person));
   }
 
-  public static directReportsOf(organization: Organization, teammates: readonly Teammate[]): readonly Teammate[] {
-    const placed = new Set(organization.placements.map(t => t.teammateId));
-    return NameOrder.sort(teammates.filter(t => placed.has(t.id) && Object.isNull(organization.departmentOf(t.id))), t => t.name);
+  public static departmentsOf(organization: Organization, parent: OrganizationParent = OrganizationParent.person): readonly Department[] {
+    const under = organization.departmentsUnder(parent);
+    return organization.childrenOf(parent).flatMap(key => [...under.filter(t => key.equals(OrganizationParent.department(t.id))),
+      ...OrganizationNode.departmentsOf(organization, key)]);
   }
 
-  public static departmentsOf(organization: Organization, parentId: string | null = null): readonly Department[] {
-    return organization.departmentsUnder(OrganizationParent.departmentOrPerson(parentId))
-      .flatMap(t => [t, ...OrganizationNode.departmentsOf(organization, t.id)]);
+  public static walk(node: OrganizationNode): readonly OrganizationNode[] {
+    return [node, ...node.children.flatMap(t => OrganizationNode.walk(t))];
+  }
+
+  private static of(key: OrganizationParent, department: Department | null, teammate: Teammate | null, leader: Teammate | null,
+    children: readonly OrganizationNode[]): OrganizationNode {
+    return new OrganizationNode(key, department, teammate, leader, children.filter(t => !Object.isNull(t.department)),
+      NameOrder.sort(children.filter(t => !Object.isNull(t.teammate)), t => t.name));
   }
 }

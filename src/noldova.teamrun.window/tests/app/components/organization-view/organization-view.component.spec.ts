@@ -13,8 +13,8 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Conversation, ConversationListParams, Department, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
-  OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
+  Conversation, ConversationListParams, Department, DetailKind, EventName, Harness, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
+  OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, Teammate, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
 } from "@noldova/teamrun.protocol";
 import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -57,8 +57,8 @@ describe("OrganizationViewComponent", () => {
   };
   const texts = (selector: string, root: ParentNode = element()): string[] => all(selector, root).map(t => t.textContent?.trim() ?? "");
   const department = (name: string): HTMLElement => {
-    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(".department-name")?.textContent?.trim() === name
-      || t.querySelector<HTMLInputElement>(".department-field")?.value === name);
+    const found = all("nol-teamrun-organization-department").find(t => t.querySelector(":scope > .department .department-name")?.textContent?.trim() === name
+      || t.querySelector<HTMLInputElement>(":scope > .department .department-field")?.value === name);
     if (Object.isUndefined(found))
       throw new Error(`No department is named ${name}.`);
     return found;
@@ -69,7 +69,7 @@ describe("OrganizationViewComponent", () => {
     texts(":scope > .department .department-count", view)[0],
     texts(":scope > .department .department-summary", view)[0],
     own(view, ".leader").map(t => t.querySelector(".name")?.textContent?.trim()),
-    own(view, ".reports").flatMap(t => texts(":scope > nol-teamrun-organization-card .name", t)),
+    own(view, ".reports").flatMap(t => texts(":scope > .report > .self .name", t)),
     own(view, ".kids").flatMap(t => all(":scope > nol-teamrun-organization-department", t).map(shape)),
     texts(":scope > .hidden", view)
   ];
@@ -98,7 +98,7 @@ describe("OrganizationViewComponent", () => {
   const shows = (name: string): string[] => [...texts(".status", card(name)), ...texts(".usage", card(name)), ...texts(".model", card(name))];
   const checks = (): (string | null)[][] => menuItems().map(t => [t.querySelector(".nol-menu-item-label")?.textContent?.trim() ?? null, t.getAttribute("aria-checked")]);
   const tree = (): unknown[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(shape);
-  const reports = (): string[] => texts(".chart .tree > .kids > .report > nol-teamrun-organization-card .name");
+  const reports = (): string[] => texts(".chart .tree > .reports > .report > .self .name");
   const settle = async (): Promise<void> => {
     await fixture.whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
@@ -186,10 +186,16 @@ describe("OrganizationViewComponent", () => {
     expect([tree(), reports(), texts(".owner .role")]).toEqual([[["Build", "1", "1 stopped", ["Offline"], [], [], []]], ["Alice", "Bob", "Code Reviewer"],
       ["Owner · 4 direct reports"]]);
 
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([new Department("build", "Build", OrganizationParent.person, "offline", 0, "c", "u"),
+      new Department("lab", "Lab", OrganizationParent.teammate("bob"), "reviewer", 0, "c", "u")], [new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
+      ...underYou(["bob"]), new TeammatePlacement("reviewer", OrganizationParent.department("lab"), 0)]).toJson());
+    await settle();
+    const nested = texts(".owner .role");
     context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], []).toJson());
     await settle();
 
-    expect([tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([[], [], ["0 teammates in 0 departments"], ["Owner · 0 direct reports"]]);
+    expect([nested, tree(), reports(), texts(".top .headcount"), texts(".owner .role")]).toEqual([["Owner · 2 direct reports"], [], [], ["0 teammates in 0 departments"],
+      ["Owner · 0 direct reports"]]);
   });
 
   it("leaves a teammate with no placement out of the organization: no card, no direct report and no place in the headcount", async () => {
@@ -228,7 +234,8 @@ describe("OrganizationViewComponent", () => {
     one(".top .edit").click();
     await settle();
 
-    expect([all(".chart .tree > .kids > .report > nol-teamrun-organization-card").length, ["Code Reviewer"].map(t => all(".move-choice, .remove", card(t)).length)]).toEqual([1, [0]]);
+    expect([all(".chart .tree > .reports > .report > .self").length, [all(".move-choice", card("Code Reviewer")).length, all(".remove", card("Code Reviewer")).length]])
+      .toEqual([1, [1, 0]]);
   });
 
   it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you reaches them", async () => {
@@ -593,6 +600,8 @@ describe("OrganizationViewComponent", () => {
       card("Code Reviewer").click();
       await settle();
       const editing = [heading(), all(".message").length, all("button.name").length];
+      one(":scope > .department .message", department("UI")).focus();
+      await settle();
       await userEvent.click(one(":scope > .department .message", department("UI")));
       await settle();
 
@@ -698,7 +707,8 @@ describe("OrganizationViewComponent", () => {
   });
 
   describe("while its structure is edited", () => {
-    const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet];
+    const changes = [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMove, MethodName.DepartmentDelete, MethodName.DepartmentMemberSet,
+      MethodName.TeammatePlace];
     let asked: [string, JsonValue][];
 
     const editAsync = async (answer: () => JsonValue | Promise<JsonValue> = () => null): Promise<void> => {
@@ -777,17 +787,19 @@ describe("OrganizationViewComponent", () => {
       expect([shown, blank, asked]).toEqual([[0, "Design", "Department name"], "Design", [[MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", name: "Craft" }]]]);
     });
 
-    it("chooses a department's leader among its members in name order, or none", async () => {
+    it("chooses a department's leader among its members in name order, then any other teammate, who joins it, or none", async () => {
       await editAsync();
       const leader = (): HTMLElement => one(":scope > .department .leader-choice", department("Design"));
 
       const options = await optionsAsync(leader());
       await closeOptionsAsync();
       await chooseAsync(leader(), "Bob");
+      await chooseAsync(leader(), "Offline");
       await chooseAsync(leader(), "No leader");
 
-      expect([options, asked]).toEqual([["No leader", "Alice", "Bob"], [
+      expect([options, asked]).toEqual([["No leader", "Alice", "Bob", "Code Reviewer", "Offline"], [
         [MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: "bob" }],
+        [MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: "offline" }],
         [MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: null }]
       ]]);
     });
@@ -800,17 +812,24 @@ describe("OrganizationViewComponent", () => {
       const nested = await dialogAsync();
       await answerAsync(".nol-teamrun-cancel");
       const cancelled = asked.length;
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf([...organization.departments,
+        new Department("lab", "Lab", OrganizationParent.teammate("offline"), null, 0, "c", "u")], organization.placements).toJson());
+      await settle();
+      remove("Lab").click();
+      const underTeammate = await dialogAsync();
+      await answerAsync(".nol-teamrun-cancel");
       remove("Build").click();
       const top = await dialogAsync();
       await answerAsync(".nol-teamrun-confirm");
 
-      expect([remove("Build").getAttribute("aria-label"), nested, cancelled, top, asked]).toEqual(["Delete Build",
+      expect([remove("Build").getAttribute("aria-label"), nested, cancelled, underTeammate, top, asked]).toEqual(["Delete Build",
         ["Delete department", "Delete UI? Its departments and members move to Design.", "Delete"], 0,
+        ["Delete department", "Delete Lab? Its departments and members move to Offline.", "Delete"],
         ["Delete department", "Delete Build? Its departments move up to report to you, and its members leave every department.", "Delete"],
         [[MethodName.DepartmentDelete, { organizationId: "my-organization", departmentId: "build" }]]]);
     });
 
-    it("removes a member from its card once you confirm, moves it to another department, and shows neither once editing is done", async () => {
+    it("removes a member from its card once you confirm, moves it under any place in the tree, and shows neither once editing is done", async () => {
       await editAsync();
 
       one(".remove", card("Bob")).click();
@@ -822,16 +841,17 @@ describe("OrganizationViewComponent", () => {
       await answerAsync(".nol-teamrun-confirm");
       const departments = await optionsAsync(one(".move-choice", card("Bob")));
       await closeOptionsAsync();
-      await chooseAsync(one(".move-choice", card("Bob")), "Build");
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
       const label = one(".remove", card("Bob")).getAttribute("aria-label");
       one(".top .edit").click();
       await settle();
 
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
-        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob", ["Design", "UI", "Build"], 0]);
+        ["Remove member", "Remove Bob from Design? Bob stays on the team, in no department.", "Remove"], "Remove Bob",
+        ["You", "Design (department)", "Alice", "UI (department)", "Code Reviewer", "Build (department)", "Offline"], 0]);
       expect(asked).toEqual([[MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }],
-        [MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: "build" }]]);
+        [MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }]]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {
@@ -858,33 +878,225 @@ describe("OrganizationViewComponent", () => {
       expect(context.count(MethodName.TeammateUpdate)).toBe(0);
     });
 
-    it("adds a member from the teammates not yet in the department, in name order", async () => {
+    const nodeOf = (name: string): HTMLElement => {
+      const found = card(name).closest<HTMLElement>("nol-teamrun-organization-department");
+      if (Object.isNull(found))
+        throw new Error(`${name} is drawn in no node.`);
+      return found;
+    };
+    const searchField = (): HTMLElement => one("nol-teamrun-organization-teammate-search .nol-quick-input-field", document);
+    const searchTexts = (selector: string): string[] => [...document.querySelectorAll<HTMLElement>(`nol-teamrun-organization-teammate-search ${selector}`)]
+      .map(t => t.textContent?.trim() ?? "");
+    const searchAsync = async (trigger: HTMLElement, query: string): Promise<string[]> => {
+      await userEvent.click(trigger);
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search .nol-quick-input-field")).not.toBeNull());
+      if (query.length > 0)
+        await userEvent.type(searchField(), query);
+      await settle();
+      return searchTexts(".nol-quick-input-option .nol-quick-input-title");
+    };
+    const pickAsync = async (name: string): Promise<void> => {
+      const option = [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-teammate-search .nol-quick-input-option")]
+        .find(t => t.querySelector(".nol-quick-input-title")?.textContent?.trim() === name);
+      if (Object.isUndefined(option))
+        throw new Error(`The search offers no ${name}.`);
+      await userEvent.click(option);
+      await settle();
+    };
+    const dragData = (key: string): DataTransfer => {
+      const data = new DataTransfer();
+      data.setData(Resources.organizationDragType, key);
+      return data;
+    };
+    const dragAsync = async (from: HTMLElement, to: HTMLElement, data: DataTransfer = new DataTransfer()): Promise<boolean> => {
+      from.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: data }));
+      const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: data });
+      to.dispatchEvent(over);
+      await settle();
+      to.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+      await settle();
+      return over.defaultPrevented;
+    };
+    const lastDialog = (): ParentNode => [...document.querySelectorAll("nol-dialog")].at(-1) ?? document;
+
+    it("adds a teammate under a department from a search of the team that lists no one until a name is typed, moving one already placed", async () => {
       await editAsync();
 
-      await openMenu(one(":scope > .reports > .add-member", department("Build")));
-      const offered = menuItems().map(t => t.querySelector(".nol-menu-item-label")?.textContent?.trim());
-      menuItem("Alice").click();
-      await Wait.until(() => expect(asked).toHaveLength(1));
+      const before = await searchAsync(one(":scope > .adds > .add-member", department("Build")), "");
+      const hint = searchTexts(".nol-quick-input-empty");
+      await userEvent.type(searchField(), "zz");
+      await settle();
+      const none = searchTexts(".nol-quick-input-empty");
+      await userEvent.clear(searchField());
+      await userEvent.type(searchField(), "al");
+      await settle();
+      const found = searchTexts(".nol-quick-input-option .nol-quick-input-title");
+      await pickAsync("Alice");
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
 
-      expect([offered, asked]).toEqual([["Alice", "Bob", "Code Reviewer"], [[MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "alice", departmentId: "build" }]]]);
+      expect([before, hint, none, found, asked]).toEqual([[], ["Type a teammate's name."], ["No teammate has that name."], ["Alice"],
+        [[MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }]]]);
     });
 
-    it("adds a department under you, even when there is none yet", async () => {
+    it("adds a teammate under a teammate and under you, closes the search on Escape, and refuses one above the node in the server's words, sending nothing", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0),
+        new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0)]).toJson());
+      await settle();
+
+      const offered = await searchAsync(one(":scope > .adds > .add-member", nodeOf("Bob")), "e");
+      await pickAsync("Alice");
+      const refused = searchTexts(".error");
+      await userEvent.keyboard("{Escape}");
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
+      await searchAsync(one(".chart .kids .adds .add-member"), "off");
+      await pickAsync("Offline");
+
+      expect([offered.includes("Bob"), refused, asked]).toEqual([false, ["A teammate or department can't be under itself."],
+        [[MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder }]]]);
+    });
+
+    it("creates a department under a teammate from a dialog asking its name and a leader among the whole team, and nothing for a blank name", async () => {
+      await editAsync();
+
+      one(":scope > .adds > .add-sub-department", nodeOf("Bob")).click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
+      await Wait.until(() => expect(inDialog(".nol-dialog-title").textContent?.trim()).toBe("New department"));
+      const leaders = await optionsAsync(inDialog(".nol-teamrun-department-leader"));
+      await closeOptionsAsync();
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "{Enter}");
+      await settle();
+      const blank = [asked.length, inDialog(".nol-teamrun-save").hasAttribute("disabled")];
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      await chooseAsync(inDialog(".nol-teamrun-department-leader"), "Offline");
+      inDialog(".nol-teamrun-save").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+
+      expect([leaders, blank, asked]).toEqual([["No leader", "Alice", "Bob", "Code Reviewer", "Offline", "New teammate…"], [0, true],
+        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", parent: { kind: "Teammate", id: "bob" }, leaderId: "offline" }]]]);
+    });
+
+    it("leads a new department with a new teammate made from the dialog, keeps the leader chosen before when that is closed, and stays open when it fails", async () => {
       await editAsync();
       context.emit(EventName.OrganizationChanged, SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0)]).toJson());
       await settle();
 
-      const empty = texts(".empty");
       one(".chart .add-department").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
+      await chooseAsync(inDialog(".nol-teamrun-department-leader"), "Bob");
+      await chooseAsync(inDialog(".nol-teamrun-department-leader"), "New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      one(".nol-teamrun-cancel", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await settle();
+      const kept = inDialog(".nol-teamrun-department-leader .nol-select-value").textContent?.trim();
+      await chooseAsync(inDialog(".nol-teamrun-department-leader"), "New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      await userEvent.type(one("input.nol-teamrun-teammate-name", document), "Dana");
+      one("button[form='nol-teamrun-teammate-form']", document).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      inDialog(".nol-teamrun-save").click();
       await Wait.until(() => expect(asked).toHaveLength(1));
+      const dana = ChatStoreService.of(context).teammates().find(t => t.name === "Dana");
 
-      expect([empty, asked]).toEqual([[], [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "New department", parent: { kind: "Person", id: null }, leaderId: null }]]]);
+      expect([kept, dana?.name, asked]).toEqual(["Bob", "Dana",
+        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", parent: { kind: "Person", id: null }, leaderId: dana?.id }]]]);
+    });
+
+    it("keeps the department dialog open, saying why, when the department can't be made", async () => {
+      await editAsync(() => Promise.reject(new Error("The runtime is busy.")));
+
+      one(".chart .add-department").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
+      await userEvent.type(inDialog(".nol-teamrun-department-name"), "Craft");
+      inDialog(".nol-teamrun-save").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-dialog-error")?.textContent?.trim()).toBe("The runtime is busy."));
+      inDialog(".nol-teamrun-cancel").click();
+      await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
+    });
+
+    it("moves a nested department anywhere from its place choice, refusing one under itself in the server's words before it is sent", async () => {
+      await editAsync();
+
+      const offered = await optionsAsync(one(":scope > .department .place-choice", department("UI")));
+      await closeOptionsAsync();
+      await chooseAsync(one(":scope > .department .place-choice", department("UI")), "Offline");
+      await chooseAsync(one(":scope > .department .place-choice", department("Design")), "UI (department)");
+      const refused = texts(".action-error");
+
+      expect([offered, refused, asked]).toEqual([["You", "Design (department)", "Alice", "Code Reviewer", "Bob", "Build (department)", "Offline"],
+        ["A teammate or department can't be under itself."],
+        [[MethodName.DepartmentMove, { organizationId: "my-organization", departmentId: "ui", parent: { kind: "Teammate", id: "offline" }, order: Resources.organizationLastOrder }]]]);
+    });
+
+    it("drags a teammate or a department onto any node while editing, you included, refusing one dropped under itself, and drags nothing outside editing", async () => {
+      await editAsync();
+
+      const own = card("Offline");
+      own.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }));
+      const ownOver = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dragData("Teammate:offline") });
+      own.dispatchEvent(ownOver);
+      await settle();
+      const marks = [ownOver.defaultPrevented, own.classList.contains("nol-teamrun-organization-drop-over"),
+        one(":scope > .department", department("Design")).classList.contains("nol-teamrun-organization-drop-over")];
+      own.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dragData("Teammate:offline") }));
+      own.dispatchEvent(new DragEvent("dragend", { bubbles: true }));
+      await settle();
+      const self = [marks, texts(".action-error"), asked.length];
+      const accepted = await dragAsync(card("Offline"), one(":scope > .department", department("Design")));
+      await dragAsync(one(":scope > .department", department("UI")), card("Offline"));
+      await dragAsync(card("Bob"), one(".owner"));
+      await dragAsync(one(":scope > .department", department("Design")), one(":scope > .department", department("UI")));
+      const refused = texts(".action-error");
+      const foreign = new DataTransfer();
+      foreign.setData("text/plain", "Offline");
+      const otherData = await dragAsync(one(".owner"), card("Bob"), foreign);
+      const owner = one(".owner").getAttribute("draggable");
+      const target = one(":scope > .department", department("Build"));
+      target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dragData("Teammate:bob") }));
+      await settle();
+      const marked = target.classList.contains("nol-teamrun-organization-drop-over");
+      target.dispatchEvent(new DragEvent("dragleave", { bubbles: true }));
+      target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true }));
+      target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true }));
+      target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dragData("Teammate:") }));
+      card("Bob").dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true }));
+      await settle();
+      const left = target.classList.contains("nol-teamrun-organization-drop-over");
+      const sent = asked.length;
+      one(".top .edit").click();
+      await settle();
+      const draggable = card("Bob").getAttribute("draggable");
+      await dragAsync(card("Bob"), one(":scope > .department", department("Build")), dragData("Teammate:bob"));
+
+      expect([self, accepted, refused, otherData, owner, marked, left, draggable, asked.length - sent]).toEqual([[[false, false, false], [], 0], true,
+        ["A teammate or department can't be under itself."], false, null, true, false, null, 0]);
+      expect(asked).toEqual([[MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }],
+        [MethodName.DepartmentMove, { organizationId: "my-organization", departmentId: "ui", parent: { kind: "Teammate", id: "offline" }, order: Resources.organizationLastOrder }],
+        [MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder }]]);
+    });
+
+    it("lands two drops made within one round trip in the order they were made, each sent once the one before it is answered", async () => {
+      let release: () => void = () => undefined;
+      const held = new Promise<JsonValue>(resolve => release = () => resolve(null));
+      await editAsync(() => asked.length === 1 ? held : null);
+
+      await dragAsync(card("Offline"), one(":scope > .department", department("Design")));
+      await dragAsync(card("Bob"), one(":scope > .department", department("Design")));
+      const whileHeld = asked.length;
+      release();
+      await Wait.until(() => expect(asked.length).toBe(2));
+
+      expect([whileHeld, asked]).toEqual([1, [
+        [MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }],
+        [MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }]]]);
     });
 
     it("says why a change failed until it is dismissed", async () => {
       await editAsync(() => Promise.reject(new Error("The runtime is busy.")));
 
-      one(".chart .add-department").click();
+      await chooseAsync(one(".move-choice", card("Bob")), "Build (department)");
       await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
       const role = one(".action-error").getAttribute("role");
       one(".dismiss").click();
@@ -987,7 +1199,8 @@ describe("OrganizationViewComponent", () => {
       const leader = one(":scope > .leader", design);
       const stem = one(":scope > .stem", design);
       const reports = one(":scope > .reports", design);
-      const member = one(":scope > nol-teamrun-organization-card", reports);
+      const report = one(":scope > .report", reports);
+      const member = one(":scope > .self", report);
       const owner = one(".owner");
       const kids = one(".chart .tree > .kids");
 
@@ -995,14 +1208,15 @@ describe("OrganizationViewComponent", () => {
         AppearanceFixture.expectPixels(box(view).width, 15 * rem);
       AppearanceFixture.expectPixels(box(member).width, 13.25 * rem);
       AppearanceFixture.expectPixels(box(stem).height, space(3));
-      AppearanceFixture.expectPixels(box(stem).left - box(card).left, 7.5 * rem);
+      AppearanceFixture.expectPixels(box(stem).left + box(stem).width / 2, box(card).left + box(card).width / 2);
       AppearanceFixture.expectPixels(box(leader).top - box(card).bottom, space(3));
       AppearanceFixture.expectPixels(box(leader).left, box(card).left);
-      AppearanceFixture.expectPixels(box(reports).left - box(leader).left, space(4));
-      AppearanceFixture.expectPixels(box(member).left - box(reports).left, space(3) + 1);
-      AppearanceFixture.expectPixels(box(member).top - box(leader).bottom, space(2));
-      expect([line(reports, "").borderLeftStyle, line(member, "::before").borderTopStyle]).toEqual(["solid", "solid"]);
-      AppearanceFixture.expectPixels(Number.parseFloat(line(member, "::before").width), space(3));
+      AppearanceFixture.expectPixels(box(member).left + box(member).width / 2, box(leader).left + box(leader).width / 2);
+      AppearanceFixture.expectPixels(box(member).top - box(leader).bottom, space(3) * 2);
+      expect([line(reports, "::before").borderLeftStyle, line(reports, "::after").borderTopStyle, line(report, "::before").borderLeftStyle])
+        .toEqual(["solid", "solid", "solid"]);
+      for (const length of [line(reports, "::before").height, line(reports, "::after").top, line(report, "::before").height])
+        AppearanceFixture.expectPixels(Number.parseFloat(length), space(3));
       AppearanceFixture.expectPixels(box(kids).top - box(owner).bottom, 0);
       AppearanceFixture.expectPixels(box(card).top - box(kids).top, space(3) * 2);
       AppearanceFixture.expectPixels(box(owner).left + box(owner).width / 2, box(kids).left + box(kids).width / 2);
@@ -1014,17 +1228,14 @@ describe("OrganizationViewComponent", () => {
         .toBe(getComputedStyle(element()).getPropertyValue("--nol-weight-emphasis").trim());
     });
 
-    it("lays a direct report out first in the row under you, its card at a department card's width and top, hung off the same line", async () => {
+    it("lays your direct reports in a grid centred under you, above the departments, each card in a column of a member's width", async () => {
       await create(() => {
         organization = SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
           new Department("build", "Build", OrganizationParent.person, null, 1, "c", "u")],
           [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
             new TeammatePlacement("bob", OrganizationParent.department("design"), 1),
-            new TeammatePlacement("offline", OrganizationParent.department("build"), 0), new TeammatePlacement("reviewer", OrganizationParent.person, 0)]);
+            new TeammatePlacement("reviewer", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.person, 1)]);
       });
-      element().style.width = "100rem";
-      element().style.height = "76rem";
-      await settle();
       await Wait.until(async () => {
         one(".chart .nol-canvas-actual").click();
         await settle();
@@ -1034,21 +1245,20 @@ describe("OrganizationViewComponent", () => {
       const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const owner = one(".owner");
+      const reports = one(".chart .tree > .reports");
       const kids = one(".chart .tree > .kids");
-      const report = one(":scope > .report", kids);
-      const design = department("Design");
-      const designCard = one(":scope > .department", design);
+      const reviewer = card("Code Reviewer");
+      const offline = card("Offline");
 
-      expect(kids.firstElementChild).toBe(report);
-      expect(texts(".name", report)).toEqual(["Code Reviewer"]);
-      AppearanceFixture.expectPixels(box(card("Code Reviewer")).width, 15 * rem);
-      AppearanceFixture.expectPixels(box(report).left, box(kids).left);
-      AppearanceFixture.expectPixels(box(design).left - box(report).right, 0);
-      AppearanceFixture.expectPixels(box(card("Code Reviewer")).top - box(kids).top, space(3) * 2);
-      AppearanceFixture.expectPixels(box(card("Code Reviewer")).top, box(designCard).top);
-      AppearanceFixture.expectPixels(box(card("Code Reviewer")).left - box(report).left, box(designCard).left - box(design).left);
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(report, "::before").left), box(report).width / 2);
-      AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(report, "::after").height), space(3));
+      expect([reports.nextElementSibling, texts(":scope > .report > .self .name", reports)]).toEqual([kids, ["Code Reviewer", "Offline"]]);
+      for (const view of [reviewer, offline])
+        AppearanceFixture.expectPixels(box(view).width, 13.25 * rem);
+      AppearanceFixture.expectPixels(box(reports).left + box(reports).width / 2, box(owner).left + box(owner).width / 2);
+      AppearanceFixture.expectPixels(box(reviewer).top - box(owner).bottom, space(3) * 2);
+      AppearanceFixture.expectPixels(box(offline).top, box(reviewer).top);
+      AppearanceFixture.expectPixels(box(offline).left - box(reviewer).right, space(4));
+      AppearanceFixture.expectPixels(box(kids).top, box(reports).bottom);
     });
 
     it.each([24, 47.75, 48, 120])("lays the chat panel out across the messages in a %drem view, beside the Tree for a group and a teammate and under the Board's chat list", async width => {
@@ -1182,7 +1392,78 @@ describe("OrganizationViewComponent", () => {
       expect([name.right <= remove.left, drop.right <= tune.left, texts(".chart .nol-canvas-zoom")]).toEqual([true, true, ["100%"]]);
     });
 
-    it("joins Add department to the bar over the departments while editing, as it joins a department", async () => {
+
+    it("wraps your direct reports after four columns, filling each row in name order before the next", async () => {
+      const named = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
+      const team = [named("fay", "Fay"), named("ada", "Ada"), named("eve", "Eve"), named("bea", "Bea"), named("dee", "Dee"), named("cy", "Cy")];
+      await create(t => {
+        organization = SampleData.organizationOf([], team.map((u, i) => new TeammatePlacement(u.id, OrganizationParent.person, i)));
+        t.answer(MethodName.TeammateList, () => team.map(u => u.toJson()));
+      });
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const reports = one(".chart .tree > .reports");
+      const ada = box(card("Ada"));
+      const bea = box(card("Bea"));
+      const dee = box(card("Dee"));
+      const eve = box(card("Eve"));
+      const fay = box(card("Fay"));
+
+      expect(texts(":scope > .report > .self .name", reports)).toEqual(["Ada", "Bea", "Cy", "Dee", "Eve", "Fay"]);
+      for (const [view, top] of [[bea, ada.top], [box(card("Cy")), ada.top], [dee, ada.top], [fay, eve.top]] as const)
+        AppearanceFixture.expectPixels(view.top, top);
+      AppearanceFixture.expectPixels(eve.left, ada.left);
+      AppearanceFixture.expectPixels(fay.left, bea.left);
+      AppearanceFixture.expectPixels(eve.top - ada.bottom, space(3));
+      AppearanceFixture.expectPixels(dee.right - ada.left, box(reports).width);
+    });
+
+    it("hangs a teammate's reports and departments under its card at any depth, each card centred over its own, a department in a row below", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([new Department("ui", "UI", OrganizationParent.teammate("bob"), null, 0, "c", "u")],
+          [new TeammatePlacement("alice", OrganizationParent.person, 0), new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0),
+            new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 1), new TeammatePlacement("offline", OrganizationParent.teammate("bob"), 0)]);
+      });
+      await Wait.until(async () => {
+        one(".chart .nol-canvas-actual").click();
+        await settle();
+        await settle();
+        expect(texts(".chart .nol-canvas-zoom")).toEqual(["100%"]);
+      });
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const centre = (view: Element): number => box(view).left + box(view).width / 2;
+      const alice = card("Alice");
+      const bob = card("Bob");
+      const reviewer = card("Code Reviewer");
+      const offline = card("Offline");
+      const ui = one(":scope > .department", department("UI"));
+      const bobNode = one(":scope > .reports > .report:nth-child(1)", one(".chart .tree > .reports > .report"));
+      const reviewerNode = one(":scope > .reports > .report:nth-child(2)", one(".chart .tree > .reports > .report"));
+
+      for (const view of [alice, bob, reviewer, offline])
+        AppearanceFixture.expectPixels(box(view).width, 13.25 * rem);
+      AppearanceFixture.expectPixels(box(bob).top - box(alice).bottom, space(3) * 2);
+      AppearanceFixture.expectPixels(box(reviewer).top, box(bob).top);
+      AppearanceFixture.expectPixels(box(reviewerNode).left - box(bobNode).right, space(4));
+      AppearanceFixture.expectPixels((box(bobNode).left + box(reviewerNode).right) / 2, centre(alice));
+      AppearanceFixture.expectPixels(centre(bob), centre(bobNode));
+      AppearanceFixture.expectPixels(centre(reviewer), centre(reviewerNode));
+      AppearanceFixture.expectPixels(box(offline).top - box(bob).bottom, space(3) * 2);
+      AppearanceFixture.expectPixels(centre(offline), centre(bob));
+      expect(box(ui).top).toBeGreaterThan(box(offline).bottom);
+      expect(box(ui).left).toBeGreaterThanOrEqual(box(bobNode).left);
+      expect(box(ui).right).toBeLessThanOrEqual(box(bobNode).right);
+    });
+
+    it("joins the add buttons to the bar over the departments while editing, as it joins a department, the line meeting the pair's middle", async () => {
       await create();
       element().style.width = "72rem";
       element().style.height = "60rem";
@@ -1191,14 +1472,15 @@ describe("OrganizationViewComponent", () => {
       one(".chart .nol-canvas-actual").click();
       await settle();
       const kid = one(".chart .tree > .kids > .kid:last-child");
-      const [box, button] = [kid.getBoundingClientRect(), one(".add-department", kid).getBoundingClientRect()];
+      const [box, member, button] = [kid.getBoundingClientRect(), one(".add-member", kid).getBoundingClientRect(), one(".add-department", kid).getBoundingClientRect()];
       const [bar, drop] = [getComputedStyle(kid, "::before"), getComputedStyle(kid, "::after")];
 
       expect([getComputedStyle(kid).position, bar.borderTopStyle, drop.borderLeftStyle]).toEqual(["relative", "solid", "solid"]);
       AppearanceFixture.expectPixels(Number.parseFloat(bar.right), box.width / 2);
       AppearanceFixture.expectPixels(box.left + Number.parseFloat(drop.left), box.left + box.width / 2);
       AppearanceFixture.expectPixels(box.top + Number.parseFloat(drop.height), button.top);
-      expect(button.left <= box.left + box.width / 2 && box.left + box.width / 2 <= button.right).toBe(true);
+      AppearanceFixture.expectPixels(box.left + box.width / 2, (member.left + button.right) / 2);
+      AppearanceFixture.expectPixels(member.top, button.top);
     });
 
     describe.each([

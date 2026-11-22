@@ -19,6 +19,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
   View switches between the Tree, a Board and Focus: the Board queues who needs you, with how long ago and what they asked, then the leaders and a column for each department, and lists the Organization chats beside it, with each one's last message and the replies that came while another was open; Focus outlines the departments and their people beside one department or teammate in full, with every activity and its time, over its conversation.
   A card's menu chooses where its teammate's Organization chat works: moves it into a project, attaches a folder, or detaches it, by the chat's usual rules, and the details say where it works (#400).
   Edit structure, in every view, adds, renames and deletes departments, chooses a department's leader, and adds, moves and removes members, asking before a delete or a removal.
+  In the Tree it edits every place: it adds a teammate, found by a search over the team and moved from wherever it was, or a department, with its name and an optional leader, any teammate or a new one, under you, any teammate or any department, and moves either anywhere by its menu or by dragging it, refusing a move that would put it under itself before it is sent; a department's leader can be any teammate (#399).
   The view, the collapsed departments and the cards' fields are kept across a restart.
 
 ### Fixed

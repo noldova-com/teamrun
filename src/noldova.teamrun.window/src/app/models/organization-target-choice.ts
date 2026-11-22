@@ -33,13 +33,12 @@ export class OrganizationTargetChoice {
   }
 
   private static under(node: OrganizationNode): readonly OrganizationTargetChoice[] {
-    const department = node.department;
     return [
-      new OrganizationTargetChoice(OrganizationTarget.department(department.id), Resources.formatOrganizationDepartmentOption(department.name)),
+      new OrganizationTargetChoice(OrganizationTarget.department(node.id), Resources.formatOrganizationDepartmentOption(node.name)),
       ...(Object.isNull(node.leader) ? []
         : [new OrganizationTargetChoice(OrganizationTarget.teammate(node.leader.id), Resources.formatOrganizationLeaderOption(node.leader.name, node.name))]),
       ...node.members.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
-      ...node.children.flatMap(t => OrganizationTargetChoice.under(t))
+      ...node.subDepartments.flatMap(t => OrganizationTargetChoice.under(t))
     ];
   }
 }

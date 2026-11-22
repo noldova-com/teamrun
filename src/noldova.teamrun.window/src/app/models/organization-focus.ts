@@ -59,7 +59,7 @@ export class OrganizationFocus {
     for (const node of nodes) {
       if (matches(node))
         return [node];
-      const below = OrganizationFocus.pathTo(node.children, matches);
+      const below = OrganizationFocus.pathTo(node.subDepartments, matches);
       if (below.length > 0)
         return [node, ...below];
     }

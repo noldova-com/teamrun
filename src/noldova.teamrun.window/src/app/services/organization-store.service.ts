@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { Conversation, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, MethodName,
-  Organization, OrganizationChat, OrganizationParent } from "@noldova/teamrun.protocol";
+  Organization, OrganizationChat, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { OrganizationCatalog } from "./organization-catalog";
@@ -28,6 +28,7 @@ export class OrganizationStoreService {
   private readonly context: IWindowPartContext;
   private readonly catalog: OrganizationCatalog;
   private readonly actionErrorSignal: WritableSignal<string | null> = signal(null);
+  private edits: Promise<boolean> = Promise.resolve(true);
 
   public readonly id: Signal<string>;
   public readonly organization: Signal<Organization>;
@@ -53,8 +54,8 @@ export class OrganizationStoreService {
     return this.catalog.reload();
   }
 
-  public async createDepartment(name: string, parentId: string | null): Promise<boolean> {
-    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, OrganizationParent.departmentOrPerson(parentId)).toJson());
+  public async createDepartment(name: string, parent: OrganizationParent = OrganizationParent.person, leaderId: string | null = null): Promise<boolean> {
+    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, parent, leaderId).toJson());
   }
 
   public async renameDepartment(departmentId: string, name: string): Promise<boolean> {
@@ -65,9 +66,16 @@ export class OrganizationStoreService {
     return this.act(MethodName.DepartmentUpdate, new DepartmentUpdateParams(this.id(), departmentId, undefined, leaderId).toJson());
   }
 
-  public async moveDepartment(departmentId: string, parentId: string | null, order: number): Promise<boolean> {
-    return this.act(MethodName.DepartmentMove,
-      new DepartmentMoveParams(this.id(), departmentId, OrganizationParent.departmentOrPerson(parentId), order).toJson());
+  public async moveDepartment(departmentId: string, parent: OrganizationParent): Promise<boolean> {
+    if (this.refuses(OrganizationParent.department(departmentId), parent))
+      return false;
+    return this.act(MethodName.DepartmentMove, new DepartmentMoveParams(this.id(), departmentId, parent, Resources.organizationLastOrder).toJson());
+  }
+
+  public async placeTeammate(teammateId: string, parent: OrganizationParent | null): Promise<boolean> {
+    if (!Object.isNull(parent) && this.refuses(OrganizationParent.teammate(teammateId), parent))
+      return false;
+    return this.act(MethodName.TeammatePlace, new TeammatePlaceParams(this.id(), teammateId, parent, Resources.organizationLastOrder).toJson());
   }
 
   public async deleteDepartment(departmentId: string): Promise<boolean> {
@@ -94,7 +102,19 @@ export class OrganizationStoreService {
     this.actionErrorSignal.set(null);
   }
 
-  private async act(method: MethodName, parameters: JsonValue): Promise<boolean> {
+  private refuses(node: OrganizationParent, parent: OrganizationParent): boolean {
+    const error = this.organization().moveError(node, parent);
+    this.actionErrorSignal.set(error);
+    return !Object.isNull(error);
+  }
+
+  private act(method: MethodName, parameters: JsonValue): Promise<boolean> {
+    const sent = this.edits.then(() => this.send(method, parameters));
+    this.edits = sent;
+    return sent;
+  }
+
+  private async send(method: MethodName, parameters: JsonValue): Promise<boolean> {
     this.actionErrorSignal.set(null);
     try {
       await this.context.requestAsync(Resources.formatQualifiedName(method), parameters);

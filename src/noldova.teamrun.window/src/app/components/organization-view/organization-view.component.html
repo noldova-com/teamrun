@@ -54,41 +54,46 @@ LICENSE file in the root directory of this source tree.
 <div class="body">
   <main class="chart" [class.focused]="mode() === modes.Focus">
     @if (mode() === modes.Focus) {
-      <nol-teamrun-organization-focus class="focus" [tree]="tree()" [directReports]="directReports()" [editing]="editing()" />
+      <nol-teamrun-organization-focus class="focus" [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" />
     } @else {
       <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
         @if (mode() === modes.Board) {
-          <nol-teamrun-organization-board [tree]="tree()" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
+          <nol-teamrun-organization-board [tree]="root().subDepartments" [directReports]="directReports()" [editing]="editing()" [target]="target()" (chosen)="chosen.set($event)" />
         } @else {
           <div class="tree">
-            <div class="owner" nolCanvasItem>
+            <div class="owner" nolCanvasItem [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
               <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
               <div class="who">
                 <span class="name">{{ resources.organizationOwnerName }}</span>
                 <span class="role">{{ ownerRole() }}</span>
               </div>
             </div>
-            @if (tree().length > 0 || directReports().length > 0 || editing()) {
-              <div class="kids">
-                @for (report of directReports(); track report.id) {
-                  <div class="kid report">
-                    <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name" [teammate]="report" [editing]="editing()"
-                      [nolPopoverTrigger]="reportDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment"
-                      (message)="chosen.set(targets.teammate(report.id))" />
-                    <ng-template #reportDetails><nol-teamrun-organization-details [teammate]="report" [department]="null" /></ng-template>
-                  </div>
+            @if (root().reports.length > 0) {
+              <div class="reports" [style.--nol-teamrun-organization-columns]="root().columns">
+                @for (node of root().reports; track node.id) {
+                  <nol-teamrun-organization-department class="report" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
                 }
-                @for (node of tree(); track node.id) {
+              </div>
+            }
+            @if (root().departments.length > 0 || editing()) {
+              <div class="kids">
+                @for (node of root().departments; track node.id) {
                   <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
                 }
                 @if (editing()) {
-                  <div class="kid">
+                  <div class="kid adds">
+                    <button #search="nolPopoverTrigger" type="button" nol-button class="add-member" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
+                      [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+                      aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
+                    <ng-template #teammateSearch>
+                      <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
+                    </ng-template>
                     <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
                       class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
                   </div>
                 }
               </div>
-            } @else {
+            } @else if (root().reports.length === 0) {
               <p class="empty">{{ resources.organizationEmpty }}</p>
             }
           </div>

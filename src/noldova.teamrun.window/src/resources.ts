@@ -1214,6 +1214,7 @@ export class Resources {
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
+  public static readonly organizationPersonId: string = "person";
   public static readonly organizationEmpty: string = "No departments yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";
   public static readonly organizationCardsShowLabel: string = "Cards show";
@@ -1231,12 +1232,23 @@ export class Resources {
   public static readonly organizationDepartmentNameLabel: string = "Department name";
   public static readonly organizationLeaderLabel: string = "Leader";
   public static readonly organizationNoLeader: string = "No leader";
-  public static readonly organizationMemberIn: string = "In";
   public static readonly organizationAddMember: string = "Add member";
   public static readonly organizationAddMemberIcon: string = "person_add";
   public static readonly organizationAddDepartment: string = "Add department";
   public static readonly organizationAddDepartmentIcon: string = "add";
   public static readonly organizationNewDepartment: string = "New department";
+  public static readonly organizationNewTeammateOption: string = "New teammate…";
+  public static readonly organizationNewTeammateValue: string = "new-teammate";
+  public static readonly organizationDragType: string = "application/x-noldova-organization-node";
+  public static readonly organizationDragEffect: "move" = "move";
+  public static readonly organizationDraggable: string = "true";
+  public static readonly organizationLastOrder: number = Number.MAX_SAFE_INTEGER;
+  public static readonly organizationCreateLabel: string = "Create";
+  public static readonly organizationAddTeammate: string = "Add teammate";
+  public static readonly organizationAddTeammateSearch: string = "Find a teammate";
+  public static readonly organizationAddTeammateSearchIcon: string = "search";
+  public static readonly organizationAddTeammateEmpty: string = "Type a teammate's name.";
+  public static readonly organizationAddTeammateNone: string = "No teammate has that name.";
   public static readonly organizationDeleteIcon: string = "delete";
   public static readonly organizationRemoveIcon: string = "person_remove";
   public static readonly organizationNowRunningIcon: string = "progress_activity";
@@ -1878,7 +1890,7 @@ export class Resources {
   }
 
   public static formatOrganizationMoveLabel(name: string): string {
-    return `Department of ${name}`;
+    return `Who ${name} reports to`;
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
