@@ -1,0 +1,32 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="title()" (dismissed)="closed.emit()">
+  <form id="nol-teamrun-type-form" class="nol-teamrun-form" novalidate (submit)="save($event)">
+    <label class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationTypeNameLabel }}</span>
+      <input #field nol-text-field class="nol-teamrun-type-name" name="name" [attr.aria-label]="resources.organizationTypeNameLabel" [value]="name()"
+        [disabled]="saving()" (input)="edit()">
+    </label>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationTypeIconLabel }}</span>
+      <nol-icon-chooser class="nol-teamrun-type-icon" [label]="resources.organizationTypeIconLabel" [disabled]="saving()" [(value)]="icon" />
+    </div>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationTypeColorLabel }}</span>
+      <nol-color-chooser class="nol-teamrun-type-color" [label]="resources.organizationTypeColorLabel" [allowNone]="true" [disabled]="saving()" [(value)]="color" />
+    </div>
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="closed.emit()">{{ resources.closeLabel }}</button>
+  <button type="submit" form="nol-teamrun-type-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">
+    {{ type() === null ? resources.organizationCreateLabel : resources.saveLabel }}
+  </button>
+</nol-dialog>
