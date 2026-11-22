@@ -192,7 +192,7 @@ describe("ModelCatalogCache", () => {
   });
 
   it("coalesces requests and bounds pending requests and kept catalogs", async () => {
-    let complete!: (list: ProviderModelList) => void;
+    let complete: (list: ProviderModelList) => void = () => undefined;
     const pending = new Promise<ProviderModelList>(resolve => complete = resolve);
     const fetchModels = vi.fn((): Promise<ProviderModelList> => pending);
     const cache = new ModelCatalogCache(fetchModels, clock);
