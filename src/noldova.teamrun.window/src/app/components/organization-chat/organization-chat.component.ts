@@ -7,8 +7,8 @@
  */
 
 import { NgComponentOutlet } from "@angular/common";
-import { Component, computed, createEnvironmentInjector, DestroyRef, effect, EnvironmentInjector, inject, model, type ModelSignal, type Signal, signal, type Type,
-  untracked, type WritableSignal } from "@angular/core";
+import { Component, computed, createEnvironmentInjector, DestroyRef, effect, EnvironmentInjector, inject, linkedSignal, model, type ModelSignal, type Signal, signal,
+  type Type, untracked, type WritableSignal } from "@angular/core";
 import "@noldova/context.core";
 import { type AttachmentInput, MessageAuthor, MessageStatus, OrganizationTarget, OrganizationTargetKind } from "@noldova/teamrun.protocol";
 import { provideCodeHighlighting } from "@noldova/ui.components.angular/code-highlighting";
@@ -39,7 +39,7 @@ export class OrganizationChatComponent {
   private readonly opening: Map<string, Promise<string | null>> = new Map();
   private readonly reached: Set<string> = new Set();
   private readonly reading: Set<string> = new Set();
-  private readonly errorSignal: WritableSignal<string | null> = signal(null);
+  private readonly errorSignal: WritableSignal<string | null> = linkedSignal({ source: () => this.target(), computation: (): string | null => null });
   private retrying: string | null = null;
 
   public readonly target: ModelSignal<OrganizationTarget> = model.required<OrganizationTarget>();
@@ -93,10 +93,7 @@ export class OrganizationChatComponent {
     effect(() => {
       const teammateId = this.teammateId();
       if (!Object.isNull(teammateId) && this.store.loaded() && Object.isNull(this.chatId()))
-        untracked(() => {
-          this.errorSignal.set(null);
-          void this.open(teammateId);
-        });
+        untracked(() => void this.open(teammateId));
     });
     effect(() => {
       const chatIds = this.recipients().flatMap(t => this.chatOf(t) ?? []);

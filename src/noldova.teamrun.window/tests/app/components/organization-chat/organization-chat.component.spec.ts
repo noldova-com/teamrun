@@ -188,6 +188,32 @@ describe("OrganizationChatComponent", () => {
     expect([element().querySelector("nol-teamrun-composer"), element().querySelector("nol-teamrun-history"), opened]).toEqual([null, null, ["alice"]]);
   });
 
+  it("forgets why a chat couldn't open once another is chosen under To", async () => {
+    openAnswer = () => Promise.reject(new Error("There is no teammate alice."));
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["There is no teammate alice."]));
+
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    expect(texts("[role=alert]")).toEqual([]);
+  });
+
+  it("says why a send to a group failed until a send reaches every recipient", async () => {
+    openAnswer = () => Promise.reject(new Error("The runtime is busy."));
+    await create(OrganizationTarget.department("d1"));
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["The runtime is busy."]));
+
+    openAnswer = id => chatOf(id).toJson();
+    await sendNow();
+    await Wait.until(() => expect(sent()).toHaveLength(2));
+    await fixture.whenStable();
+
+    expect(texts("[role=alert]")).toEqual([]);
+  });
+
   it("sends one message to each recipient's own Organization chat, answered by that recipient, lists them with their reply status, and opens one's chat", async () => {
     kept = [chatOf("alice")];
     await create(OrganizationTarget.department("d1"));
