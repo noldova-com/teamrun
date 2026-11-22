@@ -342,6 +342,40 @@ export class AcpTurnTests {
   }
 
   @TestMethod
+  public async leavesAnApprovedPlanTheAgentLeavesByItselfAtItsNextModeUpdateNotingAFailureButNotAClosedRun(): Promise<void> {
+    const refused = new Error("Mode refused");
+    const closed = Object.assign(new Error("The message is not open."), { info: { name: ErrorCode.Conflict } });
+    const plans: IAcpPlanReader = { methods: ["plan/review"], nativeKind: "plan/review", leavesPlan: true,
+      read: () => ({ text: "Fix the bug", steps: [] }), reply: (_params, approved) => ({ approved }) };
+    const modeUpdate = JsonReader.fromValue({ sessionId: "s", update: { sessionUpdate: "current_mode_update", currentModeId: "default" } });
+    const seen: string[] = [];
+    for (const failure of [refused, closed]) {
+      const listener = new RecordingTurnListener();
+      listener.decisions.push(Resources.acpApprovePlanOption);
+      const left: string[] = [];
+      const leaving = Promise.withResolvers<void>();
+      const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined, null, plans,
+        t => {
+          left.push(t);
+          leaving.reject(failure);
+          return leaving.promise;
+        });
+      await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
+
+      const answer = await turn.onRequest("7", "plan/review", JsonReader.fromValue({ sessionId: "s" }));
+      const beforeUpdate = left.length;
+      await turn.onNotificationAsync(Resources.acpSessionUpdate, modeUpdate);
+      await turn.onNotificationAsync(Resources.acpSessionUpdate, modeUpdate);
+      await leaving.promise.catch(() => undefined);
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      seen.push([JSON.stringify(answer), beforeUpdate, left.join(","), listener.texts.filter(t => t.startsWith(Resources.formatChatModeKeptOut("Agent", ""))).join("|")].join(" "));
+    }
+
+    Assert.areEqual([`{"approved":true} 0 s ${Resources.formatChatModeKeptOut("Agent", "Mode refused")}`, "{\"approved\":true} 0 s "].join("\n"), seen.join("\n"));
+  }
+
+  @TestMethod
   public async cancelsAnElicitationWhoseCancelArrivesInTheSameChunk(): Promise<void> {
     await using host = new GrokTestHost();
     const listener = new RecordingTurnListener();

@@ -37,6 +37,7 @@ import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { ISavedImageReader } from "../../interfaces/i-saved-image.reader.js";
 import { AcpConfigOption } from "../../models/acp-config-option.js";
+import { AcpHeldSteer } from "../../models/acp-held-steer.js";
 import { AcpModelChoices } from "../../models/acp-model-choices.js";
 import { AcpSession } from "../../models/acp-session.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
@@ -324,13 +325,26 @@ export class AcpAdapter implements IProviderAdapter {
     let keeping: AcpKeptSession | null = null;
     let unreported = false;
     const approvedTools = request.tools?.approvedTools ?? [];
+    const readOnlyChat = this.agent.modes.some(t => t.id === asked.requested.mode && t.readOnly && t.id !== this.planMode);
+    const restartsPlan = readOnlyChat && asked !== request && this.agent.plans?.leavesPlan === true;
+    const restarts = new Set<string>();
+    const held: AcpHeldSteer[] = [];
+    const leave = (t: string): Promise<void> => {
+      if (!restartsPlan)
+        return this.leavePlan(client, t, asked, request);
+      this.sessionModes.set(client, this.agent.defaultMode);
+      restarts.add(t);
+      turn.restartAfterCancel();
+      client?.notify(Resources.acpSessionCancel, { sessionId: t });
+      return Promise.resolve();
+    };
     const createTurn = (target: ITurnListener, turnSignal: AbortSignal): AcpTurn => new AcpTurn(kindId, this.descriptor.displayName, this.agent.toolTitle,
       target, turnSignal, this.timings.streamInterval, (tool, session) => this.savedImages?.read(tool, session, request.provider, request.workingDirectory) ?? null,
       this.agent.routedMcpTool, async t => (await request.tools?.host.listToolsAsync(t) ?? []).map(u => String(u[Resources.nameField])),
       (tool, session) => this.agent.toDos?.read(tool, session, request.provider) ?? null, tool => this.savedImages?.failureOf(tool) ?? null, this.agent.questions,
-      this.agent.plans ?? null, t => this.leavePlan(client, t, asked, request), approvedTools, tool => this.agent.mcpToolOf?.(tool) ?? null,
+      this.agent.plans ?? null, leave, approvedTools, tool => this.agent.mcpToolOf?.(tool) ?? null,
       async t => Object.isNull(request.tools) ? [] : ReadOnlyMcpTools.listAsync(request.tools, t),
-      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null);
+      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null, readOnlyChat);
     const turn = createTurn(listener, signal);
     const sender = SenderEnvironment.read(request.environment);
     const commands = new AcpCommands();
@@ -491,12 +505,34 @@ export class AcpAdapter implements IProviderAdapter {
       const steering = this.agent.steering;
       if (!Object.isUndefined(steering))
         listener.onSteerable?.(t => {
+          if (restarts.has(steered)) {
+            const sent = Promise.withResolvers<boolean>();
+            held.push(new AcpHeldSteer(t, sent));
+            steers.push(sent.promise);
+            return sent.promise;
+          }
           const taken = this.steer(current, steering, steered, t);
           steers.push(taken);
           return taken;
         });
       step = Resources.turnStepPrompt;
-      const result = JsonReader.fromValue(await client.request(Resources.acpSessionPrompt, { sessionId, prompt }, null));
+      let result = JsonReader.fromValue(await client.request(Resources.acpSessionPrompt, { sessionId, prompt }, null));
+      if (restarts.has(sessionId))
+        try {
+          await this.leavePlan(client, sessionId, asked, request);
+          if (!signal.aborted && result.readNonBlankString(Resources.acpStopReasonField) === Resources.acpCancelled) {
+            turn.noteSent(CoreResources.planApprovedPrompt);
+            const sending = [...held];
+            const answer = client.request(Resources.acpSessionPrompt, { sessionId, prompt: await this.restartBlocksOf(sending) }, null);
+            restarts.delete(sessionId);
+            sending.forEach(t => t.sent.resolve(true));
+            result = JsonReader.fromValue(await answer);
+          }
+        }
+        finally {
+          restarts.delete(sessionId);
+          held.forEach(t => t.sent.resolve(false));
+        }
       step = Resources.turnStepAnswer;
       const reason = result.readNonBlankString(Resources.acpStopReasonField);
       if (signal.aborted || reason === Resources.acpCancelled)
@@ -531,6 +567,7 @@ export class AcpAdapter implements IProviderAdapter {
     }
     finally {
       listener.onSteerable?.(null);
+      held.forEach(t => t.sent.resolve(false));
       signal.removeEventListener(Resources.abortEvent, cancel);
       interruptWait.abort();
       toolsWait.abort();
@@ -688,6 +725,19 @@ export class AcpAdapter implements IProviderAdapter {
     catch {
       return false;
     }
+  }
+
+  private async restartBlocksOf(steers: readonly AcpHeldSteer[]): Promise<JsonValue[]> {
+    const blocks = await this.blocksOf(CoreResources.planApprovedPrompt, []);
+    for (const held of steers) {
+      try {
+        blocks.push(...await this.blocksOf(held.steer.text, held.steer.attachments));
+      }
+      catch {
+        held.sent.resolve(false);
+      }
+    }
+    return blocks;
   }
 
   private async blocksOf(text: string, attachments: readonly MessageAttachment[]): Promise<JsonValue[]> {
@@ -890,16 +940,18 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async leavePlan(client: AcpClient | null, sessionId: string, asked: TurnRequest, request: TurnRequest): Promise<void> {
-    if (this.agent.plans?.leavesPlan === true) {
+    const leaves = this.agent.plans?.leavesPlan === true;
+    if (leaves)
       this.sessionModes.set(client, this.agent.defaultMode);
-      return;
-    }
     if (asked === request || Object.isNull(client))
       return;
     const wanted = this.agent.modes.find(t => t.id === asked.requested.mode && t.id !== this.planMode);
     const mode = Object.isUndefined(wanted) || this.runsInDefault(wanted.id) ? this.agent.defaultMode : wanted.id;
-    if (!Object.isNull(mode))
-      await client.request(Resources.acpSessionSetMode, { sessionId, modeId: mode });
+    if (Object.isNull(mode) || (leaves && mode === this.agent.defaultMode))
+      return;
+    await client.request(Resources.acpSessionSetMode, { sessionId, modeId: mode });
+    if (leaves)
+      this.sessionModes.set(client, mode);
   }
 
   private async noteWakeModeAsync(client: AcpClient | null, launched: string | null, wake: WakeTurn): Promise<void> {

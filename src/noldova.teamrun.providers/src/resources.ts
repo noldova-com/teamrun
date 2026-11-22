@@ -548,6 +548,7 @@ export class Resources {
   public static readonly acpToolCall: string = "tool_call";
   public static readonly acpToolUpdate: string = "tool_call_update";
   public static readonly acpPlanUpdate: string = "plan";
+  public static readonly acpCurrentModeUpdate: string = "current_mode_update";
   public static readonly acpEntriesField: string = "entries";
   public static readonly acpPlanStatuses: Readonly<Record<string, PlanStepStatus>> = {
     pending: PlanStepStatus.Pending,
@@ -3948,6 +3949,14 @@ export class Resources {
 
   public static formatPlanModeKept(provider: string, error: string): string {
     return `${provider} couldn't leave its plan mode once the plan was approved: ${error}`;
+  }
+
+  public static formatReadOnlyChatRefused(provider: string, tool: string): string {
+    return `TeamRun refused ${provider}'s request to run ${tool}: the plan is approved, and the chat's own mode is read-only.`;
+  }
+
+  public static formatChatModeKeptOut(provider: string, error: string): string {
+    return `${provider} left its plan mode for its default mode and couldn't go back to the chat's mode: ${error}`;
   }
 
   public static formatToDoListUnread(provider: string, error: string): string {

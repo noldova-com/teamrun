@@ -3130,6 +3130,7 @@ export declare class Resources {
    * The ACP session update that sends the agent's plan: `plan`.
    */
   public static readonly acpPlanUpdate: string;
+  public static readonly acpCurrentModeUpdate: string;
   public static readonly acpEntriesField: string;
   public static readonly acpPlanStatuses: Readonly<Record<string, PlanStepStatus>>;
   public static readonly planDetailId: string;
@@ -6677,6 +6678,8 @@ export declare class Resources {
    * @returns Such as "Cursor couldn't leave its plan mode once the plan was approved: Mode refused".
    */
   public static formatPlanModeKept(provider: string, error: string): string;
+  public static formatChatModeKeptOut(provider: string, error: string): string;
+  public static formatReadOnlyChatRefused(provider: string, tool: string): string;
 
   /**
    * Formats the note of a to-do list notification that couldn't be read, which leaves the reply's plan as it was.
@@ -12993,7 +12996,7 @@ export interface IAcpPlanReader {
   readonly methods: readonly string[];
   /** The native kind the plan's approval shows, such as Cursor's `create_plan`. */
   readonly nativeKind: string;
-  /** Whether the agent leaves its plan mode by itself, for its default mode, once told the plan is approved, as Grok does; a turn otherwise switches it out first. */
+  /** Whether the agent leaves its plan mode by itself, for its default mode, once told the plan is approved, as Grok does, and a turn then asks for the chat's mode once it reports its new mode, which applies from the agent's next turn; a turn otherwise switches it out first. */
   readonly leavesPlan: boolean;
   /**
    * The request's plan: its Markdown text and its to-dos as steps; `null` when the agent handed over no plan, and a turn then answers as if the
@@ -16207,9 +16210,11 @@ export declare class AcpTurn implements IAcpClientListener {
    * @param plans Reads the agent's own plan requests; none by default. A plan request of the turn's session reports its plan text, and its
    * to-dos as the reply's plan, asks the person to Approve plan or Keep planning, reports the plan text again as approved or refused, and
    * answers the agent with the person's choice; a dismissed or stopped ask answers as cancelled.
-   * @param leavePlan Called once the person approved a plan, before the agent is answered: the adapter switches the session out of its plan
-   * mode, or, when the reader's `leavesPlan` says the agent leaves it by itself, notes the mode the agent leaves it for; nothing by default.
-   * When it fails, the turn reports a note with `Resources.formatPlanModeKept` and the plan is still approved.
+   * @param leavePlan Called once the person approved a plan to switch the session out of its plan mode, into the chat's own mode; nothing by
+   * default. It is called before the agent is answered, and when it fails, the turn reports a note with `Resources.formatPlanModeKept` and the
+   * plan is still approved. When the reader's `leavesPlan` says the agent leaves its plan mode by itself, for its default mode, once answered,
+   * it is called instead at the session's next `current_mode_update`, without waiting for it, and a failure other than the run closing reports
+   * a note with `Resources.formatChatModeKeptOut`; for such an agent the mode it asks for applies from the agent's next turn.
    * @param approvedTools The names of TeamRun's tools the person approved for every call; none by default.
    * @param mcpToolOf Reads which MCP server and tool a permission request is for, as `IAcpAgent.mcpToolOf`; none by default. A request it reads
    * as TeamRun's server, `teamrun`, and a tool `readOnlyTools` lists is allowed once without asking; one for another tool of that server is asked
@@ -16221,6 +16226,11 @@ export declare class AcpTurn implements IAcpClientListener {
    * mode, by `leavePlan` or by the agent itself, `allowsAll` allows nothing, and a turn that fails to leave it keeps asking. False by default.
    * @param toDoList Reads the agent's own to-do list notifications; none by default. One of the turn's session, while the turn runs, reports
    * the list as the reply's plan.
+   * @param readOnlyChat Whether the chat's own mode, which a plan-first turn leaves its plan for, is read-only, such as Ask; false by default.
+   * Once the person approves the plan of such a turn, each permission request the rules above for TeamRun's tools don't settle is refused
+   * without asking, with a `Resources.formatReadOnlyChatRefused` note, whatever mode the agent reports, until the turn ends. For an agent whose
+   * reader's `leavesPlan` is set, the adapter's `leavePlan` then cancels the turn at that update, and the adapter goes on in the same reply
+   * with a new turn in the chat's mode, so a write the agent starts before the cancel lands is refused too.
    */
   public constructor(kindId: string, providerName: string, toolTitle: string, listener: ITurnListener, signal: AbortSignal, streamInterval: number,
     savedImageOf?: (tool: JsonReader, sessionId: string) => SavedImage | null, routedMcpTool?: string | null,
@@ -16228,7 +16238,7 @@ export declare class AcpTurn implements IAcpClientListener {
     imageFailureOf?: (tool: JsonReader) => JsonObject | null, questions?: IAcpQuestionReader | null, plans?: IAcpPlanReader | null,
     leavePlan?: (sessionId: string) => Promise<void>, approvedTools?: readonly string[], mcpToolOf?: (tool: JsonReader) => AcpMcpTool | null,
     readOnlyTools?: (signal: AbortSignal) => Promise<readonly string[]>, allowsAll?: boolean, planning?: boolean,
-    toDoList?: IAcpToDoListReader | null);
+    toDoList?: IAcpToDoListReader | null, readOnlyChat?: boolean);
 
   /**
    * Whether the agent reported that its context is full, as Grok's failed `context_length` retry state does, so a failed prompt says so.
@@ -16266,6 +16276,12 @@ export declare class AcpTurn implements IAcpClientListener {
    * blank for a resumed one.
    */
   public beginAsync(sessionId: string, resumed: boolean, observed: ObservedSettings, roleApplied?: import("@noldova/teamrun.protocol").RoleApplication | null): Promise<void>;
+
+  /**
+   * Keeps the turn going past its prompt's next `cancelled` answer, which the adapter asks for when it cancels an approved plan's turn to
+   * go on in a new prompt in the chat's mode: that answer ends the text so far without finishing the turn.
+   */
+  public restartAfterCancel(): void;
 
   /**
    * Holds the end of a woken turn until a switch of its session's mode settles.

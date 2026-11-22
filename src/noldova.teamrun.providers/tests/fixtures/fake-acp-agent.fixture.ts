@@ -95,6 +95,11 @@ export class FakeAcpAgent {
   private approvalPrompt: number | null = null;
   private planPrompt: number | null = null;
   private planThenBackground: number | null = null;
+  private planLeftPrompt: number | null = null;
+  private planLeftAnswer: JsonValue = null;
+  private planLeftEdit: JsonValue = null;
+  private planLeftCancelled: boolean = false;
+  private planLeftEndsFirst: boolean = false;
   private planAskPrompt: number | null = null;
   private readonly planAnswers: JsonValue[] = [];
   private readonly methods: string[] = [];
@@ -181,7 +186,37 @@ export class FakeAcpAgent {
           this.planAskPrompt = null;
         }
       }
+      else if (value["id"] === "grok-plan-left" && !Object.isNull(this.planLeftPrompt)) {
+        this.planLeftAnswer = value["result"] ?? value["error"] ?? null;
+        this.update({ sessionUpdate: "current_mode_update", currentModeId: "default" });
+        if (this.planLeftEndsFirst) {
+          this.endPlanLeft(this.planLeftPrompt, "end_turn");
+          return;
+        }
+        this.write({ jsonrpc: "2.0", id: "grok-plan-left-edit", method: "session/request_permission", params: { sessionId: this.sessionId,
+          toolCall: { toolCallId: "edit-1", kind: "edit", title: "Edit notes.md", rawInput: { path: "notes.md" } }, options: [
+            { optionId: "allow-once", name: "Allow once", kind: "allow_once" }, { optionId: "reject-once", name: "Reject", kind: "reject_once" }
+          ] } });
+      }
+      else if (value["id"] === "grok-plan-left-edit" && !Object.isNull(this.planLeftPrompt)) {
+        this.planLeftEdit = value["result"] ?? value["error"] ?? null;
+        const prompt = this.planLeftPrompt;
+        if (this.planLeftCancelled && process.env["TEAMRUN_FAKE_ACP_PLAN_LEFT_HOLD"] === "1") {
+          const released = setInterval(() => {
+            if (!existsSync(join(process.cwd(), "plan-left-released.txt"))) return;
+            clearInterval(released);
+            this.endPlanLeft(prompt, "cancelled");
+          }, 10);
+        }
+        else if (this.planLeftCancelled)
+          this.endPlanLeft(prompt, "cancelled");
+        else
+          this.write({ jsonrpc: "2.0", id: "grok-plan-left-ping", method: "fake/ping", params: { sessionId: this.sessionId } });
+      }
+      else if (value["id"] === "grok-plan-left-ping" && !Object.isNull(this.planLeftPrompt))
+        this.endPlanLeft(this.planLeftPrompt, "end_turn");
       else if (value["id"] === "grok-plan" && this.planThenBackground !== null) {
+        this.update({ sessionUpdate: "current_mode_update", currentModeId: "default" });
         this.startBackground(this.planThenBackground, "background");
         this.planThenBackground = null;
       }
@@ -202,6 +237,8 @@ export class FakeAcpAgent {
     const method = message.readString("method");
     this.methods.push(method);
     if (method === "session/cancel") {
+      if (!Object.isNull(this.planLeftPrompt))
+        this.planLeftCancelled = true;
       if (this.wakeHeld === "hold")
         this.endWake("wake cancelled", "cancelled");
       if (this.held !== null && process.env["TEAMRUN_FAKE_ACP_IGNORE_CANCEL"] !== "1") {
@@ -384,9 +421,15 @@ export class FakeAcpAgent {
       this.respond(id, process.env["TEAMRUN_FAKE_ACP_SET_ANSWER"] === "null" ? { configOptions: null } : { configOptions: this.options });
     }
     else if (method === "session/set_mode") {
-      if (process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === "fail") { this.fail(id, "Mode refused"); return; }
+      if (process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === "fail" || process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === `fail-${params.readString("modeId")}`) {
+        this.fail(id, "Mode refused");
+        return;
+      }
       if (process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === "late" && this.wakeHeld !== null) { this.lateModeRefusal = id; return; }
       this.sets.push(`mode=${params.readString("modeId")}`);
+      const setsFile = process.env["TEAMRUN_FAKE_ACP_SETS"];
+      if (!Object.isUndefined(setsFile))
+        appendFileSync(setsFile, `mode=${params.readString("modeId")}\n`);
       this.respond(id, {});
     }
     else if (method === "session/prompt" && this.held !== null && JSON.stringify(params.toJson()["_meta"] ?? null) === JSON.stringify({ fx: { steer: true } })) {
@@ -490,6 +533,18 @@ export class FakeAcpAgent {
       }
       if (prompt === "background" || prompt === "background-held" || prompt === "background-and-sub-agent") {
         this.startBackground(id, prompt);
+        return;
+      }
+      if (prompt === "Go ahead with the plan." && this.planLeftCancelled) {
+        this.planLeftCancelled = false;
+        this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ restarted: parts.map(t => t.toJson()["text"] ?? null), sets: this.sets }) } });
+        this.respond(id, { stopReason: "end_turn" });
+        return;
+      }
+      if (prompt === "plan-left-for-default" || prompt === "plan-left-ends-first") {
+        this.planLeftPrompt = id;
+        this.planLeftEndsFirst = prompt === "plan-left-ends-first";
+        this.write({ jsonrpc: "2.0", id: "grok-plan-left", method: "x.ai/exit_plan_mode", params: { sessionId: this.sessionId, toolCallId: "tc-1", planContent: "# Tidy" } });
         return;
       }
       if (prompt === "plan-then-background") {
@@ -1074,6 +1129,13 @@ export class FakeAcpAgent {
 
   private update(update: JsonObject): void {
     this.write({ jsonrpc: "2.0", method: "session/update", params: { sessionId: this.sessionId, update } });
+  }
+
+  private endPlanLeft(prompt: number, stopReason: string): void {
+    this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ result: this.planLeftAnswer, edit: this.planLeftEdit, sets: this.sets,
+      cancelled: this.planLeftCancelled }) } });
+    this.respond(prompt, { stopReason });
+    this.planLeftPrompt = null;
   }
 
   private respond(id: number, result: JsonValue): void {
