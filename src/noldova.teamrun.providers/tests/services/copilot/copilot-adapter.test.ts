@@ -20,6 +20,7 @@ import { TurnAbilityProbes } from "../../fixtures/ability-checks/turn-ability-pr
 import { AcpCommandCheck } from "../../fixtures/acp-command-check.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
 import { CopilotTestHost } from "../../fixtures/copilot-test-host.fixture.js";
+import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { PlanToolRule } from "../../fixtures/plan-tool-rule.fixture.js";
 import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
@@ -786,10 +787,8 @@ export class CopilotAdapterTests {
     const joined = adapter.listModels(host.provider);
     let ended = false;
     void Promise.allSettled([refreshed, joined]).then(() => { ended = true; });
-    await Wait.until(() => {
-      timer.advance(host.timings.stopGrace);
-      return ended;
-    }, "The refresh and the joined listing did not end.");
+    await IdleLimit.elapseAsync(timer, host.timings.stopGrace, "The refresh held no wait due within the stop grace.");
+    await Wait.until(() => ended, "The refresh and the joined listing did not end.");
 
     Assert.isTrue(await joined === await refreshed);
     Assert.areEqual(2, host.programs.started.length);
