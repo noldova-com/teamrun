@@ -23,11 +23,11 @@ export class OrganizationTargetChoice {
     this.label = label;
   }
 
-  public static of(tree: readonly OrganizationNode[], directReports: readonly Teammate[]): readonly OrganizationTargetChoice[] {
+  public static of(tree: readonly OrganizationNode[], reports: readonly Teammate[]): readonly OrganizationTargetChoice[] {
     return [
       new OrganizationTargetChoice(OrganizationTarget.leaders, Resources.organizationLeadersTitle),
       new OrganizationTargetChoice(OrganizationTarget.everyone, Resources.organizationEveryoneTitle),
-      ...directReports.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
+      ...reports.map(t => new OrganizationTargetChoice(OrganizationTarget.teammate(t.id), t.name)),
       ...tree.flatMap(t => OrganizationTargetChoice.under(t))
     ];
   }

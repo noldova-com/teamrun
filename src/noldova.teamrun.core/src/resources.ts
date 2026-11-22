@@ -52,6 +52,8 @@ export class Resources {
   public static readonly contextOmissionNote: string = "Earlier messages were omitted from this context.";
   public static readonly defaultHopLimit: number = 4;
   public static readonly maximumTitleLength: number = 60;
+  public static readonly messageParameterName: string = "message";
+  public static readonly titleNeedsText: string = "A title needs a message with a line that isn't blank.";
   public static readonly titleOpeningLength: number = 4000;
   public static readonly titleAskTimeout: number = 60_000;
   public static readonly titleModelSeparator: string = "/";
@@ -311,6 +313,7 @@ export class Resources {
   public static readonly gitObjectsDirectoryName: string = "objects";
   public static readonly gitBranchesPath: string = "refs/heads";
   public static readonly chatGitHead: string = "ref: refs/heads/main\n";
+  public static readonly chatGitHeadDraftFileName: string = "HEAD.teamrun";
   public static readonly chatGitConfig: string = "[core]\n\trepositoryformatversion = 0\n\tbare = false\n";
   public static readonly removeRetries: number = 3;
   public static readonly checkpointsDeleted: string = "Deleted";
@@ -1351,6 +1354,10 @@ export class Resources {
     return `The message "${messageId}" is not a running reply.`;
   }
 
+  public static formatReadyWakeWithoutText(wakeId: string): string {
+    return `The ready wake "${wakeId}" has no text to deliver.`;
+  }
+
   public static formatReplyWithoutProvenance(messageId: string): string {
     return `The reply "${messageId}" has no provenance, so the provider that writes it is unknown.`;
   }
@@ -1785,6 +1792,10 @@ export class Resources {
 
   public static formatToolCallNotKept(chatId: string, failureKind: string): string {
     return `A tool call's record in the chat ${chatId} wasn't kept: ${failureKind}.`;
+  }
+
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string {
+    return `A waiting message in the chat ${chatId} was kept but not delivered: ${failureKind}.`;
   }
 
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string {

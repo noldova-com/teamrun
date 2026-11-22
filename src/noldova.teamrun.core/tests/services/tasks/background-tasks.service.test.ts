@@ -87,6 +87,21 @@ export class BackgroundTasksServiceTests {
   }
 
   @TestMethod
+  public async publishesOnlyTheLatestKeptCharactersOfOutputGatheredBetweenPublishes(): Promise<void> {
+    const { service, listener } = BackgroundTasksServiceTests.create(20);
+    const flood = "x".repeat(Resources.maximumBackgroundTaskOutput);
+    await service.startAsync("conv-1", "msg-1", "codex", new TaskStart("item-1", "npm test", () => Promise.resolve()));
+
+    service.write("msg-1", "item-1", "head ");
+    service.write("msg-1", "item-1", flood);
+    await service.endAsync("msg-1", new TaskEnd("item-1", BackgroundTaskStatus.Completed, 0));
+
+    const outputs = listener.events.filter(t => t.name === EventName.BackgroundTaskOutput).map(t => BackgroundTaskOutputPayload.fromJson(t.payload).text);
+    Assert.areEqual(JSON.stringify([flood.length]), JSON.stringify(outputs.map(t => t.length)));
+    Assert.areEqual(flood, outputs.join(String.empty));
+  }
+
+  @TestMethod
   public async ignoresOutputAndEndsForUnknownOrEndedTasks(): Promise<void> {
     const { service, listener } = BackgroundTasksServiceTests.create();
     await service.startAsync("conv-1", "msg-1", "claude", new TaskStart("bash-1", "sleep 5", () => Promise.resolve()));

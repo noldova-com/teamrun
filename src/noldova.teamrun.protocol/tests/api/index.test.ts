@@ -70,6 +70,7 @@ export class ProtocolApiTests {
     Assert.isDefined(api.SharedMcpTeammateSetParams);
     Assert.isDefined(api.TeammateName);
     Assert.isDefined(api.NameOrder);
+    Assert.isDefined(api.TextCut);
     Assert.isDefined(api.ProfileFolderName);
     Assert.isDefined(api.ProfileFolderPath);
     Assert.isDefined(api.DiscoveredProfile);

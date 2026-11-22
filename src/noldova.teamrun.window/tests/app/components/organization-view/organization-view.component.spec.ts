@@ -779,6 +779,19 @@ describe("OrganizationViewComponent", () => {
     };
     const chosenLabel = (): string => one(".nol-select-value", select()).textContent?.trim() ?? "";
 
+    it("says why a send failed once, in the panel, and not in the view's header", async () => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+      await create(context => context.answer(MethodName.OrganizationChatOpen, () => Promise.reject(new Error("The runtime is busy."))));
+
+      await userEvent.fill(one("aside.messages nol-teamrun-composer textarea"), "Status?");
+      await settle();
+      await userEvent.click(one("aside.messages .nol-teamrun-composer-send"));
+      await Wait.until(() => expect(texts("aside.messages nol-teamrun-organization-chat [role=alert]")).toEqual(["The runtime is busy."]));
+      await settle();
+
+      expect([texts("[role=alert]"), texts(".action-error")]).toEqual([["The runtime is busy."], []]);
+    });
+
     it("talks to the first department until a teammate's name or a department's Message is chosen, also while editing, but not by the rest of a card, Enter on it or its own buttons", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await create();
@@ -864,6 +877,24 @@ describe("OrganizationViewComponent", () => {
       expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (Department)", "Design (Department)"],
         ["All leaders and your direct reports", "Everyone", "Design (Department)", "Alice (leads Design)", "Bob", "UI (Department)", "Code Reviewer (leads UI)", "Build (Department)", "Offline"],
         [["Chat with UI"], "UI (Department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
+    });
+
+    it("offers a teammate who reports to your direct report outside a department after your direct reports, at any depth", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([], [new TeammatePlacement("alice", OrganizationParent.person, 0),
+          new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0), new TeammatePlacement("offline", OrganizationParent.teammate("bob"), 0)]);
+      });
+
+      expect([await pickAsync("Offline"), heading()]).toEqual([["All leaders and your direct reports", "Everyone", "Alice", "Bob", "Offline"], ["Chat with Offline"]]);
+    });
+
+    it("offers your direct reports by name, then the teammates under them by name", async () => {
+      await create(() => {
+        organization = SampleData.organizationOf([], [new TeammatePlacement("offline", OrganizationParent.person, 0),
+          new TeammatePlacement("reviewer", OrganizationParent.person, 1), new TeammatePlacement("alice", OrganizationParent.teammate("reviewer"), 0)]);
+      });
+
+      expect(await pickAsync("Alice")).toEqual(["All leaders and your direct reports", "Everyone", "Code Reviewer", "Offline", "Alice"]);
     });
 
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
@@ -1468,11 +1499,12 @@ describe("OrganizationViewComponent", () => {
 
       await chooseAsync(one(".move-choice", card("Bob")), "Build (Department)");
       await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
-      const role = one(".action-error").getAttribute("role");
+      await settle();
+      const alerts = all("[role=alert]").map(t => t.matches(".action-error"));
       one(".dismiss").click();
       await settle();
 
-      expect([role, texts(".action-error")]).toEqual(["alert", []]);
+      expect([alerts, texts("[role=alert]")]).toEqual([[true], []]);
     });
   });
 

@@ -963,6 +963,7 @@ export class Resources {
   public static readonly backgroundTasksViewIcon: string = "pending_actions";
   public static readonly noBackgroundTasksText: string = "No background tasks in this chat.";
   public static readonly backgroundTasksIdPrefix: string = "nol-teamrun-tasks-";
+  public static readonly composerReachIdPrefix: string = "nol-teamrun-composer-reach-";
   public static readonly backgroundTasksHeadingLevel: number = 3;
   public static readonly runningTasksTitle: string = "Running";
   public static readonly finishedTasksTitle: string = "Finished";
@@ -1975,6 +1976,10 @@ export class Resources {
     return `Choose what ${name}'s card shows and where ${name} works`;
   }
 
+  public static formatOrganizationReportsTo(manager: string): string {
+    return `Reports to ${manager}`;
+  }
+
   public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
     const parts = [role, department].filter(t => !Object.isNull(t) && t.length > 0);
     return parts.length === 0 ? null : parts.join(" · ");
@@ -2195,6 +2200,10 @@ export class Resources {
 
   public static formatOrganizationLastLine(author: string, text: string): string {
     return `${author}: ${text}`;
+  }
+
+  public static formatOrganizationReach(count: number): string {
+    return count === 1 ? "Goes to 1 teammate" : `Goes to ${count} teammates`;
   }
 
   public static formatOrganizationFanOutKey(organizationId: string, teammateIds: readonly string[]): string {
@@ -3301,8 +3310,9 @@ export class Resources {
     return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
   }
 
-  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`Your ${count} ${count === 1 ? "direct report" : "direct reports"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>, under: number = 0): string {
+    const reports = `Your ${count} ${count === 1 ? "direct report" : "direct reports"}`;
+    return [under === 0 ? reports : `${reports} and ${under} under them`, ...Resources.statusCountParts(counts)].join(" · ");
   }
 
   public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
