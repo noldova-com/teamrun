@@ -3498,6 +3498,11 @@ export declare class Resources {
    */
   public static readonly chatGitHead: string;
   /**
+   * The file a chat folder's `HEAD` is written to before it is renamed to `HEAD`, so a write cut short never leaves a broken one:
+   * `HEAD.teamrun`.
+   */
+  public static readonly chatGitHeadDraftFileName: string;
+  /**
    * The `config` of a chat folder's Git root.
    */
   public static readonly chatGitConfig: string;
@@ -5407,6 +5412,11 @@ export declare class Resources {
   public static formatReplyWithoutProvenance(messageId: string): string;
 
   /**
+   * Composes the internal error for a stored Ready wake without the text it delivers; the chat's wakes are then not settled, and the log says so.
+   */
+  public static formatReadyWakeWithoutText(wakeId: string): string;
+
+  /**
    * Composes the invalid-parameters message for a relative profile directory.
    */
   public static formatProfileDirNotAbsolute(profileDir: string): string;
@@ -7183,7 +7193,9 @@ export declare class ChatFolders {
   public exists(conversationId: string): boolean;
 
   /**
-   * Makes the folder and its Git root when either is missing, keeping what the folder holds.
+   * Makes the folder and its Git root when either is missing, keeping what the folder holds; the Git root's `HEAD`, which tells
+   * whether the root is made, is written beside it as `Resources.chatGitHeadDraftFileName` and renamed, so a write cut short is
+   * made again by the next call.
    * @param conversationId The conversation id.
    * @returns The folder's path.
    * @throws {Error} When the system refuses to make it.
