@@ -541,6 +541,17 @@ export class RuntimePartTests {
   }
 
   @TestMethod
+  public findsAToolsHandlerByItsNameAndRefusesOneThatIsMissingNamingIt(): void {
+    const handlers = new Map([["teamrun.projectOpen", "open"]]);
+
+    const found = RuntimePart.handlerAt(handlers, "teamrun.projectOpen");
+    const failure = Assert.throws(() => RuntimePart.handlerAt(handlers, "teamrun.missing"), RuntimePartException);
+
+    Assert.areEqual("open", found);
+    Assert.areEqual(RuntimeResources.formatHandlerMissing("teamrun.missing"), failure.message);
+  }
+
+  @TestMethod
   public async registersExactlyTheMethodsAndEventsItsModuleDeclares(): Promise<void> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);

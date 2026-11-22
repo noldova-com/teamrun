@@ -202,13 +202,9 @@ export { DepartmentMemberSetParams } from "../models/methods/department-member-s
 export { OrganizationLayoutSaveParams } from "../models/methods/organization-layout-save-params.js";
 export { OrganizationNodeKind } from "../enums/organization-node-kind.js";
 export { OrganizationTargetKind } from "../enums/organization-target-kind.js";
-export { OrganizationRecipientState } from "../enums/organization-recipient-state.js";
 export { OrganizationParent } from "../models/organization-parent.js";
 export { OrganizationTarget } from "../models/organization-target.js";
 export { TeammatePlacement } from "../models/teammate-placement.js";
-export { OrganizationRecipient } from "../models/organization-recipient.js";
-export { OrganizationMessage } from "../models/organization-message.js";
-export { OrganizationMessageSendParams } from "../models/methods/organization-message-send-params.js";
 export { OrganizationChat } from "../models/organization-chat.js";
 export { ChatMemberParams, ChatMemberParams as ConversationMemberParams } from "../models/methods/chat-member-params.js";
 export { ChatMemberModeParams } from "../models/methods/chat-member-mode-params.js";

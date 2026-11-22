@@ -849,6 +849,9 @@ export declare class Resources {
    */
   public static formatDatabaseFileName(moduleId: string): string;
 
+  /** Why TeamRun can't register a tool: no command or method handler is registered under its name. */
+  public static formatHandlerMissing(name: string): string;
+
   /**
    * Says why a shared MCP server that signs in with an account is left out while the account's module isn't on.
    * @param account The account.
@@ -1066,6 +1069,18 @@ export declare class Resources {
    * @returns The line.
    */
   public static formatProgramNotStarted(program: string, origin: ProcessOrigin | null, kind: string): string;
+}
+
+/** A sub-agent tool: its descriptor, the method it runs, and how it reads its input and the turn's token into that method's parameters. */
+export declare class SubAgentMethod {
+  /** What Noldova Desktop's tool registry takes. */
+  public readonly descriptor: IToolDescriptor;
+  /** The method it runs. */
+  public readonly method: MethodName;
+  /** Reads the tool's input and the turn's token into the method's parameters. */
+  public readonly paramsOf: (input: JsonObject, token: string) => JsonObject;
+  /** Creates the value. */
+  public constructor(descriptor: IToolDescriptor, method: MethodName, paramsOf: (input: JsonObject, token: string) => JsonObject);
 }
 
 /**
@@ -1432,6 +1447,8 @@ export declare class SubAgentTools {
   public static readonly stop: IToolDescriptor;
   /** The three, in the order `module.json` declares them. */
   public static readonly all: readonly IToolDescriptor[];
+  /** The three with the method each runs and how it reads its input into that method's parameters. */
+  public static readonly methods: readonly SubAgentMethod[];
 
   /**
    * The parameters of `SubAgentStart`.
@@ -2438,6 +2455,12 @@ export declare class RuntimePart implements IRuntimePart {
    */
   public constructor(registries?: IProviderKindRegistryFactory, productVersion?: string | null, commands?: TeammateCommandFolder,
     endpoints?: (log: ILog) => McpHttpEndpoint);
+
+  /**
+   * Returns the command or method handler registered under the name.
+   * @throws RuntimePartException with `Resources.formatHandlerMissing` when none is, so that a tool never goes missing in silence.
+   */
+  public static handlerAt<T>(handlers: ReadonlyMap<string, T>, name: string): T;
 
   /**
    * Composes the chat engine over the module's database, with the hand-off limit `HopLimitSetting` reads at each hand-off,

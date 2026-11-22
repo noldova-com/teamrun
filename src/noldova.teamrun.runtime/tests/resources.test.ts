@@ -17,6 +17,7 @@ export class ResourcesTests {
     Assert.areEqual("teamrun.stateInvalidated", Resources.formatQualifiedName("teamrun", "StateInvalidated"));
     Assert.areEqual("20260908120000-initial", Resources.formatMigrationId("20260908120000_Initial"));
     Assert.areEqual("teamrun.sqlite", Resources.formatDatabaseFileName("teamrun"));
+    Assert.areEqual("TeamRun has no command or method teamrun.missing for its tool.", Resources.formatHandlerMissing("teamrun.missing"));
   }
 
   @TestMethod

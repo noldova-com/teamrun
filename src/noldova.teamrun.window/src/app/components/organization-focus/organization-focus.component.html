@@ -105,5 +105,5 @@ LICENSE file in the root directory of this source tree.
       </div>
     </div>
   </nol-canvas>
-  <nol-teamrun-organization-messages class="conversation" [shape]="thread" [target]="focus().target" />
+  <nol-teamrun-organization-chat class="conversation" [target]="focus().target" (targetChange)="go($event)" />
 </section>

@@ -9,7 +9,7 @@
 import { OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
-import { OrganizationConversation } from "./organization-conversation";
+import { OrganizationTargetKey } from "./organization-target-key";
 import type { OrganizationNode } from "./organization.node";
 
 export class OrganizationTargetChoice {
@@ -18,7 +18,7 @@ export class OrganizationTargetChoice {
   public readonly label: string;
 
   public constructor(target: OrganizationTarget, label: string) {
-    this.key = OrganizationConversation.keyOf(target);
+    this.key = OrganizationTargetKey.of(target);
     this.target = target;
     this.label = label;
   }

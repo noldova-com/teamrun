@@ -33,6 +33,9 @@ import {
   ConversationRewindParams,
   ConversationRewindResult,
   ConversationRewoundPayload,
+  DepartmentCreateParams,
+  DepartmentMemberSetParams,
+  DepartmentUpdateParams,
   DetailEventPayload,
   DetailKind,
   ErrorCode,
@@ -533,6 +536,32 @@ export class ConversationEngineTests {
     Assert.areEqual("true true true true", [grokProvider, benProvider]
       .flatMap(t => [promptOf(t.id).includes("@Ben look"), promptOf(t.id).includes(JSON.stringify(saved?.path ?? "missing"))]).join(" "));
     Assert.areEqual("@Grok @Ben look", (await host.messages.findAsync(result.sent.id))?.details[0]?.text);
+  }
+
+  @TestMethod
+  public async tellsADepartmentsLeaderAndMemberTheirPlaceAndWhomTheyReportToAndReopensATeammatesChat(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const leadProvider = await host.createProviderAsync("fake", "Lead");
+    const memberProvider = await host.createProviderAsync("fake", "Member");
+    const lead = await host.teammates.createAsync(new TeammateCreateParams("Lead", null, leadProvider.id, Harness.Provider, null, null));
+    const member = await host.teammates.createAsync(new TeammateCreateParams("Member", null, memberProvider.id, Harness.Provider, null, null));
+    const design = await host.organization.createAsync(new DepartmentCreateParams("Design", OrganizationParent.person));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(lead.id, design.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(member.id, design.id));
+    await host.organization.updateAsync(new DepartmentUpdateParams(design.id, undefined, lead.id));
+    const leadChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, lead.id));
+    const memberChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));
+    const reopened = await host.engine.openOrganizationChatAsync(new OrganizationChat(Resources.defaultOrganizationId, member.id));
+
+    await host.engine.sendAsync(new MessageSendParams(leadChat.id, "@Lead Status?", null, null, [], [lead.id]));
+    await host.engine.sendAsync(new MessageSendParams(memberChat.id, "@Member Status?", null, null, [], [member.id]));
+    await host.engine.waitForIdle();
+    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+
+    Assert.areEqual(memberChat.id, reopened.id);
+    Assert.isTrue(promptOf(leadProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
+      Resources.organizationReportsToPerson)));
+    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead")));
   }
 
   @TestMethod

@@ -52,7 +52,6 @@ import {
   ComputerUseGrantTimings,
   NodeTimer,
   TeammatesService,
-  OrganizationMessagesService,
   OrganizationService,
   WindowsService
 } from "@noldova/teamrun.core";
@@ -275,8 +274,6 @@ export class RuntimePart implements IRuntimePart {
     const channels = new Map<string, EventChannel>(Object.values(EventName).map(t => [t, context.declareEvent(Resources.formatQualifiedName(context.moduleId, t))]));
     this.subscriptions.push(events.subscribe(new EventForwarder(channels)));
     await engine.reconcileAsync();
-    const organizationMessages = new OrganizationMessagesService(database, organization, teammates, messages, engine, events);
-    await organizationMessages.reconcileAsync();
     this.answerer = RuntimePart.registerAnswerer(context, engine, calls);
     await database.database.connection.runInTransactionAsync(async transaction => {
       const usual = new Map<string, string | null>();
@@ -299,7 +296,7 @@ export class RuntimePart implements IRuntimePart {
       : new ComputerUseGrantsService(new RuntimeRememberedAppGrants(context.permissions), conversations, teammates, apps,
         ComputerUseGrantTimings.createDefault(), new NodeTimer());
     const dispatcher = new RequestDispatcher(kinds, providers, projects, conversations, messages, approvals, engine, teammates, events, drafts, folder,
-      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization, organizationMessages);
+      tasks, planUsage, new ReadingPositionsService(database), windows, sharedServers, grants, acpAgents, organization);
     const methods = new Map<string, IMethodHandler>();
     const clients = new WindowClients(new DispatchedMethod(MethodName.WindowFocused, dispatcher), windows);
     context.onClientClosed(t => clients.close(t));
@@ -330,22 +327,28 @@ export class RuntimePart implements IRuntimePart {
     const commands = new InProcessCliContext(context.moduleId, methods, context.secrets);
     await new CliPart({}, Readable.from([])).activateAsync(commands);
     for (const tool of TeamRunTools.all)
-      context.tools.register(tool.descriptor, new CommandTool(context.moduleId, tool, commands.commands.get(tool.command)!));
+      context.tools.register(tool.descriptor, new CommandTool(context.moduleId, tool, RuntimePart.handlerAt(commands.commands, tool.command)));
     context.tools.register(TeamRunTools.openPanel, new PanelTool(context.moduleId, windows, true));
     context.tools.register(TeamRunTools.closePanel, new PanelTool(context.moduleId, windows, false));
   }
 
   private static registerChanges(context: IRuntimePartContext, methods: ReadonlyMap<string, IMethodHandler>, subjects: ChangeSubjects,
     conversations: ConversationsService, engine: ConversationEngine, teammates: TeammatesService): void {
-    const handlerOf = (method: MethodName): IMethodHandler => methods.get(Resources.formatQualifiedName(context.moduleId, method))!;
+    const handlerOf = (method: MethodName): IMethodHandler => RuntimePart.handlerAt(methods, Resources.formatQualifiedName(context.moduleId, method));
     for (const change of TeamRunChanges.all)
       context.tools.register(change.descriptor, new MethodTool(context.moduleId, change, handlerOf(change.method), subjects, conversations));
     context.tools.register(TeamRunChanges.send, new SendTool(context.moduleId, engine, engine, teammates));
-    for (const [tool, method, paramsOf] of [[SubAgentTools.start, MethodName.SubAgentStart, SubAgentTools.startParamsOf],
-      [SubAgentTools.wait, MethodName.SubAgentWait, SubAgentTools.waitParamsOf], [SubAgentTools.stop, MethodName.SubAgentStop, SubAgentTools.stopParamsOf]] as const)
-      context.tools.register(tool, new SubAgentTool(context.moduleId, tool, handlerOf(method), engine, paramsOf));
+    for (const tool of SubAgentTools.methods)
+      context.tools.register(tool.descriptor, new SubAgentTool(context.moduleId, tool.descriptor, handlerOf(tool.method), engine, tool.paramsOf));
     context.tools.register(CommandTools.run, new SubAgentTool(context.moduleId, CommandTools.run, handlerOf(MethodName.CommandStart), engine,
       CommandTools.runParamsOf, Resources.commandNoRunningTurn));
+  }
+
+  public static handlerAt<T>(handlers: ReadonlyMap<string, T>, name: string): T {
+    const handler = handlers.get(name);
+    if (Object.isUndefined(handler))
+      throw new RuntimePartException(Resources.formatHandlerMissing(name));
+    return handler;
   }
 
   private static registerAnswerer(context: IRuntimePartContext, engine: ConversationEngine, calls: ServedCalls): Registration | null {

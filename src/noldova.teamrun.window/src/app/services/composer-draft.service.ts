@@ -14,12 +14,13 @@ import { AttachmentInput, type Draft, type MessageAttachment } from "@noldova/te
 import { Resources } from "../../resources";
 import { DraftNotSavedException } from "../exceptions/draft-not-saved.exception";
 import { DraftStaleException } from "../exceptions/draft-stale.exception";
+import type { IComposerDrafts } from "../interfaces/i-composer-drafts";
 import type { ComposerDraft } from "../models/composer-draft";
 import { ChatStoreService } from "./chat-store.service";
 import { ClockService } from "./clock.service";
 
 @Injectable()
-export class ComposerDraftService {
+export class ComposerDraftService implements IComposerDrafts {
   public static readonly interval: InjectionToken<number> = new InjectionToken<number>(Resources.draftSaveIntervalToken,
     { providedIn: "root", factory: () => Resources.draftSaveInterval });
 
@@ -156,7 +157,11 @@ export class ComposerDraftService {
       return false;
     }
     this.revisions.set(draft.conversationId, saved.revision);
-    draft.attachments.forEach((t, index) => t.markSaved(saved.attachments[index]!));
+    draft.attachments.forEach((t, index) => {
+      const attachment = saved.attachments.at(index);
+      if (!Object.isUndefined(attachment))
+        t.markSaved(attachment);
+    });
     return true;
   }
 

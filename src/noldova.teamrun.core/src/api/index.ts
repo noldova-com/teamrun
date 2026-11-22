@@ -50,8 +50,6 @@ export type { IComputerUseGrantsService } from "../interfaces/i-computer-use-gra
 export type { IRememberedAppGrants } from "../interfaces/i-remembered-app-grants.js";
 export type { ITeammatesService } from "../interfaces/i-teammates.service.js";
 export type { IOrganizationService } from "../interfaces/i-organization.service.js";
-export type { IOrganizationMessagesService } from "../interfaces/i-organization-messages.service.js";
-export type { IOrganizationSender } from "../interfaces/i-organization-sender.js";
 export type { ITimer } from "../interfaces/i-timer.js";
 export type { ICommandStarter } from "../interfaces/i-command-starter.js";
 export type { IRunningCommand } from "../interfaces/i-running-command.js";
@@ -115,6 +113,7 @@ export { QuestionAsk } from "../models/question-ask.js";
 export { QueuedAnswer } from "../models/queued-answer.js";
 export { SendAsk } from "../models/send-ask.js";
 export { OrganizationChatOpening } from "../models/organization-chat-opening.js";
+export { SendAllowance } from "../models/send-allowance.js";
 export { OutsideReply } from "../models/outside-reply.js";
 export { OutsideReplyState } from "../enums/outside-reply-state.js";
 export { EventSubscription } from "../models/event-subscription.js";
@@ -193,9 +192,9 @@ export { ProviderKindRegistry } from "../services/provider-kinds/provider-kind-r
 export { ProviderKindsService } from "../services/provider-kinds/provider-kinds.service.js";
 export { TeammatesService } from "../services/teammates/teammates.service.js";
 export { OrganizationService } from "../services/organization/organization.service.js";
-export { OrganizationMessagesService } from "../services/organization/organization-messages.service.js";
-export { OrganizationMessagesMigration } from "../models/migrations/organization-messages-migration.js";
 export { TeammateLastRepliesMigration } from "../models/migrations/teammate-last-replies-migration.js";
+export { OrganizationMessagesMigration } from "../models/migrations/organization-messages-migration.js";
+export { OrganizationMessagesDropMigration } from "../models/migrations/organization-messages-drop-migration.js";
 export { TeammatePlacementsMigration } from "../models/migrations/teammate-placements-migration.js";
 export { SharedMcpServersService } from "../services/shared-mcp-servers/shared-mcp-servers.service.js";
 export { AcpAgentsService } from "../services/acp-agents/acp-agents.service.js";

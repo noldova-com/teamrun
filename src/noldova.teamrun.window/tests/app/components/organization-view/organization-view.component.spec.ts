@@ -5,6 +5,7 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
@@ -12,8 +13,8 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  Department, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationLayoutSaveParams, OrganizationParent,
-  PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
+  Conversation, ConversationListParams, Department, DetailKind, EventName, Message, MessageAuthor, MessageStatus, MethodName, Organization, OrganizationChat,
+  OrganizationLayoutSaveParams, OrganizationParent, PlanUsage, PlanWindow, PlanWindowName, TeammateIdParams, TeammateLastReply, TeammatePlacement, TeammateWork
 } from "@noldova/teamrun.protocol";
 import { SelectComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
@@ -23,7 +24,6 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -109,7 +109,11 @@ describe("OrganizationViewComponent", () => {
     saves = [];
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
-      .answer(MethodName.OrganizationMessageList, () => [])
+      .answer(MethodName.OrganizationChatOpen, t => {
+        const teammateId = TeammateIdParams.fromJson(t).teammateId;
+        return new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
+          null, new OrganizationChat("my-organization", teammateId)).toJson();
+      })
       .answer(MethodName.OrganizationLayoutSave, t => {
         saves.push(OrganizationLayoutSaveParams.fromJson(t).layout);
         return null;
@@ -117,7 +121,8 @@ describe("OrganizationViewComponent", () => {
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
     configure(context);
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
+      { provide: WindowPartTokens.shown, useValue: signal(true).asReadonly() }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
     element().style.width = "100rem";
     element().style.height = "76rem";
@@ -135,7 +140,6 @@ describe("OrganizationViewComponent", () => {
   afterEach(async () => {
     await page.viewport(viewport.width, viewport.height);
     AppearanceFixture.reset();
-    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);
@@ -210,7 +214,7 @@ describe("OrganizationViewComponent", () => {
     expect([all(".chart .tree > .kids > .report > nol-teamrun-organization-card").length, ["Code Reviewer", "Offline"].map(t => all(".move-choice, .remove", card(t)).length)]).toEqual([2, [0, 0]]);
   });
 
-  it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you counts them", async () => {
+  it("shows the teammates in no department after the leaders on the Board and right under Organization in Focus, and its message to everyone who reports to you reaches them", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => {
       organization = new Organization([new Department("design", "Design", OrganizationParent.person, "alice", 0, "c", "u"),
@@ -222,11 +226,10 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".chart nol-teamrun-organization-board .leaders > nol-teamrun-organization-card .name"),
       texts(".chart nol-teamrun-organization-board .leaders > .report .name")]).toEqual([["Alice", "Code Reviewer", "Offline"], ["Code Reviewer", "Offline"]]);
-    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Design"]));
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
     await userEvent.click(one(".message-leaders"));
-    await settle();
-    const note = texts("aside.messages .nol-teamrun-organization-thread-note").join();
-    expect([note.startsWith("3 people report to you: Alice, "), ["Code Reviewer", "Offline"].every(t => note.includes(t))]).toEqual([true, true]);
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual([Resources.organizationLeadersChat]));
+    expect(texts("aside.messages .nol-teamrun-organization-recipient-name").sort()).toEqual(["Alice", "Code Reviewer", "Offline"]);
 
     one(".top .views [role=radio]:last-of-type").click();
     await settle();
@@ -458,38 +461,51 @@ describe("OrganizationViewComponent", () => {
       .toEqual([["Focus", "true"], expect.objectContaining({ view: "Focus", focus: null }), ["Organization"], 0]);
   });
 
-  it("talks in a thread beside the Tree and in an inbox beside the Board, whose leaders and department buttons open their conversations", async () => {
+  it("talks in the Organization chat panel beside the Tree under To, and beside the Board under its chat list, whose leaders and department buttons choose whom", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" })));
-    const panel = (): unknown[] => [one("aside.messages > nol-teamrun-organization-messages").classList.contains("nol-teamrun-organization-messages-inbox"),
-      texts("aside.messages .nol-teamrun-organization-thread-title"), all("aside.messages .to").length];
+    const panel = (): unknown[] => [all("aside.messages > nol-teamrun-organization-chats").length,
+      texts("aside.messages > nol-teamrun-organization-chat .nol-teamrun-organization-chat-title"), all("aside.messages nol-teamrun-organization-chat > .to").length];
 
-    expect(panel()).toEqual([true, ["Design"], 0]);
+    expect(panel()).toEqual([1, ["Chat with Design"], 0]);
     await userEvent.click(one(".message-leaders"));
     await settle();
-    expect(panel()).toEqual([true, ["All leaders and your direct reports"], 0]);
+    expect(panel()).toEqual([1, ["Chat with all leaders and your direct reports"], 0]);
     await userEvent.click(one(".lane:nth-child(1) .message-department"));
     await settle();
-    expect(panel()).toEqual([true, ["Design"], 0]);
+    expect(panel()).toEqual([1, ["Chat with Design"], 0]);
 
     one(".top .views [role=radio]:first-of-type").click();
     await settle();
-    expect(panel()).toEqual([false, ["Chat with Design"], 1]);
+    expect(panel()).toEqual([0, ["Chat with Design"], 1]);
+  });
+
+  it("talks with the teammate whose Organization chat is chosen in the Board's chat list", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view: "Board" }))
+      .answer(MethodName.ConversationList, t => Object.isNull(ConversationListParams.fromJson(t).projectId) ? [new Conversation("org-alice", null, "alice", SampleData.timestamp,
+        SampleData.timestamp, false, null, null, false, null, false, [], false, false, null, new OrganizationChat("my-organization", "alice")).toJson()] : []));
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-conversation-title")).toEqual(["Alice"]));
+
+    await userEvent.click(one("aside.messages .nol-teamrun-organization-conversation"));
+    await settle();
+
+    expect(texts("aside.messages > nol-teamrun-organization-chat .nol-teamrun-organization-chat-title")).toEqual(["Chat with Alice"]);
   });
 
   it("talks with the kept focus until another conversation is chosen, and keeps that one when the organization changes", async () => {
     AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
     await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ focus: "Department:build" })));
-    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-thread-title")).toEqual(["Chat with Build"]));
-    const kept = texts("aside.messages .nol-teamrun-organization-thread-title");
+    await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual(["Chat with Build"]));
+    const kept = texts("aside.messages .nol-teamrun-organization-chat-title");
     await userEvent.click(one(":scope > .department .message", department("Design")));
     await settle();
-    const chosen = texts("aside.messages .nol-teamrun-organization-thread-title");
+    const chosen = texts("aside.messages .nol-teamrun-organization-chat-title");
 
     context.emit(EventName.OrganizationChanged, organization.toJson());
     await settle();
 
-    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-thread-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
+    expect([kept, chosen, texts("aside.messages .nol-teamrun-organization-chat-title")]).toEqual([["Chat with Build"], ["Chat with Design"], ["Chat with Design"]]);
   });
 
   it("switches the structure into editing and back from the header, without keeping it on the server", async () => {
@@ -509,7 +525,7 @@ describe("OrganizationViewComponent", () => {
   });
 
   describe("with its messages beside the tree", () => {
-    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-thread-title");
+    const heading = (): string[] => texts("aside.messages .nol-teamrun-organization-chat-title");
 
     afterEach(() => AppearanceFixture.reset());
 
@@ -603,12 +619,14 @@ describe("OrganizationViewComponent", () => {
       const ui = [heading(), chosenLabel()];
       await pickAsync("All leaders and your direct reports");
       const leaders = [heading(), chosenLabel()];
+      await pickAsync("Everyone");
+      const everyone = [heading(), chosenLabel()];
       await userEvent.click(one(".name", card("Offline")));
       await settle();
 
-      expect([shown, offered, ui, leaders, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
+      expect([shown, offered, ui, leaders, everyone, [heading(), chosenLabel()]]).toEqual([["To", "To, Design (department)", "Design (department)"],
         ["All leaders and your direct reports", "Everyone", "Design (department)", "Alice (leads Design)", "Bob", "UI (department)", "Code Reviewer (leads UI)", "Build (department)", "Offline"],
-        [["Chat with UI"], "UI (department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Offline"], "Offline"]]);
+        [["Chat with UI"], "UI (department)"], [["Chat with all leaders and your direct reports"], "All leaders and your direct reports"], [["Chat with Everyone"], "Everyone"], [["Chat with Offline"], "Offline"]]);
     });
 
     it("keeps whom it talks to when To answers with a choice no longer offered", async () => {
@@ -896,14 +914,14 @@ describe("OrganizationViewComponent", () => {
       expect([getComputedStyle(lasted).whiteSpace, getComputedStyle(text).overflowWrap]).toEqual(["nowrap", "anywhere"]);
     });
 
-    it("sets To under the messages' head over a select as wide as their padding allows, above the thread, a department's Message under its summary at its start, and a name as plain text", async () => {
+    it("sets To under the chat's head over a select as wide as the panel's padding allows, above the composer, a department's Message under its summary at its start, and a name as plain text", async () => {
       await create();
       const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const aside = one("aside.messages");
       const border = Number.parseFloat(getComputedStyle(aside).borderTopWidth);
-      const [head, label, choice, thread] = [one(".nol-teamrun-organization-thread-head", aside), one(".to-label", aside), one(".to-choice", aside),
-        one(".nol-teamrun-organization-thread", aside)];
+      const [head, label, choice, thread] = [one(".nol-teamrun-organization-chat-title", aside), one(".to-label", aside), one(".to-choice", aside),
+        one("nol-teamrun-composer", aside)];
       const design = one(":scope > .department", department("Design"));
       const inset = Number.parseFloat(getComputedStyle(design).borderLeftWidth) + space(3);
       const [summary, message] = [one(".department-summary", design), one(".message", design)];
@@ -1016,6 +1034,60 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(Number.parseFloat(getComputedStyle(report, "::after").height), space(3));
     });
 
+    it.each([24, 47.75, 48, 120])("lays the chat panel out across the messages in a %drem view, beside the Tree for a group and a teammate and under the Board's chat list", async width => {
+      await create();
+      element().style.width = `${width}rem`;
+      await settle();
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const box = (view: Element): DOMRect => view.getBoundingClientRect();
+      const inner = box(one(".body")).width - 2 * space(6);
+      const across = (basis: number): number => {
+        if (width < 48)
+          return inner;
+        const free = inner - space(4) - (35 + basis) * rem;
+        if (free >= 0)
+          return basis * rem + free / 1000;
+        const shrinks = basis * rem - 2 * Number.parseFloat(getComputedStyle(one("aside.messages")).borderLeftWidth);
+        return basis * rem + free * shrinks / (35 * rem + shrinks);
+      };
+      const laidOut = (basis: number): HTMLElement => {
+        const aside = one("aside.messages");
+        const border = Number.parseFloat(getComputedStyle(aside).borderLeftWidth);
+        const panel = one(":scope > nol-teamrun-organization-chat", aside);
+        const [title, composer] = [box(one(".nol-teamrun-organization-chat-title", panel)), box(one("nol-teamrun-composer", panel))];
+        AppearanceFixture.expectPixels(box(aside).width, across(basis));
+        AppearanceFixture.expectPixels(box(panel).left, box(aside).left + border);
+        AppearanceFixture.expectPixels(box(panel).right, box(aside).right - border);
+        AppearanceFixture.expectPixels(title.right, box(panel).right - space(3));
+        AppearanceFixture.expectPixels(composer.left, box(panel).left);
+        AppearanceFixture.expectPixels(composer.right, box(panel).right);
+        expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth);
+        return panel;
+      };
+
+      const group = laidOut(22);
+      const [icon, title, choice] = [box(one(".nol-teamrun-organization-chat-icon", group)), box(one(".nol-teamrun-organization-chat-title", group)), box(one(".to-choice", group))];
+      AppearanceFixture.expectPixels(icon.left, box(group).left + space(3));
+      AppearanceFixture.expectPixels(title.left, icon.right + space(2));
+      AppearanceFixture.expectPixels(choice.right, box(group).right - space(3));
+      for (const row of all(".nol-teamrun-organization-recipient", group)) {
+        AppearanceFixture.expectPixels(box(row).left, box(group).left + space(1));
+        AppearanceFixture.expectPixels(box(row).right, box(group).right - space(1));
+        AppearanceFixture.expectPixels(box(one(".nol-teamrun-organization-recipient-status", row)).right, box(row).right - space(2));
+      }
+      one(".name", card("Alice")).click();
+      await Wait.until(() => expect(texts("aside.messages .nol-teamrun-organization-chat-title")).toEqual(["Chat with Alice"]));
+      await settle();
+      const teammate = laidOut(22);
+      AppearanceFixture.expectPixels(box(one(".nol-teamrun-organization-chat-title", teammate)).left, box(teammate).left + space(3));
+      AppearanceFixture.expectPixels(box(one(".history", teammate)).bottom, box(one("nol-teamrun-composer", teammate)).top);
+      one(".top .views [role=radio]:nth-of-type(2)").click();
+      await settle();
+      const board = laidOut(24);
+      expect([texts(".nol-teamrun-organization-chat-title", board), box(board).top >= box(one("aside.messages > nol-teamrun-organization-chats")).bottom]).toEqual([["Chat with Alice"], true]);
+    });
+
     it("fills the space under the header, inside the view's padding, with the canvas and the messages beside it, 22rem wide for the Tree's thread and 24rem for the Board's inbox as the chart takes the rest, and fits the chart at 100% to its top, under the canvas's tools", async () => {
       await create();
       element().style.width = "100rem";
@@ -1058,7 +1130,7 @@ describe("OrganizationViewComponent", () => {
       one(".top .views [role=radio]:nth-of-type(3)").click();
       await settle();
       const [chart, outline, focus, canvas, conversation] = [box(".chart"), box(".chart .outline"), box(".chart section.focus"), box(".chart section.focus > nol-canvas"),
-        box(".chart section.focus > nol-teamrun-organization-messages")];
+        box(".chart section.focus > nol-teamrun-organization-chat")];
       for (const [actual, expected] of [[outline.left, chart.left], [outline.width, chart.width], [focus.top - outline.bottom, space(4)], [focus.left, chart.left],
         [focus.width, chart.width], [canvas.height, 32 * rem], [conversation.top - canvas.bottom, space(4)], [conversation.height, 17 * rem]] as const)
         AppearanceFixture.expectPixels(actual, expected);

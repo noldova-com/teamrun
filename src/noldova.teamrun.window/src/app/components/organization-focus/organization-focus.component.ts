@@ -15,12 +15,11 @@ import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, Ca
 
 import { Resources } from "../../../resources";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
-import { OrganizationMessagesShape } from "../../enums/organization-messages-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
 import { OrganizationCrumb } from "../../models/organization-crumb";
 import { ConfirmRequest } from "../../models/confirm-request";
-import { OrganizationConversation } from "../../models/organization-conversation";
+import { OrganizationTargetKey } from "../../models/organization-target-key";
 import { OrganizationEdits } from "../../models/organization-edits";
 import { OrganizationFocus } from "../../models/organization-focus";
 import type { OrganizationNode } from "../../models/organization.node";
@@ -31,12 +30,12 @@ import { OrganizationStoreService } from "../../services/organization-store.serv
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
-import { OrganizationMessagesComponent } from "../organization-messages/organization-messages.component";
+import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationMessagesComponent, TextFieldComponent],
+    OrganizationChatComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -55,7 +54,6 @@ export class OrganizationFocusComponent {
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
-  protected readonly thread: OrganizationMessagesShape = OrganizationMessagesShape.Thread;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
@@ -66,7 +64,7 @@ export class OrganizationFocusComponent {
     const focus = this.focus();
     return Object.isNull(focus.teammate) || focus.department?.leader?.id !== focus.teammate.id;
   });
-  protected readonly key: Signal<string> = computed(() => OrganizationConversation.keyOf(this.focus().target));
+  protected readonly key: Signal<string> = computed(() => OrganizationTargetKey.of(this.focus().target));
   protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
     const names = new Map<string, string>();
     for (const person of this.directReports())
@@ -89,7 +87,7 @@ export class OrganizationFocusComponent {
     const here = this.key();
     const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.department.name, OrganizationTarget.department(t.department.id), false)),
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
-    return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationConversation.keyOf(t.target) === here));
+    return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationTargetKey.of(t.target) === here));
   });
   protected readonly unitName: Signal<string> = computed(() => this.focus().teammate?.name ?? this.focus().department?.name ?? Resources.organizationTitle);
   protected readonly unitSummary: Signal<string> = computed(() => {
@@ -153,11 +151,11 @@ export class OrganizationFocusComponent {
   }
 
   protected isHere(target: OrganizationTarget): boolean {
-    return OrganizationConversation.keyOf(target) === this.key();
+    return OrganizationTargetKey.of(target) === this.key();
   }
 
   protected go(target: OrganizationTarget): void {
-    this.layout.focusOn(OrganizationConversation.keyOf(target));
+    this.layout.focusOn(OrganizationTargetKey.of(target));
   }
 
   protected department(row: OrganizationOutlineRow): OrganizationTarget {

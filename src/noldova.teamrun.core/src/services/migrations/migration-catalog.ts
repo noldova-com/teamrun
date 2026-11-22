@@ -36,6 +36,7 @@ import { HandoverSummariesMigration } from "../../models/migrations/handover-sum
 import { HandoverSummaryKindsMigration } from "../../models/migrations/handover-summary-kinds-migration.js";
 import { CheckpointFoldersMigration } from "../../models/migrations/checkpoint-folders-migration.js";
 import { DepartmentsMigration } from "../../models/migrations/departments-migration.js";
+import { OrganizationMessagesDropMigration } from "../../models/migrations/organization-messages-drop-migration.js";
 import { OrganizationMessagesMigration } from "../../models/migrations/organization-messages-migration.js";
 import { TeammateLastRepliesMigration } from "../../models/migrations/teammate-last-replies-migration.js";
 import { TeammatePlacementsMigration } from "../../models/migrations/teammate-placements-migration.js";
@@ -50,5 +51,5 @@ export class MigrationCatalog {
     new MessageTextMigration(), new AccountLimitsMigration(), new SustainAttemptsMigration(),
     new SustainAttemptReasonsMigration(), new HandoverSummariesMigration(), new HandoverSummaryKindsMigration(),
     new CheckpointFoldersMigration(), new DepartmentsMigration(),
-    new OrganizationMessagesMigration(), new TeammateLastRepliesMigration(), new TeammatePlacementsMigration()];
+    new OrganizationMessagesMigration(), new TeammateLastRepliesMigration(), new TeammatePlacementsMigration(), new OrganizationMessagesDropMigration()];
 }

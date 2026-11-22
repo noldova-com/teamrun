@@ -100,6 +100,19 @@ describe("ComposerDraftService", () => {
       .toEqual([[null, "D:/data/attachments/drafts/c1/notes.txt"], [null, "D:/data/attachments/drafts/c1/more.txt"]]);
   });
 
+  it("marks as saved only the files the saved draft holds", async () => {
+    const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new ComposerAttachment(t));
+    context.answer(MethodName.DraftSave, t => {
+      const draft = SampleData.savedDraft(DraftSaveParams.fromJson(t), 1);
+      return new Draft(draft.chatId, draft.text, draft.attachments.slice(0, 1), [], draft.revision, draft.updatedAt).toJson();
+    });
+    drafts.schedule(draft("", "c1", files));
+
+    await drafts.save();
+
+    expect(files.map(t => t.isSaved)).toEqual([true, false]);
+  });
+
   it("discards the files it prepared when a file or the save fails, and says why", async () => {
     const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new ComposerAttachment(t));
     let prepared = 0;

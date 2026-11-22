@@ -499,18 +499,15 @@ export class Resources {
   public static readonly deleteTeammatePlacement: string = "DELETE FROM teammatePlacements WHERE teammateId = ?";
   public static readonly organizationMessagesMigrationId: string = "20261121090000_OrganizationMessages";
   public static readonly organizationMessagesTable: string = "organizationMessages";
-  public static readonly selectOrganizationMessages: string = "SELECT json FROM organizationMessages ORDER BY createdAt, rowid";
+  public static readonly organizationMessagesDropMigrationId: string = "20261124090000_OrganizationMessagesDrop";
+  public static readonly dropOrganizationMessages: string = "DROP TABLE organizationMessages";
   public static readonly teammateLastRepliesMigrationId: string = "20261122090000_TeammateLastReplies";
   public static readonly createTeammateLastReplyIndex: string =
     "CREATE INDEX IX_messages_teammateId_endedAt ON messages (json_extract(json, '$.teammateId'), json_extract(json, '$.endedAt')) "
     + `WHERE ${Resources.formatFinishedReply(null)}`;
-  public static readonly selectOrganizationMessage: string = "SELECT json FROM organizationMessages WHERE id = ?";
-  public static readonly insertOrganizationMessage: string = "INSERT INTO organizationMessages (id, json, createdAt) VALUES (?, ?, ?)";
-  public static readonly updateOrganizationMessage: string = "UPDATE organizationMessages SET json = ? WHERE id = ?";
   public static readonly defaultOrganizationId: string = "my-organization";
   public static readonly organizationReportsToPerson: string = "the person";
   public static readonly organizationNoDepartment: string = "you are in no department";
-  public static readonly organizationSendInterrupted: string = "TeamRun stopped before it was sent.";
   public static readonly selectHandoverSummary: string = "SELECT text, kind FROM handoverSummaries WHERE chatId = ? AND teammateId = ? AND through = ?";
   public static readonly upsertHandoverSummary: string = "INSERT INTO handoverSummaries (chatId, teammateId, through, text, kind) VALUES (?, ?, ?, ?, ?) "
     + "ON CONFLICT (chatId, teammateId) DO UPDATE SET through = excluded.through, text = excluded.text, kind = excluded.kind";
@@ -651,8 +648,6 @@ export class Resources {
   public static readonly selectLastSequenceByConversation: string = "SELECT sequence FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT 1";
   public static readonly selectMessageById: string = "SELECT json FROM messages WHERE id = ?";
   public static readonly selectMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
-  public static readonly selectRepliesTo: string =
-    "SELECT json FROM messages WHERE chatId = ? AND sequence > ? AND json_valid(json) AND json_extract(json, '$.inReplyTo') = ? ORDER BY sequence";
   public static readonly selectMessageOutlinesByConversation: string =
     "SELECT json_set(json, '$.details', json('[]')) AS json FROM messages WHERE chatId = ? AND sequence > ? ORDER BY sequence";
   public static readonly selectNewestMessagesByConversation: string = "SELECT json FROM messages WHERE chatId = ? ORDER BY sequence DESC LIMIT ?";
@@ -1503,9 +1498,6 @@ export class Resources {
     return `${role}\n\n${text}`;
   }
 
-  public static formatOrganizationMessagePrompt(place: string, manager: string, text: string): string {
-    return Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(place, manager), text);
-  }
 
   public static formatOutsideChatTitle(name: string): string {
     return `From outside TeamRun · ${name}`;
@@ -2011,15 +2003,6 @@ export class Resources {
 
   public static formatDepartmentNotFound(id: string): string {
     return `Department not found: ${id}.`;
-  }
-
-  public static formatOrganizationMessageNotFound(id: string): string {
-    return `Organization message not found: ${id}.`;
-  }
-
-  public static formatAccountCannotReply(teammate: string, account: string | null): string {
-    return Object.isNull(account) ? `${teammate}'s account is deleted, so it can't reply.`
-      : `${teammate}'s account ${account} can't reply: it is turned off, signed out or of a kind TeamRun lacks.`;
   }
 
   public static formatTeammateNotPlaced(id: string): string {

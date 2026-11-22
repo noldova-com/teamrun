@@ -20,7 +20,7 @@ export interface IEngineCallbacks {
   requireTeammateAsync(id: string, transaction?: SqlTransaction): Promise<Teammate>;
   capEndsTasksAsync(teammate: Teammate, chatId: string): Promise<boolean>;
   sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null, signal: AbortSignal | undefined,
-    outside?: MessageSender | null, queues?: boolean): Promise<MessageSendResult>;
+    outside?: MessageSender | null): Promise<MessageSendResult>;
   refuseRaisedModeAsync(params: MessageSendParams): Promise<void>;
   toolModeOfAsync(open: ReplyMode): Promise<ProviderMode | null>;
   modeIn(requested: RequestedSettings): ProviderMode | null;

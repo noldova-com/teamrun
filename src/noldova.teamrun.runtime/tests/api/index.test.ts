@@ -18,7 +18,7 @@ export class RuntimeApiTests {
       "HostedMigrations", "InProcessCliContext", "MainProcessMethod", "McpHttpEndpoint", "McpHttpTransport", "MethodFailures", "MethodTool", "ModuleDatabaseConnection", "OutsideConnectionMethod", "OutsideSessions",
       "ModuleDatabaseProvider", "ModuleDatabaseSession", "PanelTool", "PermissionAnswerer", "ProviderCreateMethod", "ProviderKindRegistryFactory", "ProviderUpdateMethod", "ReplyFailureNotices", "ReplyWork", "RequestedModeMethod", "Resources", "RuntimeAppDescriptions",
       "RuntimeCommandStarter", "RuntimePart", "RuntimeException", "RuntimePartException", "ProcessNotStartedException", "RuntimeProcessStarter", "RuntimeRememberedAppGrants", "RuntimeToolSession", "RuntimeToolSessions", "SendTool", "ServedCalls", "SharedMcpAccounts", "SharedMcpOauth", "SubAgentTool",
-      "SubAgentTools", "CommandTools", "TeammateCommandFolder",
+      "SubAgentMethod", "SubAgentTools", "CommandTools", "TeammateCommandFolder",
       "TeamRunChange", "TeamRunChanges", "TeamRunTool", "TeamRunTools", "WindowClients", "WorkingMethod",
       "Pages", "TeamRunPagesHost"
     ];

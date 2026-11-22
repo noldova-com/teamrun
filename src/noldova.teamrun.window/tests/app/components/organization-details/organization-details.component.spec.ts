@@ -22,7 +22,6 @@ import { OrganizationViewComponent } from "../../../../src/app/components/organi
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationLayoutService } from "../../../../src/app/services/organization-layout.service";
-import { OrganizationMessagesStoreService } from "../../../../src/app/services/organization-messages-store.service";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { Resources } from "../../../../src/resources";
@@ -48,7 +47,7 @@ describe("OrganizationDetailsComponent", () => {
   const element = (): HTMLElement => {
     const native: unknown = fixture.nativeElement;
     if (!(native instanceof HTMLElement))
-      throw new Error("The component has no element.");
+      throw new Error("The fixture has no element.");
     return native;
   };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
@@ -97,7 +96,6 @@ describe("OrganizationDetailsComponent", () => {
     TestBed.overrideProvider(ClockService, { useValue: clock });
     context = SampleData.createContext()
       .answer(MethodName.OrganizationList, () => organization.toJson())
-      .answer(MethodName.OrganizationMessageList, () => [])
       .answer(MethodName.OrganizationLayoutSave, () => null);
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
@@ -113,7 +111,8 @@ describe("OrganizationDetailsComponent", () => {
     await settle();
   };
 
-  const viewport = { width: window.innerWidth, height: window.innerHeight };
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
 
   beforeEach(async () => {
     await page.viewport(1600, 1200);
@@ -121,9 +120,8 @@ describe("OrganizationDetailsComponent", () => {
   });
 
   afterEach(async () => {
-    await page.viewport(viewport.width, viewport.height);
+    await page.viewport(viewportWidth, viewportHeight);
     AppearanceFixture.reset();
-    OrganizationMessagesStoreService.release(context);
     TeammateStatusStoreService.release(context);
     OrganizationLayoutService.release(context);
     OrganizationStoreService.release(context);

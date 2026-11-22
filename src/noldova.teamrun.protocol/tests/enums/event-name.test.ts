@@ -41,7 +41,6 @@ export class EventNameTests {
     Assert.areEqual("ProviderKindsChanged", EventName.ProviderKindsChanged);
     Assert.areEqual("OrganizationChanged", EventName.OrganizationChanged);
     Assert.areEqual("OrganizationLayoutUpdated", EventName.OrganizationLayoutUpdated);
-    Assert.areEqual("OrganizationMessageUpdated", EventName.OrganizationMessageUpdated);
   }
 
   @TestMethod

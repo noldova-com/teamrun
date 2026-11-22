@@ -7,8 +7,8 @@
  */
 
 import { ColumnType, type MigrationBuilder, SqlMigration } from "@noldova/context.data.sql";
-import type { OrganizationMessage } from "@noldova/teamrun.protocol";
 
+import type { IOrganizationMessageRow } from "../../interfaces/i-organization-message-row.js";
 import { Resources } from "../../resources.js";
 
 export class OrganizationMessagesMigration extends SqlMigration {
@@ -17,7 +17,7 @@ export class OrganizationMessagesMigration extends SqlMigration {
   }
 
   public override apply(builder: MigrationBuilder): void {
-    builder.createTable<OrganizationMessage>(Resources.organizationMessagesTable,
+    builder.createTable<IOrganizationMessageRow>(Resources.organizationMessagesTable,
       table => {
         table.addColumn(t => t.id, ColumnType.Text);
         table.addColumn(Resources.jsonColumn, ColumnType.Text);

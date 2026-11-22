@@ -343,3 +343,9 @@
 .nol-teamrun-composer-space {
   flex: 1;
 }
+
+:host(.nol-teamrun-composer-fan-out) .nol-teamrun-composer-access,
+:host(.nol-teamrun-composer-fan-out) .nol-teamrun-composer-provider,
+:host(.nol-teamrun-composer-fan-out) .nol-teamrun-composer-picker {
+  display: none;
+}

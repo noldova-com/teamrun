@@ -6,10 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-export enum OrganizationRecipientState {
-  Queued = "Queued",
-  Started = "Started",
-  Stopped = "Stopped",
-  Removed = "Removed",
-  Failed = "Failed"
+export interface IOrganizationMessageRow {
+  readonly id: string;
+  readonly createdAt: string;
 }

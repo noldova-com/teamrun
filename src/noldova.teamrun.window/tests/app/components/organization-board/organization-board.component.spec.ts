@@ -18,7 +18,7 @@ import { ChoicePillsComponent, ThemeMode } from "@noldova/ui.components.angular"
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { OrganizationBoardComponent } from "../../../../src/app/components/organization-board/organization-board.component";
-import { OrganizationConversation } from "../../../../src/app/models/organization-conversation";
+import { OrganizationTargetKey } from "../../../../src/app/models/organization-target-key";
 import { OrganizationNode } from "../../../../src/app/models/organization.node";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
@@ -51,7 +51,7 @@ describe("OrganizationBoardComponent", () => {
   const element = (): HTMLElement => {
     const native: unknown = fixture.nativeElement;
     if (!(native instanceof HTMLElement))
-      throw new Error("The component has no element.");
+      throw new Error("The fixture has no element.");
     return native;
   };
   const all = (selector: string, root: ParentNode = element()): HTMLElement[] => [...root.querySelectorAll<HTMLElement>(selector)];
@@ -182,7 +182,7 @@ describe("OrganizationBoardComponent", () => {
   it("opens each conversation in the inbox from its row, and marks the open one", async () => {
     await create();
     const chosen: string[] = [];
-    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationConversation.keyOf(t)));
+    fixture.componentInstance.chosen.subscribe(t => chosen.push(OrganizationTargetKey.of(t)));
     const selected = (): string[] => all(".ask.selected .name, .leaders > .selected .name, .lane.selected .lane-name, .lane > .selected .name")
       .map(t => t.textContent?.trim() ?? "");
 
@@ -191,13 +191,13 @@ describe("OrganizationBoardComponent", () => {
     expect([chosen, selected()]).toEqual([["Teammate:bob", "Teammate:offline", "Leaders:", "Teammate:alice", "Teammate:reviewer", "Department:design",
       "Department:ui", "Department:build", "Teammate:bob", "Teammate:offline", "Teammate:carol"], []]);
 
-    const marked: string[][] = [];
-    for (const target of [OrganizationTarget.teammate("bob"), OrganizationTarget.department("build"), OrganizationTarget.teammate("alice")]) {
+    const marked = async (target: OrganizationTarget): Promise<string[]> => {
       fixture.componentRef.setInput("target", target);
       await settle();
-      marked.push(selected());
-    }
-    expect(marked).toEqual([["Bob", "Bob"], ["Build"], ["Alice"]]);
+      return selected();
+    };
+    expect([await marked(OrganizationTarget.teammate("bob")), await marked(OrganizationTarget.department("build")), await marked(OrganizationTarget.teammate("alice"))])
+      .toEqual([["Bob", "Bob"], ["Build"], ["Alice"]]);
   });
 
   it("edits the structure in edit mode: renames a department, adds a member from outside it and a department, and lets each member's card move or remove it", async () => {
