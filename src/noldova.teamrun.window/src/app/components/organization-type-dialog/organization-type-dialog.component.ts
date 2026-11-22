@@ -75,8 +75,11 @@ export class OrganizationTypeDialogComponent {
     }
     const icon = this.icon();
     const color = this.color()?.toLowerCase() ?? null;
-    const changed = name !== type.name || icon !== type.icon || color !== type.color;
-    const saved = !changed || await this.organization().updateNodeType(type.id, name === type.name ? undefined : name, icon === type.icon ? undefined : icon,
+    if (name === type.name && icon === type.icon && color === type.color) {
+      this.closed.emit();
+      return;
+    }
+    const saved = await this.organization().updateNodeType(type.id, name === type.name ? undefined : name, icon === type.icon ? undefined : icon,
       color === type.color ? undefined : color);
     this.saving.set(false);
     if (saved)
