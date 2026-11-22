@@ -194,3 +194,14 @@
 .lane-empty {
   padding: var(--nol-space-2);
 }
+
+nol-teamrun-organization-card:is(:focus-visible, [data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  nol-teamrun-organization-card:is(:focus-visible, [data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
+}
