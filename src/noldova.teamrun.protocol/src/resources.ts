@@ -579,6 +579,8 @@ export class Resources {
   public static readonly invalidNodeTypeColor: string = "A node type's color is a kit color's name, a #rrggbb color in lowercase, or null.";
   public static readonly duplicateNodeType: string = "Each node type of an organization has its own id and its own name.";
   public static readonly unknownNodeType: string = "A department's type is one of its organization's node types.";
+  public static readonly emptyNodeTypeUpdate: string = "A node type update changes its name, icon or color.";
+  public static readonly nodeTypeInUse: string = "A node type that a department has can't be deleted; give those departments another type first.";
   public static readonly organizationParentIdRequired: string = "A teammate or department parent names its id; the person names none.";
   public static readonly organizationNodeUnderItself: string = "A teammate or department can't be under itself.";
   public static readonly invalidOrganizationOrder: string = "A place's order among its siblings is a whole number from 0.";

@@ -17,21 +17,25 @@ import { OrganizationParent } from "../organization-parent.js";
 export class DepartmentCreateParams {
   public readonly organizationId: string;
   public readonly name: string;
+  public readonly typeId: string;
   public readonly parent: OrganizationParent;
   public readonly leaderId: string | null;
 
   public constructor(
     organizationId: string,
     name: string,
+    typeId: string,
     parent: OrganizationParent,
     leaderId: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(organizationId, Resources.organizationIdField);
     Department.validateName(name);
+    ArgumentException.throwIfNullOrWhitespace(typeId, Resources.typeIdField);
     if (!Object.isNull(leaderId))
       ArgumentException.throwIfNullOrWhitespace(leaderId, Resources.leaderIdField);
 
     this.organizationId = organizationId;
     this.name = name;
+    this.typeId = typeId;
     this.parent = parent;
     this.leaderId = leaderId;
   }
@@ -42,6 +46,7 @@ export class DepartmentCreateParams {
     return new DepartmentCreateParams(
       reader.readNonBlankString(Resources.organizationIdField),
       Department.readName(reader),
+      reader.readNonBlankString(Resources.typeIdField),
       OrganizationParent.fromJson(parent.toJson(), parent.path),
       reader.hasField(Resources.leaderIdField) ? reader.readNullableString(Resources.leaderIdField) : null);
   }
@@ -50,6 +55,7 @@ export class DepartmentCreateParams {
     return {
       [Resources.organizationIdField]: this.organizationId,
       [Resources.nameField]: this.name,
+      [Resources.typeIdField]: this.typeId,
       [Resources.parentField]: this.parent.toJson(),
       [Resources.leaderIdField]: this.leaderId
     };

@@ -580,14 +580,14 @@ export declare enum MethodName {
   /**
    * Creates a department, last among the departments under its parent, and publishes `OrganizationChanged`; a leader given is
    * placed in it first, from wherever it was, and leads it, in the same transaction. Parameters: `DepartmentCreateParams`.
-   * Result: `Department`; a parent or leader that doesn't exist fails with `NotFound`, and a leader the department would sit under
-   * fails with `InvalidParams`.
+   * Result: `Department`; a parent, leader or node type that doesn't exist fails with `NotFound`, and a leader the department would
+   * sit under fails with `InvalidParams`.
    */
   DepartmentCreate = "DepartmentCreate",
   /**
-   * Renames a department or sets or clears its leader, and publishes `OrganizationChanged`. Parameters: `DepartmentUpdateParams`.
-   * Result: `Department`; a leader who isn't a member is placed in it first, last among its teammates, and a leader the department
-   * sits under fails with `InvalidParams`.
+   * Renames a department, changes its node type, or sets or clears its leader, and publishes `OrganizationChanged`.
+   * Parameters: `DepartmentUpdateParams`. Result: `Department`; a leader who isn't a member is placed in it first, last among its
+   * teammates, a leader the department sits under fails with `InvalidParams`, and a type the organization doesn't have fails with `NotFound`.
    */
   DepartmentUpdate = "DepartmentUpdate",
   /**
@@ -606,6 +606,22 @@ export declare enum MethodName {
    * Parameters: `DepartmentMemberSetParams`. Result: `null`.
    */
   DepartmentMemberSet = "DepartmentMemberSet",
+  /**
+   * Adds a node type to an organization, last among its types, and publishes `OrganizationChanged`.
+   * Parameters: `NodeTypeCreateParams`. Result: `NodeType`; a name another of its types has, ignoring case, fails with `Conflict`.
+   */
+  NodeTypeCreate = "NodeTypeCreate",
+  /**
+   * Renames a node type or sets or clears its icon or color, and publishes `OrganizationChanged`.
+   * Parameters: `NodeTypeUpdateParams`. Result: `NodeType`; a type that doesn't exist fails with `NotFound`, and a name another of
+   * its organization's types has, ignoring case, fails with `Conflict`.
+   */
+  NodeTypeUpdate = "NodeTypeUpdate",
+  /**
+   * Deletes a node type no department has, and publishes `OrganizationChanged`. Parameters: `NodeTypeIdParams`. Result: `null`;
+   * a type that doesn't exist fails with `NotFound`, and one a department has fails with `Conflict`.
+   */
+  NodeTypeDelete = "NodeTypeDelete",
   /**
    * Places a teammate under the person, a department or another teammate at an order among the teammates there, or takes it
    * out of the organization, and publishes `OrganizationChanged`. A teammate that leaves a department stops leading it; what
@@ -2238,6 +2254,32 @@ export declare class Resources {
   public static readonly departmentsField: string;
   /** Name of a department's or placement's parent field: `parent`. */
   public static readonly parentField: string;
+  /** Name of a department's node type id field: `typeId`. */
+  public static readonly typeIdField: string;
+  /** Name of an organization's node types field: `nodeTypes`. */
+  public static readonly nodeTypesField: string;
+  /** Name of a node type's icon field: `icon`. */
+  public static readonly iconField: string;
+  /** Name of a node type's color field: `color`. */
+  public static readonly colorField: string;
+  /** Why a node type name is refused: it isn't 1 to 100 characters on one line, or is only spaces. */
+  public static readonly invalidNodeTypeName: string;
+  /** What a node type's icon may be: a Material Symbols name of 1 to 64 lowercase letters, digits or underscores. */
+  public static readonly nodeTypeIconPattern: RegExp;
+  /** Why a node type's icon is refused. */
+  public static readonly invalidNodeTypeIcon: string;
+  /** What a node type's color may be: a kit color's name, or a #rrggbb color in lowercase. */
+  public static readonly nodeTypeColorPattern: RegExp;
+  /** Why a node type's color is refused. */
+  public static readonly invalidNodeTypeColor: string;
+  /** Why an organization with two node types of one id or one name, ignoring case, is refused. */
+  public static readonly duplicateNodeType: string;
+  /** Why a department whose type isn't one of its organization's node types is refused. */
+  public static readonly unknownNodeType: string;
+  /** Why a node type update that changes nothing is refused. */
+  public static readonly emptyNodeTypeUpdate: string;
+  /** Why deleting a node type that a department has is refused. */
+  public static readonly nodeTypeInUse: string;
   /** Name of an organization's placements field: `placements`. */
   public static readonly placementsField: string;
   /** What a department name may be: 1 to 100 characters with no line break or other control character. */
@@ -12003,12 +12045,69 @@ export declare class TeammateIdParams {
   public toJson(): JsonObject;
 }
 
-/** A department of the organization: it has a name, an optional leader, and sits under the person, a teammate or another department. */
+/** A kind of organization node, such as Department or Team: a name, an optional icon and an optional color, kept per organization. */
+export declare class NodeType {
+  /** id. */
+  public readonly id: string;
+  /** The name, 1 to 100 characters on one line, unique in its organization ignoring case. */
+  public readonly name: string;
+  /** A Material Symbols name, or null for the default icon. */
+  public readonly icon: string | null;
+  /** A kit color's name or a #rrggbb color, or null for the default color. */
+  public readonly color: string | null;
+  /** When it was created, as ISO 8601 text. */
+  public readonly createdAt: string;
+  /** When it last changed, as ISO 8601 text. */
+  public readonly updatedAt: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the id or a time is blank, or the name, icon or color is invalid.
+   */
+  public constructor(id: string, name: string, icon: string | null, color: string | null, createdAt: string, updatedAt: string);
+  /**
+   * Checks a node type name.
+   * @throws ArgumentException when it isn't 1 to 100 characters on one line, or is only spaces.
+   */
+  public static validateName(name: string): void;
+  /**
+   * Checks a node type's icon.
+   * @throws ArgumentException when it isn't null or a Material Symbols name.
+   */
+  public static validateIcon(icon: string | null): void;
+  /**
+   * Checks a node type's color.
+   * @throws ArgumentException when it isn't null, a kit color's name or a #rrggbb color.
+   */
+  public static validateColor(color: string | null): void;
+  /**
+   * Reads a node type name from its `name` field.
+   * @throws JsonException at the field's path when it isn't a valid name.
+   */
+  public static readName(reader: JsonReader): string;
+  /**
+   * Reads a node type's icon from its `icon` field.
+   * @throws JsonException at the field's path when it isn't null or a valid icon.
+   */
+  public static readIcon(reader: JsonReader): string | null;
+  /**
+   * Reads a node type's color from its `color` field.
+   * @throws JsonException at the field's path when it isn't null or a valid color.
+   */
+  public static readColor(reader: JsonReader): string | null;
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeType;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** A department of the organization: it has a name, a node type, an optional leader, and sits under the person, a teammate or another department. */
 export declare class Department {
   /** id. */
   public readonly id: string;
   /** The name, 1 to 100 characters on one line. */
   public readonly name: string;
+  /** The id of its node type, one of its organization's `nodeTypes`. */
+  public readonly typeId: string;
   /** What it sits under. */
   public readonly parent: OrganizationParent;
   /** The teammate who leads it, always one of its members, or null. */
@@ -12026,6 +12125,7 @@ export declare class Department {
   public constructor(
     id: string,
     name: string,
+    typeId: string,
     parent: OrganizationParent,
     leaderId: string | null,
     order: number,
@@ -12091,6 +12191,8 @@ export declare class Organization {
   public readonly createdAt: string;
   /** When it last changed, as ISO 8601 text. */
   public readonly updatedAt: string;
+  /** The kinds of node its departments are, in the order they were made. */
+  public readonly nodeTypes: readonly NodeType[];
   /** The departments, by their order among their siblings, then by when they were created. */
   public readonly departments: readonly Department[];
   /** The placed teammates, by their order among their siblings, then by id. */
@@ -12098,7 +12200,7 @@ export declare class Organization {
   /**
    * Creates a validated immutable value.
    * @throws ArgumentException when the id, a time or the folder is blank, the name is invalid, the order isn't a whole number from 0,
-   * two departments share an id, a teammate is placed twice, a parent is neither the person, a placed teammate nor one of the departments,
+   * two node types share an id or a name, a department's type isn't one of the node types, two departments share an id, a teammate is placed twice, a parent is neither the person, a placed teammate nor one of the departments,
    * or a teammate or department sits under itself.
    */
   public constructor(
@@ -12108,13 +12210,14 @@ export declare class Organization {
     order: number,
     createdAt: string,
     updatedAt: string,
+    nodeTypes: readonly NodeType[],
     departments: readonly Department[],
     placements: readonly TeammatePlacement[]);
   /**
    * Returns this organization with another tree.
    * @param departments The departments.
    * @param placements The placed teammates.
-   * @returns The organization, with the same id, name, folder, order and times.
+   * @returns The organization, with the same id, name, folder, order, times and node types.
    */
   public withTree(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization;
   /**
@@ -12141,6 +12244,12 @@ export declare class Organization {
   public get members(): readonly DepartmentMember[];
   /** The leaders: each department's leader, in the departments' order, then each placed teammate with a teammate or department under it. */
   public get leaders(): readonly string[];
+  /**
+   * Finds a department's node type.
+   * @param departmentId The department.
+   * @returns Its node type, or null when no department has that id.
+   */
+  public typeOf(departmentId: string): NodeType | null;
   /**
    * Returns the departments directly under a parent, in their order.
    * @param parent The parent.
@@ -12351,17 +12460,20 @@ export declare class DepartmentCreateParams {
   public readonly organizationId: string;
   /** The name. */
   public readonly name: string;
+  /** The id of its node type, one of the organization's node types. */
+  public readonly typeId: string;
   /** What it goes under. */
   public readonly parent: OrganizationParent;
   /** The teammate placed in it first, from wherever it was, as its leader, or null. */
   public readonly leaderId: string | null;
   /**
    * Creates a validated immutable value.
-   * @throws ArgumentException when the name is invalid or the leader id is blank.
+   * @throws ArgumentException when the name is invalid or the type or leader id is blank.
    */
   public constructor(
     organizationId: string,
     name: string,
+    typeId: string,
     parent: OrganizationParent,
     leaderId?: string | null);
   /** Reads a wire value and reports malformed fields at their JSON path. */
@@ -12370,7 +12482,7 @@ export declare class DepartmentCreateParams {
   public toJson(): JsonObject;
 }
 
-/** Parameters for renaming a department or setting or clearing its leader; an omitted field stays. */
+/** Parameters for renaming a department, changing its node type, or setting or clearing its leader; an omitted field stays. */
 export declare class DepartmentUpdateParams {
   /** The organization's id. */
   public readonly organizationId: string;
@@ -12380,6 +12492,8 @@ export declare class DepartmentUpdateParams {
   public readonly name: string | undefined;
   /** The new leader, null to clear it, or undefined to keep it. */
   public readonly leaderId: string | null | undefined;
+  /** The id of its new node type, or undefined to keep it. */
+  public readonly typeId: string | undefined;
   /**
    * Creates a validated immutable value.
    * @throws ArgumentException when it changes nothing or a field is invalid.
@@ -12388,7 +12502,8 @@ export declare class DepartmentUpdateParams {
     organizationId: string,
     departmentId: string,
     name: string | undefined,
-    leaderId: string | null | undefined);
+    leaderId: string | null | undefined,
+    typeId?: string);
   /** Reads a wire value and reports malformed fields at their JSON path. */
   public static fromJson(value: unknown, path?: string): DepartmentUpdateParams;
   /**
@@ -12399,6 +12514,79 @@ export declare class DepartmentUpdateParams {
    */
   public applyTo(department: Department, updatedAt: string): Department;
   /** Returns the wire representation, without the omitted fields. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for adding a node type to an organization. */
+export declare class NodeTypeCreateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The name. */
+  public readonly name: string;
+  /** A Material Symbols name, or null for the default icon. */
+  public readonly icon: string | null;
+  /** A kit color's name or a #rrggbb color, or null for the default color. */
+  public readonly color: string | null;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when the organization id is blank or the name, icon or color is invalid.
+   */
+  public constructor(organizationId: string, name: string, icon?: string | null, color?: string | null);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeCreateParams;
+  /** Returns the wire representation. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters for renaming a node type or setting or clearing its icon or color; an omitted field stays. */
+export declare class NodeTypeUpdateParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The node type's id. */
+  public readonly typeId: string;
+  /** The new name, or undefined to keep it. */
+  public readonly name: string | undefined;
+  /** The new icon, null to clear it, or undefined to keep it. */
+  public readonly icon: string | null | undefined;
+  /** The new color, null to clear it, or undefined to keep it. */
+  public readonly color: string | null | undefined;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when it changes nothing or a field is invalid.
+   */
+  public constructor(
+    organizationId: string,
+    typeId: string,
+    name: string | undefined,
+    icon: string | null | undefined,
+    color: string | null | undefined);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeUpdateParams;
+  /**
+   * Returns the node type with this update's changes.
+   * @param type The node type as it is.
+   * @param updatedAt The change's time, as ISO 8601 text.
+   * @returns The changed node type.
+   */
+  public applyTo(type: NodeType, updatedAt: string): NodeType;
+  /** Returns the wire representation, without the omitted fields. */
+  public toJson(): JsonObject;
+}
+
+/** Parameters naming one node type of an organization. */
+export declare class NodeTypeIdParams {
+  /** The organization's id. */
+  public readonly organizationId: string;
+  /** The node type's id. */
+  public readonly typeId: string;
+  /**
+   * Creates a validated immutable value.
+   * @throws ArgumentException when an id is blank.
+   */
+  public constructor(organizationId: string, typeId: string);
+  /** Reads a wire value and reports malformed fields at their JSON path. */
+  public static fromJson(value: unknown, path?: string): NodeTypeIdParams;
+  /** Returns the wire representation. */
   public toJson(): JsonObject;
 }
 

@@ -15,6 +15,7 @@ import { OrganizationTargetKind } from "../enums/organization-target-kind.js";
 import { Resources } from "../resources.js";
 import { Department } from "./department.js";
 import { DepartmentMember } from "./department-member.js";
+import { NodeType } from "./node-type.js";
 import { OrganizationParent } from "./organization-parent.js";
 import type { OrganizationTarget } from "./organization-target.js";
 import { TeammatePlacement } from "./teammate-placement.js";
@@ -26,6 +27,7 @@ export class Organization {
   public readonly order: number;
   public readonly createdAt: string;
   public readonly updatedAt: string;
+  public readonly nodeTypes: readonly NodeType[];
   public readonly departments: readonly Department[];
   public readonly placements: readonly TeammatePlacement[];
 
@@ -36,6 +38,7 @@ export class Organization {
     order: number,
     createdAt: string,
     updatedAt: string,
+    nodeTypes: readonly NodeType[],
     departments: readonly Department[],
     placements: readonly TeammatePlacement[]) {
     ArgumentException.throwIfNullOrWhitespace(id, Resources.idField);
@@ -45,6 +48,10 @@ export class Organization {
       throw new ArgumentException(Resources.invalidOrganizationListOrder, Resources.orderField);
     ArgumentException.throwIfNullOrWhitespace(createdAt, Resources.createdAtField);
     ArgumentException.throwIfNullOrWhitespace(updatedAt, Resources.updatedAtField);
+    if (new Set(nodeTypes.map(t => t.id)).size !== nodeTypes.length || new Set(nodeTypes.map(t => t.name.toLowerCase())).size !== nodeTypes.length)
+      throw new ArgumentException(Resources.duplicateNodeType, Resources.nodeTypesField);
+    if (departments.some(t => !nodeTypes.some(u => u.id === t.typeId)))
+      throw new ArgumentException(Resources.unknownNodeType, Resources.departmentsField);
     const ids = new Set(departments.map(t => t.id));
     if (ids.size !== departments.length)
       throw new ArgumentException(Resources.duplicateDepartment, Resources.departmentsField);
@@ -58,6 +65,7 @@ export class Organization {
     this.order = order;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
+    this.nodeTypes = [...nodeTypes];
     this.departments = [...departments].sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
     this.placements = [...placements].sort((a, b) => a.order - b.order || a.teammateId.localeCompare(b.teammateId));
     if ([...departments.map(t => t.parent), ...placements.map(t => t.parent)].some(t => !this.has(t)))
@@ -77,6 +85,11 @@ export class Organization {
       .filter(t => t.kind === OrganizationNodeKind.Teammate).map(t => String(t.id));
     const leaders = this.departments.map(t => t.leaderId).filter((t): t is string => !Object.isNull(t));
     return [...new Set([...leaders, ...this.placements.map(t => t.teammateId).filter(t => parents.includes(t))])];
+  }
+
+  public typeOf(departmentId: string): NodeType | null {
+    const typeId = this.departments.find(t => t.id === departmentId)?.typeId;
+    return this.nodeTypes.find(t => t.id === typeId) ?? null;
   }
 
   public departmentsUnder(parent: OrganizationParent): readonly Department[] {
@@ -160,7 +173,7 @@ export class Organization {
   }
 
   public withTree(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
-    return new Organization(this.id, this.name, this.folder, this.order, this.createdAt, this.updatedAt, departments, placements);
+    return new Organization(this.id, this.name, this.folder, this.order, this.createdAt, this.updatedAt, this.nodeTypes, departments, placements);
   }
 
   public static validateName(name: string): void {
@@ -196,6 +209,7 @@ export class Organization {
       reader.readInteger(Resources.orderField),
       reader.readNonBlankString(Resources.createdAtField),
       reader.readNonBlankString(Resources.updatedAtField),
+      reader.readObjectArray(Resources.nodeTypesField).map(t => NodeType.fromJson(t.toJson(), t.path)),
       reader.readObjectArray(Resources.departmentsField).map(t => Department.fromJson(t.toJson(), t.path)),
       reader.readObjectArray(Resources.placementsField).map(t => TeammatePlacement.fromJson(t.toJson(), t.path)));
   }
@@ -208,6 +222,7 @@ export class Organization {
       [Resources.orderField]: this.order,
       [Resources.createdAtField]: this.createdAt,
       [Resources.updatedAtField]: this.updatedAt,
+      [Resources.nodeTypesField]: this.nodeTypes.map(t => t.toJson()),
       [Resources.departmentsField]: this.departments.map(t => t.toJson()),
       [Resources.placementsField]: this.placements.map(t => t.toJson())
     };

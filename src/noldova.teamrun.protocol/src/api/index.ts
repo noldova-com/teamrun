@@ -194,11 +194,15 @@ export { TeammateUpdateParams } from "../models/methods/teammate-update-params.j
 export { TeammateIdParams } from "../models/methods/teammate-id-params.js";
 export { Department } from "../models/department.js";
 export { DepartmentMember } from "../models/department-member.js";
+export { NodeType } from "../models/node-type.js";
 export { Organization } from "../models/organization.js";
 export { DepartmentCreateParams } from "../models/methods/department-create-params.js";
 export { DepartmentUpdateParams } from "../models/methods/department-update-params.js";
 export { TeammatePlaceParams } from "../models/methods/teammate-place-params.js";
 export { DepartmentMoveParams } from "../models/methods/department-move-params.js";
+export { NodeTypeCreateParams } from "../models/methods/node-type-create-params.js";
+export { NodeTypeIdParams } from "../models/methods/node-type-id-params.js";
+export { NodeTypeUpdateParams } from "../models/methods/node-type-update-params.js";
 export { DepartmentIdParams } from "../models/methods/department-id-params.js";
 export { DepartmentMemberSetParams } from "../models/methods/department-member-set-params.js";
 export { OrganizationLayoutSaveParams } from "../models/methods/organization-layout-save-params.js";
