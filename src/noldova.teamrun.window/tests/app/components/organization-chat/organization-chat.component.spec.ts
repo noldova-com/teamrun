@@ -352,14 +352,23 @@ describe("OrganizationChatComponent", () => {
     expect(queued().map(t => [t.delivery, t.message.chatId])).toEqual([[MessageDelivery.Queue, "org-alice"]]);
   });
 
-  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a message to a replying teammate behind its reply, by Enter and by the send button, while replying is set to %s",
+  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a message to a replying teammate behind its reply, by Enter and by the send button, and marks Enter on Queue in the send menu, while replying is set to %s",
     async setting => {
       const main = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-deliver .nol-split-button-main");
+      const arrow = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-deliver .nol-split-button-arrow");
+      const offered = (): (string | null)[][] => [...document.querySelectorAll<HTMLElement>("button.nol-teamrun-deliver")]
+        .map(t => [t.dataset["delivery"] ?? null, t.querySelector(".nol-menu-item-shortcut")?.textContent?.trim() ?? null]);
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
       kept = [chatOf("alice")];
       running = [reply("org-alice", MessageStatus.Running)];
       await create(OrganizationTarget.teammate("alice"));
       context.changeSetting(Resources.whileReplyingSetting, setting);
       await Wait.until(() => expect(main()?.getAttribute("aria-label")).toBe(Resources.deliveryLabels[MessageDelivery.Queue]));
+      arrow()?.click();
+      await Wait.until(() => expect(offered()).toHaveLength(3));
+      const shortcuts = offered();
+      arrow()?.click();
+      await Wait.until(() => expect(offered()).toHaveLength(0));
 
       await type("By Enter");
       box()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
@@ -370,8 +379,10 @@ describe("OrganizationChatComponent", () => {
       main()?.click();
       await Wait.until(() => expect(queued()).toHaveLength(2));
 
-      expect(queued().map(t => [t.delivery, t.message.chatId, t.message.text]))
-        .toEqual([[MessageDelivery.Queue, "org-alice", "By Enter"], [MessageDelivery.Queue, "org-alice", "By the button"]]);
+      expect([shortcuts, queued().map(t => [t.delivery, t.message.chatId, t.message.text])]).toEqual([
+        [[MessageDelivery.Steer, null], [MessageDelivery.Queue, "Enter"], [MessageDelivery.StopAndSend, "Ctrl+Enter"]],
+        [[MessageDelivery.Queue, "org-alice", "By Enter"], [MessageDelivery.Queue, "org-alice", "By the button"]]
+      ]);
     });
 
   it("shows each recipient's reply that ended in that recipient's own chat before the panel opened, read from the chat, whatever the teammate replied elsewhere", async () => {
