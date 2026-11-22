@@ -999,8 +999,7 @@ describe("ChatStoreService", () => {
     const peer = new Conversation("peer", "p1", "Created elsewhere", SampleData.timestamp, SampleData.timestamp);
     context.answer(MethodName.ConversationList, () => [renamed.toJson(), peer.toJson()]);
     context.emit(EventName.StateInvalidated, null);
-    await Wait.until(() => expect(store.isBusy()).toBe(false));
-    expect(store.hasConversation("peer")).toBe(true);
+    await Wait.until(() => expect(store.hasConversation("peer")).toBe(true));
     expect(store.selectedConversation()?.title).toBe("Renamed");
     expect(store.history()).toBe(history);
     expect(context.count(MethodName.MessagePage)).toBe(pages);
@@ -1019,8 +1018,7 @@ describe("ChatStoreService", () => {
     context.emit(EventName.StateResyncRequested, null);
     context.emit(EventName.StateResyncRequested, null);
     providers.resolve([SampleData.provider.toJson()]);
-    await Wait.until(() => expect(store.isBusy()).toBe(false));
-    expect(store.resyncs()).toBe(resyncs + 1);
+    await Wait.until(() => expect(store.resyncs()).toBe(resyncs + 1));
     expect(messages()[0]?.status).toBe(MessageStatus.Completed);
     expect(store.runningReply()).toBeNull();
     expect(context.count(MethodName.MessagePage)).toBe(pages + 1);
@@ -1028,10 +1026,8 @@ describe("ChatStoreService", () => {
     store.deselectConversation();
     const catalogs = context.count(MethodName.ProjectList);
     context.emit(EventName.StateResyncRequested, null);
-    await Wait.until(() => expect(context.count(MethodName.ProjectList)).toBe(catalogs + 1));
-    await Wait.until(() => expect(store.isBusy()).toBe(false));
-    expect(context.count(MethodName.MessagePage)).toBe(pages + 1);
-    expect(store.resyncs()).toBe(resyncs + 2);
+    await Wait.until(() => expect(store.resyncs()).toBe(resyncs + 2));
+    expect([context.count(MethodName.ProjectList), context.count(MethodName.MessagePage)]).toEqual([catalogs + 1, pages + 1]);
   });
 
   it("lists the installations, which reads the providers' latest versions, when the window loads and on a reconnect, not on each catalog change", async () => {

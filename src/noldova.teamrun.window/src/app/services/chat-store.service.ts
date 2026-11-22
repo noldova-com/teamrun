@@ -2298,7 +2298,7 @@ export class ChatStoreService {
     this.catalogDirty = true;
     if (!Object.isNull(this.catalogReload))
       return this.catalogReload;
-    const reload = this.perform(async () => {
+    const reload = this.attempt(async () => {
       do {
         this.catalogDirty = false;
         if (this.kindsFailedSignal())

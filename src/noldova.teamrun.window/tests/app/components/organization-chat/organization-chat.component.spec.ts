@@ -48,6 +48,7 @@ describe("OrganizationChatComponent", () => {
   let pages: ReadonlyMap<string, readonly Message[]>;
   let unreadable: readonly string[];
   let openAnswer: (teammateId: string) => JsonValue | Promise<JsonValue>;
+  let listing: Promise<void>;
 
   const element = (): HTMLElement => {
     const native: unknown = fixture.nativeElement;
@@ -72,8 +73,10 @@ describe("OrganizationChatComponent", () => {
         const params = WaitingMessageAddParams.fromJson(t);
         return new WaitingMessage(`w${context.count(MethodName.WaitingMessageAdd)}`, params.delivery, params.message, SampleData.timestamp).toJson();
       })
-      .answer(MethodName.ConversationList, t => Object.isNull(ConversationListParams.fromJson(t).projectId) ? kept.map(u => u.toJson())
-        : [SampleData.conversation.toJson()])
+      .answer(MethodName.ConversationList, async t => {
+        await listing;
+        return Object.isNull(ConversationListParams.fromJson(t).projectId) ? kept.map(u => u.toJson()) : [SampleData.conversation.toJson()];
+      })
       .answer(MethodName.OrganizationChatOpen, t => {
         const id = OrganizationChat.fromJson(t).teammateId;
         opened.push(id);
@@ -126,6 +129,7 @@ describe("OrganizationChatComponent", () => {
     pages = new Map();
     unreadable = [];
     openAnswer = id => chatOf(id).toJson();
+    listing = Promise.resolve();
   });
 
   afterEach(async () => {
@@ -179,6 +183,32 @@ describe("OrganizationChatComponent", () => {
 
     await Wait.until(() => expect(element().querySelector("nol-teamrun-composer")).not.toBeNull());
     expect(opened).toEqual(["alice", "bob"]);
+  });
+
+  it.each([
+    ["just after it opened", false],
+    ["while the window still reads the chats again after it opened", true]
+  ])("sends the first message to a teammate's new chat %s, and clears the box", async (_, holds) => {
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    openAnswer = id => {
+      kept = [chatOf(id)];
+      if (holds)
+        listing = held;
+      context.emit(EventName.StateInvalidated, null);
+      return chatOf(id).toJson();
+    };
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(box()).not.toBeNull());
+    await type("Hello");
+    await sendNow();
+
+    await Wait.until(() => expect(sent().map(t => [t.chatId, t.responderTeammateId, t.text])).toEqual([["org-alice", "alice", "Hello"]]));
+    await Wait.until(() => expect(box()?.value).toBe(""));
+    expect(context.count(MethodName.ConversationList)).toBeGreaterThan(1);
+    release();
   });
 
   it("says why the teammate's chat couldn't open, with no composer", async () => {
