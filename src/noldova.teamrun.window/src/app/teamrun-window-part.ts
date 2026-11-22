@@ -98,10 +98,14 @@ export class TeamRunWindowPart implements IWindowPart {
     context.registerView(new ViewContribution(Resources.changesViewName, Resources.changesTitle, Resources.changesViewIcon, DockSide.Bottom, true,
       () => import("./components/changes-view/changes-view.component").then(t => t.ChangesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 20 }));
     context.registerCommand(new CommandContribution(Resources.showOrganizationCommand, Resources.showOrganizationTitle, Resources.organizationViewIcon, null, async () => {
-      const organization = await OrganizationCatalog.of(context).firstAsync();
-      context.openDocument(Resources.organizationDocumentName, organization?.id ?? Resources.organizationDocumentInstance, organization?.name ?? Resources.organizationTitle);
+      const catalog = OrganizationCatalog.of(context);
+      const organization = await catalog.firstAsync();
+      if (!Object.isNull(organization))
+        context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
+      else if (!Object.isNull(catalog.loadError()))
+        context.openDocument(Resources.organizationDocumentName, Resources.organizationDocumentInstance, Resources.organizationTitle);
       return null;
-    }));
+    }, () => OrganizationCatalog.of(context).organizations().length > 0 || !Object.isNull(OrganizationCatalog.of(context).loadError())));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showTeammatesCommand, Resources.showTeammatesTitle, Resources.teammatesViewIcon,
       Resources.teammatesDocumentName, Resources.teammatesDocumentInstance, Resources.teammatesTitle));
     context.registerCommand(TeamRunWindowPart.opening(context, Resources.showProvidersCommand, Resources.showProvidersTitle, Resources.providersViewIcon,

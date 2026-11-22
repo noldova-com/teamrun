@@ -2843,16 +2843,20 @@ describe("ProjectsViewComponent", () => {
       expect(levels).toEqual(["1", "2", "2", "2", "3", "3", "2", "3", "1"]);
     });
 
-    it("shows the Organizations group for an organization with no teammate and no department, and none while there is no organization", async () => {
+    it("shows the Organizations group for an organization with no teammate and no department, and its header with \"+\" and no rows while there is no organization", async () => {
       await create(t => t.answer(MethodName.TeammateList, () => [grok].map(u => u.toJson()))
         .answer(MethodName.OrganizationList, () => [SampleData.organizationOf([], []).toJson()]));
       await Wait.until(() => expect(names()).toEqual([organization.name]));
       const shown = headers();
       context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
       await settle();
+      const list = element().querySelector(".nol-teamrun-organization-list");
+      const header = find<HTMLElement>("nol-section-header", Resources.organizationsTitle);
 
       expect(shown).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
-      expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
+      expect([headers(), names(), list?.childElementCount, list?.getAttribute("role"), list?.getAttribute("aria-label")])
+        .toEqual([[Resources.organizationsTitle, Resources.projectsViewTitle], [], 0, null, null]);
+      expect(part(header, "button.nol-teamrun-new-organization").getAttribute("aria-label")).toBe(Resources.newOrganizationTitle);
     });
 
     it("creates an organization from \"+\" on the group's header with the name the person saves, and leaves it when they close the dialog", async () => {
@@ -2986,7 +2990,7 @@ describe("ProjectsViewComponent", () => {
         new OrganizationUpdateParams(organization.id, undefined, "E:/other"), new OrganizationUpdateParams(organization.id, undefined, null)]);
     });
 
-    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and offers no delete for the last one", async () => {
+    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and deletes the last one the same way", async () => {
       const novaChat = organizationChatOf("o9", nova, labs.id);
       conversations = [novaChat];
       await createOrganization(t => t.answer(MethodName.OrganizationDelete, () => null));
@@ -3009,8 +3013,21 @@ describe("ProjectsViewComponent", () => {
       expect(before).toEqual([]);
       expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: labs.id });
       expect([asked, cancelled]).toEqual([[Resources.deleteOrganizationTitle, Resources.formatDeleteOrganizationText(labs.name)], 0]);
-      expect([names().includes(labs.name), await organizationMenu(organization.name)])
-        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel]]);
+      const lastMenu = await organizationMenu(organization.name);
+      await choose(organizationRow(organization.name), Resources.organizationDeleteLabel);
+      const askedLast = dialogText();
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+      await Wait.until(() => expect(deletes()).toEqual([labs.id, organization.id]));
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
+      await settle();
+      const emptied = [headers().includes(Resources.organizationsTitle), names()];
+      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson());
+      await Wait.until(() => expect(names()).toEqual(["Studio"]));
+
+      expect([names().includes(labs.name), lastMenu])
+        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel, Resources.organizationDeleteLabel]]);
+      expect([askedLast, emptied]).toEqual([Resources.formatDeleteOrganizationText(organization.name), [true, []]]);
+      expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: organization.id });
     });
 
     it("logs an organization change the engine refuses", async () => {

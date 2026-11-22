@@ -157,6 +157,18 @@ describe("TeamRun's window part", () => {
       .toEqual([null, [{ name: "teamrun.organization", instance: "my-organization", title: "Organization", options: undefined }]]);
   });
 
+  it("leaves Show organization unavailable and opens nothing while there is no organization, and makes it available once one is created", async () => {
+    const context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => []);
+    await createPart().activateAsync(context);
+    const show = context.commands.find(t => t.name === "teamrun.showOrganization");
+    await OrganizationCatalog.of(context).reload();
+
+    const none = [show?.isEnabled(null), await show?.runAsync(null), [...context.openedDocuments]];
+    context.emit(EventName.OrganizationChanged, new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson());
+
+    expect([none, show?.isEnabled(null)]).toEqual([[false, null, []], true]);
+  });
+
   it("opens the organization the newest listing names when a resync reloads the list while Show organization waits for it", async () => {
     const first = new DeferredResponse();
     const answers = [first.promise, Promise.resolve([new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()])];
