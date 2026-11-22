@@ -41,9 +41,10 @@ export class Resources {
   public static readonly grokAgentArguments: readonly string[] = ["--no-auto-update"];
   public static readonly grokPermissionModeArgument: string = "--permission-mode";
   public static readonly grokDefaultPermissionMode: string = "default";
-  public static readonly grokStdioArguments: readonly string[] = ["agent", "--no-leader", "stdio"];
+  public static readonly grokAgentCommandArguments: readonly string[] = ["agent", "--no-leader"];
+  public static readonly grokStdioCommand: string = "stdio";
   public static readonly grokModelArgument: string = "--model";
-  public static readonly grokNoSubAgentsArgument: string = "--no-subagents";
+  public static readonly grokSubAgentsVariable: string = "GROK_SUBAGENTS";
   public static readonly grokEffortArgument: string = "--reasoning-effort";
   public static readonly copilotKindId: string = "copilot";
   public static readonly copilotDisplayName: string = "GitHub Copilot";

@@ -29,21 +29,23 @@ export class GrokAgentTests {
     const near = agent.launch(null, new RequestedSettings("grok", null, null), "C:\\p");
     const deep = agent.launch(null, new RequestedSettings("grok", null, null), `C:\\${"x".repeat(200)}`);
     const title = agent.launch(null, new RequestedSettings("grok", null, null), `C:\\${"x".repeat(200)}`, null, undefined, false, true);
+    const deepHome = deep.environment[Resources.grokHomeVariable] ?? String.empty;
 
     Assert.areEqual(join(person, ".grok"), near.environment[Resources.grokHomeVariable]);
-    Assert.areNotEqual(join(person, ".grok"), deep.environment[Resources.grokHomeVariable]);
-    Assert.areEqual(realpathSync(join(person, ".grok")), realpathSync(deep.environment[Resources.grokHomeVariable]!));
+    Assert.isFalse(String.isNullOrWhitespace(deepHome));
+    Assert.areNotEqual(join(person, ".grok"), deepHome);
+    Assert.areEqual(realpathSync(join(person, ".grok")), realpathSync(deepHome));
     Assert.areEqual(directory.resolve("title-home"), title.environment[Resources.grokHomeVariable]);
   }
 
   @TestMethod
-  public launchesGrokWithTheSearchAndUseToolsThatReachItsMcpTools(): void {
+  public launchesGrokWithTheChosenModelAndEffortAsOptionsOfItsAgentCommandAheadOfStdio(): void {
     using directory = new TemporaryDirectory();
     const agent = new GrokAgent(new ProcessCommand("grok", []), {}, directory.resolve("profile"));
 
     const launch = agent.launch(null, new RequestedSettings("grok", "grok-4", "high"));
 
-    Assert.areEqual("--no-auto-update,--permission-mode,default,--model,grok-4,--reasoning-effort,high,agent,--no-leader,stdio",
+    Assert.areEqual("--no-auto-update,--permission-mode,default,agent,--no-leader,--model,grok-4,--reasoning-effort,high,stdio",
       launch.command.arguments.join(","));
     Assert.areEqual("_x.ai/auth/logout,x.ai/auth/logout", agent.signOut.methods.join(","));
     Assert.isFalse(agent.logsOut);
@@ -86,14 +88,18 @@ export class GrokAgentTests {
   }
 
   @TestMethod
-  public launchesGrokWithoutItsOwnSubAgentsForATurnInPlanOrAskMode(): void {
+  public launchesGrokWithoutItsOwnSubAgentsThroughItsEnvironmentForATurnOrTitleInPlanOrAskMode(): void {
     using directory = new TemporaryDirectory();
-    const agent = new GrokAgent(new ProcessCommand("grok", []), {}, directory.resolve("profile"));
+    const agent = new GrokAgent(new ProcessCommand("grok", []), { [Resources.grokSubAgentsVariable]: "1" }, directory.resolve("profile"));
 
-    const launched = ["default", "plan", "ask", "bypassPermissions", "unknown", null].map(t => `${t}:${agent.launch(null, new RequestedSettings("grok", null, null, null, t)).command
-      .arguments.includes(Resources.grokNoSubAgentsArgument)}`);
+    const launched = ["default", "plan", "ask", "bypassPermissions", "unknown", null].map(t => {
+      const turn = agent.launch(null, new RequestedSettings("grok", null, null, null, t));
+      const title = agent.launch(null, new RequestedSettings("grok", null, null, null, t), null, null, undefined, false, true);
+      return `${t}:${turn.environment[Resources.grokSubAgentsVariable]}/${title.environment[Resources.grokSubAgentsVariable]}/${turn.command.arguments.join(" ")}`;
+    });
 
-    Assert.areEqual("default:false,plan:true,ask:true,bypassPermissions:false,unknown:false,null:false", launched.join(","));
+    Assert.areEqual(["default:1/1", "plan:0/0", "ask:0/0", "bypassPermissions:1/1", "unknown:1/1", "null:1/1"]
+      .map(t => `${t}/--no-auto-update --permission-mode ${t.startsWith("bypass") ? "bypassPermissions" : "default"} agent --no-leader stdio`).join(","), launched.join(","));
   }
 
   @TestMethod

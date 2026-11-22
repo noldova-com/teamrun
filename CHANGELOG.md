@@ -27,6 +27,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Grok's model and effort:** a Grok reply now runs on the model and reasoning effort you chose, rather than Grok's own defaults, and a Plan or Ask chat's Grok starts without its own sub-agents again (#467).
 - **Grok after an approved plan:** in an Ask chat, once you approve a Grok reply's plan, TeamRun stops that Grok turn and goes on in the same reply with a new one in Ask, so the chat stays read-only, rather than going on in Default, where it could change files; in other chats Grok takes the chat's own mode from its next turn; when Grok refuses the switch, the reply says so (#447).
 - **A shared MCP server on Windows:** the server and what it started now end with TeamRun however TeamRun ends, rather than now and then running on after TeamRun was ended at once; when they can't be ended, TeamRun's MCP watch says so in the provider's log (#443).
 - **A Pi teammate switched back to Default:** its next reply runs on Pi's current default model and thinking level, not the ones it ran with before, also after its Pi closed, TeamRun restarted or the default changed (#138).

@@ -2550,10 +2550,13 @@ export declare class Resources {
   public static readonly grokDefaultPermissionMode: string;
   /** The tool through which Grok calls every MCP tool: `use_tool`. */
   public static readonly grokRoutedMcpTool: string;
-  public static readonly grokStdioArguments: readonly string[];
+  /** Grok's `agent` command and its options before the model and effort: `agent`, `--no-leader`. */
+  public static readonly grokAgentCommandArguments: readonly string[];
+  /** The `agent` subcommand that serves ACP over standard input and output, after the model and effort: `stdio`. */
+  public static readonly grokStdioCommand: string;
   public static readonly grokModelArgument: string;
-  /** The launch argument that turns Grok's own sub-agents off, for a turn in a mode other than Default: `--no-subagents`. */
-  public static readonly grokNoSubAgentsArgument: string;
+  /** The variable that turns Grok's own sub-agents off, set to `grokDisabledValue` for a turn in a read-only mode: `GROK_SUBAGENTS`. */
+  public static readonly grokSubAgentsVariable: string;
   public static readonly grokEffortArgument: string;
   public static readonly acpInitialize: string;
   public static readonly acpAuthenticate: string;
