@@ -6,12 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { type ComponentFixture, TestBed } from "@angular/core/testing";
+import { ApplicationRef } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
 import { userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
 import { MethodName, NodeType, Organization, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
-import { DialogTokens } from "@noldova/ui.components.angular";
+import { DialogService } from "@noldova/ui.components.angular";
 
 import { OrganizationTypeDialogComponent } from "../../../../src/app/components/organization-type-dialog/organization-type-dialog.component";
 import { OrganizationScope } from "../../../../src/app/services/organization-scope";
@@ -27,15 +28,14 @@ describe("OrganizationTypeDialogComponent", () => {
     [SampleData.departmentType, team], [], []);
   let context: FakeWindowPartContext;
   let store: OrganizationStoreService;
-  let fixture: ComponentFixture<OrganizationTypeDialogComponent>;
   let created: string[];
   let closes: number;
 
   const element = (): HTMLElement => {
-    const native: unknown = fixture.nativeElement;
-    if (!(native instanceof HTMLElement))
-      throw new Error("The fixture has no element.");
-    return native;
+    const found = [...document.querySelectorAll<HTMLElement>("nol-teamrun-organization-type-dialog")].at(-1);
+    if (Object.isUndefined(found))
+      throw new Error("No type dialog is open.");
+    return found;
   };
   const one = <T extends HTMLElement>(selector: string, root: ParentNode = element()): T => {
     const found = root.querySelector<T>(selector);
@@ -44,9 +44,9 @@ describe("OrganizationTypeDialogComponent", () => {
     return found;
   };
   const settle = async (): Promise<void> => {
-    await fixture.whenStable();
+    await TestBed.inject(ApplicationRef).whenStable();
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    await fixture.whenStable();
+    await TestBed.inject(ApplicationRef).whenStable();
   };
   const save = (): HTMLButtonElement => one<HTMLButtonElement>(".nol-teamrun-save");
   const nameField = (): HTMLInputElement => one<HTMLInputElement>("input.nol-teamrun-type-name");
@@ -60,17 +60,15 @@ describe("OrganizationTypeDialogComponent", () => {
   const create = async (type: NodeType | null, configure: (context: FakeWindowPartContext) => void = () => undefined): Promise<void> => {
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organization.toJson()]);
     configure(context);
-    TestBed.configureTestingModule({ providers: [{ provide: DialogTokens.titleId, useValue: "nol-teamrun-dialog-title" }] });
+    TestBed.configureTestingModule({});
     store = new OrganizationStoreService(context, new OrganizationScope());
     await Wait.until(() => expect(store.organization().nodeTypes.map(t => t.id)).toEqual(["department", "team"]));
-    fixture = TestBed.createComponent(OrganizationTypeDialogComponent);
-    fixture.componentRef.setInput("organization", store);
-    fixture.componentRef.setInput("type", type);
     created = [];
     closes = 0;
-    fixture.componentInstance.created.subscribe(t => created.push(t.id));
-    fixture.componentInstance.closed.subscribe(() => closes++);
-    fixture.autoDetectChanges();
+    const dialog = OrganizationTypeDialogComponent.open(TestBed.inject(DialogService), store, type);
+    dialog?.created.subscribe(t => created.push(t.id));
+    dialog?.closed.subscribe(() => closes++);
+    await Wait.until(() => expect(element().querySelector(".nol-dialog-title")?.textContent?.trim()).toBe(Object.isNull(type) ? "New type" : "Edit type"));
     await settle();
   };
 

@@ -2678,8 +2678,8 @@ describe("ProjectsViewComponent", () => {
       const lab = new NodeType("lab", "Lab", "science", "teal", SampleData.timestamp, SampleData.timestamp);
       context.emit(EventName.OrganizationChanged, new Organization(labs.id, labs.name, null, labs.order, SampleData.timestamp, SampleData.timestamp,
         [SampleData.departmentType, lab], [new Department("research", "Research", lab.id, OrganizationParent.person, null, 0, "c", "u")], labs.placements).toJson());
-      await Wait.until(() => expect(organizationRow("Research").querySelector(".material-symbols-rounded")?.textContent).toBe("science"));
-      const icon = part(organizationRow("Research"), ".material-symbols-rounded");
+      await Wait.until(() => expect(organizationRow("Research").querySelector("nol-teamrun-organization-type-icon .material-symbols-rounded")?.textContent).toBe("science"));
+      const icon = part(organizationRow("Research"), "nol-teamrun-organization-type-icon .material-symbols-rounded");
       const name = part(organizationRow("Research"), ".nol-teamrun-organization-name");
       const probe = document.createElement("span");
       probe.style.color = "var(--nol-swatch-teal)";
@@ -2688,7 +2688,7 @@ describe("ProjectsViewComponent", () => {
 
       expect(icon.getBoundingClientRect().right).toBeLessThanOrEqual(name.getBoundingClientRect().left);
       AppearanceFixture.expectPixels(middle(icon), middle(name));
-      expect([getComputedStyle(icon).color, organizationRow("Marketing").querySelector(".material-symbols-rounded")]).toEqual([getComputedStyle(probe).color, null]);
+      expect([getComputedStyle(icon).color, organizationRow("Marketing").querySelector("nol-teamrun-organization-type-icon .material-symbols-rounded")]).toEqual([getComputedStyle(probe).color, null]);
       probe.remove();
     });
 

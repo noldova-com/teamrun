@@ -371,7 +371,7 @@ describe("OrganizationFocusComponent", () => {
     const choice = one(".unit-type");
     const shown = one(".nol-select-value", choice).textContent?.trim();
     const geometry = [box(choice).left - box(one(".unit-rename")).left, box(choice).top >= box(one(".edit-row")).bottom];
-    await userEvent.click(one(".nol-select-button", choice));
+    one(".nol-select-button", choice).click();
     await Wait.until(() => expect(document.querySelector(".nol-select-option")).not.toBeNull());
     const offered = [...document.querySelectorAll(".nol-select-option")].map(t => t.textContent?.trim());
     await userEvent.click(one(".nol-select-option[data-value='team']", document));

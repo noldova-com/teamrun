@@ -58,6 +58,8 @@ describe("OrganizationTypesDialogComponent", () => {
     await Wait.until(() => expect(context.count(MethodName.OrganizationList)).toBe(1));
     OrganizationTypesDialogComponent.open(TestBed.inject(DialogService), store);
     await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-types-dialog .nol-teamrun-new-type")).not.toBeNull());
+    await Wait.until(() => expect([names(), document.querySelector("nol-teamrun-organization-types-dialog .types-empty") !== null])
+      .toEqual([types.map(t => t.name), types.length === 0]));
     return store;
   };
 
@@ -108,7 +110,7 @@ describe("OrganizationTypesDialogComponent", () => {
     }));
 
     one("nol-teamrun-organization-types-dialog .nol-teamrun-new-type").click();
-    await Wait.until(() => expect(document.querySelector("nol-dialog input.nol-teamrun-type-name")).not.toBeNull());
+    await Wait.until(() => expect(one(".nol-dialog-title", top()).textContent?.trim()).toBe("New type"));
     const title = one(".nol-dialog-title", top()).textContent?.trim();
     await userEvent.type(one("input.nol-teamrun-type-name", top()), "Squad");
     one(".nol-teamrun-save", top()).click();

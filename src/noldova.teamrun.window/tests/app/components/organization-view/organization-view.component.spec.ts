@@ -1261,7 +1261,7 @@ describe("OrganizationViewComponent", () => {
     };
     const addDepartmentAsync = async (): Promise<void> => {
       one(".chart .add-department").click();
-      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
+      await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-type .nol-select-value")?.textContent?.trim()).toBeTruthy());
     };
     const typeShown = (): string | undefined => inDialog(".nol-teamrun-department-type .nol-select-value").textContent?.trim();
 
