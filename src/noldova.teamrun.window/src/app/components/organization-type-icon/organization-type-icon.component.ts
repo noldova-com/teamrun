@@ -17,6 +17,8 @@ import { ColorChoices } from "@noldova/ui.components.angular";
 })
 export class OrganizationTypeIconComponent {
   public readonly type: InputSignal<NodeType | null> = input.required<NodeType | null>();
+  public readonly fallback: InputSignal<string | null> = input<string | null>(null);
 
+  protected readonly icon: Signal<string | null> = computed(() => this.type()?.icon ?? this.fallback());
   protected readonly color: Signal<string | null> = computed(() => ColorChoices.toCss(this.type()?.color ?? null));
 }

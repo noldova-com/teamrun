@@ -37,8 +37,8 @@ import { OrganizationFocusComponent } from "../organization-focus/organization-f
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationChatsComponent } from "../organization-chats/organization-chats.component";
 import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
-import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 import { OrganizationTypesDialogComponent } from "../organization-types-dialog/organization-types-dialog.component";
+import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",

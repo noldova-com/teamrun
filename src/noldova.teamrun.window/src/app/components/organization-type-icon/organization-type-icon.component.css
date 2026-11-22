@@ -11,7 +11,7 @@
 }
 
 .material-symbols-rounded {
-  font-size: 1.25rem;
+  font-size: var(--nol-teamrun-type-icon-size, 1.25rem);
   line-height: 1;
   flex: none;
 }

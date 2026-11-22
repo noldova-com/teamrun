@@ -73,6 +73,7 @@ LICENSE file in the root directory of this source tree.
             <button type="button" nol-icon-button class="delete-department" [icon]="resources.organizationDeleteIcon"
               [label]="resources.formatOrganizationDeleteNamed(department.name)" (click)="deleteDepartment(department)"></button>
           } @else {
+            <nol-teamrun-organization-type-icon [type]="node.type" />
             <span class="title lane-name">{{ node.name }}</span>
             <nol-chip class="lane-count">{{ node.headcount }}</nol-chip>
             <span class="spacer"></span>

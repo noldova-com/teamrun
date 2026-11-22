@@ -6,6 +6,6 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-@if (type()?.icon; as icon) {
+@if (icon(); as icon) {
   <span class="material-symbols-rounded" aria-hidden="true" [style.color]="color()">{{ icon }}</span>
 }

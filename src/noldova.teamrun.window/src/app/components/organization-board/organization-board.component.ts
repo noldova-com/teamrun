@@ -29,13 +29,14 @@ import { TeammateStatusStoreService } from "../../services/teammate-status-store
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-board",
   imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+    OrganizationTypeIconComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
