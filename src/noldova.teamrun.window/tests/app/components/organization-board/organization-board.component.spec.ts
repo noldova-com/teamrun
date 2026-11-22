@@ -82,6 +82,7 @@ describe("OrganizationBoardComponent", () => {
     clock = new FakeClock(Date.parse(started) + 5 * 60_000);
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
+    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, ChatStoreService.provider,
@@ -245,7 +246,7 @@ describe("OrganizationBoardComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", typeId: "department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
     expect(fields().map(t => t.value)).toEqual(["Design", "UI", "Build"]);
   });

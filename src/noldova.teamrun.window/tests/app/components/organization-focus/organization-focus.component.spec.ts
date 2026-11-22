@@ -96,6 +96,7 @@ describe("OrganizationFocusComponent", () => {
       });
     for (const method of [MethodName.DepartmentCreate, MethodName.DepartmentUpdate, MethodName.DepartmentMemberSet, MethodName.DepartmentDelete])
       context.answer(method, () => null);
+    context.answer(MethodName.NodeTypeCreate, () => SampleData.departmentType.toJson());
     const data = new TeammateFixture(context);
     data.teammates = [...data.teammates, data.reviewer, carol];
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
@@ -259,7 +260,7 @@ describe("OrganizationFocusComponent", () => {
     await Wait.until(() => expect(edits()).toEqual([
       ["teamrun.departmentUpdate", { organizationId: "my-organization", departmentId: "design", name: "Craft" }],
       ["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "carol", departmentId: "design" }],
-      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", parent: { kind: "Person", id: null }, leaderId: null }]
+      ["teamrun.departmentCreate", { organizationId: "my-organization", name: "Lab", typeId: "department", parent: { kind: "Person", id: null }, leaderId: null }]
     ]));
   });
 

@@ -12,9 +12,9 @@ import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Department, NodeType, Organization, OrganizationParent, OrganizationUpdateParams, TeammatePlacement } from "@noldova/teamrun.protocol";
 
-@TestClass
 const nodeTypes = [new NodeType("department", "Department", null, null, "c", "u")];
 
+@TestClass
 export class OrganizationUpdateParamsTests {
   @TestMethod
   public preservesItsFieldsAndRejectsMalformedValues(): void {

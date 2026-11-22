@@ -11,9 +11,9 @@ import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Department, NodeType, Organization, OrganizationNodeKind, OrganizationParent, OrganizationTarget, Resources, TeammatePlacement } from "@noldova/teamrun.protocol";
 
-@TestClass
 const nodeTypes = [new NodeType("department", "Department", null, null, "c", "u")];
 
+@TestClass
 export class OrganizationTests {
   @TestMethod
   public preservesItsFieldsAndRejectsMalformedValues(): void {
