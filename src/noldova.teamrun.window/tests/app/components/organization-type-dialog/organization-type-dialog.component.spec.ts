@@ -126,9 +126,10 @@ describe("OrganizationTypeDialogComponent", () => {
     await settle();
     save().click();
     await Wait.until(() => expect(element().querySelector(".nol-teamrun-dialog-error")?.textContent?.trim()).toBe("The runtime is busy."));
+    await Wait.until(() => expect(save().disabled).toBe(false));
     await settle();
 
-    expect([context.parametersOf(MethodName.NodeTypeUpdate), closes, save().disabled]).toEqual([{ organizationId: "my-organization", typeId: "plain", icon: "groups" }, 0, false]);
+    expect([context.parametersOf(MethodName.NodeTypeUpdate), closes]).toEqual([{ organizationId: "my-organization", typeId: "plain", icon: "groups" }, 0]);
   });
 
   it("closes without asking the runtime when nothing about the type changed", async () => {
