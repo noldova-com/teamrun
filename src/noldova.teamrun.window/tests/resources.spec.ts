@@ -227,10 +227,11 @@ describe("Resources", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
   });
 
-  it("counts Focus's direct reports and a department's teammates in the singular for one and the plural for more", () => {
+  it("counts Focus's direct reports, and those under them, and a department's teammates in the singular for one and the plural for more", () => {
     expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
+      Resources.formatOrganizationFocusLeaders(3, new Map(), 1),
       Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
-      .toEqual(["Your 1 direct report", "Your 2 direct reports", "1 teammate", "2 teammates"]);
+      .toEqual(["Your 1 direct report", "Your 2 direct reports", "Your 3 direct reports and 1 under them", "1 teammate", "2 teammates"]);
   });
 
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {

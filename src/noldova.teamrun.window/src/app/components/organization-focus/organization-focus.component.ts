@@ -98,7 +98,9 @@ export class OrganizationFocusComponent {
     if (!Object.isNull(focus.teammate))
       return Resources.formatOrganizationFocusTeammate(focus.teammate.role, this.departmentNames().get(focus.teammate.id) ?? focus.departmentName, focus.teammate.model);
     const counts = this.countsOf(this.cards());
-    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length, counts) : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
+    const under = this.cards().filter(t => this.managers().has(t.id)).length;
+    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length - under, counts, under)
+      : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
   });
 
   protected reportsToOf(teammate: Teammate): string | null {

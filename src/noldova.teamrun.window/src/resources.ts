@@ -3278,8 +3278,9 @@ export class Resources {
     return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
   }
 
-  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`Your ${count} ${count === 1 ? "direct report" : "direct reports"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>, under: number = 0): string {
+    const reports = `Your ${count} ${count === 1 ? "direct report" : "direct reports"}`;
+    return [under === 0 ? reports : `${reports} and ${under} under them`, ...Resources.statusCountParts(counts)].join(" · ");
   }
 
   public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {

@@ -169,8 +169,9 @@ describe("OrganizationFocusComponent", () => {
     fixture.componentRef.setInput("tree", root.subDepartments);
     await settle();
 
-    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name")])
-      .toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Carol", "Offline"]]);
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 1 under them · ")])
+      .toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Carol", "Offline"], true]);
     const button = one(".obtn", row("Offline")).getBoundingClientRect();
     const note = one(".reports-to", row("Offline")).getBoundingClientRect();
     const label = one(".label", row("Offline")).getBoundingClientRect();
