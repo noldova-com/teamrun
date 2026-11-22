@@ -13,6 +13,8 @@ const net = require("node:net");
 const path = require("node:path");
 const tls = require("node:tls");
 
+const preloadRuntime = require("./runtime-preload.cjs");
+
 const log = process.env["TEAMRUN_ACP_REGISTRY_DOUBLE_LOG"];
 const registryHost = "cdn.agentclientprotocol.com";
 const registryUrl = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
@@ -22,13 +24,13 @@ const icons = new Set(JSON.parse(registry).agents.map(t => t.icon));
 const realFetch = globalThis.fetch;
 const realConnect = tls.connect;
 
-const urlOf = input => typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+const urlOf = input => Object.isString(input) ? input : input instanceof URL ? input.href : input.url;
 
-const methodOf = (input, init) => init?.method ?? (typeof input === "object" && !(input instanceof URL) ? input.method : "GET");
+const methodOf = (input, init) => init?.method ?? (Object.isObject(input) && !(input instanceof URL) ? input.method : "GET");
 
 const hostOf = args => {
-  const options = args.find(t => typeof t === "object" && t !== null) ?? {};
-  return options.servername ?? options.host ?? (typeof args[1] === "string" ? args[1] : undefined);
+  const options = args.find(t => Object.isObject(t)) ?? {};
+  return options.servername ?? options.host ?? (Object.isString(args[1]) ? args[1] : undefined);
 };
 
 const processName = () => process.type ?? (process.env["ELECTRON_RUN_AS_NODE"] === "1" ? "runtime" : "node");
@@ -36,10 +38,13 @@ const processName = () => process.type ?? (process.env["ELECTRON_RUN_AS_NODE"] =
 const preload = `--require "${__filename.split(path.sep).join("/")}"`;
 const inherited = process.env["NODE_OPTIONS"] ?? "";
 
-if (log !== undefined && !inherited.includes(preload))
+if (!Object.isUndefined(log) && !inherited.includes(preload))
   process.env["NODE_OPTIONS"] = inherited === "" ? preload : `${inherited} ${preload}`;
 
-if (log !== undefined) {
+if (!Object.isUndefined(log))
+  preloadRuntime(__filename);
+
+if (!Object.isUndefined(log)) {
   globalThis.fetch = async (input, init) => {
     const url = new URL(urlOf(input));
     if (url.hostname !== registryHost)

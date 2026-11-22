@@ -58,6 +58,7 @@ export class TeamRunApp {
   private static readonly REMOVE_RETRY_DELAY: number = 200;
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer", "--host-resolver-rules=MAP *.test 127.0.0.1"];
   private static readonly LINUX_PASSWORD_STORE: string = "--password-store=gnome-libsecret";
+  private static readonly MAC_MOCK_KEYCHAIN: string = "--use-mock-keychain";
   private static readonly DESKTOP_DEFAULT_WINDOW: readonly [number, number] = [1280, 800];
   private static readonly PROCESSES: string = "/proc";
   private static readonly RUNTIME_ENTRY: string = "/desktop.runtime/services/runtime-entry.js";
@@ -351,7 +352,7 @@ export class TeamRunApp {
     const application = await _electron.launch({
       executablePath: TeamRunApp.electron,
       args: [...[...preloads, TeamRunApp.REGISTRY_DOUBLE].flatMap(t => ["-r", t]), TeamRunApp.MAIN, `--data-dir=${this.data}`, `--device-dir=${this.device}`, ...TeamRunApp.LAUNCH_ARGUMENTS,
-        ...process.platform === "linux" ? [TeamRunApp.LINUX_PASSWORD_STORE] : []],
+        ...process.platform === "linux" ? [TeamRunApp.LINUX_PASSWORD_STORE] : [], ...process.platform === "darwin" ? [TeamRunApp.MAC_MOCK_KEYCHAIN] : []],
       cwd: TeamRunApp.APP_ROOT,
       env: environment
     });
