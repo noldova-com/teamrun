@@ -157,6 +157,10 @@ import type {
   TeammatePlaceParams,
   DepartmentMoveParams,
   DepartmentUpdateParams,
+  NodeType,
+  NodeTypeCreateParams,
+  NodeTypeIdParams,
+  NodeTypeUpdateParams,
   Organization,
   OrganizationChat,
   OrganizationCreateParams,
@@ -3106,6 +3110,10 @@ export declare class Resources {
   public static readonly organizationsTable: string;
   /** The name of the organization every database starts with: `My organization`. */
   public static readonly defaultOrganizationName: string;
+  /** The node types migration's fixed id: `20261126090000_NodeTypes`. */
+  public static readonly nodeTypesMigrationId: string;
+  /** Gives each organization, stored and in the change feed, its node types: the Department type when it has departments, else none; and each department that type. */
+  public static readonly addDefaultNodeTypes: readonly string[];
   /** Inserts "My organization", with no folder, first in the list. */
   public static readonly insertDefaultOrganization: string;
   /** Copies the departments aside while the table is made again with its organization. */
@@ -4786,6 +4794,12 @@ export declare class Resources {
   public static formatLastOrganization(name: string): string;
   /** Returns a placement's key in the change feed: the organization's id and the teammate's. */
   public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string;
+  /** Says no node type of the organization has the id. */
+  public static formatNodeTypeNotFound(id: string): string;
+  /** Says another node type of the organization has the name. */
+  public static formatNodeTypeNameTaken(name: string): string;
+  /** Says how many departments have the node type, which can't be deleted until they have another. */
+  public static formatNodeTypeInUse(name: string, count: number): string;
   public static formatDepartmentNotFound(id: string): string;
 
   /** Why a teammate that has no place in the organization can't be a parent. */
@@ -10276,6 +10290,24 @@ export interface IOrganizationService {
   setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
 
   /**
+   * Adds a node type to an organization, last among its types, and records the organization's change in the change feed.
+   * @throws ServiceException `NotFound` for an unknown organization, and `Conflict` when another of its types has the name, ignoring case.
+   */
+  createNodeTypeAsync(params: NodeTypeCreateParams): Promise<NodeType>;
+
+  /**
+   * Renames a node type or sets or clears its icon or color, and records the organization's change in the change feed.
+   * @throws ServiceException `NotFound` for an unknown organization or type, and `Conflict` when another of its types has the name.
+   */
+  updateNodeTypeAsync(params: NodeTypeUpdateParams): Promise<NodeType>;
+
+  /**
+   * Deletes a node type, and records the organization's change in the change feed.
+   * @throws ServiceException `NotFound` for an unknown organization or type, and `Conflict`, saying how many departments have it, with their ids, when any does.
+   */
+  deleteNodeTypeAsync(params: NodeTypeIdParams): Promise<void>;
+
+  /**
    * Places a teammate under a parent at an order among the teammates there, numbering the siblings it left and joined from 0 again,
    * or takes it out of the organization, and records each change in the change feed. A teammate that no longer sits directly in a
    * department it leads stops leading it; what sits under a teammate taken out moves to its parent.
@@ -10344,6 +10376,15 @@ export declare class OrganizationService implements IOrganizationService {
 
   /** See {@link IOrganizationService.setMemberAsync}. */
   public setMemberAsync(params: DepartmentMemberSetParams): Promise<void>;
+
+  /** See {@link IOrganizationService.createNodeTypeAsync}. */
+  public createNodeTypeAsync(params: NodeTypeCreateParams): Promise<NodeType>;
+
+  /** See {@link IOrganizationService.updateNodeTypeAsync}. */
+  public updateNodeTypeAsync(params: NodeTypeUpdateParams): Promise<NodeType>;
+
+  /** See {@link IOrganizationService.deleteNodeTypeAsync}. */
+  public deleteNodeTypeAsync(params: NodeTypeIdParams): Promise<void>;
 
   /** See {@link IOrganizationService.placeAsync}. */
   public placeAsync(params: TeammatePlaceParams): Promise<void>;
@@ -11518,6 +11559,15 @@ export declare class UniqueIndexNamesMigration extends SqlMigration {
   public constructor();
 
   /** Creates each unique index under its `UX_` name and drops its `IX_` one. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Gives each organization with departments the Department node type, each other one no types, and each department that type, in the tables and the change feed. */
+export declare class NodeTypesMigration extends SqlMigration {
+  /** Uses the fixed node types migration id. */
+  public constructor();
+
+  /** Runs `Resources.addDefaultNodeTypes`. */
   public override apply(builder: MigrationBuilder): void;
 }
 

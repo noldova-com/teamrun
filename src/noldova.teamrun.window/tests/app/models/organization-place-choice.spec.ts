@@ -14,7 +14,7 @@ import { SampleData } from "../../fixtures/sample-data.fixture";
 describe("OrganizationPlaceChoice", () => {
   const teammate = (id: string, name: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, "t", "t");
   const team = [teammate("ada", "Ada"), teammate("bea", "Bea"), teammate("cy", "Cy")];
-  const root = OrganizationNode.treeOf(SampleData.organizationOf([new Department("design", "Design", OrganizationParent.person, "ada", 0, "c", "u")],
+  const root = OrganizationNode.treeOf(SampleData.organizationOf([new Department("design", "Design", "department", OrganizationParent.person, "ada", 0, "c", "u")],
     [new TeammatePlacement("ada", OrganizationParent.department("design"), 0), new TeammatePlacement("bea", OrganizationParent.department("design"), 1),
       new TeammatePlacement("cy", OrganizationParent.teammate("bea"), 0)]), team);
 

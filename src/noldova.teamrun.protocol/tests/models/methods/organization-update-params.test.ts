@@ -10,7 +10,9 @@ import "@noldova/context.core";
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Department, Organization, OrganizationParent, OrganizationUpdateParams, TeammatePlacement } from "@noldova/teamrun.protocol";
+import { Department, NodeType, Organization, OrganizationParent, OrganizationUpdateParams, TeammatePlacement } from "@noldova/teamrun.protocol";
+
+const nodeTypes = [new NodeType("department", "Department", null, null, "c", "u")];
 
 @TestClass
 export class OrganizationUpdateParamsTests {
@@ -29,7 +31,7 @@ export class OrganizationUpdateParamsTests {
 
   @TestMethod
   public keepsTheFieldItIsNotGiven(): void {
-    const organization = new Organization("o1", "My organization", "/work/mine", 2, "c", "u", [], []);
+    const organization = new Organization("o1", "My organization", "/work/mine", 2, "c", "u", nodeTypes, [], []);
     const renamed = new OrganizationUpdateParams("o1", "Studio", undefined).applyTo(organization, "later");
     const cleared = new OrganizationUpdateParams("o1", undefined, null).applyTo(organization, "later");
 
@@ -38,8 +40,8 @@ export class OrganizationUpdateParamsTests {
 
   @TestMethod
   public appliesItsNameAndFolderAndKeepsTheRest(): void {
-    const department = new Department("d1", "Design", OrganizationParent.person, null, 0, "c", "u");
-    const organization = new Organization("o1", "My organization", null, 2, "c", "u", [department], [new TeammatePlacement("t1", OrganizationParent.person, 0)]);
+    const department = new Department("d1", "Design", "department", OrganizationParent.person, null, 0, "c", "u");
+    const organization = new Organization("o1", "My organization", null, 2, "c", "u", nodeTypes, [department], [new TeammatePlacement("t1", OrganizationParent.person, 0)]);
     const updated = new OrganizationUpdateParams("o1", "Studio", "/work/studio").applyTo(organization, "later");
 
     Assert.areEqual("o1|Studio|/work/studio|2|c|later|d1|t1", [updated.id, updated.name, updated.folder, updated.order, updated.createdAt, updated.updatedAt,

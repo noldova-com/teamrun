@@ -43,6 +43,9 @@ import {
   OrganizationChat,
   DepartmentMoveParams,
   DepartmentUpdateParams,
+  NodeTypeCreateParams,
+  NodeTypeIdParams,
+  NodeTypeUpdateParams,
   WaitingMessageAddParams,
   WaitingMessageEditParams,
   WaitingMessageIdParams,
@@ -262,6 +265,9 @@ export class RequestDispatcher {
       case MethodName.DepartmentMove:
       case MethodName.DepartmentDelete:
       case MethodName.DepartmentMemberSet:
+      case MethodName.NodeTypeCreate:
+      case MethodName.NodeTypeUpdate:
+      case MethodName.NodeTypeDelete:
       case MethodName.TeammatePlace:
       case MethodName.OrganizationLayoutRead:
       case MethodName.OrganizationLayoutSave:
@@ -684,6 +690,24 @@ export class RequestDispatcher {
       case MethodName.DepartmentDelete: {
         const params = DepartmentIdParams.fromJson(payload);
         await organization.deleteAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return null;
+      }
+      case MethodName.NodeTypeCreate: {
+        const params = NodeTypeCreateParams.fromJson(payload);
+        const type = await organization.createNodeTypeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return type.toJson();
+      }
+      case MethodName.NodeTypeUpdate: {
+        const params = NodeTypeUpdateParams.fromJson(payload);
+        const type = await organization.updateNodeTypeAsync(params);
+        await this.publishOrganizationAsync(organization, params.organizationId);
+        return type.toJson();
+      }
+      case MethodName.NodeTypeDelete: {
+        const params = NodeTypeIdParams.fromJson(payload);
+        await organization.deleteNodeTypeAsync(params);
         await this.publishOrganizationAsync(organization, params.organizationId);
         return null;
       }
