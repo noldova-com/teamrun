@@ -22,6 +22,7 @@ import type { IAcpModelListReader } from "./i-acp-model-list.reader.js";
 import type { IAcpModelStore } from "./i-acp-model-store.js";
 import type { IAcpOwnMcpServersReader } from "./i-acp-own-mcp-servers.reader.js";
 import type { IAcpSteering } from "./i-acp-steering.js";
+import type { IAcpToolGate } from "./i-acp-tool-gate.js";
 import type { IAcpPlanReader } from "./i-acp-plan.reader.js";
 import type { IAcpToDoListReader } from "./i-acp-to-do-list.reader.js";
 import type { IAcpQuestionReader } from "./i-acp-question.reader.js";
@@ -70,6 +71,7 @@ export interface IAcpAgent {
   readonly questions: IAcpQuestionReader | null;
   readonly ownMcpServers?: IAcpOwnMcpServersReader;
   readonly steering?: IAcpSteering;
+  readonly toolGate?: IAcpToolGate;
   readonly levels?: IAcpLevelReader;
   readonly modes: readonly ProviderMode[];
   readonly defaultMode: string | null;

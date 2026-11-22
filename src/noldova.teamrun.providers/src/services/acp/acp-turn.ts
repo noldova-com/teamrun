@@ -19,6 +19,7 @@ import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
 import type { IAcpQuestionReader } from "../../interfaces/i-acp-question.reader.js";
 import type { IAcpSubAgent } from "../../interfaces/i-acp-sub-agent.js";
 import type { IAcpToDoListReader } from "../../interfaces/i-acp-to-do-list.reader.js";
+import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import { AcpField } from "../../models/acp-field.js";
 import type { AcpMcpTool } from "../../models/acp-mcp-tool.js";
 import { SavedImage } from "../../models/saved-image.js";
@@ -59,6 +60,7 @@ export class AcpTurn implements IAcpClientListener {
   private planning: boolean;
   private leavingPlan: string | null = null;
   private readonly readOnlyChat: boolean;
+  private readonly toolGate: IAcpToolGate | null;
   private refusesWrites: boolean = false;
   private restarting: boolean = false;
   private readonly asking: Map<string, AbortController> = new Map();
@@ -95,7 +97,7 @@ export class AcpTurn implements IAcpClientListener {
     leavePlan: (sessionId: string) => Promise<void> = () => Promise.resolve(), approvedTools: readonly string[] = [],
     mcpToolOf: (tool: JsonReader) => AcpMcpTool | null = () => null,
     readOnlyTools: (signal: AbortSignal) => Promise<readonly string[]> = () => Promise.resolve([]), allowsAll: boolean = false,
-    planning: boolean = false, toDoList: IAcpToDoListReader | null = null, readOnlyChat: boolean = false) {
+    planning: boolean = false, toDoList: IAcpToDoListReader | null = null, readOnlyChat: boolean = false, toolGate: IAcpToolGate | null = null) {
     this.kindId = kindId;
     this.providerName = providerName;
     this.toolTitle = toolTitle;
@@ -119,6 +121,7 @@ export class AcpTurn implements IAcpClientListener {
     this.planning = planning;
     this.toDoList = toDoList;
     this.readOnlyChat = readOnlyChat;
+    this.toolGate = toolGate;
   }
 
   public async beginAsync(sessionId: string, resumed: boolean, observed: ObservedSettings, roleApplied: RoleApplication | null = null): Promise<void> {
@@ -377,6 +380,8 @@ export class AcpTurn implements IAcpClientListener {
       return this.askQuestions(id, params, this.questions);
     if (!Object.isNull(this.plans) && this.plans.methods.includes(method))
       return this.reviewPlan(id, params, this.plans);
+    if (!Object.isNull(this.toolGate) && this.toolGate.methods.includes(method))
+      return this.gateAsync(params, this.toolGate);
     if (method !== Resources.acpRequestPermission)
       throw new AcpConnectionException(Resources.acpUnsupportedRequest);
     if (!this.canAsk || params.readNonBlankString(Resources.sessionIdField) !== this.sessionId)
@@ -788,6 +793,36 @@ export class AcpTurn implements IAcpClientListener {
       return false;
     const listed = await this.teamRunTools(this.signal).catch((): readonly string[] => []);
     return listed.includes(name.slice(Resources.routedTeamRunToolPrefix.length));
+  }
+
+  private async gateAsync(params: JsonReader, gate: IAcpToolGate): Promise<JsonValue> {
+    if (!this.readOnlyChat || this.planning)
+      return gate.answer(null);
+    try {
+      return await this.readOnlyGateAsync(params, gate);
+    }
+    catch {
+      return gate.answer(Resources.formatReadOnlyToolRefused(this.providerName, this.toolTitle));
+    }
+  }
+
+  private async readOnlyGateAsync(params: JsonReader, gate: IAcpToolGate): Promise<JsonValue> {
+    const gated = gate.read(params);
+    const key = Object.isNull(gated) ? undefined
+      : [...this.tools.keys()].find(t => t === gated.toolUseId || t.endsWith(`${Resources.requestIdSeparator}${gated.toolUseId}`));
+    const call = Object.isUndefined(key) ? undefined : this.tools.get(key);
+    const update = JsonReader.fromValue(call ?? {});
+    if (!Object.isNull(gated) && (gate.readOnly(update) || await this.listsReadOnlyAsync(gated.mcp)))
+      return gate.answer(null);
+    const note = Resources.formatReadOnlyToolRefused(this.providerName, update.readOptionalString(Resources.titleField) ?? gated?.mcp?.tool ?? this.toolTitle);
+    await this.listener.onDetailAsync(new TurnDetail(DetailKind.Note, note, null, null));
+    if (!Object.isUndefined(key))
+      await this.denyAsync(key);
+    return gate.answer(note);
+  }
+
+  private async listsReadOnlyAsync(mcp: AcpMcpTool | null): Promise<boolean> {
+    return mcp?.server === ProtocolResources.mcpServerName && (await this.readOnlyTools(this.signal).catch((): readonly string[] => [])).includes(mcp.tool);
   }
 
   private async refuseAsync(tool: JsonReader, options: readonly ApprovalOption[], note: string, scope: string | null): Promise<JsonValue> {

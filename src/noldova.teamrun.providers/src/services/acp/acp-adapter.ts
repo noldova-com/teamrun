@@ -39,6 +39,7 @@ import type { ISavedImageReader } from "../../interfaces/i-saved-image.reader.js
 import { AcpConfigOption } from "../../models/acp-config-option.js";
 import { AcpHeldSteer } from "../../models/acp-held-steer.js";
 import { AcpModelChoices } from "../../models/acp-model-choices.js";
+import { AcpServedEndpoint } from "../../models/acp-served-endpoint.js";
 import { AcpSession } from "../../models/acp-session.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
@@ -325,7 +326,8 @@ export class AcpAdapter implements IProviderAdapter {
     let keeping: AcpKeptSession | null = null;
     let unreported = false;
     const approvedTools = request.tools?.approvedTools ?? [];
-    const readOnlyChat = this.agent.modes.some(t => t.id === asked.requested.mode && t.readOnly && t.id !== this.planMode);
+    const readOnlyMode = this.agent.modes.find(t => t.id === asked.requested.mode && t.readOnly && t.id !== this.planMode);
+    const readOnlyChat = !Object.isUndefined(readOnlyMode);
     const restartsPlan = readOnlyChat && asked !== request && this.agent.plans?.leavesPlan === true;
     const restarts = new Set<string>();
     const held: AcpHeldSteer[] = [];
@@ -344,7 +346,8 @@ export class AcpAdapter implements IProviderAdapter {
       (tool, session) => this.agent.toDos?.read(tool, session, request.provider) ?? null, tool => this.savedImages?.failureOf(tool) ?? null, this.agent.questions,
       this.agent.plans ?? null, leave, approvedTools, tool => this.agent.mcpToolOf?.(tool) ?? null,
       async t => Object.isNull(request.tools) ? [] : ReadOnlyMcpTools.listAsync(request.tools, t),
-      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null, readOnlyChat);
+      !Object.isUndefined(this.agent.allowAllMode) && asked.requested.mode === this.agent.allowAllMode, asked !== request, this.agent.toDoList ?? null, readOnlyChat,
+      this.agent.toolGate ?? null);
     const turn = createTurn(listener, signal);
     const sender = SenderEnvironment.read(request.environment);
     const commands = new AcpCommands();
@@ -399,6 +402,8 @@ export class AcpAdapter implements IProviderAdapter {
           : new ModelListException(Resources.formatModelsNotLoaded(this.descriptor.displayName, request.requested.model));
       if (!Object.isNull(request.requested.effort) && !Object.isNullOrUndefined(selected?.effortLevels) && !selected.effortLevels.includes(request.requested.effort))
         throw new SettingUnavailableException(Resources.formatUnknownEffort(request.requested.effort, selected.displayName));
+      if (!Object.isUndefined(readOnlyMode) && !Object.isUndefined(this.agent.toolGate) && Object.isNull(this.agent.toolGate.metaOf(initialized)))
+        throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, readOnlyMode.name));
       if (this.agent.authenticates && !this.canAuthenticate(initialized))
         throw new SignInException(this.agent.formatSignIn(request.provider));
       if (Object.isNull(taken))
@@ -408,12 +413,12 @@ export class AcpAdapter implements IProviderAdapter {
       client.setListener(channel);
       this.channels.set(client, channel);
       const endpoint = this.endpointOf(request.tools, initialized);
-      let served: { url: string; token: string } | null = null;
+      let served: AcpServedEndpoint | null = null;
       if (!Object.isNull(endpoint)) {
         const token = taken?.token ?? endpoint.issueKept();
         revoke = () => endpoint.revoke(token);
         adopt = tools => tools.adopt(token);
-        served = { url: endpoint.url, token };
+        served = new AcpServedEndpoint(endpoint.url, token);
       }
       const params = await this.paramsOf(request, initialized, served);
       const reopen = async (failure: unknown): Promise<AcpClient> => {
@@ -1100,7 +1105,7 @@ export class AcpAdapter implements IProviderAdapter {
     }));
   }
 
-  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: { url: string; token: string } | null,
+  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: AcpServedEndpoint | null,
     environment: NodeJS.ProcessEnv): JsonValue[] {
     const shared = request.sharedServers.map(t => this.sharedServerOf(t, initialized,
       (variable: string) => request.sharedValues.valueOf(t.name, variable) ?? environment[variable] ?? String.empty));
@@ -1331,7 +1336,7 @@ export class AcpAdapter implements IProviderAdapter {
     this.kept.delete(kept.client);
     kept.end();
     const endpoint = Object.isNull(kept.token) ? null : this.endpointOf(request.tools, kept.initialized);
-    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : { url: endpoint.url, token: kept.token };
+    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new AcpServedEndpoint(endpoint.url, kept.token);
     if (kept.key === key && kept.client.isConnected && Object.isNull(request.tools) === Object.isNull(kept.token) && Object.isNull(sender) === Object.isNull(kept.sender)
       && (Object.isNull(kept.sender) || request.adoptSender(kept.sender)) && (Object.isNull(kept.token) || request.tools?.adopt(kept.token) === true)
       && JSON.stringify(await this.paramsOf(request, kept.initialized, served)) === kept.params)
@@ -1341,11 +1346,11 @@ export class AcpAdapter implements IProviderAdapter {
     return null;
   }
 
-  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: { url: string; token: string } | null): Promise<Record<string, JsonValue>> {
+  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: AcpServedEndpoint | null): Promise<Record<string, JsonValue>> {
     const params: Record<string, JsonValue> = { cwd: request.workingDirectory, mcpServers: this.serversOf(request, initialized, served,
       await this.starter.readEnvironmentAsync(this.agent.baseEnvironment)) };
-    const meta = this.agent.sessionMeta(request.requested);
-    if (!Object.isNull(meta))
+    const meta = { ...this.agent.sessionMeta(request.requested) ?? {}, ...this.agent.toolGate?.metaOf(initialized) ?? {} };
+    if (Object.keys(meta).length > 0)
       params[Resources.acpMetaField] = meta;
     return params;
   }

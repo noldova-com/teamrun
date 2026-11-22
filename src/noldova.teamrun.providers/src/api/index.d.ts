@@ -2812,6 +2812,22 @@ export declare class Resources {
   public static readonly xaiExitPlanModeTool: string;
   /** The `x.ai/exit_plan_mode` field that holds the plan: `planContent`. */
   public static readonly xaiPlanContentField: string;
+  public static readonly xaiHooksRunMethods: readonly string[];
+  public static readonly xaiHooksField: string;
+  public static readonly xaiHookDecisionsField: string;
+  public static readonly xaiHookDecisionField: string;
+  public static readonly xaiHookDeny: string;
+  public static readonly xaiHookReasonField: string;
+  public static readonly xaiHookCallbackIdsField: string;
+  public static readonly xaiHookEventField: string;
+  public static readonly xaiPreToolUseEvent: string;
+  /** The event name Grok's `x.ai/hooks/run` request carries for a tool call it is about to run, its hook event's serialized name: `pre_tool_use`. */
+  public static readonly xaiPreToolUseWireEvent: string;
+  public static readonly xaiToolUseIdField: string;
+  public static readonly xaiToolNameField: string;
+  public static readonly xaiReadOnlyField: string;
+  public static readonly xaiMcpToolSeparator: string;
+  public static readonly grokReadOnlyHookId: string;
   /** The `x.ai/exit_plan_mode` outcome of an approved plan: `approved`. */
   public static readonly xaiApprovedOutcome: string;
 
@@ -6683,6 +6699,7 @@ export declare class Resources {
   public static formatPlanModeKept(provider: string, error: string): string;
   public static formatChatModeKeptOut(provider: string, error: string): string;
   public static formatReadOnlyChatRefused(provider: string, tool: string): string;
+  public static formatReadOnlyToolRefused(provider: string, tool: string): string;
 
   /**
    * Formats the note of a to-do list notification that couldn't be read, which leaves the reply's plan as it was.
@@ -12941,6 +12958,12 @@ export interface IAcpAgent {
   readonly steering?: IAcpSteering;
 
   /**
+   * Asks TeamRun before each of the agent's tool calls, ahead of the agent's own permission rules, so a read-only chat can refuse a tool
+   * the person's rules would allow; absent for an agent with no such hook, where those rules answer without TeamRun.
+   */
+  readonly toolGate?: IAcpToolGate;
+
+  /**
    * Lists each model's effort levels with a command of the agent's own, run after the listing session; absent for an agent whose session
    * options name the levels.
    */
@@ -13012,6 +13035,37 @@ export interface IAcpPlanReader {
    * they dismissed it, the turn stopped or the request didn't read.
    */
   reply(params: JsonReader, approved: boolean | null): JsonObject;
+}
+
+/**
+ * An ACP agent's hook that asks the client before each tool call, ahead of the agent's own permission rules.
+ */
+export interface IAcpToolGate {
+  /**
+   * The hook request's method, as an extension method, then plain.
+   */
+  readonly methods: readonly string[];
+
+  /**
+   * The `_meta` entries that register the hook on `session/new`, `session/load` and `session/resume`, or `null` when `initialized`, the
+   * agent's `initialize` answer, doesn't offer a hook that can refuse a call, so none is registered.
+   */
+  metaOf(initialized: JsonReader): JsonObject | null;
+
+  /**
+   * Reads the call a hook request asks about, or `null` when it isn't a pre-tool request or names no call.
+   */
+  read(params: JsonReader): AcpGatedTool | null;
+
+  /**
+   * Whether the agent's merged tool updates for the call mark it read-only.
+   */
+  readOnly(update: JsonReader): boolean;
+
+  /**
+   * The answer: the call goes on when `refusal` is `null`, and is refused with it as the reason otherwise.
+   */
+  answer(refusal: string | null): JsonObject;
 }
 
 /**
@@ -13271,6 +13325,21 @@ export declare class AcpPermissionSwitch {
    * @throws ArgumentException when a part is blank.
    */
   public constructor(optionId: string, mode: string, onValue: string, offValue: string);
+}
+
+/**
+ * The tool call an ACP agent's pre-tool hook asks about.
+ */
+export declare class AcpGatedTool {
+  /** The call's id, as the agent's tool updates name it. */
+  public readonly toolUseId: string;
+  /** The MCP server and tool the call is for, or `null` when it isn't an MCP tool. */
+  public readonly mcp: AcpMcpTool | null;
+
+  /**
+   * @throws ArgumentException when `toolUseId` is blank.
+   */
+  public constructor(toolUseId: string, mcp: AcpMcpTool | null);
 }
 
 /**
@@ -13691,6 +13760,8 @@ export declare class GrokAgent implements IAcpAgent {
   public readonly ownMcpServers: IAcpOwnMcpServersReader;
   /** Grok's `x.ai/interject`. */
   public readonly steering: IAcpSteering;
+  /** Grok's `PreToolUse` client hook, `x.ai/hooks/run`. */
+  public readonly toolGate: IAcpToolGate;
   public readonly authMeta: JsonObject;
   public readonly initializeMeta: JsonObject | null;
   public readonly stopReasons: readonly string[];
@@ -15446,6 +15517,24 @@ export declare class GrokMcpServersReader implements IAcpOwnMcpServersReader {
 }
 
 /**
+ * Grok's `PreToolUse` client hook: registered under `_meta["x.ai/hooks"]` when Grok's `initialize` answer offers `deny`, asked through
+ * `x.ai/hooks/run` before each tool call and ahead of Grok's own permission rules, and read-only from the `_meta["x.ai/tool"].read_only` of the
+ * call's earlier `tool_call` update. Grok lets a call go on when the answer doesn't come within 30 seconds.
+ */
+export declare class GrokToolGate implements IAcpToolGate {
+  /** `x.ai/hooks/run`, as an extension method, then plain. */
+  public readonly methods: readonly string[];
+  /** @inheritdoc */
+  public metaOf(initialized: JsonReader): JsonObject | null;
+  /** Reads a `PreToolUse` request's `toolUseId`, and its `toolName` as `server__tool` when it has one `__`. */
+  public read(params: JsonReader): AcpGatedTool | null;
+  /** @inheritdoc */
+  public readOnly(update: JsonReader): boolean;
+  /** `{}` to go on, or `{ decision: "deny", reason }`. */
+  public answer(refusal: string | null): JsonObject;
+}
+
+/**
  * Gives Grok's running turn a person's message through `x.ai/interject`, its text and its content blocks; Grok queues it and reads it at the
  * turn's next safe point.
  */
@@ -16234,6 +16323,9 @@ export declare class AcpTurn implements IAcpClientListener {
    * without asking, with a `Resources.formatReadOnlyChatRefused` note, whatever mode the agent reports, until the turn ends. For an agent whose
    * reader's `leavesPlan` is set, the adapter's `leavePlan` then cancels the turn at that update, and the adapter goes on in the same reply
    * with a new turn in the chat's mode, so a write the agent starts before the cancel lands is refused too.
+   * @param toolGate Answers the agent's pre-tool hook, whose methods the turn then answers; none by default. While `readOnlyChat` is set and the
+   * turn isn't planning, a call is refused, with a `Resources.formatReadOnlyToolRefused` note, unless the agent's earlier tool update for it
+   * marks it read-only or it is one of TeamRun's tools `readOnlyTools` lists; every other call goes on, and the agent's own rules decide.
    */
   public constructor(kindId: string, providerName: string, toolTitle: string, listener: ITurnListener, signal: AbortSignal, streamInterval: number,
     savedImageOf?: (tool: JsonReader, sessionId: string) => SavedImage | null, routedMcpTool?: string | null,
@@ -16241,7 +16333,7 @@ export declare class AcpTurn implements IAcpClientListener {
     imageFailureOf?: (tool: JsonReader) => JsonObject | null, questions?: IAcpQuestionReader | null, plans?: IAcpPlanReader | null,
     leavePlan?: (sessionId: string) => Promise<void>, approvedTools?: readonly string[], mcpToolOf?: (tool: JsonReader) => AcpMcpTool | null,
     readOnlyTools?: (signal: AbortSignal) => Promise<readonly string[]>, allowsAll?: boolean, planning?: boolean,
-    toDoList?: IAcpToDoListReader | null, readOnlyChat?: boolean);
+    toDoList?: IAcpToDoListReader | null, readOnlyChat?: boolean, toolGate?: IAcpToolGate | null);
 
   /**
    * Whether the agent reported that its context is full, as Grok's failed `context_length` retry state does, so a failed prompt says so.

@@ -382,6 +382,7 @@ export class Resources {
   public static readonly offValueParameterName: string = "offValue";
   public static readonly serverParameterName: string = "server";
   public static readonly toolParameterName: string = "tool";
+  public static readonly toolUseIdParameterName: string = "toolUseId";
   public static readonly antigravityLevelIdPattern: RegExp = /^(.+)-(high|medium|low)$/;
   public static readonly antigravityLevelNamePattern: RegExp = /^(.+) \((High|Medium|Low)\)$/;
   public static readonly acpDefaultLevelName: string = "Standard";
@@ -471,6 +472,21 @@ export class Resources {
   public static readonly xaiExitPlanModeMethods: readonly string[] = ["_x.ai/exit_plan_mode", "x.ai/exit_plan_mode"];
   public static readonly xaiExitPlanModeTool: string = "exit_plan_mode";
   public static readonly xaiPlanContentField: string = "planContent";
+  public static readonly xaiHooksRunMethods: readonly string[] = ["_x.ai/hooks/run", "x.ai/hooks/run"];
+  public static readonly xaiHooksField: string = "x.ai/hooks";
+  public static readonly xaiHookDecisionsField: string = "decisions";
+  public static readonly xaiHookDecisionField: string = "decision";
+  public static readonly xaiHookDeny: string = "deny";
+  public static readonly xaiHookReasonField: string = "reason";
+  public static readonly xaiHookCallbackIdsField: string = "hookCallbackIds";
+  public static readonly xaiHookEventField: string = "hookEventName";
+  public static readonly xaiPreToolUseEvent: string = "PreToolUse";
+  public static readonly xaiPreToolUseWireEvent: string = "pre_tool_use";
+  public static readonly xaiToolUseIdField: string = "toolUseId";
+  public static readonly xaiToolNameField: string = "toolName";
+  public static readonly xaiReadOnlyField: string = "read_only";
+  public static readonly xaiMcpToolSeparator: string = "__";
+  public static readonly grokReadOnlyHookId: string = "teamrun-read-only-chat";
   public static readonly xaiApprovedOutcome: string = "approved";
   public static readonly xaiAcceptedOutcome: string = "accepted";
   public static readonly xaiOtherAnswer: string = "Other";
@@ -3954,6 +3970,10 @@ export class Resources {
 
   public static formatReadOnlyChatRefused(provider: string, tool: string): string {
     return `TeamRun refused ${provider}'s request to run ${tool}: the plan is approved, and the chat's own mode is read-only.`;
+  }
+
+  public static formatReadOnlyToolRefused(provider: string, tool: string): string {
+    return `TeamRun refused ${provider}'s request to run ${tool}: the chat's mode is read-only, and ${provider} doesn't mark this tool as one that only reads.`;
   }
 
   public static formatChatModeKeptOut(provider: string, error: string): string {

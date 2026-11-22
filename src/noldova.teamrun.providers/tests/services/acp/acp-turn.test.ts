@@ -12,7 +12,8 @@ import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.js
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { ApprovalAsk, QuestionAsk } from "@noldova/teamrun.core";
 import { ApprovalKind, DetailKind, ErrorCode, ObservedSettings, PlanStep, PlanStepStatus, QuestionAnswer, ReplyPlan, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
-import { AcpClient, AcpConnectionException, AcpMcpTool, AcpTurn, type IAcpPlanReader, Resources, SavedImage, StartedProcess } from "@noldova/teamrun.providers";
+import { AcpClient, AcpConnectionException, AcpMcpTool, AcpTurn, GrokToolGate, type IAcpPlanReader, Resources, SavedImage, StartedProcess }
+  from "@noldova/teamrun.providers";
 import { CopilotApprovedToolRecording } from "../../fixtures/copilot-approved-tool.recording.js";
 import { GrokApprovedToolRecording } from "../../fixtures/grok-approved-tool.recording.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
@@ -373,6 +374,64 @@ export class AcpTurnTests {
     }
 
     Assert.areEqual([`{"approved":true} 0 s ${Resources.formatChatModeKeptOut("Agent", "Mode refused")}`, "{\"approved\":true} 0 s "].join("\n"), seen.join("\n"));
+  }
+
+  @TestMethod
+  public async letsAToolHookCallGoOnOnlyWhenItsChatIsntReadOnlyItPlansItIsMarkedReadOnlyOrItIsAListedReadOnlyTeamRunTool(): Promise<void> {
+    const readOnly = await AcpTurnTests.gateAnswersAsync(true, false);
+    const other = await AcpTurnTests.gateAnswersAsync(false, false);
+    const planning = await AcpTurnTests.gateAnswersAsync(true, true);
+    const unlisted = new AcpTurn("grok", "Grok", "Grok tool", new RecordingTurnListener(), new AbortController().signal, 1, undefined, null, undefined, undefined, undefined,
+      null, null, undefined, [], undefined, () => Promise.reject(new Error("No list.")), false, false, null, true, new GrokToolGate());
+    await unlisted.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
+    const unread = JSON.stringify(await unlisted.onRequest("9", "x.ai/hooks/run", AcpTurnTests.hookOf("use", "teamrun__list_chats")));
+
+    const refused = (tool: string): string => JSON.stringify({ decision: "deny", reason: Resources.formatReadOnlyToolRefused("Grok", tool) });
+    Assert.areEqual([["{}", refused("Tool write"), refused("Tool plain"), refused("Grok tool"), "{}", refused("Tool use"), refused("Grok tool"), refused("fetch"),
+      refused("Grok tool"), refused("Grok tool"), "8"].join(" "), Array.from({ length: 10 }, () => "{}").concat("0").join(" "),
+    Array.from({ length: 10 }, () => "{}").concat("0").join(" "), refused("list_chats")].join("\n"), [readOnly, other, planning, unread].join("\n"));
+  }
+
+  @TestMethod
+  public async refusesAToolHookCallInAReadOnlyChatWhenItsRefusalCantBeNoted(): Promise<void> {
+    const listener = new RecordingTurnListener();
+    listener.refusedDetail = Resources.formatReadOnlyToolRefused("Grok", "Tool write");
+    const turn = new AcpTurn("grok", "Grok", "Grok tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined,
+      null, null, undefined, [], undefined, () => Promise.resolve([]), false, false, null, true, new GrokToolGate());
+    await turn.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
+    await turn.onNotificationAsync(Resources.acpSessionUpdate, AcpTurnTests.toolCallOf("write", false));
+
+    const answer = await turn.onRequest("9", "x.ai/hooks/run", AcpTurnTests.hookOf("write", "write"));
+
+    Assert.areEqual(JSON.stringify({ decision: "deny", reason: Resources.formatReadOnlyToolRefused("Grok", "Grok tool") }), JSON.stringify(answer));
+  }
+
+  private static async gateAnswersAsync(readOnlyChat: boolean, planning: boolean): Promise<string> {
+    const listener = new RecordingTurnListener();
+    const turn = new AcpTurn("grok", "Grok", "Grok tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined, null, null,
+      undefined, [], undefined, () => Promise.resolve(["list_chats"]), false, planning, null, readOnlyChat, new GrokToolGate());
+    await turn.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
+    for (const update of [AcpTurnTests.toolCallOf("read", true), AcpTurnTests.toolCallOf("write", false), AcpTurnTests.toolCallOf("plain", null),
+      AcpTurnTests.toolCallOf("use", false)])
+      await turn.onNotificationAsync(Resources.acpSessionUpdate, update);
+    const asked = [AcpTurnTests.hookOf("read", "read_file"), AcpTurnTests.hookOf("write", "write"), AcpTurnTests.hookOf("plain", "plain"), AcpTurnTests.hookOf("never", "never"),
+      AcpTurnTests.hookOf("use", "teamrun__list_chats"), AcpTurnTests.hookOf("use", "teamrun__send_message"), AcpTurnTests.hookOf("write", "write", "post_tool_use"),
+      AcpTurnTests.hookOf("gone", "other__fetch"), AcpTurnTests.hookOf(" ", "write"), AcpTurnTests.hookOf("write", "write", "PreToolUse")];
+    const answers: string[] = [];
+    for (const params of asked)
+      answers.push(JSON.stringify(await turn.onRequest("9", "x.ai/hooks/run", params)));
+    const notes = ["Tool write", "Tool plain", "Grok tool", "Tool use", "fetch"].map(t => Resources.formatReadOnlyToolRefused("Grok", t));
+    return [...answers, String(listener.texts.filter(t => notes.includes(t)).length)].join(" ");
+  }
+
+  private static hookOf(id: string, name: string, event: string = "pre_tool_use"): JsonReader {
+    return JsonReader.fromValue({ hookCallbackId: "teamrun-read-only-chat", hookEventName: event, sessionId: "s", cwd: "/work", workspaceRoot: "/work", timestamp: "t",
+      permissionMode: "default", toolName: name, toolUseId: id, toolInput: {}, toolInputTruncated: false });
+  }
+
+  private static toolCallOf(id: string, readOnly: boolean | null): JsonReader {
+    return JsonReader.fromValue({ sessionId: "s", update: { sessionUpdate: "tool_call", toolCallId: id, title: `Tool ${id}`, status: "pending",
+      ...Object.isNull(readOnly) ? {} : { _meta: { "x.ai/tool": { name: id, read_only: readOnly } } } } });
   }
 
   @TestMethod

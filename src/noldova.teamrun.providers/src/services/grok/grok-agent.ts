@@ -24,6 +24,7 @@ import type { IAcpOwnMcpServersReader } from "../../interfaces/i-acp-own-mcp-ser
 import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
 import type { IAcpQuestionReader } from "../../interfaces/i-acp-question.reader.js";
 import type { IAcpSteering } from "../../interfaces/i-acp-steering.js";
+import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import type { IAcpUsageReader } from "../../interfaces/i-acp-usage.reader.js";
 import { AcpLaunch } from "../../models/acp-launch.js";
 import type { AcpModelMember } from "../../models/acp-model-member.js";
@@ -45,6 +46,7 @@ import { GrokAccountReader } from "./grok-account.reader.js";
 import { GrokMcpServersReader } from "./grok-mcp-servers.reader.js";
 import { GrokSignOutReader } from "./grok-sign-out.reader.js";
 import { GrokSteering } from "./grok-steering.js";
+import { GrokToolGate } from "./grok-tool-gate.js";
 import { GrokUsageReader } from "./grok-usage.reader.js";
 
 export class GrokAgent implements IAcpAgent {
@@ -85,6 +87,7 @@ export class GrokAgent implements IAcpAgent {
   public readonly plans: IAcpPlanReader = new GrokPlanReader();
   public readonly ownMcpServers: IAcpOwnMcpServersReader = new GrokMcpServersReader();
   public readonly steering: IAcpSteering = new GrokSteering();
+  public readonly toolGate: IAcpToolGate = new GrokToolGate();
   public readonly interactiveSignIn: boolean = false;
   public readonly turnModels: IAcpModelStore | null = null;
   public readonly modes: readonly ProviderMode[] = [

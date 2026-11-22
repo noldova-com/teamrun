@@ -11,7 +11,7 @@ import fsPromises from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
 import { mock } from "node:test";
-import { JsonException, JsonReader } from "@noldova/context.json";
+import { JsonException, type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as CoreResources, ForkRequest, McpEndpoint, SessionTokens, SharedMcpFailureKind, SharedMcpValues, type TurnDetail, TurnOutcome, TurnRequest,
   TurnSteer, TurnTools } from "@noldova/teamrun.core";
@@ -55,6 +55,7 @@ class BlockingOnReplyListener extends RecordingTurnListener {
 
 @TestClass
 export class GrokAdapterTests {
+  private static readonly hooks: JsonObject = { "x.ai/hooks": { blockingEvents: ["PreToolUse", "Stop", "SubagentStop"], decisions: ["deny", "block"] } };
   private static readonly editRefused: string = Resources.formatReadOnlyChatRefused(Resources.grokDisplayName, "Edit notes.md");
 
   @TestMethod
@@ -921,7 +922,7 @@ export class GrokAdapterTests {
   @TestMethod
   public async reachesTeamRunsToolsAtTheEndpointWhenItsInitializeOffersHttpAndStillWaitsForTheirListing(): Promise<void> {
     await using host = new GrokTestHost();
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true } } };
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true }, _meta: GrokAdapterTests.hooks } };
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) });
     const tools = new TurnTools({ listToolsAsync: () => Promise.resolve([]), callToolAsync: () => Promise.resolve({}) },
       [], new McpEndpoint("http://127.0.0.1:4711/mcp", new SessionTokens(), "c1/t1"));
@@ -1403,7 +1404,7 @@ export class GrokAdapterTests {
   @TestMethod
   public async doesOnItsDoubleWhatItsAbilityRowSays(): Promise<void> {
     await using host = new GrokTestHost();
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, mcpCapabilities: { http: true } },
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, mcpCapabilities: { http: true }, _meta: GrokAdapterTests.hooks },
       _meta: { agentVersion: "1.0.30-fixture", modelState: JsonReader.fromValue(GrokModelStateRecording.initialized).readObject("_meta").readObject("modelState").toJson() } };
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) });
     const provider = new Provider("g", "grok", "Work", host.directory.resolve("profile"), AuthStatus.Unknown, null, null, null, null, "t");
@@ -1448,12 +1449,61 @@ export class GrokAdapterTests {
   }
 
   private static offeringHttp(host: GrokTestHost): NodeJS.ProcessEnv {
-    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true } } };
+    const capabilities = { agentCapabilities: { loadSession: true, promptCapabilities: { image: false }, mcpCapabilities: { http: true, sse: true }, _meta: GrokAdapterTests.hooks } };
     return { ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) };
   }
 
   private static endpoint(): McpEndpoint {
     return new McpEndpoint("http://127.0.0.1:4711/mcp", new SessionTokens(), "c1/t1");
+  }
+
+  @TestMethod
+  public async registersItsReadOnlyHookOnEachNewAndLoadedSessionOnlyWhenGrokOffersToRefuseACall(): Promise<void> {
+    await using host = new GrokTestHost();
+    await using plain = new GrokTestHost();
+    const first = await host.createAdapter().runTurn(host.request("Hello"), new RecordingTurnListener(), new AbortController().signal);
+    await host.createAdapter().runTurn(host.request("Again", first.nativeSessionId), new RecordingTurnListener(), new AbortController().signal);
+    await plain.createAdapter(GrokAdapterTests.withoutHooks(plain)).runTurn(plain.request("Hello"), new RecordingTurnListener(), new AbortController().signal);
+
+    const hooks = JSON.stringify({ "x.ai/hooks": { PreToolUse: [{ hookCallbackIds: ["teamrun-read-only-chat"] }] } });
+    Assert.areEqual(`session/new ${hooks}\nsession/load ${hooks}\nsession/new null`,
+      [host, plain].map(t => readFileSync(join(t.directory.resolve("person"), "session-meta.txt"), "utf8").trim()).join("\n"));
+  }
+
+  @TestMethod
+  public async refusesEachToolGrokDoesntMarkReadOnlyInAReadOnlyChatThroughItsHookAheadOfGrokRulesAndLetsOtherChatsGoOn(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter();
+
+    const answers = [await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "ask"), await GrokAdapterTests.gateAsync(host, adapter, "gated-read:read_file", "ask"),
+      await GrokAdapterTests.gateAsync(host, adapter, "gated-unknown", "ask"), await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "default")];
+
+    const refused = (tool: string): string =>
+      JSON.stringify({ gate: { decision: "deny", reason: Resources.formatReadOnlyToolRefused(Resources.grokDisplayName, tool) } });
+    Assert.areEqual([`${TurnOutcome.Completed} ${refused("Gated edit")}`, `${TurnOutcome.Completed} {"gate":{}}`, `${TurnOutcome.Completed} ${refused("Gated unknown")}`,
+      `${TurnOutcome.Completed} {"gate":{}}`].join("\n"), answers.join("\n"));
+  }
+
+  @TestMethod
+  public async refusesAReadOnlyChatOnAGrokThatOffersNoHookAndRunsOtherChatsThere(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAdapter(GrokAdapterTests.withoutHooks(host));
+
+    const asked = await adapter.runTurn(host.request("gated-edit:write", null, null, null, null, "ask"), new RecordingTurnListener(), new AbortController().signal);
+    const chatted = await GrokAdapterTests.gateAsync(host, adapter, "gated-edit:write", "default");
+
+    Assert.areEqual(`${TurnOutcome.Failed}:${Resources.formatModeUnavailable(Resources.grokDisplayName, "Ask")}|${TurnOutcome.Completed} {"gate":{}}`,
+      `${asked.outcome}:${String(asked.error)}|${chatted}`);
+  }
+
+  private static async gateAsync(host: GrokTestHost, adapter: GrokAdapter, prompt: string, mode: string): Promise<string> {
+    const listener = new RecordingTurnListener();
+    const turn = await adapter.runTurn(host.request(prompt, null, null, null, null, mode), listener, new AbortController().signal);
+    return `${turn.outcome} ${listener.texts.find(t => t.startsWith("{\"gate\"")) ?? "no answer"}`;
+  }
+
+  private static withoutHooks(host: GrokTestHost): NodeJS.ProcessEnv {
+    return { ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify({ agentCapabilities: { loadSession: true, promptCapabilities: { image: false } } }) };
   }
 
   private static formatUsage(usage: ReplyUsage): string {

@@ -99,6 +99,7 @@ export class FakeAcpAgent {
   private planLeftAnswer: JsonValue = null;
   private planLeftEdit: JsonValue = null;
   private planLeftCancelled: boolean = false;
+  private gatedPrompt: number | null = null;
   private planLeftEndsFirst: boolean = false;
   private planAskPrompt: number | null = null;
   private readonly planAnswers: JsonValue[] = [];
@@ -213,6 +214,11 @@ export class FakeAcpAgent {
         else
           this.write({ jsonrpc: "2.0", id: "grok-plan-left-ping", method: "fake/ping", params: { sessionId: this.sessionId } });
       }
+      else if (value["id"] === "grok-gate" && !Object.isNull(this.gatedPrompt)) {
+        this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ gate: value["result"] ?? value["error"] ?? null }) } });
+        this.respond(this.gatedPrompt, { stopReason: "end_turn" });
+        this.gatedPrompt = null;
+      }
       else if (value["id"] === "grok-plan-left-ping" && !Object.isNull(this.planLeftPrompt))
         this.endPlanLeft(this.planLeftPrompt, "end_turn");
       else if (value["id"] === "grok-plan" && this.planThenBackground !== null) {
@@ -326,7 +332,8 @@ export class FakeAcpAgent {
         return;
       }
       const capabilities = process.env["TEAMRUN_FAKE_ACP_CAPABILITIES"] === undefined
-        ? { agentCapabilities: { loadSession: true, promptCapabilities: { image: mode === "images" } } }
+        ? { agentCapabilities: { loadSession: true, promptCapabilities: { image: mode === "images" },
+          _meta: { "x.ai/hooks": { blockingEvents: ["PreToolUse", "Stop", "SubagentStop"], decisions: ["deny", "block"] } } } }
         : FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_CAPABILITIES") as JsonObject;
       this.respond(id, FakeAcpAgent.omitting({
         authMethods: ![undefined, "omit"].includes(process.env["TEAMRUN_FAKE_ACP_AUTH_METHODS"]) ? FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_AUTH_METHODS")
@@ -355,6 +362,7 @@ export class FakeAcpAgent {
       this.sessionCwd = params.readOptionalString("cwd") ?? process.cwd();
       if (method === "session/new") appendFileSync(join(process.cwd(), "new-sessions.txt"), "new\n");
       appendFileSync(join(process.cwd(), "mcp-servers.txt"), `${JSON.stringify(params.toJson()["mcpServers"])}\n`);
+      appendFileSync(join(process.cwd(), "session-meta.txt"), `${method} ${JSON.stringify(params.toJson()["_meta"] ?? null)}\n`);
       if (method !== "session/new") {
         this.sessionId = params.readString("sessionId");
         if (this.sessionId === "missing") { this.fail(id, "Session not found"); return; }
@@ -539,6 +547,16 @@ export class FakeAcpAgent {
         this.planLeftCancelled = false;
         this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ restarted: parts.map(t => t.toJson()["text"] ?? null), sets: this.sets }) } });
         this.respond(id, { stopReason: "end_turn" });
+        return;
+      }
+      if (prompt.startsWith("gated-")) {
+        const [kind = "", name = kind] = prompt.slice("gated-".length).split(":");
+        this.gatedPrompt = id;
+        this.update({ sessionUpdate: "tool_call", toolCallId: "gate-1", title: `Gated ${kind}`, kind: kind === "read" ? "read" : "edit", status: "pending",
+          ...kind === "unknown" ? {} : { _meta: { "x.ai/tool": { name, read_only: kind === "read" } } } });
+        this.write({ jsonrpc: "2.0", id: "grok-gate", method: "x.ai/hooks/run", params: { hookCallbackId: "teamrun-read-only-chat", hookEventName: "pre_tool_use",
+          sessionId: this.sessionId, cwd: process.cwd(), workspaceRoot: process.cwd(), timestamp: new Date().toISOString(), permissionMode: "default", toolName: name,
+          toolUseId: "gate-1", toolInput: {}, toolInputTruncated: false } });
         return;
       }
       if (prompt === "plan-left-for-default" || prompt === "plan-left-ends-first") {
