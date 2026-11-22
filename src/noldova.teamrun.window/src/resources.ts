@@ -10,7 +10,7 @@ import type { FocusOrigin } from "@angular/cdk/a11y";
 import { GitHubNames } from "@noldova/git.github.protocol";
 import { CheckState, ReviewDecision } from "@noldova/git.hosting.protocol";
 import { GitNames } from "@noldova/git.protocol";
-import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
+import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, type NodeType, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
 import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
@@ -690,7 +690,7 @@ export class Resources {
   public static readonly organizationLeadersTitle: string = "All leaders and your direct reports";
   public static readonly organizationLeadersChat: string = "Chat with all leaders and your direct reports";
   public static readonly organizationEveryoneTitle: string = "Everyone";
-  public static readonly organizationDeletedDepartment: string = "Deleted department";
+  public static readonly organizationDeletedDepartment: string = "Deleted unit";
   public static readonly organizationRemovedTeammate: string = "Removed teammate";
   public static readonly organizationGroupIcon: string = "forum";
   public static readonly senderChatGone: string = "from a deleted chat";
@@ -1234,7 +1234,6 @@ export class Resources {
   public static readonly teamRunTagPrefix: string = "nol-teamrun-";
   public static readonly escapeOwnersSelector: string = "input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='menu'], [role='listbox'], [role='dialog'], dialog";
   public static readonly teammatesTitle: string = "Teammates";
-  public static readonly organizationDefaultTypeName: string = "Department";
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
   public static readonly organizationOwnerName: string = "You";
@@ -1254,7 +1253,7 @@ export class Resources {
   public static readonly flowShapeData: string = "flowShape";
   public static readonly afterPseudo: string = "::after";
   public static readonly borderBox: string = "border-box";
-  public static readonly organizationEmpty: string = "No departments yet.";
+  public static readonly organizationEmpty: string = "No units yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";
   public static readonly organizationCardsShowLabel: string = "Cards show";
   public static readonly organizationCardsShowIcon: string = "tune";
@@ -1268,16 +1267,30 @@ export class Resources {
   public static readonly organizationStatusKeyLabel: string = "Status key";
   public static readonly organizationStatusKey: readonly TeammateStatus[] = [TeammateStatus.Working, TeammateStatus.WaitingForYou, TeammateStatus.Idle,
     TeammateStatus.Stopped];
-  public static readonly organizationDepartmentNameLabel: string = "Department name";
+  public static readonly organizationDepartmentNameLabel: string = "Unit name";
   public static readonly organizationLeaderLabel: string = "Leader";
   public static readonly organizationNoLeader: string = "No leader";
   public static readonly organizationAddMember: string = "Add member";
   public static readonly organizationAddMemberIcon: string = "person_add";
-  public static readonly organizationAddDepartment: string = "Add department";
+  public static readonly organizationAddDepartment: string = "Add unit";
   public static readonly organizationAddDepartmentIcon: string = "add";
-  public static readonly organizationNewDepartment: string = "New department";
+  public static readonly organizationNewDepartment: string = "New unit";
   public static readonly organizationNewTeammateOption: string = "New teammate…";
   public static readonly organizationNewTeammateValue: string = "new-teammate";
+  public static readonly organizationTypeLabel: string = "Type";
+  public static readonly organizationChooseType: string = "Choose a type";
+  public static readonly organizationNewTypeOption: string = "New type…";
+  public static readonly organizationNewTypeValue: string = "new-type";
+  public static readonly organizationNewTypeTitle: string = "New type";
+  public static readonly organizationEditTypeTitle: string = "Edit type";
+  public static readonly organizationTypeNameLabel: string = "Type name";
+  public static readonly organizationTypeIconLabel: string = "Icon";
+  public static readonly organizationTypeColorLabel: string = "Icon color";
+  public static readonly organizationTypesTitle: string = "Types";
+  public static readonly organizationTypesButton: string = "Types…";
+  public static readonly organizationNoTypes: string = "No types yet. Add one here, or when you add a unit.";
+  public static readonly organizationEditTypeIcon: string = "edit";
+  public static readonly organizationTypesIcon: string = "category";
   public static readonly organizationDragType: string = "application/x-noldova-organization-node";
   public static readonly organizationDragEffect: "move" = "move";
   public static readonly organizationDraggable: string = "true";
@@ -1308,11 +1321,9 @@ export class Resources {
   public static readonly organizationMessageButton: string = "Message";
   public static readonly organizationMessageIcon: string = "chat";
   public static readonly organizationToLabel: string = "To";
-  public static readonly organizationDeleteDepartmentTitle: string = "Delete department";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Remove member";
   public static readonly organizationRemoveLabel: string = "Remove";
-  public static readonly organizationRemoveDepartment: string = "Remove department";
   public static readonly organizationRemoveTeammate: string = "Remove teammate";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
     [OrganizationCardField.Status, OrganizationCardField.Now, OrganizationCardField.Usage, OrganizationCardField.Last,
@@ -1808,10 +1819,10 @@ export class Resources {
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
   public static readonly organizationBoardLeadersTitle: string = "Reports to you";
-  public static readonly organizationBoardLeadersNote: string = "They report to you; the leaders talk across departments.";
+  public static readonly organizationBoardLeadersNote: string = "They report to you; the leaders talk across units.";
   public static readonly organizationBoardMessageLeaders: string = "Message all leaders and your direct reports";
   public static readonly organizationBoardMessageLeadersIcon: string = "forum";
-  public static readonly organizationBoardDepartmentsTitle: string = "Departments";
+  public static readonly organizationBoardDepartmentsTitle: string = "Units";
   public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
   public static readonly organizationBoardMessageIcon: string = "chat";
   public static readonly organizationBoardNoMembers: string = "No members yet.";
@@ -1895,7 +1906,7 @@ export class Resources {
   }
 
   public static formatOrganizationHeadcount(teammates: number, departments: number): string {
-    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 department" : `${departments} departments`}`;
+    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 unit" : `${departments} units`}`;
   }
 
   public static formatOrganizationOwnerRole(reports: number): string {
@@ -1915,8 +1926,20 @@ export class Resources {
   }
 
   public static formatOrganizationDeleteDepartment(name: string, parent: string | null): string {
-    return Object.isNull(parent) ? `Delete ${name}? Its departments move up to report to you, and its members leave every department.`
-      : `Delete ${name}? Its departments and members move to ${parent}.`;
+    return Object.isNull(parent) ? `Delete ${name}? Its units move up to report to you, and its members leave every unit.`
+      : `Delete ${name}? Its units and members move to ${parent}.`;
+  }
+
+  public static formatOrganizationUnitNameLabel(type: NodeType | null): string {
+    return Object.isNull(type) ? Resources.organizationDepartmentNameLabel : `${type.name} name`;
+  }
+
+  public static formatOrganizationDeleteUnit(type: NodeType | null): string {
+    return Object.isNull(type) ? "Delete unit" : `Delete ${type.name}`;
+  }
+
+  public static formatOrganizationRemoveUnit(type: NodeType | null): string {
+    return Object.isNull(type) ? "Remove unit" : `Remove ${type.name}`;
   }
 
   public static formatOrganizationDeleteNamed(name: string): string {
@@ -1932,7 +1955,7 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
-    return `Remove ${teammate} from ${department}? ${teammate} stays on the team, in no department.`;
+    return `Remove ${teammate} from ${department}? ${teammate} will report to you.`;
   }
 
   public static formatOrganizationHidden(count: number): string {
@@ -2157,8 +2180,12 @@ export class Resources {
     return `Message ${name}`;
   }
 
-  public static formatOrganizationDepartmentOption(name: string): string {
-    return `${name} (department)`;
+  public static formatOrganizationEditType(name: string): string {
+    return `Edit ${name}`;
+  }
+
+  public static formatOrganizationDepartmentOption(name: string, type: NodeType | null): string {
+    return Object.isNull(type) ? name : `${name} (${type.name})`;
   }
 
   public static formatOrganizationLeaderOption(name: string, department: string): string {
@@ -2194,7 +2221,7 @@ export class Resources {
   }
 
   public static formatDeleteOrganizationText(name: string): string {
-    return `Delete ${name}? Its departments go, and its teammates leave it. The teammates themselves and their chats stay.`;
+    return `Delete ${name}? Its units go, and its teammates leave it. The teammates themselves and their chats stay.`;
   }
 
   public static formatOrganizationFanOutRetry(key: string, text: string, sources: readonly string[]): string {
