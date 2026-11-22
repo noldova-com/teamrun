@@ -12,28 +12,22 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import "@noldova/context.core";
 import { type ElectronApplication, type Locator, type Page, type TestInfo, _electron, test as base, expect } from "playwright/test";
 
 import type { IDesktopBridge } from "../interfaces/i-desktop-bridge.ts";
+import type { ITeamRunFixtures } from "../interfaces/i-team-run-fixtures.ts";
 import { CodexDouble } from "./codex-double.ts";
+import { CodexShim } from "./codex-shim.ts";
+import { HolderListing } from "./holder-listing.ts";
+import { PollTiming } from "./poll-timing.ts";
+import { ProcessStatus } from "./process-status.ts";
+import { StartedProcess } from "./started-process.ts";
 
 declare global {
   interface Window {
     readonly desktop: IDesktopBridge;
   }
-}
-
-export interface IStartedProcess {
-  readonly pid: number;
-  readonly name: string;
-  readonly start: string;
-}
-
-export interface IProcessStatus extends IStartedProcess {
-  readonly parent: number;
-  readonly session: number;
-  readonly state: string;
-  readonly command: string;
 }
 
 export class TeamRunApp {
@@ -59,7 +53,8 @@ export class TeamRunApp {
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer", "--host-resolver-rules=MAP *.test 127.0.0.1"];
   private static readonly LINUX_PASSWORD_STORE: string = "--password-store=gnome-libsecret";
   private static readonly MAC_MOCK_KEYCHAIN: string = "--use-mock-keychain";
-  private static readonly DESKTOP_DEFAULT_WINDOW: readonly [number, number] = [1280, 800];
+  private static readonly DESKTOP_DEFAULT_WIDTH: number = 1280;
+  private static readonly DESKTOP_DEFAULT_HEIGHT: number = 800;
   private static readonly PROCESSES: string = "/proc";
   private static readonly RUNTIME_ENTRY: string = "/desktop.runtime/services/runtime-entry.js";
   private static readonly DATA_ARGUMENT: string = "--data-dir";
@@ -124,13 +119,13 @@ export class TeamRunApp {
   }
 
   public get electronApp(): ElectronApplication {
-    if (this.application === null)
+    if (Object.isNull(this.application))
       throw new Error("The app has not started.");
     return this.application;
   }
 
   public get page(): Page {
-    if (this.window === null)
+    if (Object.isNull(this.window))
       throw new Error("The app has not started.");
     return this.window;
   }
@@ -159,8 +154,8 @@ export class TeamRunApp {
     return this.failures;
   }
 
-  public static pollOf(timeout: number = TeamRunApp.POLL_TIMEOUT): { readonly timeout: number; readonly intervals: number[] } {
-    return { timeout, intervals: [...TeamRunApp.POLL_INTERVALS] };
+  public static pollOf(timeout: number = TeamRunApp.POLL_TIMEOUT): PollTiming {
+    return new PollTiming(timeout, TeamRunApp.POLL_INTERVALS);
   }
 
   public static async savedLayoutAsync(page: Page): Promise<string> {
@@ -173,10 +168,10 @@ export class TeamRunApp {
     return { HOME: home, USERPROFILE: home, APPDATA: path.win32.join(home, "AppData", "Roaming"), LOCALAPPDATA: path.win32.join(home, "AppData", "Local") };
   }
 
-  public static shimsOf(platform: NodeJS.Platform, bin: string): readonly (readonly [string, string])[] {
+  public static shimsOf(platform: NodeJS.Platform, bin: string): readonly CodexShim[] {
     if (platform === "win32")
-      return [[path.win32.join(bin, "codex.cmd"), `@"${process.execPath}" "${TeamRunApp.DOUBLE}" %*\r\n`]];
-    return [[path.posix.join(bin, "codex"), `#!/bin/sh\nexec "${process.execPath}" "${TeamRunApp.DOUBLE}" "$@"\n`]];
+      return [new CodexShim(path.win32.join(bin, "codex.cmd"), `@"${process.execPath}" "${TeamRunApp.DOUBLE}" %*\r\n`)];
+    return [new CodexShim(path.posix.join(bin, "codex"), `#!/bin/sh\nexec "${process.execPath}" "${TeamRunApp.DOUBLE}" "$@"\n`)];
   }
 
   public static environmentOf(platform: NodeJS.Platform, inherited: Readonly<Record<string, string | undefined>>, variables: Readonly<Record<string, string>>,
@@ -191,8 +186,11 @@ export class TeamRunApp {
       [CodexDouble.LOG_VARIABLE]: codexLog
     };
     const names = new Set(Object.keys(own).map(t => nameOf(t)));
-    return Object.fromEntries([...Object.entries(inherited).filter(t => !names.has(nameOf(t[0]))), ...Object.entries(own)]
-      .filter((t): t is [string, string] => t[1] !== undefined));
+    const environment: Record<string, string> = {};
+    for (const [name, value] of [...Object.entries(inherited).filter(t => !names.has(nameOf(t[0]))), ...Object.entries(own)])
+      if (!Object.isUndefined(value))
+        environment[name] = value;
+    return environment;
   }
 
   public static makeWork(root: string, prepare: (work: string) => void, remove: (work: string) => void = t => TeamRunApp.removeWork(t)): string {
@@ -222,9 +220,9 @@ export class TeamRunApp {
     for (const folder of [...Object.values(TeamRunApp.homeVariablesOf(platform, home)), path.join(home, ".codex"), path.join(work, "data"), path.join(work, "device"), bin])
       mkdirSync(folder, { recursive: true });
     writeFileSync(path.join(home, ".codex", "config.toml"), "");
-    for (const [shim, script] of TeamRunApp.shimsOf(platform, bin)) {
-      writeFileSync(shim, script);
-      chmodSync(shim, 0o755);
+    for (const shim of TeamRunApp.shimsOf(platform, bin)) {
+      writeFileSync(shim.file, shim.script);
+      chmodSync(shim.file, 0o755);
     }
   }
 
@@ -252,30 +250,30 @@ export class TeamRunApp {
     }
   }
 
-  public static processOf(pid: number): IStartedProcess | null {
+  public static processOf(pid: number): StartedProcess | null {
     const status = TeamRunApp.statusesOf([pid])[0];
-    return status === undefined ? null : { pid: status.pid, name: status.name, start: status.start };
+    return Object.isUndefined(status) ? null : new StartedProcess(status.pid, status.name, status.start);
   }
 
-  public static isAlive(started: IStartedProcess): boolean {
+  public static isAlive(started: StartedProcess): boolean {
     return TeamRunApp.aliveOf([started]).length > 0;
   }
 
-  public static aliveOf(started: readonly IStartedProcess[]): readonly IStartedProcess[] {
+  public static aliveOf(started: readonly StartedProcess[]): readonly StartedProcess[] {
     const statuses = TeamRunApp.statusesOf(started.map(t => t.pid));
     return started.filter(t => statuses.some(u => u.pid === t.pid && u.start === t.start && u.state !== TeamRunApp.ZOMBIE));
   }
 
-  private static statusesOf(pids: readonly number[] | null): readonly IProcessStatus[] {
+  private static statusesOf(pids: readonly number[] | null): readonly ProcessStatus[] {
     if (process.platform === "win32" || process.platform === "darwin") {
       const listed = process.platform === "win32" ? TeamRunApp.windowsProcesses() : TeamRunApp.macProcesses();
-      return pids === null ? listed : listed.filter(t => pids.includes(t.pid));
+      return Object.isNull(pids) ? listed : listed.filter(t => pids.includes(t.pid));
     }
     const all = pids ?? readdirSync(TeamRunApp.PROCESSES).filter(t => /^\d+$/.test(t)).map(Number);
-    return all.map(t => TeamRunApp.statusOf(t)).filter(t => t !== null);
+    return all.map(t => TeamRunApp.statusOf(t)).filter(t => !Object.isNull(t));
   }
 
-  private static windowsProcesses(): readonly IProcessStatus[] {
+  private static windowsProcesses(): readonly ProcessStatus[] {
     const result = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", TeamRunApp.WINDOWS_PROCESSES_QUERY],
       { encoding: "utf8", timeout: TeamRunApp.HOLDERS_TIMEOUT, killSignal: "SIGKILL", maxBuffer: TeamRunApp.PROCESSES_BUFFER });
     if (result.status !== 0)
@@ -284,17 +282,17 @@ export class TeamRunApp {
     if (!Array.isArray(parsed))
       throw new Error("Listing the processes gave no list.");
     const listed: readonly unknown[] = parsed;
-    return listed.filter(TeamRunApp.isRecord).map(t => ({ pid: Number(t["pid"]), parent: Number(t["parent"]), name: String(t["name"]), start: String(t["start"]),
-      command: String(t["command"]), session: TeamRunApp.NO_SESSION, state: "" }));
+    return listed.filter(TeamRunApp.isRecord).map(t => new ProcessStatus(Number(t["pid"]), String(t["name"]), String(t["start"]), Number(t["parent"]), TeamRunApp.NO_SESSION, "",
+      String(t["command"])));
   }
 
-  private static macProcesses(): readonly IProcessStatus[] {
-    const commands = new Map(TeamRunApp.macList(TeamRunApp.MAC_COMMAND_ARGUMENTS).map(t => TeamRunApp.MAC_COMMAND_LINE.exec(t))
-      .filter(t => t !== null).map((t): [number, string] => [Number(t[1]), t[2] ?? ""]));
-    return TeamRunApp.macList(TeamRunApp.MAC_STATUS_ARGUMENTS).map(t => TeamRunApp.MAC_STATUS_LINE.exec(t)).filter(t => t !== null).map(t => {
+  private static macProcesses(): readonly ProcessStatus[] {
+    const commands = new Map<number, string>(TeamRunApp.macList(TeamRunApp.MAC_COMMAND_ARGUMENTS).map(t => TeamRunApp.MAC_COMMAND_LINE.exec(t))
+      .filter(t => !Object.isNull(t)).map(t => [Number(t[1]), t[2] ?? ""]));
+    return TeamRunApp.macList(TeamRunApp.MAC_STATUS_ARGUMENTS).map(t => TeamRunApp.MAC_STATUS_LINE.exec(t)).filter(t => !Object.isNull(t)).map(t => {
       const pid = Number(t[1]);
-      return { pid, parent: Number(t[2]), session: Number(t[3]), state: (t[4] ?? "").charAt(0), start: String(Date.parse(t[5] ?? "") / 1_000), name: t[6] ?? "",
-        command: commands.get(pid) ?? "" };
+      return new ProcessStatus(pid, t[6] ?? "", String(Date.parse(t[5] ?? "") / 1_000), Number(t[2]), Number(t[3]), (t[4] ?? "").charAt(0),
+        commands.get(pid) ?? "");
     });
   }
 
@@ -311,10 +309,10 @@ export class TeamRunApp {
   }
 
   private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-    return typeof value === "object" && value !== null;
+    return Object.isObject(value) && !Object.isFunction(value);
   }
 
-  private static statusOf(pid: number): IProcessStatus | null {
+  private static statusOf(pid: number): ProcessStatus | null {
     let stat: string;
     try {
       stat = readFileSync(path.join(TeamRunApp.PROCESSES, String(pid), "stat"), "utf8");
@@ -324,11 +322,10 @@ export class TeamRunApp {
     }
     const end = stat.lastIndexOf(")");
     const fields = stat.slice(end + 2).split(" ");
-    return { pid, name: stat.slice(stat.indexOf("(") + 1, end), start: fields[19] ?? "", parent: Number(fields[1]), session: Number(fields[3]), state: fields[0] ?? "",
-      command: "" };
+    return new ProcessStatus(pid, stat.slice(stat.indexOf("(") + 1, end), fields[19] ?? "", Number(fields[1]), Number(fields[3]), fields[0] ?? "", "");
   }
 
-  public static stopAlive(started: readonly IStartedProcess[]): void {
+  public static stopAlive(started: readonly StartedProcess[]): void {
     for (const alive of TeamRunApp.aliveOf(started))
       TeamRunApp.stop(alive.pid);
   }
@@ -374,16 +371,16 @@ export class TeamRunApp {
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
     window.on("console", t => this.console.push(`${t.type()}: ${t.text()}`));
     this.window = window;
-    const area = await application.evaluate(({ BrowserWindow, screen }, [width, height]) => {
+    const area = await application.evaluate(({ BrowserWindow, screen }, { width, height }) => {
       for (const shown of BrowserWindow.getAllWindows()) {
         shown.setContentSize(width, height);
         shown.center();
       }
       return screen.getPrimaryDisplay().workArea;
-    }, TeamRunApp.DESKTOP_DEFAULT_WINDOW);
+    }, { width: TeamRunApp.DESKTOP_DEFAULT_WIDTH, height: TeamRunApp.DESKTOP_DEFAULT_HEIGHT });
     await expect.poll(() => window.evaluate(() => [innerWidth, innerHeight]), {
       message: `the window at Desktop's default size, which the specs were written against, on a screen whose work area is ${area.width}×${area.height}`,
-      ...TeamRunApp.pollOf(30_000) }).toEqual([...TeamRunApp.DESKTOP_DEFAULT_WINDOW]);
+      ...TeamRunApp.pollOf(30_000) }).toEqual([TeamRunApp.DESKTOP_DEFAULT_WIDTH, TeamRunApp.DESKTOP_DEFAULT_HEIGHT]);
     return window;
   }
 
@@ -440,24 +437,24 @@ export class TeamRunApp {
     return `${result.status} ${`${result.stdout ?? ""}${result.stderr ?? ""}`.trim()}`;
   }
 
-  public runtimeProcesses(): readonly IStartedProcess[] {
+  public runtimeProcesses(): readonly StartedProcess[] {
     if (process.platform !== "linux" && process.platform !== "win32" && process.platform !== "darwin")
       throw new Error("The quit check reads /proc on Linux and the process list on macOS and Windows, so it runs there only.");
     const statuses = TeamRunApp.statusesOf(null);
     const runtime = statuses.filter(t => this.isRuntime(t));
     const sessions = runtime.filter(t => t.session === t.pid).map(t => t.session);
     const found = TeamRunApp.withChildren([...runtime, ...statuses.filter(t => sessions.includes(t.session) && !runtime.includes(t))], statuses);
-    return (process.platform === "darwin" ? TeamRunApp.withGroups(found, statuses) : found).map(t => ({ pid: t.pid, name: t.name, start: t.start }));
+    return (process.platform === "darwin" ? TeamRunApp.withGroups(found, statuses) : found).map(t => new StartedProcess(t.pid, t.name, t.start));
   }
 
-  private static withGroups(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
+  private static withGroups(found: readonly ProcessStatus[], statuses: readonly ProcessStatus[]): readonly ProcessStatus[] {
     const all = [...found];
     for (const member of all)
       all.push(...statuses.filter(t => (t.session === member.session || t.parent === member.pid && BigInt(t.start) >= BigInt(member.start)) && !all.includes(t)));
     return all;
   }
 
-  public static withChildren(found: readonly IProcessStatus[], statuses: readonly IProcessStatus[]): readonly IProcessStatus[] {
+  public static withChildren(found: readonly ProcessStatus[], statuses: readonly ProcessStatus[]): readonly ProcessStatus[] {
     const all = [...found];
     for (const parent of all)
       all.push(...statuses.filter(t => t.parent === parent.pid && BigInt(t.start) >= BigInt(parent.start) && !all.includes(t)));
@@ -470,13 +467,13 @@ export class TeamRunApp {
 
   public async waitForExitAsync(): Promise<number | null> {
     const child = this.child;
-    if (child === null || child.exitCode !== null || child.signalCode !== null)
+    if (Object.isNull(child) || !Object.isNull(child.exitCode) || !Object.isNull(child.signalCode))
       return child?.exitCode ?? null;
     return TeamRunApp.withinAsync(new Promise<number | null>(resolve => child.once("exit", code => resolve(code))), TeamRunApp.EXIT_TIMEOUT, null);
   }
 
   public async snapshotAsync(testInfo: TestInfo, name: string): Promise<void> {
-    if (this.application !== null)
+    if (!Object.isNull(this.application))
       await TeamRunApp.endRefusedNavigationAsync(this.application, this.page.url());
     const tree = await this.page.locator("body").ariaSnapshot({ timeout: TeamRunApp.SNAPSHOT_TIMEOUT }).catch((error: unknown) => String(error));
     await testInfo.attach(`${name}.txt`, { body: tree, contentType: "text/plain" });
@@ -492,10 +489,10 @@ export class TeamRunApp {
     for (const [index, window] of (application?.windows() ?? []).entries()) {
       if (window.isClosed())
         continue;
-      if (application !== null)
+      if (!Object.isNull(application))
         await TeamRunApp.endRefusedNavigationAsync(application, window.url());
       const shot = await window.screenshot({ timeout: TeamRunApp.SNAPSHOT_TIMEOUT }).catch(() => null);
-      if (shot !== null)
+      if (!Object.isNull(shot))
         await testInfo.attach(`window-${index}`, { body: shot, contentType: "image/png" });
       const tree = await window.locator("body").ariaSnapshot({ timeout: TeamRunApp.SNAPSHOT_TIMEOUT }).catch((error: unknown) => String(error));
       await testInfo.attach(`window-${index}.txt`, { body: `${window.url()}\n${tree}`, contentType: "text/plain" });
@@ -514,13 +511,13 @@ export class TeamRunApp {
 
   public async keepTraceAsync(testInfo: TestInfo, failed: boolean): Promise<void> {
     const application = this.application;
-    if (application === null || this.hasExited || !this.isTracing)
+    if (Object.isNull(application) || this.hasExited || !this.isTracing)
       return;
     this.isTracing = false;
     const file = testInfo.outputPath(TeamRunApp.TRACE_FILE);
     const failure = await TeamRunApp.withinAsync(application.context().tracing.stop(failed ? { path: file } : {}).then(() => null, (error: unknown) => String(error)),
       TeamRunApp.SNAPSHOT_TIMEOUT, `stopping it took over ${TeamRunApp.SNAPSHOT_TIMEOUT} ms`);
-    if (failure !== null)
+    if (!Object.isNull(failure))
       process.stdout.write(`The app's trace wasn't kept: ${failure}\n`);
   }
 
@@ -542,14 +539,14 @@ export class TeamRunApp {
     return readFileSync(log, "utf8").split(/\r?\n/).filter(t => t.startsWith(TeamRunApp.REFUSED_PREFIX)).map(t => t.slice(TeamRunApp.REFUSED_PREFIX.length));
   }
 
-  private static holdersOf(work: string, end: boolean): { readonly lines: readonly string[]; readonly failure: string | null } {
+  private static holdersOf(work: string, end: boolean): HolderListing {
     const script = [TeamRunApp.HOLDERS_QUERY, end ? TeamRunApp.HOLDERS_END : TeamRunApp.HOLDERS_LIST].join("; ");
     const result = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script],
       { encoding: "utf8", env: { ...process.env, [TeamRunApp.WORK_VARIABLE]: work }, timeout: TeamRunApp.HOLDERS_TIMEOUT, killSignal: "SIGKILL" });
     const lines = (result.stdout ?? "").split(/\r?\n/).map(t => t.trim()).filter(t => t !== "");
-    if (result.error !== undefined)
-      return { lines, failure: result.error.message };
-    return { lines, failure: result.status === 0 ? null : `PowerShell ended with ${result.status}: ${(result.stderr ?? "").trim()}` };
+    if (!Object.isUndefined(result.error))
+      return new HolderListing(lines, result.error.message);
+    return new HolderListing(lines, result.status === 0 ? null : `PowerShell ended with ${result.status}: ${(result.stderr ?? "").trim()}`);
   }
 
   private removeHeldWork(): void {
@@ -560,14 +557,14 @@ export class TeamRunApp {
     const ended = TeamRunApp.holdersOf(this.work, true);
     if (ended.lines.length > 0)
       process.stdout.write(`What still named the work folder ${TeamRunApp.HOLDERS_WAIT_SECONDS} s after the app ended, and what it started: ${ended.lines.join(", ")}\n`);
-    if (ended.failure !== null)
+    if (!Object.isNull(ended.failure))
       process.stdout.write(`Waiting for what names the work folder failed: ${ended.failure}\n`);
     try {
       TeamRunApp.removeWork(this.work);
     }
     catch (error) {
       const holders = TeamRunApp.holdersOf(this.work, false);
-      const named = holders.failure === null ? holders.lines.join(", ") || "none" : `unknown, since listing them failed: ${holders.failure}`;
+      const named = Object.isNull(holders.failure) ? holders.lines.join(", ") || "none" : `unknown, since listing them failed: ${holders.failure}`;
       throw new Error(`${error instanceof Error ? error.message : String(error)}; the processes that still name the folder: ${named}`, { cause: error });
     }
   }
@@ -609,18 +606,18 @@ export class TeamRunApp {
 
   private async endAppAsync(): Promise<void> {
     const application = this.application;
-    if (application === null || this.hasExited)
+    if (Object.isNull(application) || this.hasExited)
       return;
     const closed = await TeamRunApp.withinAsync(application.close().then(() => true, () => false), TeamRunApp.CLOSE_TIMEOUT, false);
     const pid = this.child?.pid;
-    if (!closed && !this.hasExited && pid !== undefined) {
+    if (!closed && !this.hasExited && !Object.isUndefined(pid)) {
       TeamRunApp.stop(-pid);
       TeamRunApp.stop(pid);
     }
     await this.waitForExitAsync();
   }
 
-  private isRuntime(status: IProcessStatus): boolean {
+  private isRuntime(status: ProcessStatus): boolean {
     if (process.platform === "win32") {
       const command = status.command.replaceAll("\\", "/").toLowerCase();
       return command.includes(TeamRunApp.RUNTIME_ENTRY) && command.includes(TeamRunApp.DATA_ARGUMENT) && command.includes(this.data.replaceAll("\\", "/").toLowerCase());
@@ -635,13 +632,13 @@ export class TeamRunApp {
   private stopStartedPrograms(): void {
     for (const file of readdirSync(this.work).filter(t => t.endsWith(TeamRunApp.PID_SUFFIX)).map(t => path.join(this.work, t))) {
       const pid = TeamRunApp.readPid(file);
-      if (pid !== null && TeamRunApp.isRunning(pid) && TeamRunApp.startedBefore(pid, file))
+      if (!Object.isNull(pid) && TeamRunApp.isRunning(pid) && TeamRunApp.startedBefore(pid, file))
         TeamRunApp.stop(pid);
     }
   }
 }
 
-export const test = base.extend<{ app: TeamRunApp; isAppTraced: boolean }>({
+export const test = base.extend<ITeamRunFixtures>({
   isAppTraced: [false, { option: true }],
   app: async ({ isAppTraced }, use, testInfo) => {
     const app = new TeamRunApp(isAppTraced);
