@@ -54,6 +54,10 @@
   opacity: 0;
   animation: nol-teamrun-flow-glow ease-out forwards;
 }
+:host(.cards) .lines,
+:host(.cards) .glow {
+  z-index: auto;
+}
 @keyframes nol-teamrun-flow-march {
   to {
     stroke-dashoffset: -8;

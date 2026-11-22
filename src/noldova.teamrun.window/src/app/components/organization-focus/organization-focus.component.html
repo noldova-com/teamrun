@@ -68,7 +68,9 @@ LICENSE file in the root directory of this source tree.
 </nav>
 <section class="focus" [attr.aria-label]="resources.organizationFocusUnitLabel">
   <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
-    <div class="focus-plane">
+    <div #plane class="focus-plane">
+      <nol-teamrun-flow-overlay [container]="plane" [layout]="cardsLayout" [chat]="conversation()?.nativeElement ?? null" [flows]="flows.flows()" (arrived)="flows.arrive($event)"
+        (finished)="flows.finish($event)" />
       <div class="crumbs">
         @for (crumb of crumbs(); track $index) {
           @if (!$first) {
@@ -98,8 +100,8 @@ LICENSE file in the root directory of this source tree.
       </div>
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {
-          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="card.name" [teammate]="card" [shape]="fluid" [editing]="editing()"
-            [department]="departmentOf(card)" [departmentName]="departmentNames().get(card.id)" [nolPopoverTrigger]="cardDetails" [nolPopoverOpenOn]="detailsOpening"
+          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="card.name" [attr.data-flow-node]="card.id" [teammate]="card" [shape]="fluid"
+            [editing]="editing()" [department]="departmentOf(card)" [departmentName]="departmentNames().get(card.id)" [nolPopoverTrigger]="cardDetails" [nolPopoverOpenOn]="detailsOpening"
             [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="go(teammate(card))" />
           <ng-template #cardDetails><nol-teamrun-organization-details [teammate]="card" [department]="departmentOf(card)" /></ng-template>
         } @empty {
@@ -108,5 +110,5 @@ LICENSE file in the root directory of this source tree.
       </div>
     </div>
   </nol-canvas>
-  <nol-teamrun-organization-chat class="conversation" [target]="focus().target" (targetChange)="go($event)" />
+  <nol-teamrun-organization-chat #conversation class="conversation" [target]="focus().target" (targetChange)="go($event)" />
 </section>

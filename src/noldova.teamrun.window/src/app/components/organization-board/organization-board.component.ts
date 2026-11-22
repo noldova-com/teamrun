@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, effect, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
+import { Component, computed, effect, ElementRef, inject, type InputSignal, input, output, type OutputEmitterRef, type Signal, signal, untracked, type WritableSignal } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
@@ -14,6 +14,7 @@ import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, Cho
   OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { FlowLayout } from "../../enums/flow-layout";
 import { OrganizationBoardSort } from "../../enums/organization-board-sort";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
@@ -24,9 +25,11 @@ import { OrganizationEdits } from "../../models/organization-edits";
 import type { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { ClockService } from "../../services/clock.service";
+import { OrganizationFlowService } from "../../services/organization-flow.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
+import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
@@ -37,9 +40,11 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, FlowOverlayComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
+    OrganizationCardComponent, OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TeammateAvatarComponent,
+    TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
+  providers: [OrganizationFlowService.provider],
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
 })
@@ -56,9 +61,13 @@ export class OrganizationBoardComponent {
   public readonly managers: InputSignal<ReadonlyMap<string, Teammate>> = input<ReadonlyMap<string, Teammate>>(new Map<string, Teammate>());
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
   public readonly target: InputSignal<OrganizationTarget | null> = input<OrganizationTarget | null>(null);
+  public readonly chat: InputSignal<HTMLElement | null> = input<HTMLElement | null>(null);
   public readonly chosen: OutputEmitterRef<OrganizationTarget> = output<OrganizationTarget>();
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
+  protected readonly cards: FlowLayout = FlowLayout.Cards;
   protected readonly row: OrganizationCardShape = OrganizationCardShape.Row;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;

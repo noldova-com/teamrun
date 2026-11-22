@@ -23,8 +23,8 @@ import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/
 import { page, userEvent } from "vitest/browser";
 
 import { OrganizationViewComponent } from "../../../../src/app/components/organization-view/organization-view.component";
+import { FlowFrame } from "../../../../src/app/models/flow-frame";
 import { FlowPoint } from "../../../../src/app/models/flow-point";
-import { TreeFlowLines } from "../../../../src/app/models/tree-flow-lines";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../../src/app/services/clock.service";
 import { OrganizationFlowService } from "../../../../src/app/services/organization-flow.service";
@@ -653,7 +653,7 @@ describe("OrganizationViewComponent", () => {
     await sending("s3", "org-alice");
     const tree = one(".tree");
     const area = tree.getBoundingClientRect();
-    const scale = area.width / TreeFlowLines.layoutWidthOf(tree);
+    const scale = area.width / FlowFrame.layoutWidthOf(tree);
     const local = (box: DOMRect): DOMRect => new DOMRect((box.left - area.left) / scale, (box.top - area.top) / scale, box.width / scale, box.height / scale);
     const bob = local(one("[data-flow-node=bob]").getBoundingClientRect());
     const alice = local(one("[data-flow-node=alice]").getBoundingClientRect());
@@ -688,7 +688,7 @@ describe("OrganizationViewComponent", () => {
     const fromBob = (): boolean => {
       const tree = one(".tree");
       const area = tree.getBoundingClientRect();
-      const scale = area.width / TreeFlowLines.layoutWidthOf(tree);
+      const scale = area.width / FlowFrame.layoutWidthOf(tree);
       const bob = one("[data-flow-node=bob]").getBoundingClientRect();
       const start = `M ${round((bob.left - area.left + bob.width / 2) / scale)} ${round((bob.top - area.top) / scale)} `;
       return one(".nol-teamrun-flow-overlay path").getAttribute("d")?.startsWith(start) ?? false;
@@ -706,30 +706,34 @@ describe("OrganizationViewComponent", () => {
     expect([before, rendered, [moved.width, moved.height], fromBob()]).toEqual([[], [["route writing"], true], [size.width, size.height], true]);
   });
 
-  it("draws no message on the Board, none while its setting is off, and none while motion is reduced", async () => {
+  it("draws no message in the Tree, on the Board or in Focus while its setting is off or motion is reduced", async () => {
+    const views = ["Tree", "Board", "Focus"];
+    const inEach = async (id: string): Promise<string[][]> => {
+      const shown: string[][] = [];
+      for (const view of views) {
+        await pickView(view);
+        await flow(asked, answer(id, asked, "alice", MessageStatus.Pending));
+        shown.push(routes());
+      }
+      return shown;
+    };
     await create(t => t.changeSetting(Resources.organizationMessageFlowSetting, false));
-    await flow(asked, answer("r1", asked, "bob", MessageStatus.Running));
-    const off = routes();
+    const off = await inEach("r1");
     context.changeSetting(Resources.organizationMessageFlowSetting, true);
-    await flow(answer("r2", asked, "alice", MessageStatus.Running));
-    const on = routes();
-    await pickView("Board");
-    const board = all(".nol-teamrun-flow-overlay").length;
-    await pickView("Tree");
-    let reduced: string[] = [];
+    const on = await inEach("r2");
+    let reduced: string[][] = [];
     try {
       await EmulatedMediaFixture.emulateAsync("prefers-reduced-motion", "reduce");
-      await flow(answer("r3", asked, "bob", MessageStatus.Running));
-      reduced = routes();
+      reduced = await inEach("r3");
     }
     finally {
       await EmulatedMediaFixture.resetAsync();
     }
 
-    expect([off, on, board, reduced]).toEqual([[], ["route sent", "route writing"], 0, []]);
+    expect([off, on, reduced]).toEqual([[[], [], []], [["route writing"], ["route writing"], ["route writing"]], [[], [], []]]);
   });
 
-  it("ends the messages it can't draw, sent on the Board, in Focus or to a collapsed department's member, so the Tree shows none of them later", async () => {
+  it("ends the messages it can't draw, sent in Focus to a teammate off screen or to a collapsed department's member, so the Tree shows none of them later", async () => {
     const clock = new FakeClock(Date.parse("2026-09-10T08:05:00.000Z"));
     TestBed.overrideProvider(ClockService, { useValue: clock });
     await create();
@@ -745,8 +749,6 @@ describe("OrganizationViewComponent", () => {
     const toggle = (): HTMLElement => one(":scope > .department .department-toggle", department("Design"));
     toggle().click();
     await Wait.until(() => expect(saves).toHaveLength(1));
-    await pickView("Board");
-    await flow(asked, answer("r1", asked, "bob", MessageStatus.Running), answer("r1", asked, "bob", MessageStatus.Completed));
     await pickView("Focus");
     const focus = await sendAndEnd("r2");
     await pickView("Tree");
@@ -756,7 +758,102 @@ describe("OrganizationViewComponent", () => {
     await Wait.until(() => expect(toggle().getAttribute("aria-expanded")).toBe("true"));
     await settle();
 
-    expect([focus, back, collapsed, card("Bob").isConnected, drawn()]).toEqual([[0, 4, 0], 0, [0, 2, 0], true, 0]);
+    expect([focus, back, collapsed, card("Bob").isConnected, drawn()]).toEqual([[0, 2, 0], 0, [0, 2, 0], true, 0]);
+  });
+
+  describe("on the Board and in Focus", () => {
+    const box = (view: Element): DOMRect => view.getBoundingClientRect();
+    const points = (selector: string, area: HTMLElement): FlowPoint[] => {
+      const scale = box(area).width / FlowFrame.layoutWidthOf(area);
+      return (one(`.nol-teamrun-flow-overlay ${selector}`, area).getAttribute("d") ?? "").split(/[ML]/u).filter(t => t.trim().length > 0)
+        .map(t => t.trim().split(" ").map(u => Number.parseFloat(u)))
+        .map(t => new FlowPoint(box(area).left + (t.at(0) ?? Number.NaN) * scale, box(area).top + (t.at(1) ?? Number.NaN) * scale));
+    };
+    const expectRoute = (shown: readonly FlowPoint[], expected: readonly FlowPoint[]): void => {
+      expect(shown.length).toBe(expected.length);
+      expected.forEach((point, i) => {
+        AppearanceFixture.expectPixels(shown.at(i)?.x ?? Number.NaN, point.x);
+        AppearanceFixture.expectPixels(shown.at(i)?.y ?? Number.NaN, point.y);
+      });
+    };
+    const edges = (view: DOMRect): FlowPoint[] => [new FlowPoint(view.left + view.width / 2, view.top), new FlowPoint(view.left + view.width / 2, view.bottom),
+      new FlowPoint(view.left, view.top + view.height / 2), new FlowPoint(view.right, view.top + view.height / 2)];
+    const isOnEdge = (point: FlowPoint | undefined, view: DOMRect): boolean => edges(view).some(t => Math.hypot(t.x - (point?.x ?? Number.NaN), t.y - (point?.y ?? Number.NaN)) < 0.5);
+    const isInside = (point: FlowPoint, view: DOMRect): boolean => point.x > view.left + 0.5 && point.x < view.right - 0.5 && point.y > view.top + 0.5 && point.y < view.bottom - 0.5;
+    const isSquare = (route: readonly FlowPoint[]): boolean => route.slice(1).every((t, i) => Math.abs(t.x - (route.at(i)?.x ?? Number.NaN)) < 0.5
+      || Math.abs(t.y - (route.at(i)?.y ?? Number.NaN)) < 0.5);
+    const createWithChat = async (teammateId: string): Promise<void> => {
+      const chat = new Conversation(`org-${teammateId}`, null, teammateId, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null, false, [], false, false,
+        null, new OrganizationChat("my-organization", teammateId));
+      await create(t => t.answer(MethodName.ConversationList, u => Object.isNull(ConversationListParams.fromJson(u).projectId) ? [chat.toJson()] : []));
+      await Wait.until(() => expect(ChatStoreService.of(context).conversation(chat.id)).not.toBeNull());
+    };
+
+    it("draws your message on the Board from the canvas's edge beside the chat panel, level with its receiver's card, into the card's side, then a pulse and a glow over the card, and the answer back the same way, over the lanes and under the cards", async () => {
+      await create();
+      await pickView("Board");
+      const board = one("nol-teamrun-organization-board");
+      await flow(asked, answer("r1", asked, "bob", MessageStatus.Pending));
+      const bob = box(one("[data-flow-node=bob]", board));
+      const level = bob.top + bob.height / 2;
+      const yours = points("path.writing", board);
+      const layers = [getComputedStyle(one(".nol-teamrun-flow-overlay .lines", board)).zIndex, box(one("aside.messages")).left >= box(one(".chart nol-canvas")).right];
+      await flow(answer("r1", asked, "bob", MessageStatus.Running));
+      const sent = [routes(), all(".nol-teamrun-flow-overlay .pulse", board).length];
+      const answering = points("path.writing", board);
+      await end(".pulse");
+      const glow = box(one(".nol-teamrun-flow-overlay .glow", board));
+
+      expectRoute(yours, [new FlowPoint(box(board).right, level), new FlowPoint(bob.right, level)]);
+      expectRoute(answering, [new FlowPoint(bob.right, level), new FlowPoint(box(board).right, level)]);
+      [glow.left, glow.top, glow.width, glow.height].forEach((t, i) => AppearanceFixture.expectPixels(t, [bob.left, bob.top, bob.width, bob.height].at(i) ?? Number.NaN));
+      expect([layers, sent]).toEqual([["auto", true], [["route sent", "route writing"], 1]]);
+    });
+
+    it("draws your message in Focus from the canvas's edge over the conversation below it, straight up into its receiver's card", async () => {
+      await create();
+      await pickView("Focus");
+      const plane = one(".focus-plane");
+      await flow(asked, answer("r1", asked, "alice", MessageStatus.Pending));
+      const alice = box(one("[data-flow-node=alice]", plane));
+      const middle = alice.left + alice.width / 2;
+
+      expect(box(one(".focus nol-teamrun-organization-chat")).top).toBeGreaterThanOrEqual(box(one(".focus nol-canvas")).bottom);
+      expectRoute(points("path.writing", plane), [new FlowPoint(middle, box(plane).bottom), new FlowPoint(middle, alice.bottom)]);
+    });
+
+    it.each(["Board", "Focus"])("draws a teammate's send on the %s at right angles from the middle of its card's edge to the middle of its receiver's, turning outside both cards", async view => {
+      await createWithChat("alice");
+      await pickView(view);
+      if (view === "Focus") {
+        Required.of(all(".outline .orow.department .obtn").find(t => t.textContent?.includes("Design") ?? false)).click();
+        await settle();
+      }
+      context.emit(EventName.MessageSending, new MessageSendingPayload("s1", "c7", "bob", "org-alice").toJson());
+      await settle();
+      const area = one(view === "Board" ? "nol-teamrun-organization-board" : ".focus-plane");
+      const bob = box(one("[data-flow-node=bob]", area));
+      const alice = box(one("[data-flow-node=alice]", area));
+      const route = points("path.writing", area);
+
+      expect([routes(), isOnEdge(route.at(0), bob), isOnEdge(route.at(-1), alice), isSquare(route), route.some(t => isInside(t, bob) || isInside(t, alice))])
+        .toEqual([["route writing"], true, true, true, false]);
+    });
+
+    it.each([ThemeMode.Light, ThemeMode.Dark])("draws a message being written on the Board in the default theme's %s mode at 3:1 or more against a lane's background", async mode => {
+      AppearanceFixture.apply(DefaultTheme.theme, mode);
+      await create();
+      await pickView("Board");
+      await flow(asked, answer("r1", asked, "bob", MessageStatus.Pending));
+      const dots = getComputedStyle(one(".nol-teamrun-flow-overlay .writing"));
+      const background = getComputedStyle(one(".lane")).backgroundColor;
+      const channels = (color: string): number[] => (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(t => Number(t));
+      const opacity = Number.parseFloat(dots.opacity);
+      const seen = channels(dots.stroke).map((t, i) => Math.round(t * opacity + (channels(background).at(i) ?? 0) * (1 - opacity)));
+
+      expect(dots.stroke).toBe(AppearanceFixture.readColor(DefaultTheme.theme, mode, "accent"));
+      expect(AppearanceFixture.contrast(`rgb(${seen.join(", ")})`, background)).toBeGreaterThanOrEqual(3);
+    });
   });
 
   describe("with its messages beside the tree", () => {
@@ -1641,7 +1738,7 @@ describe("OrganizationViewComponent", () => {
       });
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const tree = one(".chart .tree");
-      const scale = box(tree).width / TreeFlowLines.layoutWidthOf(tree);
+      const scale = box(tree).width / FlowFrame.layoutWidthOf(tree);
       const at = (x: number, y: number): FlowPoint => new FlowPoint(x, y);
       const points = (): FlowPoint[] => (one(".nol-teamrun-flow-overlay path:last-of-type").getAttribute("d") ?? "").split(/[ML]/u).filter(t => t.trim().length > 0)
         .map(t => t.trim().split(" ").map(u => Number.parseFloat(u)))
@@ -1957,7 +2054,7 @@ describe("OrganizationViewComponent", () => {
       });
       const box = (view: Element): DOMRect => view.getBoundingClientRect();
       const tree = one(".chart .tree");
-      const scale = box(tree).width / TreeFlowLines.layoutWidthOf(tree);
+      const scale = box(tree).width / FlowFrame.layoutWidthOf(tree);
       const reports = one(".chart .tree > .reports");
       const middle = box(reports).left + box(reports).width / 2;
       const bus = box(reports).top + AppearanceFixture.measureLook("space-3") * scale;

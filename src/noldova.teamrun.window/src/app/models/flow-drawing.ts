@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import type { OrganizationFlow } from "./organization-flow";
 import type { FlowRoute } from "./flow-route";
 
@@ -24,7 +26,8 @@ export class FlowDrawing {
 
   public get key(): string {
     const box = this.route.target;
-    return `${this.flow.id} ${this.flow.stage} ${this.route.path} ${box.left} ${box.top} ${box.width} ${box.height}`;
+    const at = Object.isNull(box) ? "" : ` ${box.left} ${box.top} ${box.width} ${box.height}`;
+    return `${this.flow.id} ${this.flow.stage} ${this.route.path}${at}`;
   }
 
   public static sameAll(drawings: readonly FlowDrawing[], others: readonly FlowDrawing[]): boolean {

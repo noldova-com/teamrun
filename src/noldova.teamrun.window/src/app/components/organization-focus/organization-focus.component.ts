@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, inject, type InputSignal, input, type Signal } from "@angular/core";
+import { Component, computed, ElementRef, inject, type InputSignal, input, type Signal, viewChild } from "@angular/core";
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
@@ -14,6 +14,7 @@ import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, Ca
   MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { FlowLayout } from "../../enums/flow-layout";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { OrganizationBoardAsk } from "../../models/organization-board-ask";
@@ -25,10 +26,12 @@ import { OrganizationFocus } from "../../models/organization-focus";
 import type { OrganizationNode } from "../../models/organization.node";
 import { OrganizationOutlineRow } from "../../models/organization-outline-row";
 import { ChatStoreService } from "../../services/chat-store.service";
+import { OrganizationFlowService } from "../../services/organization-flow.service";
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationStoreService } from "../../services/organization-store.service";
 import { TeammateStatusStoreService } from "../../services/teammate-status-store.service";
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
+import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
@@ -38,9 +41,10 @@ import { OrganizationTypeIconComponent } from "../organization-type-icon/organiz
 
 @Component({
   selector: "nol-teamrun-organization-focus",
-  imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationChatComponent, OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TextFieldComponent],
+  imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, FlowOverlayComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
+    OrganizationCardComponent, OrganizationChatComponent, OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
+  providers: [OrganizationFlowService.provider],
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
 })
@@ -56,6 +60,9 @@ export class OrganizationFocusComponent {
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly resources: typeof Resources = Resources;
+  protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
+  protected readonly cardsLayout: FlowLayout = FlowLayout.Cards;
+  protected readonly conversation: Signal<ElementRef<HTMLElement> | undefined> = viewChild("conversation", { read: ElementRef });
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;

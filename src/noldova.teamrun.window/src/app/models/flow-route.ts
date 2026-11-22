@@ -14,9 +14,9 @@ import type { FlowPoint } from "./flow-point";
 
 export class FlowRoute {
   public readonly points: readonly FlowPoint[];
-  public readonly target: FlowBox;
+  public readonly target: FlowBox | null;
 
-  public constructor(points: readonly FlowPoint[], target: FlowBox) {
+  public constructor(points: readonly FlowPoint[], target: FlowBox | null) {
     this.points = points;
     this.target = target;
   }
@@ -39,8 +39,12 @@ export class FlowRoute {
       return null;
     const points = [...up.slice(0, up.indexOf(common)).flatMap(t => t.uplink),
       ...down.slice(0, down.indexOf(common)).reverse().flatMap(t => [...t.uplink].reverse())];
+    return FlowRoute.along(points, target.box);
+  }
+
+  public static along(points: readonly FlowPoint[], target: FlowBox | null): FlowRoute | null {
     const joined = FlowRoute.withoutReturns(points);
-    return joined.length < 2 ? null : new FlowRoute(joined, target.box);
+    return joined.length < 2 ? null : new FlowRoute(joined, target);
   }
 
   private static withoutReturns(points: readonly FlowPoint[]): FlowPoint[] {
