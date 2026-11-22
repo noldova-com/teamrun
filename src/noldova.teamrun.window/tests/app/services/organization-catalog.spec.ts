@@ -22,7 +22,7 @@ describe("OrganizationCatalog", () => {
   const organizationOf = (...names: readonly string[]): Organization =>
     SampleData.organizationOf(names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const named = (id: string, order: number, createdAt: string): Organization =>
-    new Organization(id, id, null, order, createdAt, createdAt, [], []);
+    new Organization(id, id, null, order, createdAt, createdAt, [SampleData.departmentType], [], []);
   const namesOf = (catalog: OrganizationCatalog): string =>
     catalog.organizations().map(t => `${t.id}:${t.departments.map(u => u.name).join("+")}`).join(",");
   let context: FakeWindowPartContext;

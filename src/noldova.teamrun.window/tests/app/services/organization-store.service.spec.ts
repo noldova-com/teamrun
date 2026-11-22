@@ -8,19 +8,21 @@
 
 import { signal } from "@angular/core";
 
+import type { JsonValue } from "@noldova/context.json";
 import { FailureCode } from "@noldova/desktop.protocol";
 import { RuntimeRequestException } from "@noldova/desktop.window";
-import { Chat, Department, DepartmentMoveParams, MethodName, Organization, OrganizationChat, OrganizationParent, TeammatePlacement } from "@noldova/teamrun.protocol";
+import { Chat, Department, DepartmentMoveParams, MethodName, NodeType, Organization, OrganizationChat, OrganizationParent, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 import { OrganizationScope } from "../../../src/app/services/organization-scope";
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
 import { Resources } from "../../../src/resources";
 import { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { SampleData } from "../../fixtures/sample-data.fixture";
 import { Wait } from "../../fixtures/wait.fixture";
 
 describe("OrganizationStoreService", () => {
   const organizationOf = (id: string, ...names: readonly string[]): Organization =>
-    new Organization(id, id, null, 0, "c", "u", names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
+    new Organization(id, id, null, 0, "c", "u", [SampleData.departmentType], names.map((t, i) => new Department(t, t, "department", OrganizationParent.person, null, i, "c", "u")), []);
   const namesOf = (store: OrganizationStoreService): string => store.organization().departments.map(t => t.name).join(",");
   let context: FakeWindowPartContext;
 
@@ -81,8 +83,8 @@ describe("OrganizationStoreService", () => {
 
     expect([done, store.actionError()]).toEqual([new Array<boolean>(11).fill(true), null]);
     expect(asked).toEqual([
-      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","parent":{"kind":"Person","id":null},"leaderId":null}`,
-      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"UI","parent":{"kind":"Teammate","id":"t1"},"leaderId":"t2"}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"department","parent":{"kind":"Person","id":null},"leaderId":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"UI","typeId":"department","parent":{"kind":"Teammate","id":"t1"},"leaderId":"t2"}`,
       `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","name":"Craft"}`,
       `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","leaderId":"t1"}`,
       `${MethodName.DepartmentUpdate} {"organizationId":"o2","departmentId":"d1","leaderId":null}`,
@@ -92,6 +94,39 @@ describe("OrganizationStoreService", () => {
       `${MethodName.DepartmentDelete} {"organizationId":"o2","departmentId":"d1"}`,
       `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":"d2"}`,
       `${MethodName.DepartmentMemberSet} {"organizationId":"o2","teammateId":"t1","departmentId":null}`
+    ]);
+  });
+
+  it("makes a Department type first when the organization has no node type, and makes no department when that fails", async () => {
+    const asked: string[] = [];
+    const untyped = new Organization("o2", "o2", null, 0, "c", "u", [], [], []);
+    let created: () => JsonValue = () => {
+      throw new RuntimeRequestException(FailureCode.Internal, "The disk is full.");
+    };
+    context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [untyped.toJson()])
+      .answer(MethodName.NodeTypeCreate, t => {
+        asked.push(`${MethodName.NodeTypeCreate} ${JSON.stringify(t)}`);
+        return created();
+      })
+      .answer(MethodName.DepartmentCreate, t => {
+        asked.push(`${MethodName.DepartmentCreate} ${JSON.stringify(t)}`);
+        return null;
+      });
+    const scope = new OrganizationScope();
+    scope.follow(signal("o2"));
+    const store = new OrganizationStoreService(context, scope);
+    await Wait.until(() => expect(store.organization().name).toBe("o2"));
+
+    const failed = await store.createDepartment("Design");
+    const said = store.actionError();
+    created = () => new NodeType("t9", "Department", null, null, "c", "u").toJson();
+    const made = await store.createDepartment("Design");
+
+    expect([failed, said, made, store.actionError()]).toEqual([false, "The disk is full.", true, null]);
+    expect(asked).toEqual([
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.NodeTypeCreate} {"organizationId":"o2","name":"Department","icon":null,"color":null}`,
+      `${MethodName.DepartmentCreate} {"organizationId":"o2","name":"Design","typeId":"t9","parent":{"kind":"Person","id":null},"leaderId":null}`
     ]);
   });
 
@@ -118,7 +153,7 @@ describe("OrganizationStoreService", () => {
   });
 
   it("refuses a move under itself or under a node it doesn't know before sending it, in the server's words", async () => {
-    const organization = new Organization("my-organization", "my-organization", null, 0, "c", "u", [new Department("d1", "d1", "department", OrganizationParent.person, null, 0, "c", "u"),
+    const organization = new Organization("my-organization", "my-organization", null, 0, "c", "u", [SampleData.departmentType], [new Department("d1", "d1", "department", OrganizationParent.person, null, 0, "c", "u"),
       new Department("d2", "d2", "department", OrganizationParent.department("d1"), null, 0, "c", "u")], [new TeammatePlacement("t1", OrganizationParent.department("d2"), 0)]);
     context = new FakeWindowPartContext().answer(MethodName.OrganizationList, () => [organization.toJson()]);
     const store = new OrganizationStoreService(context, new OrganizationScope());

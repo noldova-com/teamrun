@@ -18,6 +18,7 @@ export class DepartmentUpdateParamsTests {
     Assert.areEqual('{"organizationId":"o1","departmentId":"d1","name":"Design","leaderId":"t1"}', JSON.stringify(new DepartmentUpdateParams("o1", "d1", "Design", "t1").toJson()));
     Assert.areEqual('{"organizationId":"o1","departmentId":"d1","name":"Design"}', JSON.stringify(new DepartmentUpdateParams("o1", "d1", "Design", undefined).toJson()));
     Assert.areEqual('{"organizationId":"o1","departmentId":"d1","leaderId":null}', JSON.stringify(new DepartmentUpdateParams("o1", "d1", undefined, null).toJson()));
+    Assert.areEqual('{"organizationId":"o1","departmentId":"d1","typeId":"team"}', JSON.stringify(new DepartmentUpdateParams("o1", "d1", undefined, undefined, "team").toJson()));
   }
 
   @TestMethod
@@ -30,6 +31,9 @@ export class DepartmentUpdateParamsTests {
     Assert.isUndefined(cleared.name);
     Assert.isNull(cleared.leaderId);
     Assert.areEqual("t1", DepartmentUpdateParams.fromJson({ organizationId: "o1", departmentId: "d1", leaderId: "t1" }).leaderId);
+    Assert.isUndefined(renamed.typeId);
+    Assert.areEqual("team", DepartmentUpdateParams.fromJson({ organizationId: "o1", departmentId: "d1", typeId: "team" }).typeId);
+    Assert.areEqual("$.input.typeId", Assert.throws(() => DepartmentUpdateParams.fromJson({ organizationId: "o1", departmentId: "d1", typeId: " " }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.name", Assert.throws(() => DepartmentUpdateParams.fromJson({ organizationId: "o1", departmentId: "d1", name: "" }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.departmentId", Assert.throws(() => DepartmentUpdateParams.fromJson({ organizationId: "o1", name: "Design" }, "$.input"), JsonException).path);
   }
@@ -45,6 +49,7 @@ export class DepartmentUpdateParamsTests {
       [renamed.id, renamed.name, renamed.parentId, renamed.leaderId, renamed.order, renamed.createdAt, renamed.updatedAt].join(","));
     Assert.areEqual("Design", cleared.name);
     Assert.isNull(cleared.leaderId);
+    Assert.areEqual("department,team", [renamed.typeId, new DepartmentUpdateParams("o1", "d1", undefined, undefined, "team").applyTo(department, "later").typeId].join(","));
   }
 
   @TestMethod
@@ -55,5 +60,6 @@ export class DepartmentUpdateParamsTests {
     Assert.areEqual("departmentId", Assert.throws(() => new DepartmentUpdateParams("o1", "d1", undefined, undefined), ArgumentException).parameterName);
     Assert.throws(() => new DepartmentUpdateParams("o1", "d1", " ", undefined), ArgumentException);
     Assert.throws(() => new DepartmentUpdateParams("o1", "d1", undefined, " "), ArgumentException);
+    Assert.areEqual("typeId", Assert.throws(() => new DepartmentUpdateParams("o1", "d1", undefined, undefined, " "), ArgumentException).parameterName);
   }
 }

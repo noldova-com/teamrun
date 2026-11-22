@@ -9,9 +9,11 @@
 import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Department, Organization, OrganizationNodeKind, OrganizationParent, OrganizationTarget, Resources, TeammatePlacement } from "@noldova/teamrun.protocol";
+import { Department, NodeType, Organization, OrganizationNodeKind, OrganizationParent, OrganizationTarget, Resources, TeammatePlacement } from "@noldova/teamrun.protocol";
 
 @TestClass
+const nodeTypes = [new NodeType("department", "Department", null, null, "c", "u")];
+
 export class OrganizationTests {
   @TestMethod
   public preservesItsFieldsAndRejectsMalformedValues(): void {
@@ -184,27 +186,56 @@ export class OrganizationTests {
 
   @TestMethod
   public keepsItsNameFolderAndOrder(): void {
-    const value = new Organization("o2", "Studio", "/work/studio", 1, "c", "u", [], []);
+    const value = new Organization("o2", "Studio", "/work/studio", 1, "c", "u", nodeTypes, [], []);
     const moved = value.withTree([OrganizationTests.department("d1", null, 0)], [new TeammatePlacement("t1", OrganizationParent.person, 0)]);
     const json = value.toJson();
 
     Assert.areEqual("o2|Studio|/work/studio|1|c|u", [moved.id, moved.name, moved.folder, moved.order, moved.createdAt, moved.updatedAt].join("|"));
     Assert.areEqual("d1|t1", `${moved.departments[0]?.id ?? ""}|${moved.placements[0]?.teammateId ?? ""}`);
     Assert.isNull(Organization.fromJson({ ...json, folder: null }).folder);
-    Assert.areEqual("id", Assert.throws(() => new Organization(" ", "Studio", null, 0, "c", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("name", Assert.throws(() => new Organization("o2", "a\nb", null, 0, "c", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("folder", Assert.throws(() => new Organization("o2", "Studio", " ", 0, "c", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, -1, "c", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, 0.5, "c", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("createdAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "", "u", [], []), ArgumentException).parameterName);
-    Assert.areEqual("updatedAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "", [], []), ArgumentException).parameterName);
+    Assert.areEqual("id", Assert.throws(() => new Organization(" ", "Studio", null, 0, "c", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("name", Assert.throws(() => new Organization("o2", "a\nb", null, 0, "c", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("folder", Assert.throws(() => new Organization("o2", "Studio", " ", 0, "c", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, -1, "c", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("order", Assert.throws(() => new Organization("o2", "Studio", null, 0.5, "c", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("createdAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "", "u", nodeTypes, [], []), ArgumentException).parameterName);
+    Assert.areEqual("updatedAt", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "", nodeTypes, [], []), ArgumentException).parameterName);
     Assert.areEqual("$.input.name", Assert.throws(() => Organization.fromJson({ ...json, name: " " }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.folder", Assert.throws(() => Organization.fromJson({ ...json, folder: " " }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.folder", Assert.throws(() => Organization.fromJson({ ...json, folder: 1 }, "$.input"), JsonException).path);
   }
 
+  @TestMethod
+  public keepsItsNodeTypesAndFindsEachDepartmentsType(): void {
+    const team = new NodeType("team", "Team", "groups", "teal", "c", "u");
+    const value = new Organization("o2", "Studio", null, 1, "c", "u", [...nodeTypes, team],
+      [new Department("d1", "Design", "team", OrganizationParent.person, null, 0, "c", "u")], []);
+    const json = value.toJson();
+
+    Assert.areEqual("department,team", Organization.fromJson(json).nodeTypes.map(t => t.id).join(","));
+    Assert.areEqual("department,team", value.withTree([], []).nodeTypes.map(t => t.id).join(","));
+    Assert.areEqual("Team", value.typeOf("d1")?.name);
+    Assert.isNull(value.typeOf("gone"));
+    Assert.areEqual("$.input.nodeTypes", Assert.throws(() => Organization.fromJson({ ...json, nodeTypes: null }, "$.input"), JsonException).path);
+    Assert.areEqual("$.input.nodeTypes[1].icon", Assert.throws(() => Organization.fromJson({ ...json, nodeTypes: [...nodeTypes.map(t => t.toJson()),
+      { ...team.toJson(), icon: "No" }] }, "$.input"), JsonException).path);
+  }
+
+  @TestMethod
+  public refusesTwoNodeTypesOfOneIdOrOneNameAndADepartmentOfATypeItLacks(): void {
+    const design = new Department("d1", "Design", "team", OrganizationParent.person, null, 0, "c", "u");
+    const team = new NodeType("team", "Team", null, null, "c", "u");
+
+    Assert.areEqual("nodeTypes", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "u", [team, new NodeType("team", "Squad", null, null, "c", "u")], [], []),
+      ArgumentException).parameterName);
+    Assert.areEqual("nodeTypes", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "u", [team, new NodeType("squad", "TEAM", null, null, "c", "u")], [], []),
+      ArgumentException).parameterName);
+    Assert.areEqual("departments", Assert.throws(() => new Organization("o2", "Studio", null, 0, "c", "u", nodeTypes, [design], []), ArgumentException).parameterName);
+    Assert.areEqual(1, new Organization("o2", "Studio", null, 0, "c", "u", [team], [design], []).departments.length);
+  }
+
   private static of(departments: readonly Department[], placements: readonly TeammatePlacement[]): Organization {
-    return new Organization("o1", "My organization", null, 0, "c", "u", departments, placements);
+    return new Organization("o1", "My organization", null, 0, "c", "u", nodeTypes, departments, placements);
   }
 
   private static tree(): Organization {

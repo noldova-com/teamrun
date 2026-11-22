@@ -27,8 +27,8 @@ import { MessageDelivery, WaitingMessage, WaitingMessageAddParams, WaitingMessag
 import { ChatMemberModeParams, ChatMemberSettings, ChatMemberSettingsParams, ChatPlanFirstParams, ConversationMember, ConversationMemberParams, EventName, Harness,
   Teammate, TeammateCreateParams, TeammateUpdateParams, TeammateIdParams, DefaultTeammate, DefaultTeammateSetParams, ProjectsLayoutSaveParams,
   ComposerDefaultSaveParams } from "@noldova/teamrun.protocol";
-import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, Organization,
-  OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
+import { Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, NodeType, NodeTypeCreateParams,
+  NodeTypeIdParams, NodeTypeUpdateParams, Organization, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
 import { OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams } from "@noldova/teamrun.protocol";
 import { OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
 import { SenderEnvironment, SubAgent, SubAgentStartParams, SubAgentStatus, SubAgentStopParams, SubAgentWaitParams, SubAgentWaitResult } from "@noldova/teamrun.protocol";
@@ -201,13 +201,14 @@ export class RequestDispatcherTests {
   @TestMethod
   public async routesOrganizationMethodsAndPublishesTheWholeOrganizationAfterEachChangeWithoutInvalidatingTheCatalog(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
     const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
 
-    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", OrganizationParent.person).toJson()));
-    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Web", OrganizationParent.person).toJson()));
+    const design = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", type, OrganizationParent.person).toJson()));
+    const web = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentCreate, new DepartmentCreateParams(RequestDispatcherTests.mine, "Web", type, OrganizationParent.person).toJson()));
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.DepartmentMemberSet, new DepartmentMemberSetParams(RequestDispatcherTests.mine, ada.id, design.id).toJson()));
     const led = Department.fromJson(await RequestDispatcherTests.succeed(host, MethodName.DepartmentUpdate,
       new DepartmentUpdateParams(RequestDispatcherTests.mine, design.id, "Product", ada.id).toJson()));
@@ -228,6 +229,23 @@ export class RequestDispatcherTests {
   }
 
   @TestMethod
+  public async routesNodeTypeMethodsAndPublishesTheOrganizationAfterEach(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const changes = (): readonly Organization[] => host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload));
+
+    const team = NodeType.fromJson(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeCreate, new NodeTypeCreateParams(RequestDispatcherTests.mine, "Team", "groups").toJson()));
+    const squad = NodeType.fromJson(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeUpdate,
+      new NodeTypeUpdateParams(RequestDispatcherTests.mine, team.id, "Squad", undefined, "#00ff00").toJson()));
+    const named = changes().map(t => t.nodeTypes.map(u => u.name).join("+"));
+    Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.NodeTypeDelete, new NodeTypeIdParams(RequestDispatcherTests.mine, team.id).toJson()));
+
+    Assert.areEqual("Team|Squad|groups|#00ff00", [team.name, squad.name, String(squad.icon), String(squad.color)].join("|"));
+    Assert.areEqual("Department+Team,Department+Squad", named.join(","));
+    Assert.areEqual("Department", changes().at(-1)?.nodeTypes.map(t => t.name).join(","));
+    Assert.areEqual(0, host.listener.count(EventName.StateInvalidated));
+  }
+
+  @TestMethod
   public async opensATeammatesOrganizationChatInTheDefaultOrganizationOnceAndReturnsTheSameChatAgain(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const provider = await host.createProviderAsync();
@@ -242,10 +260,11 @@ export class RequestDispatcherTests {
   @TestMethod
   public async publishesTheOrganizationWhenADeletedTeammateLeavesItsDepartmentAndKnowsNoOrganizationMethodWithoutIt(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
     const bob = await host.teammates.createAsync(new TeammateCreateParams("Bob", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", OrganizationParent.person));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(RequestDispatcherTests.mine, "Design", type, OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(RequestDispatcherTests.mine, ada.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(RequestDispatcherTests.mine, design.id, undefined, ada.id));
 

@@ -541,11 +541,12 @@ export class ConversationEngineTests {
   @TestMethod
   public async tellsADepartmentsLeaderAndMemberTheirPlaceAndWhomTheyReportToAndReopensATeammatesChat(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const leadProvider = await host.createProviderAsync("fake", "Lead");
     const memberProvider = await host.createProviderAsync("fake", "Member");
     const lead = await host.teammates.createAsync(new TeammateCreateParams("Lead", null, leadProvider.id, Harness.Provider, null, null));
     const member = await host.teammates.createAsync(new TeammateCreateParams("Member", null, memberProvider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", type, OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, lead.id, design.id));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, member.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, lead.id));

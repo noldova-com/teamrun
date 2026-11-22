@@ -190,7 +190,7 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
-    const second = new Organization("o2", "Second", null, 1, "c", "u", [new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u")],
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [SampleData.departmentType], [new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u")],
       [new TeammatePlacement("alice", OrganizationParent.department("ops"), 0)]);
     const names = (): (string | undefined)[] => all(".chart .tree > .kids > nol-teamrun-organization-department").map(t => texts(":scope > .department .department-name", t)[0]);
     await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
@@ -661,9 +661,9 @@ describe("OrganizationViewComponent", () => {
     await create(t => t.answer(MethodName.ConversationList, u => Object.isNull(ConversationListParams.fromJson(u).projectId) ? [organizationChat.toJson()] : []));
     await Wait.until(() => expect(ChatStoreService.of(context).conversation("org-reviewer")).not.toBeNull());
     const placed = (bob: boolean, designIndex: number): Organization => SampleData.organizationOf([
-      new Department("design", "Design", OrganizationParent.person, "alice", designIndex, "c", "u"),
-      new Department("build", "Build", OrganizationParent.person, null, 1 - designIndex, "c", "u"),
-      new Department("ui", "UI", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
+      new Department("design", "Design", "department", OrganizationParent.person, "alice", designIndex, "c", "u"),
+      new Department("build", "Build", "department", OrganizationParent.person, null, 1 - designIndex, "c", "u"),
+      new Department("ui", "UI", "department", OrganizationParent.department("design"), "reviewer", 0, "c", "u")
     ], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0), new TeammatePlacement("offline", OrganizationParent.department("build"), 0),
       new TeammatePlacement("reviewer", OrganizationParent.department("ui"), 0), ...bob ? [new TeammatePlacement("bob", OrganizationParent.department("design"), 1)] : []]);
     const change = async (next: Organization): Promise<void> => {
@@ -1170,7 +1170,7 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(document.querySelector("nol-dialog")).toBeNull());
 
       expect([leaders, blank, asked]).toEqual([["No leader", "Alice", "Bob", "Code Reviewer", "Offline", "New teammate…"], [0, true],
-        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", parent: { kind: "Teammate", id: "bob" }, leaderId: "offline" }]]]);
+        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "department", parent: { kind: "Teammate", id: "bob" }, leaderId: "offline" }]]]);
     });
 
     it("leads a new department with a new teammate made from the dialog, keeps the leader chosen before when that is closed, and stays open when it fails", async () => {
@@ -1198,7 +1198,7 @@ describe("OrganizationViewComponent", () => {
       const dana = ChatStoreService.of(context).teammates().find(t => t.name === "Dana");
 
       expect([kept, dana?.name, asked]).toEqual(["Bob", "Dana",
-        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", parent: { kind: "Person", id: null }, leaderId: dana?.id }]]]);
+        [[MethodName.DepartmentCreate, { organizationId: "my-organization", name: "Craft", typeId: "department", parent: { kind: "Person", id: null }, leaderId: dana?.id }]]]);
     });
 
     it("keeps the department dialog open, saying why, when the department can't be made", async () => {

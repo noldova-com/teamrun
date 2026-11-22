@@ -235,9 +235,10 @@ export class TeammatesServiceTests {
   @TestMethod
   public async takesADeletedLeaderOutOfItsDepartmentAndItsLeadershipInTheDeletingTransaction(): Promise<void> {
     await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
     const provider = await host.createProviderAsync();
     const ada = await host.teammates.createAsync(new TeammateCreateParams("Ada", null, provider.id, Harness.Provider, null, null));
-    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", OrganizationParent.person));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(Resources.defaultOrganizationId, "Design", type, OrganizationParent.person));
     await host.organization.setMemberAsync(new DepartmentMemberSetParams(Resources.defaultOrganizationId, ada.id, design.id));
     await host.organization.updateAsync(new DepartmentUpdateParams(Resources.defaultOrganizationId, design.id, undefined, ada.id));
     const organization = host.organization;

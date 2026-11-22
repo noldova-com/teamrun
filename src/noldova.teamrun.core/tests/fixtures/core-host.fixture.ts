@@ -47,10 +47,12 @@ import {
   ConversationCreateParams,
   type Event,
   EventName,
+  NodeTypeCreateParams,
   type Project,
   ProjectOpenParams,
   ProviderCreateParams,
-  type Provider
+  type Provider,
+  Resources
 } from "@noldova/teamrun.protocol";
 
 import { BoundingWork } from "./bounding-work.fixture.js";
@@ -181,6 +183,11 @@ export class CoreHost implements AsyncDisposable {
 
   public async createProviderAsync(kind: string = "fake", label: string = "Work"): Promise<Provider> {
     return this.providers.createAsync(new ProviderCreateParams(kind, label, join(this.directory.path, "profiles", label)));
+  }
+
+  public async typeAsync(organizationId: string = Resources.defaultOrganizationId): Promise<string> {
+    const found = (await this.organization.findAsync(organizationId))?.nodeTypes.at(0);
+    return found?.id ?? (await this.organization.createNodeTypeAsync(new NodeTypeCreateParams(organizationId, "Department"))).id;
   }
 
   public async providerOfAsync(kind: string = "fake"): Promise<Provider> {

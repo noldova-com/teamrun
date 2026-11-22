@@ -12,7 +12,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 import { Conversation, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, MethodName,
-  Organization, OrganizationChat, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
+  NodeType, NodeTypeCreateParams, Organization, OrganizationChat, OrganizationParent, TeammatePlaceParams } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import { OrganizationCatalog } from "./organization-catalog";
@@ -55,7 +55,12 @@ export class OrganizationStoreService {
   }
 
   public async createDepartment(name: string, parent: OrganizationParent = OrganizationParent.person, leaderId: string | null = null): Promise<boolean> {
-    return this.act(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, parent, leaderId).toJson());
+    const sent = this.edits.then(async () => {
+      const typeId = this.organization().nodeTypes.at(0)?.id ?? await this.createDefaultType();
+      return !Object.isNull(typeId) && await this.send(MethodName.DepartmentCreate, new DepartmentCreateParams(this.id(), name, typeId, parent, leaderId).toJson());
+    });
+    this.edits = sent;
+    return sent;
   }
 
   public async renameDepartment(departmentId: string, name: string): Promise<boolean> {
@@ -126,8 +131,21 @@ export class OrganizationStoreService {
     }
   }
 
+  private async createDefaultType(): Promise<string | null> {
+    this.actionErrorSignal.set(null);
+    try {
+      const created = await this.context.requestAsync(Resources.formatQualifiedName(MethodName.NodeTypeCreate),
+        new NodeTypeCreateParams(this.id(), Resources.organizationDefaultTypeName).toJson());
+      return NodeType.fromJson(created).id;
+    }
+    catch (error) {
+      this.actionErrorSignal.set(OrganizationStoreService.messageOf(error));
+      return null;
+    }
+  }
+
   private static unloaded(id: string): Organization {
-    return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], []);
+    return new Organization(id, Resources.organizationTitle, null, 0, Resources.organizationUnloadedTime, Resources.organizationUnloadedTime, [], [], []);
   }
 
   private static messageOf(error: unknown): string {

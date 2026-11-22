@@ -102,7 +102,7 @@ describe("ProjectsViewComponent", () => {
     departmentOf("infra", "Infra", "devops", null, 0)
   ], [placementOf("grok", null, 0), placementOf("opus", null, 1), placementOf("sol", "devops", 0), placementOf("agy", "devops", 1), placementOf("builder", "devops", 2),
     placementOf("mia", "infra", 0)]);
-  const labs = new Organization("labs", "Labs", null, 1, SampleData.timestamp, SampleData.timestamp, [departmentOf("research", "Research", null, null, 0)],
+  const labs = new Organization("labs", "Labs", null, 1, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [departmentOf("research", "Research", null, null, 0)],
     [placementOf("nova", "research", 0)]);
   const organizationChatOf = (id: string, teammate: Teammate, organizationId: string = ProtocolResources.defaultOrganizationId): Conversation =>
     new Conversation(id, null, teammate.name, at, at, false, null, null, false, `/data/chats/${id}`, false, [], false, false, null, new OrganizationChat(organizationId, teammate.id));
@@ -2763,7 +2763,7 @@ describe("ProjectsViewComponent", () => {
     });
 
     it("lists a teammate under a teammate with that teammate's department, a department under a teammate by its own path, and an empty organization beside a full one", async () => {
-      const team = new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [
+      const team = new Organization("team", "Team", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [
         new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u"),
         new Department("design", "Design", "department", OrganizationParent.teammate(grok.id), null, 0, "c", "u")
       ], [
@@ -2773,7 +2773,7 @@ describe("ProjectsViewComponent", () => {
         new TeammatePlacement(mia.id, OrganizationParent.teammate(opus.id), 0),
         new TeammatePlacement(builder.id, OrganizationParent.department("design"), 0)
       ]);
-      const empty = new Organization("empty", "Empty", null, 1, SampleData.timestamp, SampleData.timestamp, [], []);
+      const empty = new Organization("empty", "Empty", null, 1, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []);
       await create(t => t.answer(MethodName.TeammateList, () => [grok, opus, builder, mia, zed].map(u => u.toJson()))
         .answer(MethodName.OrganizationList, () => [team.toJson(), empty.toJson()]));
       await Wait.until(() => expect(names()).toContain(empty.name));
@@ -2797,7 +2797,7 @@ describe("ProjectsViewComponent", () => {
 
     it("creates an organization from \"+\" on the group's header with the name the person saves, and leaves it when they close the dialog", async () => {
       await createOrganization(t => t.answer(MethodName.OrganizationCreate, u => new Organization("studio", OrganizationCreateParams.fromJson(u).name, null, 2,
-        SampleData.timestamp, SampleData.timestamp, [], []).toJson()));
+        SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson()));
       const header = find<HTMLElement>("nol-section-header", Resources.organizationsTitle);
       const add = part(header, "button.nol-teamrun-new-organization");
       const creates = (): OrganizationCreateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationCreate))
@@ -2820,7 +2820,7 @@ describe("ProjectsViewComponent", () => {
       await settle();
       await answerDialog("nol-teamrun-rename-dialog .nol-teamrun-save");
       await Wait.until(() => expect(creates()).toEqual([new OrganizationCreateParams("Studio", null)]));
-      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 2, SampleData.timestamp, SampleData.timestamp, [], []).toJson());
+      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 2, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson());
       await settle();
 
       expect([add.getAttribute("aria-label"), add.hasAttribute("nolsectionheaderaction")]).toEqual([Resources.newOrganizationTitle, true]);
@@ -2839,7 +2839,7 @@ describe("ProjectsViewComponent", () => {
     const updates = (): OrganizationUpdateParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationUpdate))
       .map(t => OrganizationUpdateParams.fromJson(t.parameters));
     const withFolder = (folder: string | null): Organization => new Organization(organization.id, organization.name, folder, organization.order,
-      SampleData.timestamp, SampleData.timestamp, organization.departments, organization.placements);
+      SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], organization.departments, organization.placements);
 
     it("renames an organization with the name the person saves, under the organization's own heading, and leaves it when they close the dialog", async () => {
       await createOrganization(t => t.answer(MethodName.OrganizationUpdate, () => null));

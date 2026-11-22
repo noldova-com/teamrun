@@ -30,11 +30,14 @@ export class DepartmentTests {
     Assert.areEqual("$.input.parent.kind", Assert.throws(() => Department.fromJson({ ...json, parent: { kind: "Team", id: "d0" } }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.name", Assert.throws(() => Department.fromJson({ ...json, name: "Two\nlines" }, "$.input"), JsonException).path);
     Assert.areEqual("$.input.order", Assert.throws(() => Department.fromJson({ ...json, order: "first" }, "$.input"), JsonException).path);
+    Assert.areEqual("department", value.typeId);
+    Assert.areEqual("$.input.typeId", Assert.throws(() => Department.fromJson({ ...json, typeId: " " }, "$.input"), JsonException).path);
   }
 
   @TestMethod
   public validatesConstructorArguments(): void {
     Assert.throws(() => new Department(" ", "Design", "department", OrganizationParent.person, null, 0, "c", "u"), ArgumentException);
+    Assert.areEqual("typeId", Assert.throws(() => new Department("d1", "Design", " ", OrganizationParent.person, null, 0, "c", "u"), ArgumentException).parameterName);
     Assert.throws(() => new Department("d1", "Design", "department", OrganizationParent.department(" "), null, 0, "c", "u"), ArgumentException);
     Assert.throws(() => new Department("d1", "Design", "department", OrganizationParent.person, " ", 0, "c", "u"), ArgumentException);
     Assert.throws(() => new Department("d1", "Design", "department", OrganizationParent.person, null, 0, " ", "u"), ArgumentException);
