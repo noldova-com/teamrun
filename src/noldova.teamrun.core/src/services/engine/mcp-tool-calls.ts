@@ -175,7 +175,7 @@ export class McpToolCalls {
   }
 
   private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private static turnStopped(): JsonObject {
