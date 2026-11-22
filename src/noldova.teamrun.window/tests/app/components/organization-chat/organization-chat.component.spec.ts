@@ -14,7 +14,7 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
+  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, Message, MessageAttachment, MessageAuthor, MessageDelivery, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
   MethodName, type Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
@@ -314,6 +314,40 @@ describe("OrganizationChatComponent", () => {
     expect([queued().map(t => [t.message.chatId, t.message.responderTeammateId, t.message.text]), sent().map(t => t.chatId)])
       .toEqual([[["org-alice", "alice", "Status?"]], ["org-bob"]]);
   });
+
+  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a group's message behind a recipient's running reply while replying is set to %s", async setting => {
+    kept = [chatOf("alice"), chatOf("bob")];
+    running = [reply("org-alice", MessageStatus.Running)];
+    await create(OrganizationTarget.department("d1"));
+    context.changeSetting(Resources.whileReplyingSetting, setting);
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Replying", "No reply yet"]));
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(queued()).toHaveLength(1));
+
+    expect(queued().map(t => [t.delivery, t.message.chatId])).toEqual([[MessageDelivery.Queue, "org-alice"]]);
+  });
+
+  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a message to a replying teammate behind its reply, by Enter and by the send button, while replying is set to %s",
+    async setting => {
+      const main = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-deliver .nol-split-button-main");
+      kept = [chatOf("alice")];
+      running = [reply("org-alice", MessageStatus.Running)];
+      await create(OrganizationTarget.teammate("alice"));
+      context.changeSetting(Resources.whileReplyingSetting, setting);
+      await Wait.until(() => expect(main()?.getAttribute("aria-label")).toBe(Resources.deliveryLabels[MessageDelivery.Queue]));
+
+      await type("By Enter");
+      box()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await Wait.until(() => expect(queued()).toHaveLength(1));
+      await type("By the button");
+      await Wait.until(() => expect(main()?.disabled).toBe(false));
+      main()?.click();
+      await Wait.until(() => expect(queued()).toHaveLength(2));
+
+      expect(queued().map(t => [t.delivery, t.message.chatId, t.message.text]))
+        .toEqual([[MessageDelivery.Queue, "org-alice", "By Enter"], [MessageDelivery.Queue, "org-alice", "By the button"]]);
+    });
 
   it("shows each recipient's reply that ended in that recipient's own chat before the panel opened, read from the chat, whatever the teammate replied elsewhere", async () => {
     organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));

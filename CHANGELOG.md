@@ -32,6 +32,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** a failed change shows its reason once, in the view's header, and a failed message to a teammate or a group once, in the chat beside the tree, rather than in both places (#138).
 - **Organization:** removing a member from a unit now says the teammate will report to you, where it goes, rather than that it stays in no unit (#137).
 - **Default teammate:** its row in Teammates now names its model and effort, such as GPT-5 and Extra high, rather than their ids, also when no teammate in the list chooses a model or effort on its provider (#214).
