@@ -311,6 +311,58 @@ describe("ComputerUseGrantsViewComponent", () => {
     expect(texts(".nol-teamrun-error-text")).toEqual([]);
   });
 
+  describe("when two lists answer out of order", () => {
+    const answers: ((failed: boolean) => void)[] = [];
+    const answer = (index: number, failed: boolean): void => {
+      const found = answers[index];
+      if (Object.isUndefined(found))
+        throw new RangeError(`There is no list ${index}.`);
+      found(failed);
+    };
+    const revokeTwo = async (): Promise<void> => {
+      answers.length = 0;
+      let held = false;
+      await create(t => t.answer(MethodName.ComputerUseGrantList, () => {
+        const listed = grants.map(u => u.toJson());
+        return held
+          ? new Promise<JsonValue>((resolve, reject) => answers.push(failed => failed
+            ? reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is restarting."))
+            : resolve(listed)))
+          : listed;
+      }));
+      held = true;
+      revokeButton(0).click();
+      await Wait.until(() => expect(answers).toHaveLength(1));
+      revokeButton(0).click();
+      await Wait.until(() => expect(answers).toHaveLength(2));
+    };
+
+    it("shows the latest list's apps and drops an older list's answer that lands after it", async () => {
+      await revokeTwo();
+
+      answer(1, false);
+      await settle();
+      answer(0, false);
+      await settle();
+
+      expect(revoked()).toEqual(["g4", "g3"]);
+      expect(rows().map(t => texts("td", t)[0])).toEqual(["com.example.notes", "paint.exe"]);
+      expect(texts(".nol-teamrun-error-text")).toEqual([]);
+    });
+
+    it("drops an older list's failure that lands after the latest list answers", async () => {
+      await revokeTwo();
+
+      answer(1, false);
+      await settle();
+      answer(0, true);
+      await settle();
+
+      expect(rows().map(t => texts("td", t)[0])).toEqual(["com.example.notes", "paint.exe"]);
+      expect(texts(".nol-teamrun-error-text")).toEqual([]);
+    });
+  });
+
   it("shows a failed list that isn't an error by its text", async () => {
     await create(t => t.answer(MethodName.ComputerUseGrantList, () => Promise.reject("The runtime stopped.")));
 
