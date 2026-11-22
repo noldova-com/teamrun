@@ -2295,6 +2295,8 @@ export interface IConversationEngine {
    * message's; refused, or with a file that can't be copied, it waits as Queue. Until a reply offers a steer, it waits like Queue.
    * A message from outside goes only after `refuseRaisedModeAsync` passes its send again, so a mode the person changed since it was
    * added refuses it, kept with that failure.
+   * Once the message is kept, a delivery that throws is logged with `Resources.formatWaitingMessageNotDelivered` and the message waits,
+   * so the request still answers with it.
    * @param params The send and how it goes.
    * @param fromOutside Whether a client other than TeamRun's window added it; by default, it didn't.
    * @returns The waiting message, as added.
@@ -2331,7 +2333,7 @@ export interface IConversationEngine {
 
   /**
    * Makes a waiting message Stop and send, clearing its failure, publishes `WaitingMessagesChanged`, and stops the chat's running
-   * replies, or sends it when there are none.
+   * replies, or sends it when there are none; a stop or a send that throws is logged, as for `addWaitingAsync`, and the message waits.
    * @param params The waiting message.
    * @returns The waiting message, as Stop and send.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown waiting message.
@@ -3276,6 +3278,8 @@ export declare class Resources {
   public static formatChatSendingStopped(chatId: string, reason: string): string;
   /** The log line for a tool call's record that couldn't be stored; the records after it are still stored. */
   public static formatToolCallNotKept(chatId: string, failureKind: string): string;
+  /** The log line for a waiting message whose delivery failed after it was kept; the request still answers with it, and it waits. */
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string;
   /** The log line for a message the provider took as a steer that couldn't be kept in the chat; the next waiting message goes on. */
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string;
   /** The log line for a steer the provider refused with an error; the message waits as Queue. */

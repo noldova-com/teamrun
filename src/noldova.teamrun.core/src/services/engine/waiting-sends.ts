@@ -82,7 +82,7 @@ export class WaitingSends {
     const added = checked.withMessage(this.keepWaitingFiles(checked.id, params.message)[0]);
     await this.waiting.addAsync(added);
     await this.publishWaitingAsync(conversation.id);
-    await this.deliverWaitingAsync(added);
+    await this.deliverStoredAsync(added);
     return added;
   }
 
@@ -128,7 +128,7 @@ export class WaitingSends {
       return changed;
     });
     await this.publishWaitingAsync(now.chatId);
-    await this.deliverWaitingAsync(now);
+    await this.deliverStoredAsync(now);
     return now;
   }
 
@@ -230,6 +230,15 @@ export class WaitingSends {
 
   private async publishWaitingAsync(chatId: string): Promise<void> {
     this.events.publish(new Event(EventName.WaitingMessagesChanged, new WaitingMessagesPayload(chatId, await this.waiting.listAsync(chatId)).toJson()));
+  }
+
+  private async deliverStoredAsync(message: WaitingMessage): Promise<void> {
+    try {
+      await this.deliverWaitingAsync(message);
+    }
+    catch (error) {
+      this.log?.write(Resources.formatWaitingMessageNotDelivered(message.chatId, Resources.formatFailureKind(error)));
+    }
   }
 
   private async deliverWaitingAsync(message: WaitingMessage): Promise<void> {

@@ -1779,6 +1779,10 @@ export class Resources {
     return `A tool call's record in the chat ${chatId} wasn't kept: ${failureKind}.`;
   }
 
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string {
+    return `A waiting message in the chat ${chatId} was kept but not delivered: ${failureKind}.`;
+  }
+
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string {
     return `A message steered into a reply in the chat ${chatId} wasn't kept in the chat: ${failureKind}.`;
   }
