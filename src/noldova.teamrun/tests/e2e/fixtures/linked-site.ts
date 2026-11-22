@@ -46,7 +46,7 @@ export class LinkedSite {
     });
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
-    const port = typeof address === "object" && address !== null ? address.port : 0;
+    const port = Object.isNull(address) || Object.isString(address) ? 0 : address.port;
     expect(port).toBeGreaterThan(0);
     return new LinkedSite(server, `http://127.0.0.1:${port}`);
   }
@@ -85,7 +85,7 @@ export class LinkedSite {
     const url = this.urlOf(step.from);
     const centreAsync = (): Promise<readonly number[]> => application.evaluate(async ({ webContents }, { address, target }) => {
       const contents = webContents.getAllWebContents().find(t => t.getURL() === address);
-      if (contents === undefined)
+      if (Object.isUndefined(contents))
         return [];
       contents.focus();
       const centre: unknown = await contents.executeJavaScript(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => { `
@@ -127,9 +127,7 @@ export class LinkedSite {
   }
 
   public async expectShownAsync(application: ElectronApplication, page: Page, title: string, name: string = title): Promise<void> {
-    const tab = page.getByRole("tab", { name, exact: true });
-    await expect(tab, `${title}'s tab`).toBeVisible({ timeout: 60_000 });
-    await tab.click();
+    await TeamRunApp.showTabAsync(page, name);
     await expect(page.locator(`${LinkedSite.FIELD}:visible`), `${title}'s address field`).toHaveValue(this.urlOf(title), { timeout: 30_000 });
     await expect.poll(() => this.isLoadedAsync(application, title), { message: `${title}'s page loaded`, ...TeamRunApp.pollOf(30_000) }).toBe(true);
   }

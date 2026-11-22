@@ -41,16 +41,38 @@ interface IRecord {
   readonly atRest: readonly string[];
 }
 
+interface IRecentFrame {
+  readonly at: number;
+  readonly bitmap: Buffer;
+  readonly png: () => Buffer;
+}
+
+interface IUnmatchedFrame {
+  readonly bitmap: Buffer;
+  readonly width: number;
+  readonly png: () => Buffer;
+}
+
 interface ISwitchRecorder {
   area: IRegion | null;
   width: number;
   page: Buffer | null;
   chat: Buffer | null;
-  recent: readonly { readonly at: number; readonly bitmap: Buffer; readonly png: () => Buffer }[];
+  recent: readonly IRecentFrame[];
   tick: number;
   readonly frames: IFrame[];
-  readonly unmatched: { readonly bitmap: Buffer; readonly width: number; readonly png: () => Buffer }[];
+  readonly unmatched: IUnmatchedFrame[];
   readonly atRest: string[];
+}
+
+class SwitchMark {
+  public readonly start: number;
+  public readonly end: number;
+
+  public constructor(start: number, end: number) {
+    this.start = start;
+    this.end = end;
+  }
 }
 
 declare global {
@@ -93,6 +115,12 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   const pageTab = page.getByRole("tab", { name: CodexDouble.PAGE_TITLE, exact: true });
   const chatTab = page.getByRole("tab", { name: "Onboarding", exact: true });
   await expect(pageTab).toBeVisible({ timeout: 60_000 });
+  for (const name of ["Providers", "New chat"]) {
+    await TeamRunApp.showTabAsync(page, name);
+    await page.getByRole("button", { name: `Close ${name}`, exact: true }).click();
+    await expect(TeamRunApp.tabOf(page, name)).toHaveCount(0);
+  }
+  await expect(chatTab).toBeVisible();
   await chatTab.click();
   await expect(panel.getByText(/^page: v1 made by \S/u)).toBeVisible({ timeout: 60_000 });
   await expect(panel.getByRole("button", { name: "Send", exact: true })).toBeVisible({ timeout: 60_000 });
@@ -101,13 +129,13 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
 
   await app.electronApp.evaluate(async ({ webContents }, { address, style }) => {
     const window = webContents.getAllWebContents().find(t => t.getURL() === address);
-    if (window === undefined)
+    if (Object.isUndefined(window))
       throw new Error(`No web contents shows ${address}.`);
     await window.insertCSS(style);
     const recorder: ISwitchRecorder = { area: null, width: 0, page: null, chat: null, recent: [], tick: 0, frames: [], unmatched: [], atRest: [] };
     window.beginFrameSubscription(false, image => {
       const at = performance.timeOrigin + performance.now();
-      if (recorder.area === null || recorder.width === 0)
+      if (Object.isNull(recorder.area) || recorder.width === 0)
         return;
       const scale = image.getSize().width / recorder.width;
       const inset = 2;
@@ -118,7 +146,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
       const cropped = image.crop(region);
       const bitmap = cropped.toBitmap();
       recorder.recent = [...recorder.recent.slice(-1), { at, bitmap, png: () => cropped.toPNG() }];
-      if (recorder.page === null || recorder.chat === null)
+      if (Object.isNull(recorder.page) || Object.isNull(recorder.chat))
         return;
       const kind = bitmap.equals(recorder.page) ? "page" : bitmap.equals(recorder.chat) ? "chat" : "other";
       recorder.frames.push({ at, kind });
@@ -128,8 +156,8 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     globalThis.nolSwitchRecorder = recorder;
   }, { address: page.url(), style: STILL_STYLE });
   await page.evaluate(selector => {
-    const view = document.querySelector(selector);
-    if (!(view instanceof HTMLElement))
+    const view = document.querySelector<HTMLElement>(selector);
+    if (Object.isNull(view))
       throw new Error(`No element matches ${selector}.`);
     const calls: ICall[] = [];
     new MutationObserver(() => {
@@ -147,12 +175,12 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   const lastCallShown = (): Promise<boolean | null> => page.evaluate(() => globalThis.nolViewCalls?.at(-1)?.isVisible ?? null);
   const viewShown = (): Promise<boolean | null> => page.evaluate(selector => {
     const view = document.querySelector(selector);
-    return view === null ? null : getComputedStyle(view).visibility === "visible";
+    return Object.isNull(view) ? null : getComputedStyle(view).visibility === "visible";
   }, VIEW);
   const nowOf = (): Promise<number> => app.electronApp.evaluate(() => performance.timeOrigin + performance.now());
   const repaintAsync = (): Promise<void> => app.electronApp.evaluate(async ({ webContents }, address) => {
     const recorder = globalThis.nolSwitchRecorder;
-    if (recorder === undefined)
+    if (Object.isUndefined(recorder))
       throw new Error("The switch recorder isn't started.");
     recorder.tick++;
     await webContents.getAllWebContents().find(t => t.getURL() === address)?.executeJavaScript(
@@ -169,7 +197,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     const isCaptured = await app.electronApp.evaluate((_electron, { name, from }) => {
       const recorder = globalThis.nolSwitchRecorder;
       const [first, second] = recorder?.recent.filter(t => t.at >= from) ?? [];
-      if (recorder === undefined || first === undefined || second === undefined || !first.bitmap.equals(second.bitmap))
+      if (Object.isUndefined(recorder) || Object.isUndefined(first) || Object.isUndefined(second) || !first.bitmap.equals(second.bitmap))
         return false;
       recorder[name] = second.bitmap;
       recorder.atRest.push(second.png().toString("base64"));
@@ -210,7 +238,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
       };
       const unmatched = recorder?.unmatched ?? [];
       const { page: atRestPage, chat: atRestChat } = recorder ?? { page: null, chat: null };
-      const differences = atRestPage === null || atRestChat === null ? []
+      const differences = Object.isNull(atRestPage) || Object.isNull(atRestChat) ? []
         : unmatched.map(t => `${differenceOf("page", t.bitmap, atRestPage, t.width)}; ${differenceOf("chat", t.bitmap, atRestChat, t.width)}`);
       return JSON.stringify({ calls: shown, frames: recorder?.frames ?? [], others: unmatched.map(t => t.png().toString("base64")), differences, atRest: recorder?.atRest ?? [] });
     }, calls)));
@@ -220,7 +248,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     await expect(tab).toHaveAttribute("aria-selected", "true");
   };
 
-  const marks: { readonly start: number; readonly end: number }[] = [];
+  const marks: SwitchMark[] = [];
   let area: IRegion | null = null;
   try {
     await switchToAsync(pageTab);
@@ -234,7 +262,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     const width = await page.evaluate(() => window.innerWidth);
     await app.electronApp.evaluate((_electron, { placed, inner }) => {
       const recorder = globalThis.nolSwitchRecorder;
-      if (recorder === undefined)
+      if (Object.isUndefined(recorder))
         throw new Error("The switch recorder isn't started.");
       recorder.width = inner;
       recorder.area = placed;
@@ -253,7 +281,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
       await expect.poll(() => presentedOtherThan("chat", start),
         { message: `switch ${String(index)} to the page: the window presents a frame that isn't the chat's`, ...TeamRunApp.pollOf(30_000) }).toBe(true);
       const end = await nowOf();
-      marks.push({ start, end });
+      marks.push(new SwitchMark(start, end));
       await switchToAsync(chatTab);
       await expect.poll(lastCallShown, { message: `switch ${String(index)} back to the chat: the view's last call hides it`, ...TeamRunApp.pollOf(30_000) }).toBe(false);
       await expect.poll(() => presentedOtherThan("page", end),
@@ -261,9 +289,9 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     }
   } finally {
     const kept = await readRecordAsync().catch((error: unknown) => String(error));
-    const summary = typeof kept === "string" ? kept : { calls: kept.calls, frames: kept.frames, differences: kept.differences };
+    const summary = Object.isString(kept) ? kept : { calls: kept.calls, frames: kept.frames, differences: kept.differences };
     await testInfo.attach("switch-record.json", { body: JSON.stringify({ area, marks, record: summary }, null, 2), contentType: "application/json" });
-    if (typeof kept !== "string") {
+    if (!Object.isString(kept)) {
       if (kept.differences.length > 0)
         await testInfo.attach("unmatched-frames.txt", { body: kept.differences.map((t, index) => `${String(index + 1)}. ${t}`).join("\n"), contentType: "text/plain" });
       for (const [index, rest] of kept.atRest.entries())
@@ -282,7 +310,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     const firstOfPage = record.frames.find(t => t.at >= start && t.at <= end && t.kind !== "chat");
     return {
       hides: calls.filter(t => !t.isVisible).length,
-      isShownFirst: shown !== undefined && firstOfPage !== undefined && shown.at < firstOfPage.at,
+      isShownFirst: !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at < firstOfPage.at,
       bounds: shown?.bounds ?? null
     };
   });

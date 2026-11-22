@@ -53,6 +53,9 @@ export class TeamRunApp {
   private static readonly LAUNCH_ARGUMENTS: readonly string[] = ["--disable-gpu", "--disable-software-rasterizer", "--host-resolver-rules=MAP *.test 127.0.0.1"];
   private static readonly LINUX_PASSWORD_STORE: string = "--password-store=gnome-libsecret";
   private static readonly MAC_MOCK_KEYCHAIN: string = "--use-mock-keychain";
+  private static readonly SHOW_ALL_TABS: string = "Show all tabs";
+  private static readonly TAB_TIMEOUT: number = 60_000;
+  private static readonly TAB_STEP_TIMEOUT: number = 1_000;
   private static readonly DESKTOP_DEFAULT_WIDTH: number = 1280;
   private static readonly DESKTOP_DEFAULT_HEIGHT: number = 800;
   private static readonly PROCESSES: string = "/proc";
@@ -160,6 +163,52 @@ export class TeamRunApp {
 
   public static async savedLayoutAsync(page: Page): Promise<string> {
     return JSON.stringify(await page.evaluate(() => window.desktop.readLayout()));
+  }
+
+  public static tabOf(page: Page, name: string): Locator {
+    return page.getByRole("tab", { name, exact: true, includeHidden: true });
+  }
+
+  public static groupOf(page: Page, name: string): Locator {
+    return page.locator("nol-tab-group").filter({ has: TeamRunApp.tabOf(page, name) });
+  }
+
+  public static async showTabAsync(page: Page, name: string): Promise<void> {
+    const tab = TeamRunApp.tabOf(page, name);
+    const menu = page.locator(".nol-tab-group-overflow-menu");
+    await expect(async () => {
+      if (await menu.isVisible())
+        await page.keyboard.press("Escape");
+      if (await tab.isVisible()) {
+        await tab.click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
+      }
+      else {
+        await TeamRunApp.groupOf(page, name).getByRole("button", { name: TeamRunApp.SHOW_ALL_TABS, exact: true }).click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
+        await menu.getByRole("menuitem", { name, exact: true }).click({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
+      }
+      await expect(tab).toHaveAttribute("aria-selected", "true", { timeout: TeamRunApp.TAB_STEP_TIMEOUT });
+      await expect(tab).toBeVisible({ timeout: TeamRunApp.TAB_STEP_TIMEOUT });
+    }, `${name}'s tab shows`).toPass({ timeout: TeamRunApp.TAB_TIMEOUT });
+  }
+
+  public static async listTabsAsync(page: Page, name: string): Promise<readonly string[]> {
+    return await TeamRunApp.groupOf(page, name).locator("nol-tab").evaluateAll(tabs => tabs.map(t => t.getAttribute("aria-label") ?? ""));
+  }
+
+  public static async expectWholeTabsAsync(page: Page, name: string): Promise<void> {
+    const group = TeamRunApp.groupOf(page, name);
+    await expect(async () => {
+      const row = await group.locator(".nol-tab-group-scroller").boundingBox();
+      if (Object.isNull(row))
+        throw new Error(`${name}'s tab row shows no box.`);
+      for (const tab of await group.getByRole("tab").all()) {
+        const box = await tab.boundingBox();
+        const label = await tab.getAttribute("aria-label");
+        if (Object.isNull(box))
+          throw new Error(`${label}'s tab shows no box.`);
+        expect(box.x >= row.x && box.x + box.width <= row.x + row.width, `${label} shows whole in its row`).toBe(true);
+      }
+    }).toPass({ timeout: TeamRunApp.TAB_TIMEOUT });
   }
 
   public static homeVariablesOf(platform: NodeJS.Platform, home: string): Readonly<Record<string, string>> {

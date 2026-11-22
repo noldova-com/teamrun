@@ -20,12 +20,25 @@ interface IGroupPlace {
   readonly bottom: number;
 }
 
-const EXPECTED: readonly (readonly [string, readonly string[], string])[] = [
-  ["Left", ["view/teamrun.projects"], "view/teamrun.projects"],
-  ["Right", ["view/teamrun.backgroundTasks", "view/git.view", "view/teamrun.pages"], "view/teamrun.backgroundTasks"],
-  ["Right", ["view/teamrun.plan", "view/teamrun.subAgents"], "view/teamrun.plan"],
-  ["Bottom", ["view/teamrun.activity", "view/teamrun.changes"], "view/teamrun.activity"]
+class DockGroup {
+  public readonly side: string | null;
+  public readonly tabs: readonly (string | null)[];
+  public readonly shown: string | null;
+
+  public constructor(side: string | null, tabs: readonly (string | null)[], shown: string | null) {
+    this.side = side;
+    this.tabs = tabs;
+    this.shown = shown;
+  }
+}
+
+const EXPECTED: readonly DockGroup[] = [
+  new DockGroup("Left", ["view/teamrun.projects"], "view/teamrun.projects"),
+  new DockGroup("Right", ["view/teamrun.backgroundTasks", "view/git.view", "view/teamrun.pages"], "view/teamrun.backgroundTasks"),
+  new DockGroup("Right", ["view/teamrun.plan", "view/teamrun.subAgents"], "view/teamrun.plan"),
+  new DockGroup("Bottom", ["view/teamrun.activity", "view/teamrun.changes"], "view/teamrun.activity")
 ];
+const SCHEMES: readonly ("light" | "dark")[] = ["light", "dark"];
 
 async function placesAsync(page: Page): Promise<readonly IGroupPlace[]> {
   return page.locator("nol-tab-group[data-side]").evaluateAll(groups => groups.map(group => {
@@ -43,13 +56,13 @@ async function placesAsync(page: Page): Promise<readonly IGroupPlace[]> {
   }));
 }
 
-function namesOf(places: readonly IGroupPlace[]): readonly (readonly [string | null, readonly (string | null)[], string | null])[] {
-  return [...places.map(t => [t.side, t.tabs, t.shown] as const)].sort((a, b) => EXPECTED.findIndex(t => t[1][0] === a[1][0]) - EXPECTED.findIndex(t => t[1][0] === b[1][0]));
+function namesOf(places: readonly IGroupPlace[]): readonly DockGroup[] {
+  return places.map(t => new DockGroup(t.side, t.tabs, t.shown)).sort((a, b) => EXPECTED.findIndex(t => t.tabs[0] === a.tabs[0]) - EXPECTED.findIndex(t => t.tabs[0] === b.tabs[0]));
 }
 
 function groupOf(places: readonly IGroupPlace[], key: string): IGroupPlace {
   const found = places.find(t => t.tabs.includes(key));
-  if (found === undefined)
+  if (Object.isUndefined(found))
     throw new Error(`No dock group holds ${key}.`);
   return found;
 }
@@ -57,7 +70,7 @@ function groupOf(places: readonly IGroupPlace[], key: string): IGroupPlace {
 async function dragAsync(page: Page, key: string, after: string): Promise<void> {
   const from = await page.locator(`nol-tab[data-tab-key='${key}']`).boundingBox();
   const to = await page.locator(`nol-tab[data-tab-key='${after}']`).boundingBox();
-  if (from === null || to === null)
+  if (Object.isNull(from) || Object.isNull(to))
     throw new Error(`${key} or ${after} isn't shown.`);
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
@@ -81,16 +94,16 @@ test("a fresh install opens Explorer on the left, Background tasks, Git and Page
   expect([explorer.left < width / 4, upper.right > width * 3 / 4, upper.left > explorer.right, upper.bottom <= lower.top, upper.left === lower.left, upper.right === lower.right,
     bottom.top > height / 2, bottom.top >= explorer.bottom, bottom.top >= lower.bottom, bottom.left < explorer.right, bottom.right > upper.left])
     .toEqual([true, true, true, true, true, true, true, true, true, true, true]);
-  for (const scheme of ["light", "dark"] as const) {
+  for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
     await testInfo.attach(`fresh-install-${scheme}.png`, { body: await page.screenshot(), contentType: "image/png" });
   }
   await page.emulateMedia({ colorScheme: null });
 
-  await page.locator("nol-tab[data-tab-key='view/teamrun.pages']").click();
+  await TeamRunApp.showTabAsync(page, "Pages");
   await dragAsync(page, "view/teamrun.changes", "view/teamrun.subAgents");
   const sash = await page.getByRole("separator", { name: "Resize the right dock" }).boundingBox();
-  if (sash === null)
+  if (Object.isNull(sash))
     throw new Error("The right dock's separator isn't shown.");
   await page.mouse.move(sash.x + sash.width / 2, sash.y + sash.height / 2);
   await page.mouse.down();

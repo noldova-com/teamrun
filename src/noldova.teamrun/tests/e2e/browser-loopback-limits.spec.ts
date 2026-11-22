@@ -41,7 +41,7 @@ class LoopbackService {
     const server = createServer();
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
-    const service = new LoopbackService(server, typeof address === "object" && address !== null ? address.port : 0);
+    const service = new LoopbackService(server, Object.isNull(address) || Object.isString(address) ? 0 : address.port);
     server.on("request", (request, response) => {
       service.hits.push(`${request.method ?? ""} ${request.url ?? ""}`);
       response.writeHead(200, { "content-type": "text/plain", "access-control-allow-origin": "*" });
@@ -64,14 +64,24 @@ class LoopbackService {
   }
 }
 
-const servePageAsync = async (script: string): Promise<[Server, string]> => {
+class LocalPage {
+  public readonly server: Server;
+  public readonly origin: string;
+
+  public constructor(server: Server, origin: string) {
+    this.server = server;
+    this.origin = origin;
+  }
+}
+
+const servePageAsync = async (script: string): Promise<LocalPage> => {
   const server = createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end(`<!doctype html><title>Waiting</title><h1>Local page</h1><script>${script}</script>`);
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
-  return [server, `http://127.0.0.1:${String(typeof address === "object" && address !== null ? address.port : 0)}`];
+  return new LocalPage(server, `http://127.0.0.1:${String(Object.isNull(address) || Object.isString(address) ? 0 : address.port)}`);
 };
 
 const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: string): Promise<string | undefined> => {
@@ -88,18 +98,18 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
 
 test("limit: a page's request reads its answer", async ({ app }) => {
   const service = await LoopbackService.startAsync();
-  const [pageServer, origin] = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
+  const local = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
     + "e => { document.title = \"Failed \" + e; });");
   try {
     const page = await app.openChatAsync();
-    await app.nameLocalSitesAsync(origin);
+    await app.nameLocalSitesAsync(local.origin);
 
-    await LinkedSite.openAsync(page, `${origin}/`, `Read ${LOCAL_DATA}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, `Read ${LOCAL_DATA}`);
 
     expect(service.hits).toEqual(["GET /data"]);
   }
   finally {
-    await LocalServer.closeAsync(pageServer);
+    await LocalServer.closeAsync(local.server);
     await service.closeAsync();
   }
 });
@@ -123,22 +133,22 @@ test("a navigation to an allowed name that resolves to this computer is refused 
 
 test("limit: a page's WebSocket hears its message", async ({ app }) => {
   const service = await LoopbackService.startAsync();
-  const [pageServer, origin] = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
+  const local = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
     + "socket.onmessage = e => { document.title = \"Heard \" + e.data; }; socket.onerror = () => { document.title = \"Failed\"; };");
   try {
     const page = await app.openChatAsync();
-    await app.nameLocalSitesAsync(origin);
+    await app.nameLocalSitesAsync(local.origin);
     await allowByNavigationAsync(app, page, `http://${service.name}/`);
-    await page.getByRole("tab", { name: "New tab", exact: true }).click();
+    await TeamRunApp.showTabAsync(page, "New tab");
     await page.getByRole("button", { name: "Close New tab", exact: true }).click();
     await expect(page.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(0);
 
-    await LinkedSite.openAsync(page, `${origin}/`, `Heard ${LOCAL_HELLO}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, `Heard ${LOCAL_HELLO}`);
 
     expect(service.hits).toEqual(["upgrade /socket"]);
   }
   finally {
-    await LocalServer.closeAsync(pageServer);
+    await LocalServer.closeAsync(local.server);
     await service.closeAsync();
   }
 });

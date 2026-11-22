@@ -70,7 +70,12 @@ test("three pages open as tabs in two workspaces come back after a restart at th
       const restarted = await app.startAsync();
 
       for (const title of TITLES)
-        await expect(restarted.getByRole("tab", { name: title, exact: true }), `${title}'s tab came back`).toBeVisible({ timeout: 60_000 });
+        await expect(TeamRunApp.tabOf(restarted, title), `${title}'s tab came back`).toBeAttached({ timeout: 60_000 });
+      for (const title of TITLES) {
+        const listed = (await TeamRunApp.listTabsAsync(restarted, title)).filter(t => TITLES.includes(t));
+        expect(listed, `${title}'s group lists it with the other restored tabs in order`).toEqual(TITLES.filter(t => listed.includes(t) || t === title));
+      }
+      await TeamRunApp.expectWholeTabsAsync(restarted, "Three");
       await expect.poll(() => site.isLoadedAsync(app.electronApp, "Three"), { message: "the shown page, Three, loaded", ...TeamRunApp.pollOf(60_000) }).toBe(true);
       const counts: (readonly number[])[] = [];
       const countAsync = async (): Promise<void> => {
