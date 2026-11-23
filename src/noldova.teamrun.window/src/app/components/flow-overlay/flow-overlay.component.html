@@ -20,8 +20,7 @@ LICENSE file in the root directory of this source tree.
   @if (drawing.flow.stage === stages.Sent) {
     <span class="pulse" [style.offset-path]="drawing.offsetPath" [style.animation-duration.ms]="resources.organizationFlowPulseDuration"
       (animationend)="arrived.emit(drawing.flow.id)"></span>
-  } @else if (drawing.flow.stage === stages.Arrived) {
-    @let target = drawing.route.target;
+  } @else if (drawing.flow.stage === stages.Arrived && drawing.route.target; as target) {
     <span class="glow" [style.left.px]="target.left" [style.top.px]="target.top" [style.width.px]="target.width" [style.height.px]="target.height"
       [style.animation-duration.ms]="resources.organizationFlowGlowDuration" (animationend)="finished.emit(drawing.flow.id)"></span>
   }

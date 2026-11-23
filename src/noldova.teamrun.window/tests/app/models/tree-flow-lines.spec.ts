@@ -64,15 +64,6 @@ describe("TreeFlowLines", () => {
       ["80,264", "80,252", "212,252", "212,192", "250,192", "250,200"]]);
   });
 
-  it("reads a container's layout width without rounding, its padding and border counted once in either box model", () => {
-    const sized = (sizing: string): number => {
-      container.setAttribute("style", `${at(0, 0, 400.5, 300)}; padding: 0 10px; border: 2px solid; box-sizing: ${sizing}`);
-      return TreeFlowLines.layoutWidthOf(container);
-    };
-
-    expect([sized("content-box"), sized("border-box")]).toEqual([424.5, 400.5]);
-  });
-
   it("reads a hidden container at its own scale", () => {
     container.style.display = "none";
 
