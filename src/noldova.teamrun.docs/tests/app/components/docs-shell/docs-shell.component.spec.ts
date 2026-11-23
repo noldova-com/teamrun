@@ -572,7 +572,7 @@ describe("DocsShellComponent", () => {
 
     it("draws the site's text at the kit's panel size, its paragraphs' lines one and a half times as tall, and its page title at the kit's heading size", async () => {
       const host = await pageAsync();
-      const text = DocsFixture.one(host, "main .nol-markdown-blocks > p:not([role=heading])");
+      const text = DocsFixture.one(host, "main .nol-markdown-blocks p.nol-markdown-paragraph");
       const size = (element: HTMLElement): string => getComputedStyle(element).fontSize;
 
       expect([size(text), size(DocsFixture.one(host, ".nol-docs-menu-link")), size(DocsFixture.one(host, ".nol-docs-search-field"))]).toEqual(Array(3).fill(resolve(host, "font-size", "var(--nol-text-panel)")));
