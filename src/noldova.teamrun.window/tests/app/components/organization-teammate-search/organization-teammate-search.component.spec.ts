@@ -22,6 +22,7 @@ import { OrganizationStoreService } from "../../../../src/app/services/organizat
 import { Resources } from "../../../../src/resources";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
 import { PartReadError } from "../../../fixtures/part-read-error.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { RecordedRequest } from "../../../fixtures/recorded-request.fixture";
 import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
@@ -69,7 +70,7 @@ describe("OrganizationTeammateSearchComponent", () => {
     await fixture.whenStable();
   };
   const openAsync = async (query: string): Promise<string[]> => {
-    await userEvent.click(one(".add", fixture.nativeElement as HTMLElement));
+    await userEvent.click(one(".add", PartReads.elementOf(fixture.nativeElement)));
     await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search .nol-quick-input-field")).not.toBeNull());
     if (query.length > 0)
       await userEvent.type(field(), query);

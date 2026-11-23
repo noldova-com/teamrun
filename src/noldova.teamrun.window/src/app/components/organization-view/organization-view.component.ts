@@ -78,7 +78,7 @@ export class OrganizationViewComponent {
     for (const node of OrganizationNode.walk(this.root()).filter(t => !Object.isNull(t.department))) {
       const color = ColorChoices.toCss(node.type?.color ?? null);
       if (!Object.isNull(color))
-        for (const key of [Resources.formatOrganizationFlowDepartmentKey(node.id), ...node.leader === null ? [] : [node.leader.id], ...node.members.map(t => t.id)])
+        for (const key of [Resources.formatOrganizationFlowDepartmentKey(node.id), ...Object.isNull(node.leader) ? [] : [node.leader.id], ...node.members.map(t => t.id)])
           colors.set(key, color);
     }
     return colors;

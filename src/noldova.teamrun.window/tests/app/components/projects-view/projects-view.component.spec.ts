@@ -2661,7 +2661,7 @@ describe("ProjectsViewComponent", () => {
     it("parts the Organizations group's rows by the rows' gap, as Projects and Chats part theirs, inside a department and after one, an empty one too", async () => {
       await createOrganization();
       const rows = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-organization-list .nol-teamrun-row")];
-      const gaps = rows.slice(1).map((t, index) => box(t).top - box(rows[index] as HTMLElement).bottom);
+      const gaps = rows.slice(1).map((t, index) => box(t).top - box(Required.of(rows[index])).bottom);
 
       expect(rows.map(t => t.textContent?.trim().split(/\s+/u).at(-1))).toHaveLength(names().length);
       for (const gap of gaps)

@@ -27,6 +27,7 @@ import {
 
 import type { ActivityEntry } from "../../models/activity-entry";
 import type { ReplyExpansion } from "../../models/reply-expansion";
+import { TakenChanges } from "../../models/taken-changes";
 import { Resources } from "../../../resources";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { FormatterService } from "../../services/formatter.service";
@@ -148,7 +149,7 @@ export class ReplyHistoryRowComponent {
   }
 
   protected choose(event: MouseEvent): void {
-    if (Object.isNull((event.target as Element).closest(Resources.markdownLinkSelector)))
+    if (!(event.target instanceof Element) || Object.isNull(event.target.closest(Resources.markdownLinkSelector)))
       this.chosen.emit();
   }
 
@@ -177,7 +178,7 @@ export class ReplyHistoryRowComponent {
     const revision = this.revision;
     this.loading.set(true);
     this.error.set(null);
-    const taken: [string, ReadonlySet<number>][] = [];
+    const taken: TakenChanges[] = [];
     try {
       let summary = this.summary();
       let details = await this.readFrom(this.details(), summary.preview.id, taken);
@@ -192,8 +193,8 @@ export class ReplyHistoryRowComponent {
       return true;
     }
     catch (error) {
-      for (const [messageId, changed] of taken)
-        this.history.restoreChanged(messageId, changed);
+      for (const t of taken)
+        this.history.restoreChanged(t.messageId, t.changed);
       if (revision === this.revision)
         this.error.set(error instanceof Error ? error.message : String(error));
       return false;
@@ -204,9 +205,9 @@ export class ReplyHistoryRowComponent {
     }
   }
 
-  private async readFrom(held: Message | null, messageId: string, taken: [string, ReadonlySet<number>][]): Promise<Message | null> {
+  private async readFrom(held: Message | null, messageId: string, taken: TakenChanges[]): Promise<Message | null> {
     const changed = this.history.takeChanged(messageId);
-    taken.push([messageId, changed]);
+    taken.push(new TakenChanges(messageId, changed));
     const last = held?.id === messageId ? held.details.at(-1) : undefined;
     if (Object.isNullOrUndefined(held) || Object.isUndefined(last) || changed.size > Resources.changedDetailsLimit)
       return await this.history.readDetails(messageId);

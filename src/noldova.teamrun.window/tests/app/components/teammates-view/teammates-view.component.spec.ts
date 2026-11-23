@@ -32,6 +32,7 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { PointerEventsFixture } from "../../../fixtures/pointer-events.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
@@ -43,7 +44,7 @@ describe("TeammatesViewComponent", () => {
   let fixture: ComponentFixture<TeammatesViewComponent>;
   let store: ChatStoreService;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
   const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
   const row = (name: string): HTMLElement => {
     const found = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-item")].find(t => t.querySelector(".nol-teamrun-item-name")?.textContent === name);
@@ -726,7 +727,7 @@ describe("TeammatesViewComponent", () => {
     const paint = (color: number | null): string => {
       kit.componentRef.setInput("color", color);
       kit.detectChanges();
-      return (kit.nativeElement as HTMLElement).style.getPropertyValue("--nol-avatar-fill");
+      return PartReads.elementOf(kit.nativeElement).style.getPropertyValue("--nol-avatar-fill");
     };
 
     expect([fill("Alice"), fill("Bob"), store.teammateColor("alice"), store.teammateColor("bob")]).toEqual([paint(2), paint(3), 2, 3]);

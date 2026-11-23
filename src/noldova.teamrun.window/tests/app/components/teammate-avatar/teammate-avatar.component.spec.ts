@@ -15,6 +15,7 @@ import { TeammateAvatarComponent } from "../../../../src/app/components/teammate
 import { TeammateColor } from "../../../../src/app/models/teammate-color";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { Resources } from "../../../../src/resources";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
@@ -23,7 +24,7 @@ describe("TeammateAvatarComponent", () => {
   const reviewer = new Teammate("reviewer", "Code Reviewer", null, "a1", Harness.Provider, null, null, "t", "t");
   let fixture: ComponentFixture<TeammateAvatarComponent>;
 
-  const avatar = (): HTMLElement => (fixture.nativeElement as HTMLElement).querySelector("nol-avatar") as HTMLElement;
+  const avatar = (): HTMLElement => PartReads.elementOf(PartReads.elementOf(fixture.nativeElement).querySelector("nol-avatar"));
   const fill = (): string => avatar().style.getPropertyValue("--nol-avatar-fill");
   const render = async (teammate: Teammate | null): Promise<void> => {
     TestBed.configureTestingModule({ imports: [TeammateAvatarComponent] });
@@ -41,7 +42,7 @@ describe("TeammateAvatarComponent", () => {
     kit.componentRef.setInput("name", "Alice");
     kit.componentRef.setInput("color", color);
     kit.detectChanges();
-    return (kit.nativeElement as HTMLElement).style.getPropertyValue("--nol-avatar-fill");
+    return PartReads.elementOf(kit.nativeElement).style.getPropertyValue("--nol-avatar-fill");
   };
 
   it("draws a teammate small, with its name's initials and the colour its id gives, under any name", async () => {
@@ -51,7 +52,7 @@ describe("TeammateAvatarComponent", () => {
 
     expect(drawn).toEqual(["CR", "Code Reviewer", true, fill()]);
     expect(avatar().textContent?.trim()).toBe("RO");
-    expect(getComputedStyle(fixture.nativeElement as HTMLElement).display).toBe("contents");
+    expect(getComputedStyle(PartReads.elementOf(fixture.nativeElement)).display).toBe("contents");
   });
 
   it("draws the default teammate when it has none, with the default letter and colour", async () => {

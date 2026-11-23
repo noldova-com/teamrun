@@ -19,6 +19,7 @@ import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { OrganizationStoreService } from "../../../src/app/services/organization-store.service";
 import { Resources } from "../../../src/resources";
 import type { FakeWindowPartContext } from "../../fixtures/fake-window-part-context.fixture";
+import { PartReads } from "../../fixtures/part-reads.fixture";
 import { RecordedRequest } from "../../fixtures/recorded-request.fixture";
 import { Required } from "../../fixtures/required.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
@@ -43,7 +44,7 @@ describe("OrganizationAddTeammateDirective", () => {
   const dialog = (): HTMLElement | null => document.querySelector<HTMLElement>("nol-teamrun-organization-add-teammate-dialog");
   const title = (): string | undefined => dialog()?.querySelector(".nol-dialog-title")?.textContent?.trim();
   const openAsync = async (selector: string): Promise<string | undefined> => {
-    await userEvent.click(Required.of((fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(selector)));
+    await userEvent.click(Required.of(PartReads.elementOf(fixture.nativeElement).querySelector<HTMLElement>(selector)));
     await Wait.until(() => expect(dialog()?.querySelector(".nol-teamrun-add-teammate-choice")).toBeTruthy());
     await fixture.whenStable();
     return title();
