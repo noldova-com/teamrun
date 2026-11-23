@@ -23,6 +23,8 @@ import { ChatStoreService } from "../../services/chat-store.service";
   styleUrl: "./teammate-avatar.component.css"
 })
 export class TeammateAvatarComponent {
+  private readonly store: ChatStoreService | null = inject(ChatStoreService, { optional: true });
+
   public readonly teammate: InputSignal<Teammate | null> = input.required<Teammate | null>();
   public readonly size: InputSignal<AvatarSize> = input<AvatarSize>(AvatarSize.Small);
   public readonly unavailable: InputSignal<boolean> = input<boolean>(false);
@@ -34,7 +36,6 @@ export class TeammateAvatarComponent {
     const teammate = this.teammate();
     return Object.isNull(teammate) ? null : TeammateName.initials(teammate.name);
   });
-  private readonly store: ChatStoreService | null = inject(ChatStoreService, { optional: true });
   protected readonly color: Signal<number | null> = computed(() => {
     const id = this.teammate()?.id ?? null;
     return Object.isNull(this.store) ? TeammateColor.of(id) : this.store.teammateColor(id);

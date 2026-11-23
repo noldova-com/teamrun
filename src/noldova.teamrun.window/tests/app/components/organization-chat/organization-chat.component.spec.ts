@@ -19,6 +19,8 @@ import {
   MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams,
   WaitingMessageIdParams, WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
+import { ThemeMode } from "@noldova/ui.components.angular";
+import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
 import { OrganizationChatComponent } from "../../../../src/app/components/organization-chat/organization-chat.component";
@@ -585,6 +587,38 @@ describe("OrganizationChatComponent", () => {
 
     expect([described[0] === described[1], described[0]?.startsWith(Resources.composerReachIdPrefix), reach(), box()?.hasAttribute("aria-describedby")])
       .toEqual([true, true, null, false]);
+  });
+
+  it("lists a group's recipients above its composer, which ends the panel with its card a space-3 in from the sides and bottom under the count in muted small text", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    try {
+      await create(OrganizationTarget.department("d1"));
+      element().style.width = "22rem";
+      await Wait.until(() => expect(texts(".nol-teamrun-composer-reach")).toEqual(["Goes to 2 teammates"]));
+      await fixture.whenStable();
+      const rect = (selector: string): DOMRect => Required.of(element().querySelector(selector)).getBoundingClientRect();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const list = rect(".nol-teamrun-organization-recipients");
+      const composer = rect("nol-teamrun-composer");
+      const card = rect(".nol-teamrun-composer-card");
+      const reach = getComputedStyle(Required.of(element().querySelector(".nol-teamrun-composer-reach")));
+      const probe = document.createElement("span");
+      probe.style.cssText = "color: color-mix(in srgb, var(--nol-text-muted) 65%, transparent); font-size: var(--nol-text-small)";
+      element().append(probe);
+      const expected = [getComputedStyle(probe).color, getComputedStyle(probe).fontSize];
+      probe.remove();
+
+      expect(list.bottom).toBeLessThanOrEqual(composer.top + 0.5);
+      AppearanceFixture.expectPixels(composer.bottom, element().getBoundingClientRect().bottom);
+      AppearanceFixture.expectPixels(card.left, composer.left + space(3));
+      AppearanceFixture.expectPixels(card.right, composer.right - space(3));
+      AppearanceFixture.expectPixels(card.bottom, composer.bottom - space(3));
+      expect([reach.color, reach.fontSize]).toEqual(expected);
+      expect(reach.fontSize).not.toBe(getComputedStyle(Required.of(element().querySelector("nol-teamrun-composer textarea"))).fontSize);
+    }
+    finally {
+      AppearanceFixture.reset();
+    }
   });
 
   it("shows no reply yet for recipients whose chats exist but who never replied", async () => {

@@ -51,7 +51,7 @@ LICENSE file in the root directory of this source tree.
       <span class="department-count">{{ node().headcount }}</span>
       @if (editing()) {
         <button type="button" nol-icon-button class="edit-unit" [icon]="resources.organizationEditUnitIcon" [label]="resources.formatOrganizationEditNamed(node().name)"
-          [attr.aria-pressed]="isSelected()" (click)="select()"></button>
+          [pressed]="isSelected()" (click)="select()"></button>
       }
     </div>
     @if (summary(); as text) {

@@ -8,20 +8,21 @@
 
 import "@noldova/context.core";
 
-import { type Teammate } from "@noldova/teamrun.protocol";
+import type { Teammate } from "@noldova/teamrun.protocol";
+
 import { Resources } from "../../resources";
 
 export class TeammateColor {
   public static byCreation(teammates: readonly Teammate[]): ReadonlyMap<string, number> {
     const ordered = teammates.toSorted((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-    return new Map(ordered.map((t, index) => [t.id, index % Resources.teammateColorCount + 1]));
+    return new Map(ordered.map((t, index) => [t.id, index % (Resources.teammateColorCount - Resources.defaultTeammateColor) + Resources.defaultTeammateColor + 1]));
   }
 
   public static of(teammateId: string | null, colors: ReadonlyMap<string, number> = new Map()): number | null {
     if (Object.isNull(teammateId))
       return null;
     const color = colors.get(teammateId);
-    if (color !== undefined)
+    if (!Object.isUndefined(color))
       return color;
     let hash = Resources.teammateColorHashOffset;
     for (let index = 0; index < teammateId.length; index++)

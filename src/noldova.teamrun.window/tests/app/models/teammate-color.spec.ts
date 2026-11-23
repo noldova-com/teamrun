@@ -8,6 +8,7 @@
 
 import { TestBed } from "@angular/core/testing";
 
+import { Harness, Teammate } from "@noldova/teamrun.protocol";
 import { AvatarComponent } from "@noldova/ui.components.angular";
 
 import { TeammateColor } from "../../../src/app/models/teammate-color";
@@ -32,5 +33,14 @@ describe("TeammateColor", () => {
     expect(TeammateColor.of(null)).toBeNull();
     expect(paint({ color: TeammateColor.of(null) })).toBe(paint({}));
     expect(paint({ color: TeammateColor.of(null) })).not.toBe(paint({ color: TeammateColor.of("t1") }));
+  });
+
+  it("colours the team by creation, the first made first and a tie by id, never in the Default's colour, starting over after the seventh, and keeps the id colour for one outside the team", () => {
+    const made = (id: string, createdAt: string): Teammate => new Teammate(id, id, null, "a1", Harness.Provider, null, null, createdAt, createdAt);
+    const team = [made("k", "2026-01-09"), made("b", "2026-01-01"), made("a", "2026-01-01"), ...["c", "d", "e", "f", "g", "h", "i"].map((t, index) => made(t, `2026-01-0${index + 2}`))];
+    const colors = TeammateColor.byCreation(team);
+
+    expect([...colors]).toEqual([["a", 2], ["b", 3], ["c", 4], ["d", 5], ["e", 6], ["f", 7], ["g", 8], ["h", 2], ["i", 3], ["k", 4]]);
+    expect([TeammateColor.of("b", colors), TeammateColor.of("t1", colors), TeammateColor.of(null, colors)]).toEqual([3, 7, null]);
   });
 });

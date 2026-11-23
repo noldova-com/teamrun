@@ -658,6 +658,7 @@ export class Resources {
   public static readonly programFocusOrigin: FocusOrigin = "program";
   public static readonly personAuthorId: string = "person";
   public static readonly teammateColorCount: number = 8;
+  public static readonly defaultTeammateColor: number = 1;
   public static readonly teammateColorHashOffset: number = 2166136261;
   public static readonly teammateColorHashPrime: number = 16777619;
   public static readonly historyEstimate: number = 160;

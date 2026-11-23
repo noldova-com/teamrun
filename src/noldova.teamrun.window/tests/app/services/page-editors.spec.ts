@@ -39,7 +39,8 @@ describe("PageEditors", () => {
       workingReplies,
       kinds: signal<readonly ProviderKind[]>([]),
       providers: signal<readonly Provider[]>([]),
-      isReplyAuthorUnavailable: (): boolean => false
+      isReplyAuthorUnavailable: (): boolean => false,
+      teammateColor: (): number | null => null
     });
   };
 

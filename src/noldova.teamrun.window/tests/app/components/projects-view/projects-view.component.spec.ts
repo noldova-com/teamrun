@@ -2657,6 +2657,16 @@ describe("ProjectsViewComponent", () => {
       for (const row of [top, organizationRow("DevOps"), teammateRow("Grok"), teammateRow("Agy")])
         AppearanceFixture.expectPixels(box(row).height, AppearanceFixture.measureLook("tree-row-height"));
     });
+
+    it("parts the Organizations group's rows by the rows' gap, as Projects and Chats part theirs, inside a department and after one, an empty one too", async () => {
+      await createOrganization();
+      const rows = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-organization-list .nol-teamrun-row")];
+      const gaps = rows.slice(1).map((t, index) => box(t).top - box(rows[index] as HTMLElement).bottom);
+
+      expect(rows.map(t => t.textContent?.trim().split(/\s+/u).at(-1))).toHaveLength(names().length);
+      for (const gap of gaps)
+        AppearanceFixture.expectPixels(gap, rowGap());
+    });
   });
 
   it("shows a row's actions without a fade, and rearranges rows during a drag without a transition, when the person prefers reduced motion", async () => {
@@ -2806,21 +2816,55 @@ describe("ProjectsViewComponent", () => {
         `${Resources.conversationDocumentName} o3`], 0]);
     });
 
-    it("opens each organization's own Organization view, under its name, from the organization's name, by Enter and from its row menu", async () => {
+    it("opens each organization's own Organization view, under its name, from the organization's name, folding or unfolding it, by Enter and from its row menu, marking it in view", async () => {
       await createOrganization();
       const views = (): string[] => context.openedDocuments.map(t => `${t.name} ${t.instance} ${t.title}`);
       const mine = `${Resources.organizationDocumentName} ${organization.id} ${organization.name}`;
 
       part(organizationRow(organization.name), ".nol-teamrun-organization-name").click();
+      await settle();
+      const folded = [organizationRow(organization.name).getAttribute("aria-expanded"), store.organizationInView()];
+      part(organizationRow(organization.name), ".nol-teamrun-organization-name").click();
+      await settle();
+      const unfolded = organizationRow(organization.name).getAttribute("aria-expanded");
       organizationRow(organization.name).focus();
       await userEvent.keyboard("{Enter}");
       await choose(organizationRow(organization.name), Resources.openOrganizationLabel);
+      await settle();
+      const kept = organizationRow(organization.name).getAttribute("aria-expanded");
       part(organizationRow(labs.name), ".nol-teamrun-organization-name").click();
+      await settle();
 
-      expect(views()).toEqual([mine, mine, mine, `${Resources.organizationDocumentName} ${labs.id} ${labs.name}`]);
+      expect([folded, unfolded, kept, organizationRow(labs.name).getAttribute("aria-expanded"), store.organizationInView()])
+        .toEqual([["false", organization.id], "true", "true", "false", labs.id]);
+      expect(views()).toEqual([mine, mine, mine, mine, `${Resources.organizationDocumentName} ${labs.id} ${labs.name}`]);
     });
 
-    it("marks a teammate whose Organization chat is shown, and shows the chat rows' spinner while its reply runs", async () => {
+    it("marks the organization in view in the selected fill, no chat or project meanwhile, and the chat chosen from the Explorer once it is opened", async () => {
+      conversations = [SampleData.conversation, scratch];
+      await createOrganization();
+      await store.conversationInView(SampleData.conversation.id);
+      await store.selectProject(SampleData.project.id);
+      await settle();
+      const marked = (): (string | null)[] => [organizationRow(organization.name).getAttribute("aria-selected"), organizationRow(labs.name).getAttribute("aria-selected"),
+        conversationRow(SampleData.conversation.title).getAttribute("aria-selected"), projectRow(SampleData.project.name).getAttribute("aria-selected")];
+      const before = marked();
+      const probe = document.body.appendChild(document.createElement("div"));
+      probe.style.cssText = "background-color: var(--nol-selected)";
+
+      store.showOrganization(organization.id, true);
+      await settle();
+      const shown = [...marked(), organizationRow(organization.name).classList.contains("nol-teamrun-selected"),
+        getComputedStyle(organizationRow(organization.name)).backgroundColor === getComputedStyle(probe).backgroundColor];
+      part(conversationRow(scratch.title), ".nol-teamrun-conversation-title").click();
+      await settle();
+      probe.remove();
+
+      expect([before, shown, store.organizationInView(), organizationRow(organization.name).getAttribute("aria-selected")]).toEqual([["false", "false", "true", "false"],
+        ["true", "false", "false", "false", true, true], null, "false"]);
+    });
+
+    it("marks a teammate whose Organization chat is shown, and leaves the status dot, not the chat rows' spinner, to say its reply runs", async () => {
       conversations = [SampleData.conversation, grokChat];
       const running = new Message("m9", "o1", 1, MessageAuthor.Provider, "m8", MessageStatus.Running, [], SampleData.provenance, SampleData.timestamp, SampleData.timestamp, null);
       await createOrganization(t => t.answer(MethodName.MessageListOpen, () => [running.toJson()]));
@@ -2829,7 +2873,8 @@ describe("ProjectsViewComponent", () => {
 
       expect([teammateRow("Grok").getAttribute("aria-selected"), teammateRow("Grok").classList.contains("nol-teamrun-selected"), teammateRow("Opus 1").getAttribute("aria-selected")])
         .toEqual(["true", true, "false"]);
-      expect([!Object.isNull(teammateRow("Grok").querySelector(".nol-teamrun-working nol-spinner")), teammateRow("Opus 1").querySelector(".nol-teamrun-working")]).toEqual([true, null]);
+      expect([teammateRow("Grok").querySelector(".nol-teamrun-working"), teammateRow("Grok").querySelector("nol-spinner"),
+        teammateRow("Grok").querySelectorAll("nol-teamrun-teammate-status").length]).toEqual([null, null, 1]);
     });
 
     it("keeps an Organization chat out of Pinned and out of a project it was moved into, and still marks it on its teammate's row", async () => {

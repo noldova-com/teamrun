@@ -15,7 +15,7 @@ import {
   AuthStatus, Conversation, ConversationCreateParams, ConversationListParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, EventName, Harness,
   MethodName, PlanUsage, PlanWindow, PlanWindowName, Provider, ProviderKind, ProviderModel, ProviderModelList, RequestedSettings, Teammate, TeammateIdParams
 } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+import { AvatarComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
@@ -716,6 +716,20 @@ describe("TeammatesViewComponent", () => {
     await settle();
 
     expect(element().querySelector(".nol-teamrun-error")).toBeNull();
+  });
+
+  it("paints each teammate's avatar in the colour the store gives it by when it was made", async () => {
+    await create();
+    const fill = (name: string): string | undefined => row(name).querySelector<HTMLElement>("nol-avatar")?.style.getPropertyValue("--nol-avatar-fill");
+    const kit = TestBed.createComponent(AvatarComponent);
+    kit.componentRef.setInput("name", "Alice");
+    const paint = (color: number | null): string => {
+      kit.componentRef.setInput("color", color);
+      kit.detectChanges();
+      return (kit.nativeElement as HTMLElement).style.getPropertyValue("--nol-avatar-fill");
+    };
+
+    expect([fill("Alice"), fill("Bob"), store.teammateColor("alice"), store.teammateColor("bob")]).toEqual([paint(2), paint(3), 2, 3]);
   });
 
   describe.each([

@@ -160,7 +160,8 @@ describe("FormatterService", () => {
 
     expect([label(on("a1")), label(on("a3")), label(on("a4"))]).toEqual(["Codex · Work", "Codex · Personal", "Codex"]);
     expect([label(on("gone")), label(on(null)), label(on("a3"), [SampleData.provider])]).toEqual(["Codex", "Codex", "Codex"]);
-    expect(formatter().replyAuthor(on("a3"), kinds, providers, false).name).toBe("Codex · Personal");
+    expect([formatter().replyAuthor(on("a3"), kinds, providers, false, 5), formatter().replyAuthor(on("a3"), kinds, providers, true, null)].map(t => [t.name, t.accent, t.unavailable]))
+      .toEqual([["Codex · Personal", 5, false], ["Codex · Personal", null, true]]);
   });
 
   it("splits a reply into answer and activity, joining tool results to their steps", () => {
