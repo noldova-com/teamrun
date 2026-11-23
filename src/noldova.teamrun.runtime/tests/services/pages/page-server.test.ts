@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createServer } from "node:http";
+
 import { MethodFailureException } from "@noldova/desktop.runtime";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import "@noldova/context.core";
@@ -147,6 +149,27 @@ export class PageServerTests {
     }
     finally {
       await harness.pages.closeAsync();
+    }
+  }
+
+  @TestMethod
+  public async logsAFailureOfTheListeningServerByKindAndKeepsServing(): Promise<void> {
+    using harness = new PagesHarness();
+    harness.file("a.html", "<p>a</p>");
+    const id = await harness.showAsync();
+    const server = createServer();
+    const pages = new Pages(harness.connection, harness.data, harness.host, { write: (t: string): void => void harness.lines.push(t) }, server);
+    const serving = new PagesServing();
+    await pages.serveAsync(serving, new ManualTimer());
+    try {
+      server.emit("error", Object.assign(new Error("Too many open files."), { code: "EMFILE" }));
+      const opened = await PageServerTests.openAsync(serving, id, null);
+
+      Assert.areEqual("The page server failed while serving pages (Error).", harness.lines.join("|"));
+      Assert.areEqual(200, (await PagesServing.getAsync(opened.address)).status);
+    }
+    finally {
+      await pages.closeAsync();
     }
   }
 

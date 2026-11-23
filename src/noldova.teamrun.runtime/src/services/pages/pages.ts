@@ -43,13 +43,13 @@ export class Pages {
 
   public constructor(connection: SqlConnection, dataDirectory: string, host: IPagesHost, log: IModuleLog, server: Server = createServer()) {
     this.store = new PagesStore(connection, new PageFiles(dataDirectory));
-    this.canvases = new CanvasStore(connection, this.store);
+    this.canvases = new CanvasStore(this.store);
     this.host = host;
     this.log = log;
     this.server = new PageServer(async (id, version) => {
       const page = await this.store.findAsync(id);
       return (await this.store.readAsync(page.chatId, id, version)).html;
-    }, server);
+    }, error => this.log.write(PagesResources.formatServerFailed(Pages.kindOf(error))), server);
   }
 
   public register(moduleId: string, tools: Pick<IToolsContext, "register">): void {

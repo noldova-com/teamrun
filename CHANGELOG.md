@@ -38,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Runtime:** a failure of the page server or of a shared MCP sign-in's listener after it starts is logged instead of ending Noldova Desktop's runtime; an attached file whose close fails after its copy keeps the copy; a page whose save fails to commit keeps the copy of the version still saved; and an outside session's wait reads its replies no more once it ends (#90).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).

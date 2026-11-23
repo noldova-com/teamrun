@@ -14,8 +14,10 @@ import { GrantedFile, type IRuntimeFiles, MethodFailureException, type RequestCo
 import "@noldova/context.core";
 
 export class GrantedFiles implements IRuntimeFiles {
-  public readonly redeemed: [string, RequestContext][] = [];
+  public readonly redeemed: string[] = [];
+  public readonly requests: RequestContext[] = [];
   public readonly opened: FileHandle[] = [];
+  public failsClose: boolean = false;
   private readonly paths: Map<string, string> = new Map();
 
   public grant(grant: string, path: string): void {
@@ -23,13 +25,21 @@ export class GrantedFiles implements IRuntimeFiles {
   }
 
   public async redeemAsync(grant: string, request: RequestContext): Promise<GrantedFile> {
-    this.redeemed.push([grant, request]);
+    this.redeemed.push(grant);
+    this.requests.push(request);
     const path = this.paths.get(grant);
     this.paths.delete(grant);
     if (Object.isUndefined(path))
       throw new MethodFailureException(new Failure(FailureCode.NotFound, "The grant is unknown."));
     const handle = await open(path, "r");
     this.opened.push(handle);
+    if (this.failsClose) {
+      const close = handle.close.bind(handle);
+      handle.close = async (): Promise<void> => {
+        await close();
+        throw new Error("The disk went away.");
+      };
+    }
     return new GrantedFile(basename(path), "application/octet-stream", (await handle.stat()).size, handle);
   }
 

@@ -14,6 +14,7 @@ export class MemoryModuleDatabase implements IModuleDatabase, Disposable {
   private readonly connection: DatabaseSync = new DatabaseSync(":memory:");
 
   public readonly statements: string[] = [];
+  public failsCommit: boolean = false;
 
   public constructor(migrations: readonly Migration[] = []) {
     for (const migration of migrations)
@@ -31,6 +32,8 @@ export class MemoryModuleDatabase implements IModuleDatabase, Disposable {
 
   public run(statement: string, ...values: SQLInputValue[]): StatementResultingChanges {
     this.statements.push(statement);
+    if (this.failsCommit && statement === "COMMIT")
+      throw new Error("The disk is full.");
     return this.connection.prepare(statement).run(...values);
   }
 

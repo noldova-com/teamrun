@@ -84,6 +84,22 @@ export class PagesStoreTests {
   }
 
   @TestMethod
+  public async keepsTheSavedCopyOfTheVersionTheDatabaseHoldsWhenAShowOrAnEditFailsToCommit(): Promise<void> {
+    using pages = new PagesHarness();
+    pages.file("a.html", "one");
+    const id = await pages.showAsync();
+    pages.file("a.html", "two");
+    pages.database.failsCommit = true;
+
+    await Assert.throwsAsync(() => pages.callAsync(PagesHarness.show, { path: "a.html", title: "A", page_id: id, base_version: 1 }), Error);
+    await Assert.throwsAsync(() => pages.callAsync(PagesHarness.edit, { page_id: id, base_version: 1, html: "three" }), Error);
+    const copy = readFileSync(pages.copyOf("c1", id), "utf8");
+    pages.database.failsCommit = false;
+
+    Assert.areEqual("one one 1", `${copy} ${await PagesStoreTests.currentAsync(pages, id)}`);
+  }
+
+  @TestMethod
   public async takesOneOfTwoShowsAgainFromTheSameVersionAtOnceAndRefusesTheOtherStale(): Promise<void> {
     using pages = new PagesHarness();
     pages.file("a.html", "a");

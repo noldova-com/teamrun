@@ -19,6 +19,7 @@ import { CanvasManifest, Page, PageAuthor, PageKind, PageVersion } from "@noldov
 
 import { PageException } from "../../exceptions/pages/page.exception.js";
 import { PageContent } from "../../models/pages/page-content.js";
+import { PageTransaction } from "../../models/pages/page-transaction.js";
 import { PageWrite } from "../../models/pages/page-write.js";
 import type { PageTextEdit } from "../../models/pages/page-text-edit.js";
 import { PagesResources } from "./pages-resources.js";
@@ -35,10 +36,10 @@ export class PagesStore {
 
   public async showAsync(chatId: string, folder: string, author: PageAuthor, path: string, title: string, id: string | null, baseVersion: number | null,
     writing: () => void): Promise<Page> {
-    return this.connection.runInTransactionAsync(async transaction => {
+    return this.inTransactionAsync(async scope => {
       if (!Object.isNull(id))
-        await this.requireNotArtboardAsync(chatId, id, transaction);
-      return this.saveAsync(await this.shownAsync(chatId, folder, author, path, title, id, baseVersion, transaction), writing, transaction);
+        await this.requireNotArtboardAsync(chatId, id, scope.transaction);
+      return this.saveAsync(await this.shownAsync(chatId, folder, author, path, title, id, baseVersion, scope.transaction), writing, scope);
     });
   }
 
@@ -100,9 +101,9 @@ export class PagesStore {
 
   public async editAsync(chatId: string, author: PageAuthor, id: string, baseVersion: number, html: string | null, edits: readonly PageTextEdit[],
     title: string | null, writing: () => void): Promise<Page> {
-    return this.connection.runInTransactionAsync(async transaction => {
-      await this.requireNotArtboardAsync(chatId, id, transaction);
-      return this.saveAsync(await this.editedAsync(chatId, author, id, baseVersion, html, edits, title, transaction), writing, transaction);
+    return this.inTransactionAsync(async scope => {
+      await this.requireNotArtboardAsync(chatId, id, scope.transaction);
+      return this.saveAsync(await this.editedAsync(chatId, author, id, baseVersion, html, edits, title, scope.transaction), writing, scope);
     });
   }
 
@@ -134,12 +135,13 @@ export class PagesStore {
   }
 
   public async restoreAsync(id: string, version: number, author: PageAuthor): Promise<Page> {
-    return this.connection.runInTransactionAsync(async transaction => {
+    return this.inTransactionAsync(async scope => {
+      const transaction = scope.transaction;
       const page = await this.findAsync(id, transaction);
       await this.requireNotArtboardAsync(page.chatId, id, transaction);
       const html = (await this.readAsync(page.chatId, id, version, PageKind.Page, transaction)).html;
       return this.saveAsync(new PageWrite(new Page(page.id, page.chatId, page.title, page.version + 1, page.madeBy, author, page.path,
-        PagesStore.bytesOf(html), page.createdAt, new Date().toISOString()), html, false), () => undefined, transaction);
+        PagesStore.bytesOf(html), page.createdAt, new Date().toISOString()), html, false), () => undefined, scope);
     });
   }
 
@@ -160,19 +162,25 @@ export class PagesStore {
     this.files.remove(chatId);
   }
 
-  public async saveAsync(write: PageWrite, writing: () => void, transaction?: SqlTransaction): Promise<Page> {
-    await this.saveAllAsync([write], writing, transaction);
+  public async saveAsync(write: PageWrite, writing: () => void, scope?: PageTransaction): Promise<Page> {
+    await this.saveAllAsync([write], writing, scope);
     return write.page;
   }
 
-  public async saveAllAsync(writes: readonly PageWrite[], writing: () => void, transaction?: SqlTransaction): Promise<void> {
+  public async saveAllAsync(writes: readonly PageWrite[], writing: () => void, scope?: PageTransaction): Promise<void> {
+    if (Object.isUndefined(scope))
+      return this.inTransactionAsync(t => this.saveAllAsync(writes, writing, t));
     writing();
-    if (Object.isUndefined(transaction))
-      await this.connection.runInTransactionAsync(t => PagesStore.writeRowsAsync(writes, t));
-    else
-      await PagesStore.writeRowsAsync(writes, transaction);
-    for (const write of writes.filter(t => t.page.kind === PageKind.Page))
+    await PagesStore.writeRowsAsync(writes, scope.transaction);
+    scope.copies.push(...writes.filter(t => t.page.kind === PageKind.Page));
+  }
+
+  public async inTransactionAsync<T>(work: (scope: PageTransaction) => Promise<T>): Promise<T> {
+    const copies: PageWrite[] = [];
+    const result = await this.connection.runInTransactionAsync(transaction => work(new PageTransaction(transaction, copies)));
+    for (const write of copies)
       this.files.write(write.page.chatId, write.page.id, write.html);
+    return result;
   }
 
   public static fileSize(folder: string, path: string): number {

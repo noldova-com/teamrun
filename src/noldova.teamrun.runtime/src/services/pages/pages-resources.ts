@@ -269,6 +269,11 @@ export class PagesResources {
     return Object.isNull(version) ? address : `${address}&${PagesResources.versionParameter}=${String(version)}`;
   }
 
+
+  public static formatServerFailed(kind: string): string {
+    return `The page server failed while serving pages (${kind}).`;
+  }
+
   public static formatServerNotListening(kind: string): string {
     return `The page server could not listen, so pages can't be shown (${kind}).`;
   }
