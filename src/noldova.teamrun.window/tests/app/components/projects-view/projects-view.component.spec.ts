@@ -271,7 +271,7 @@ describe("ProjectsViewComponent", () => {
 
     expect(fixture.debugElement.injector.get(ChatStoreService)).toBe(store);
     expect(fixture.debugElement.injector.get(ProjectsLayoutService)).toBe(layout);
-    expect(headers()).toEqual([Resources.projectsViewTitle]);
+    expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
     expect(projectNames()).toEqual([SampleData.project.name, SampleData.otherProject.name]);
     expect(nested()).toEqual([second.title, SampleData.conversation.title]);
     expect(texts(".nol-teamrun-conversation-list > .nol-teamrun-muted")).toEqual([Resources.noConversations]);
@@ -292,7 +292,7 @@ describe("ProjectsViewComponent", () => {
     await create(t => t.answer(MethodName.ProjectList, () => []).answer(MethodName.ConversationCreate, () => created.toJson()));
 
     expect(texts(".nol-teamrun-projects > .nol-teamrun-muted")).toEqual([Resources.noProjects]);
-    expect(headers()).toEqual([Resources.projectsViewTitle]);
+    expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
     expect([element().querySelectorAll("[role='tree']").length, part(element(), ".nol-teamrun-project-list").getAttribute("aria-label")]).toEqual([0, null]);
     action(Resources.newConversationLabel).click();
     await Wait.until(() => expect(context.keptDocuments.map(t => t.instance)).toEqual(["c7"]));
@@ -302,7 +302,7 @@ describe("ProjectsViewComponent", () => {
     expect(ConversationCreateParams.fromJson(requestOf(MethodName.ConversationCreate))).toEqual(new ConversationCreateParams(null, null));
     expect(context.openedDocuments).toEqual([{ name: Resources.conversationDocumentName, instance: "c7", title: created.title,
       options: { preview: true, breadcrumb: [Resources.chatsTitle] } }]);
-    expect(headers()).toEqual([Resources.projectsViewTitle, Resources.chatsTitle]);
+    expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle]);
     expect(chats()).toEqual([created.title]);
     expect(store.selectedProjectId()).toBeNull();
   });
@@ -314,7 +314,7 @@ describe("ProjectsViewComponent", () => {
     await create();
     const newest = many.toReversed().map(t => t.title);
 
-    expect(headers()).toEqual([Resources.projectsViewTitle, Resources.chatsTitle]);
+    expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle]);
     expect(chats()).toEqual(newest.slice(0, Resources.projectConversationCount));
     await choose(conversationRow(itemAt(newest, 0)), Resources.pinLabel);
     expect(pinned()).toEqual([newest[0]]);
@@ -1043,13 +1043,13 @@ describe("ProjectsViewComponent", () => {
     expect(texts(".nol-teamrun-action .nol-teamrun-label")).toEqual([Resources.newConversationLabel, Resources.openProjectLabel]);
   });
 
-  it("shows New chat, Open folder, then Projects, with no Teammates section between them", async () => {
+  it("shows New chat, Open folder, then Organizations, with no Teammates section between them", async () => {
     await create();
     const [newChat, openFolder, next] = [...part(element(), ".nol-teamrun-projects").children];
 
     expect([newChat, openFolder].map(t => t?.querySelector(".nol-teamrun-label")?.textContent?.trim())).toEqual([Resources.newConversationLabel, Resources.openProjectLabel]);
     expect(next?.tagName.toLowerCase()).toBe("nol-section-header");
-    expect(next?.querySelector(".nol-section-header-label")?.textContent?.trim()).toBe(Resources.projectsViewTitle);
+    expect(next?.querySelector(".nol-section-header-label")?.textContent?.trim()).toBe(Resources.organizationsTitle);
     expect(element().textContent).not.toContain(Resources.teammatesTitle);
   });
 
@@ -1109,14 +1109,14 @@ describe("ProjectsViewComponent", () => {
     await choose(conversationRow(second.title), Resources.pinLabel);
 
     expect(layout.pinnedConversations()).toEqual(["c2"]);
-    expect(headers()).toEqual([Resources.pinnedTitle, Resources.projectsViewTitle]);
+    expect(headers()).toEqual([Resources.pinnedTitle, Resources.organizationsTitle, Resources.projectsViewTitle]);
     expect(pinned()).toEqual([second.title]);
     expect(nested()).toEqual([SampleData.conversation.title, other.title]);
 
     await choose(find<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row", second.title), Resources.unpinLabel);
 
     expect(layout.pinnedConversations()).toEqual([]);
-    expect(headers()).toEqual([Resources.projectsViewTitle]);
+    expect(headers()).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
     expect(nested()).toEqual([second.title, SampleData.conversation.title, other.title]);
   });
 
@@ -1158,10 +1158,10 @@ describe("ProjectsViewComponent", () => {
       const ids = [Resources.pinnedGroupId, Resources.projectsGroupId, Resources.chatsGroupId];
       const titles = [Resources.pinnedTitle, Resources.projectsViewTitle, Resources.chatsTitle];
 
-      expect(headers()).toEqual(["Pinned", "Projects", "Chats"]);
+      expect(headers()).toEqual(["Pinned", "Organizations", "Projects", "Chats"]);
       expect(titles.map(t => [toggle(t).tagName.toLowerCase(), toggle(t).getAttribute("aria-controls"), toggle(t).lastElementChild?.classList.contains("nol-section-header-caret")]))
         .toEqual(ids.map(t => ["button", t, true]));
-      expect(states()).toEqual(["true", "true", "true"]);
+      expect(states()).toEqual(["true", "true", "true", "true"]);
       expect(ids.map(t => document.getElementById(t))).toEqual([part(element(), ".nol-teamrun-pins"), part(element(), ".nol-teamrun-project-list"),
         part(element(), ".nol-teamrun-chat-list")]);
       expect(part(header(Resources.chatsTitle), ".nol-section-header-icon").textContent?.trim()).toBe(Resources.chatsIcon);
@@ -1203,16 +1203,16 @@ describe("ProjectsViewComponent", () => {
 
       await userEvent.click(toggle(Resources.projectsViewTitle));
       await settle();
-      expect([states(), projectNames(), nested(), chats()]).toEqual([["false", "true"], [], [], [scratch.title]]);
+      expect([states(), projectNames(), nested(), chats()]).toEqual([["true", "false", "true"], [], [], [scratch.title]]);
       expect([controlled(Resources.projectsViewTitle) === part(element(), ".nol-teamrun-project-list"), controlled(Resources.projectsViewTitle)?.childElementCount]).toEqual([true, 0]);
 
       await userEvent.click(toggle(Resources.chatsTitle));
       await settle();
-      expect([states(), chats()]).toEqual([["false", "false"], []]);
+      expect([states(), chats()]).toEqual([["true", "false", "false"], []]);
 
       await userEvent.click(toggle(Resources.projectsViewTitle));
       await settle();
-      expect([states(), projectNames(), nested()]).toEqual([["true", "false"], [SampleData.project.name, SampleData.otherProject.name],
+      expect([states(), projectNames(), nested()]).toEqual([["true", "true", "false"], [SampleData.project.name, SampleData.otherProject.name],
         [second.title, SampleData.conversation.title]]);
       expect([controlled(Resources.projectsViewTitle) === part(element(), ".nol-teamrun-project-list"), controlled(Resources.chatsTitle) === part(element(), ".nol-teamrun-chat-list"),
         controlled(Resources.chatsTitle)?.childElementCount]).toEqual([true, true, 0]);
@@ -1239,8 +1239,8 @@ describe("ProjectsViewComponent", () => {
       conversations = [SampleData.conversation, second, scratch];
       await create(t => t.answer(MethodName.ProjectsLayoutRead, () => ({ pinnedChats: ["c2"], [Resources.collapsedGroupsField]: ["Chats", "Later", "Pinned"] })));
 
-      await Wait.until(() => expect(headers()).toEqual([Resources.pinnedTitle, Resources.projectsViewTitle, Resources.chatsTitle]));
-      expect([states(), pinned(), nested(), chats()]).toEqual([["false", "true", "false"], [], [SampleData.conversation.title], []]);
+      await Wait.until(() => expect(headers()).toEqual([Resources.pinnedTitle, Resources.organizationsTitle, Resources.projectsViewTitle, Resources.chatsTitle]));
+      expect([states(), pinned(), nested(), chats()]).toEqual([["false", "true", "true", "false"], [], [SampleData.conversation.title], []]);
       expect(layout.layout().collapsedGroups).toEqual(["Chats", "Pinned"]);
     });
   });
@@ -2202,18 +2202,18 @@ describe("ProjectsViewComponent", () => {
       AppearanceFixture.expectPixels(box(showMore).height, AppearanceFixture.measureLook("tree-row-height"));
     });
 
-    it("sets Projects' top a section header's space under Open folder, as Pinned's top is under Open folder, and the action rows' gap under the pins", async () => {
+    it("sets Organizations' top a section header's space under Open folder, as Pinned's top is under Open folder, and the action rows' gap under the pins", async () => {
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       const openFolder = action(Resources.openProjectLabel);
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openFolder).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(header(Resources.organizationsTitle)).top - box(openFolder).bottom, headerSpace());
 
       await choose(conversationRow(second.title), Resources.pinLabel);
 
       AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, headerSpace());
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, rowGap());
+      AppearanceFixture.expectPixels(box(header(Resources.organizationsTitle)).top - box(part(element(), ".nol-teamrun-pins")).bottom, rowGap());
     });
 
     it("stands each section header the action rows' gap and pitch under the row or header above, collapsed or expanded, and the first a section header's space under the actions",
@@ -2254,26 +2254,27 @@ describe("ProjectsViewComponent", () => {
         AppearanceFixture.expectPixels(box(header(Resources.pinnedTitle)).top - box(openFolder).bottom, headerSpace());
       });
 
-    it("stands Open folder the rows' gap under New chat, Projects a section header's space under it and Chats the rows' gap under Projects, each at a tree row's height", async () => {
+    it("stands Open folder the rows' gap under New chat, Organizations a section header's space under it, Projects the rows' gap under Organizations with none and Chats the rows' gap under Projects, each at a tree row's height", async () => {
       conversations = [SampleData.conversation, scratch];
       await create();
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       part(header(Resources.projectsViewTitle), ".nol-section-header-toggle").click();
       await settle();
       const [newChat, openFolder] = [action(Resources.newConversationLabel), action(Resources.openProjectLabel)];
-      const [projects, chats] = [header(Resources.projectsViewTitle), header(Resources.chatsTitle)];
+      const [organizations, projects, chats] = [header(Resources.organizationsTitle), header(Resources.projectsViewTitle), header(Resources.chatsTitle)];
       const height = AppearanceFixture.measureLook("tree-row-height");
 
       expect(element().querySelector(".nol-teamrun-project-row")).toBeNull();
       expect(height).toBeLessThan(AppearanceFixture.measureLook("section-header-height"));
-      for (const row of [newChat, openFolder, projects, chats])
+      for (const row of [newChat, openFolder, organizations, projects, chats])
         AppearanceFixture.expectPixels(box(row).height, height);
       AppearanceFixture.expectPixels(box(openFolder).top - box(newChat).bottom, rowGap());
-      AppearanceFixture.expectPixels(box(projects).top - box(openFolder).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(organizations).top - box(openFolder).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(projects).top - box(organizations).bottom, rowGap());
       AppearanceFixture.expectPixels(box(chats).top - box(projects).bottom, rowGap());
     });
 
-    it("draws Open browser as Open folder is drawn, the rows' gap under it, with its glyph and label at Open folder's insets and colours, and Projects a step under it", async () => {
+    it("draws Open browser as Open folder is drawn, the rows' gap under it, with its glyph and label at Open folder's insets and colours, and Organizations a step under it", async () => {
       await create(withBrowser);
       const header = (label: string): HTMLElement => find<HTMLElement>("nol-section-header", label);
       const [openFolder, openBrowser] = [action(Resources.openProjectLabel), action(Resources.openBrowserLabel)];
@@ -2286,7 +2287,7 @@ describe("ProjectsViewComponent", () => {
       expect([box(openBrowser).left, box(openBrowser).width]).toEqual([box(openFolder).left, box(openFolder).width]);
       AppearanceFixture.expectPixels(box(openBrowser).height, box(openFolder).height);
       AppearanceFixture.expectPixels(box(openBrowser).top - box(openFolder).bottom, rowGap());
-      AppearanceFixture.expectPixels(box(header(Resources.projectsViewTitle)).top - box(openBrowser).bottom, headerSpace());
+      AppearanceFixture.expectPixels(box(header(Resources.organizationsTitle)).top - box(openBrowser).bottom, headerSpace());
       expect(inset(openBrowser, ".nol-teamrun-glyph")).toEqual(inset(openFolder, ".nol-teamrun-glyph"));
       expect(inset(openBrowser, ".nol-teamrun-label")[0]).toBe(inset(openFolder, ".nol-teamrun-label")[0]);
       expect(colors(openBrowser)).toEqual(colors(openFolder));
@@ -2744,6 +2745,18 @@ describe("ProjectsViewComponent", () => {
       probe.remove();
     });
 
+    it("drops a teammate taken out of an organization from its rows and keeps its Organization chat", async () => {
+      conversations = [SampleData.conversation, organizationChatOf("o9", nova, labs.id), grokChat];
+      await createOrganization();
+      const before = names().slice(-3);
+
+      context.emit(EventName.OrganizationChanged, new Organization(labs.id, labs.name, null, labs.order, SampleData.timestamp, SampleData.timestamp,
+        [SampleData.departmentType], labs.departments, []).toJson());
+      await Wait.until(() => expect(names().includes("Nova")).toBe(false));
+
+      expect([before, names().slice(-2), context.requests.filter(t => t.method.toLowerCase().includes("delete"))]).toEqual([["Labs", "Research", "Nova"], ["Labs", "Research"], []]);
+    });
+
     it("collapses the group from its title, saving it", async () => {
       await createOrganization();
       part(find<HTMLElement>("nol-section-header", Resources.organizationsTitle), ".nol-section-header-toggle").click();
@@ -2855,16 +2868,20 @@ describe("ProjectsViewComponent", () => {
       expect(levels).toEqual(["1", "2", "2", "2", "3", "3", "2", "3", "1"]);
     });
 
-    it("shows the Organizations group for an organization with no teammate and no department, and none while there is no organization", async () => {
+    it("shows the Organizations group for an organization with no teammate and no department, and its header with \"+\" and no rows while there is no organization", async () => {
       await create(t => t.answer(MethodName.TeammateList, () => [grok].map(u => u.toJson()))
         .answer(MethodName.OrganizationList, () => [SampleData.organizationOf([], []).toJson()]));
       await Wait.until(() => expect(names()).toEqual([organization.name]));
       const shown = headers();
       context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
       await settle();
+      const list = element().querySelector(".nol-teamrun-organization-list");
+      const header = find<HTMLElement>("nol-section-header", Resources.organizationsTitle);
 
       expect(shown).toEqual([Resources.organizationsTitle, Resources.projectsViewTitle]);
-      expect([headers(), element().querySelector(".nol-teamrun-organization-list"), names()]).toEqual([[Resources.projectsViewTitle], null, []]);
+      expect([headers(), names(), list?.childElementCount, list?.getAttribute("role"), list?.getAttribute("aria-label")])
+        .toEqual([[Resources.organizationsTitle, Resources.projectsViewTitle], [], 0, null, null]);
+      expect(part(header, "button.nol-teamrun-new-organization").getAttribute("aria-label")).toBe(Resources.newOrganizationTitle);
     });
 
     it("creates an organization from \"+\" on the group's header with the name the person saves, and leaves it when they close the dialog", async () => {
@@ -2998,7 +3015,7 @@ describe("ProjectsViewComponent", () => {
         new OrganizationUpdateParams(organization.id, undefined, "E:/other"), new OrganizationUpdateParams(organization.id, undefined, null)]);
     });
 
-    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and offers no delete for the last one", async () => {
+    it("deletes an organization only after the person confirms, closes its view, lists its chats under Chats again, and deletes the last one the same way", async () => {
       const novaChat = organizationChatOf("o9", nova, labs.id);
       conversations = [novaChat];
       await createOrganization(t => t.answer(MethodName.OrganizationDelete, () => null));
@@ -3021,8 +3038,21 @@ describe("ProjectsViewComponent", () => {
       expect(before).toEqual([]);
       expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: labs.id });
       expect([asked, cancelled]).toEqual([[Resources.deleteOrganizationTitle, Resources.formatDeleteOrganizationText(labs.name)], 0]);
-      expect([names().includes(labs.name), await organizationMenu(organization.name)])
-        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel]]);
+      const lastMenu = await organizationMenu(organization.name);
+      await choose(organizationRow(organization.name), Resources.organizationDeleteLabel);
+      const askedLast = dialogText();
+      await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-confirm");
+      await Wait.until(() => expect(deletes()).toEqual([labs.id, organization.id]));
+      context.emit(EventName.OrganizationRemoved, new OrganizationIdParams(organization.id).toJson());
+      await settle();
+      const emptied = [headers().includes(Resources.organizationsTitle), names()];
+      context.emit(EventName.OrganizationChanged, new Organization("studio", "Studio", null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [], []).toJson());
+      await Wait.until(() => expect(names()).toEqual(["Studio"]));
+
+      expect([names().includes(labs.name), lastMenu])
+        .toEqual([false, [Resources.openOrganizationLabel, Resources.renameConversationLabel, Resources.setOrganizationFolderLabel, Resources.organizationDeleteLabel]]);
+      expect([askedLast, emptied]).toEqual([Resources.formatDeleteOrganizationText(organization.name), [true, []]]);
+      expect(context.closedDocuments).toContainEqual({ name: Resources.organizationDocumentName, instance: organization.id });
     });
 
     it("logs an organization change the engine refuses", async () => {

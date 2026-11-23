@@ -11,7 +11,7 @@ import { Component, computed, effect, inject, type InputSignal, input, output, t
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-  SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+  OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationBoardSort } from "../../enums/organization-board-sort";
@@ -29,6 +29,7 @@ import { TeammateStatusStoreService } from "../../services/teammate-status-store
 import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -37,7 +38,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-board",
   imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
+    OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TeammateAvatarComponent, TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   templateUrl: "./organization-board.component.html",
   styleUrl: "./organization-board.component.css"
@@ -65,7 +66,10 @@ export class OrganizationBoardComponent {
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
-  protected readonly leaders: Signal<readonly Teammate[]> = computed(() => this.departments().flatMap(t => Object.isNull(t.leader) ? [] : [t.leader]));
+  protected readonly led: Signal<readonly OrganizationNode[]> = computed(() => this.departments().filter(t => !Object.isNull(t.leader)));
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly asks: Signal<readonly OrganizationBoardAsk[]> = computed(() => OrganizationBoardAsk.byStatus([
     ...this.reports().map(t => new OrganizationBoardAsk(t, this.reportsToOf(t) ?? Resources.organizationReportsToYou, this.status(t))),
     ...this.departments().flatMap(node => [...Object.isNull(node.leader) ? [] : [node.leader], ...node.members].map(t => new OrganizationBoardAsk(t, node.name, this.status(t))))

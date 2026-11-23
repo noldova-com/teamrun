@@ -158,16 +158,34 @@ export class OrganizationCardComponent {
       void this.organization.placeTeammate(this.teammate().id, choice.parent);
   }
 
-  protected confirmRemove(department: Department): void {
+  protected confirmLeaveUnit(department: Department): void {
     const teammate = this.teammate();
+    this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, department.name),
+      Resources.organizationLeaveUnitLabel, null, true), () => void this.organization.setMember(teammate.id, null));
+  }
+
+  protected confirmRemove(): void {
+    const teammate = this.teammate();
+    const organization = this.organization.organization();
+    const node = OrganizationParent.teammate(teammate.id);
+    const holds = organization.placementsUnder(node).length > 0 || organization.departmentsUnder(node).length > 0;
+    this.confirm(new ConfirmRequest(Resources.organizationRemoveTeammate,
+      Resources.formatOrganizationRemoveFrom(teammate.name, organization.name, holds ? this.nameOf(organization.parentOf(node)) : null),
+      Resources.organizationRemoveLabel, null, true), () => void this.organization.placeTeammate(teammate.id, null));
+  }
+
+  private confirm(request: ConfirmRequest, confirmed: () => void): void {
     const dialog = this.dialogs.open(ConfirmDialogComponent, ".nol-teamrun-cancel");
-    dialog.componentRef?.setInput("request", new ConfirmRequest(Resources.organizationRemoveMemberTitle,
-      Resources.formatOrganizationRemoveMember(teammate.name, department.name), Resources.organizationRemoveLabel, null, true));
-    dialog.componentInstance?.answered.subscribe(confirmed => {
+    dialog.componentRef?.setInput("request", request);
+    dialog.componentInstance?.answered.subscribe(answer => {
       dialog.close();
-      if (confirmed)
-        void this.organization.setMember(teammate.id, null);
+      if (answer)
+        confirmed();
     });
+  }
+
+  private nameOf(parent: OrganizationParent | null): string {
+    return [...this.store.teammates(), ...this.organization.organization().departments].find(t => t.id === parent?.id)?.name ?? Resources.organizationRemoveReportsToYou;
   }
 
   private async openChat(): Promise<Conversation | null> {

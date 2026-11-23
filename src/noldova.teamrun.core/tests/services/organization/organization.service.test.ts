@@ -9,7 +9,7 @@
 import "@noldova/context.core";
 import { ChangeOperation } from "@noldova/context.data";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity } from "@noldova/teamrun.core";
+import { ChangeEntity, DatabaseContext, OrganizationService } from "@noldova/teamrun.core";
 import {
   ConversationCreateParams, type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
   NodeTypeCreateParams, NodeTypeIdParams, NodeTypeUpdateParams, type Organization, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent,
@@ -312,6 +312,41 @@ export class OrganizationServiceTests {
   }
 
   @TestMethod
+  public async takesADirectReportOutAndMovesAnotherTeammatesReportsUpToItsParentInTheirOrder(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const boss = await OrganizationServiceTests.teammateAsync(host, "Boss");
+    const dee = await OrganizationServiceTests.teammateAsync(host, "Dee");
+    const ann = await OrganizationServiceTests.teammateAsync(host, "Ann");
+    const bo = await OrganizationServiceTests.teammateAsync(host, "Bo");
+    const cy = await OrganizationServiceTests.teammateAsync(host, "Cy");
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, OrganizationParent.person, 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, dee.id, OrganizationParent.person, 1));
+    for (const [order, report] of [ann, bo, cy].entries())
+      await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, report.id, OrganizationParent.teammate(boss.id), order));
+
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, dee.id, null, 0));
+    const direct = await OrganizationServiceTests.mineAsync(host);
+    await host.organization.placeAsync(new TeammatePlaceParams(OrganizationServiceTests.mine, boss.id, null, 0));
+    const organization = await OrganizationServiceTests.mineAsync(host);
+
+    Assert.areEqual("Person:0,,Teammate:0,Teammate:1,Teammate:2", [boss, dee, ann, bo, cy].map(t => OrganizationServiceTests.parentOf(direct, t)).join(","));
+    Assert.areEqual(",,Person:0,Person:1,Person:2", [boss, dee, ann, bo, cy].map(t => OrganizationServiceTests.parentOf(organization, t)).join(","));
+    Assert.areEqual(2, (await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement)).split(",").filter(t => t === "Delete").length);
+  }
+
+  @TestMethod
+  public async placesNoOneInANewOrganizationOrForANewTeammate(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    await OrganizationServiceTests.teammateAsync(host, "Ada");
+
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+    await OrganizationServiceTests.teammateAsync(host, "Bea");
+
+    Assert.areEqual("My organization:0,Studio:0", (await host.organization.listAsync()).map(t => `${t.name}:${t.placements.length}`).join(","));
+    Assert.areEqual(0, studio.placements.length);
+  }
+
+  @TestMethod
   public async movesADepartmentUnderATeammateButNotUnderOneInsideIt(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const boss = await OrganizationServiceTests.teammateAsync(host, "Boss");
@@ -360,7 +395,6 @@ export class OrganizationServiceTests {
     Assert.areEqual("Design studio", (await host.organization.listAsync()).map(t => t.name).join(","));
     Assert.isNull(await host.organization.findAsync(lab.id));
     Assert.areEqual("Insert,Insert,Update,Delete,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Organization));
-    await OrganizationServiceTests.failsAsync(ErrorCode.Conflict, () => host.organization.deleteOrganizationAsync(new OrganizationIdParams(studio.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.deleteOrganizationAsync(new OrganizationIdParams(lab.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.updateOrganizationAsync(new OrganizationUpdateParams(lab.id, "Lab", null)));
   }
@@ -419,6 +453,34 @@ export class OrganizationServiceTests {
     Assert.areEqual(OrganizationServiceTests.mine, (await host.conversations.findAsync(kept.id))?.organizationChat?.organizationId);
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.readLayoutAsync(new OrganizationIdParams(studio.id)));
     await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(studio.id, {})));
+  }
+
+  @TestMethod
+  public async deletesTheLastOrganizationWithItsTreeAndStartsWithNoneUntilOneIsCreated(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationServiceTests.teammateAsync(host, "Ada");
+    const design = await OrganizationServiceTests.createAsync(host, "Design");
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(OrganizationServiceTests.mine, ada.id, design.id));
+    await host.organization.saveLayoutAsync(new OrganizationLayoutSaveParams(OrganizationServiceTests.mine, { collapsed: [design.id] }));
+    const chat = await host.conversations.createAsync(new ConversationCreateParams(null, "Organization · Ada", ada.id), undefined,
+      new OrganizationChat(OrganizationServiceTests.mine, ada.id));
+
+    await host.organization.deleteOrganizationAsync(new OrganizationIdParams(OrganizationServiceTests.mine));
+    const left = (await host.organization.listAsync()).length;
+    await using restarted = await DatabaseContext.openAsync(host.directory.path);
+    const organizations = new OrganizationService(restarted);
+    const atStart = (await organizations.listAsync()).length;
+    const studio = await organizations.createOrganizationAsync(new OrganizationCreateParams("Studio", null));
+
+    Assert.areEqual("0|0|Studio:0", [left, atStart, (await organizations.listAsync()).map(t => `${t.name}:${t.order}`).join(",")].join("|"));
+    Assert.areEqual(studio.id, (await organizations.findAsync(studio.id))?.id);
+    Assert.areEqual("Ada", (await host.teammates.listAsync()).map(t => t.name).join(","));
+    Assert.isNull((await host.conversations.findAsync(chat.id))?.organizationChat);
+    Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Department));
+    Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.TeammatePlacement));
+    Assert.areEqual("Insert,Delete", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Preference));
+    Assert.areEqual("Update,Delete,Insert", await OrganizationServiceTests.feedAsync(host, ChangeEntity.Organization));
+    await OrganizationServiceTests.failsAsync(ErrorCode.NotFound, () => host.organization.readLayoutAsync(new OrganizationIdParams(OrganizationServiceTests.mine)));
   }
 
   @TestMethod

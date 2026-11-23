@@ -1564,9 +1564,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
           const compacts = ParticipantContext.asksToCompact(item.trigger);
           const slashCommand = ParticipantContext.commandOf(item.trigger);
           const run = this.createRun(item, folder, requested, posted ?? item.message);
+          const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
           this.state.turns.set(token, item);
           this.state.replyRuns.set(item, run);
-          const tools = await this.toolCalls.openToolsAsync(reply, run, token, folder, requested);
           try {
             const shared = await this.sharedOfAsync(item.provider, reply.teammateId, folder.path);
             const descriptor = this.registry.get(requested.kind).descriptor;

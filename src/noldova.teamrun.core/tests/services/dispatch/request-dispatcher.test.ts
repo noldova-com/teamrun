@@ -370,17 +370,18 @@ export class RequestDispatcherTests {
     Assert.isNull(await RequestDispatcherTests.succeed(host, MethodName.OrganizationDelete, new OrganizationIdParams(studio.id).toJson()));
     const invalidatedByDelete = host.listener.count(EventName.StateInvalidated) - invalidated;
     const unknown = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationChatOpen, new OrganizationChat(studio.id, ada.id).toJson()));
-    const last = await host.dispatcher.dispatch(new Request("r", MethodName.OrganizationDelete, new OrganizationIdParams(RequestDispatcherTests.mine).toJson()));
+    const storedOther = await host.conversations.findAsync(other.id);
+    const storedMine = await host.conversations.findAsync(mine.id);
+    const last = await RequestDispatcherTests.succeed(host, MethodName.OrganizationDelete, new OrganizationIdParams(RequestDispatcherTests.mine).toJson());
+    const none = RequestDispatcherTests.organizations(await RequestDispatcherTests.succeed(host, MethodName.OrganizationList, null));
 
     Assert.areEqual("My organization,Design studio", listed.map(t => t.name).join(","));
     Assert.areEqual("/work/studio", renamed.folder);
     Assert.areEqual("Studio,Design studio", host.listener.events.filter(t => t.name === EventName.OrganizationChanged).map(t => Organization.fromJson(t.payload).name).join(","));
-    Assert.areEqual(JSON.stringify([{ organizationId: studio.id }]),
+    Assert.areEqual(JSON.stringify([{ organizationId: studio.id }, { organizationId: RequestDispatcherTests.mine }]),
       JSON.stringify(host.listener.events.filter(t => t.name === EventName.OrganizationRemoved).map(t => t.payload)));
     Assert.areNotEqual(mine.id, other.id);
     Assert.areEqual(other.id, again.id);
-    const storedOther = await host.conversations.findAsync(other.id);
-    const storedMine = await host.conversations.findAsync(mine.id);
     Assert.isNotNull(storedOther);
     Assert.isNotNull(storedMine);
     Assert.isNull(storedOther.organizationChat);
@@ -388,7 +389,8 @@ export class RequestDispatcherTests {
     Assert.areEqual(RequestDispatcherTests.mine, storedMine.organizationChat.organizationId);
     Assert.areEqual(1, invalidatedByDelete);
     Assert.areEqual(ErrorCode.NotFound, unknown.info?.name);
-    Assert.areEqual(ErrorCode.Conflict, last.info?.name);
+    Assert.isNull(last);
+    Assert.areEqual(0, none.length);
   }
 
   @TestMethod
