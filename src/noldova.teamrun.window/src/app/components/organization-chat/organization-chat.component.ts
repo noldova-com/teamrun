@@ -78,6 +78,10 @@ export class OrganizationChatComponent {
         return Resources.formatOrganizationChat(Resources.organizationEveryoneTitle);
     }
   });
+  private readonly listedChatId: Signal<string | null> = computed(() => {
+    const chatId = this.chatId();
+    return Object.isNull(chatId) || Object.isNull(this.store.conversation(chatId)) ? null : chatId;
+  });
   protected readonly historyInputs: Signal<Record<string, unknown>> = computed(() => ({ chatId: this.chatId() }));
   protected readonly error: Signal<string | null> = this.errorSignal.asReadonly();
   protected readonly recipients: Signal<readonly string[]> = computed(() =>
@@ -110,7 +114,7 @@ export class OrganizationChatComponent {
       untracked(() => chatIds.filter(t => !this.reading.has(t)).forEach(t => void this.read(t)));
     });
     effect(onCleanup => {
-      const chatId = this.chatId();
+      const chatId = this.listedChatId();
       if (Object.isNull(chatId))
         return;
       untracked(() => void this.store.conversationInView(chatId));
