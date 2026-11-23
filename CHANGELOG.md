@@ -39,7 +39,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
-- **Approvals:** an added ACP agent's command approval whose title is its own command shows it with control and direction characters replaced and cut at the usual length, like every other approval.
+- **Approvals:** an added ACP agent's command approval whose title is its own command shows it with control and direction characters replaced and cut at the usual length, like every other approval (#187).
 - **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** the chat beside the tree shows a teammate's new Organization chat, your message and its reply, once the window has read its chats again, rather than staying empty (#175).
