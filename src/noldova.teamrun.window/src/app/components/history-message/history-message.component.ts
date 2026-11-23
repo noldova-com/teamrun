@@ -85,7 +85,6 @@ import type { ModelCatalog } from "../../models/model-catalog";
 import type { ReplySegment } from "../../models/reply-segment";
 import type { ReplyStats } from "../../models/reply-stats";
 import type { SustainHandover } from "../../models/sustain-handover";
-import { TeammateColor } from "../../models/teammate-color";
 import { TitleReveal } from "../../models/title-reveal";
 import type { WakeReceived } from "../../models/wake-received";
 import { Resources } from "../../../resources";
@@ -719,10 +718,10 @@ export class HistoryMessageComponent implements OnInit {
           return new Author(Resources.personAuthorId, name, MessageAuthorKind.Person);
         const shown = sender.outside ? JSON.stringify(sender.name) : name;
         return new Author(sender.teammateId ?? shown, shown, MessageAuthorKind.Agent, null, this.formatter.authorInitials(sender.teammateId, name),
-            TeammateColor.of(sender.teammateId), null, !Object.isNull(sender.teammateId) && this.store.isTeammateUnavailable(sender.teammateId));
+            this.store.teammateColor(sender.teammateId), null, !Object.isNull(sender.teammateId) && this.store.isTeammateUnavailable(sender.teammateId));
       }
       case MessageAuthor.Provider: {
-        return this.formatter.replyAuthor(message, this.store.kinds(), this.store.providers(), this.store.isReplyAuthorUnavailable(message.teammateId));
+        return this.formatter.replyAuthor(message, this.store.kinds(), this.store.providers(), this.store.isReplyAuthorUnavailable(message.teammateId), this.store.teammateColor(message.teammateId));
       }
       default:
         return new Author(Resources.moduleId, name, MessageAuthorKind.System);

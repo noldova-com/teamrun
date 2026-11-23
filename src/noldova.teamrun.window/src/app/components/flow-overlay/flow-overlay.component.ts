@@ -32,6 +32,7 @@ export class FlowOverlayComponent {
   public readonly flows: InputSignal<readonly OrganizationFlow[]> = input<readonly OrganizationFlow[]>([]);
   public readonly layout: InputSignal<FlowLayout> = input<FlowLayout>(FlowLayout.Tree);
   public readonly chat: InputSignal<HTMLElement | null> = input<HTMLElement | null>(null);
+  public readonly colors: InputSignal<ReadonlyMap<string, string>> = input<ReadonlyMap<string, string>>(new Map());
   public readonly arrived: OutputEmitterRef<string> = output<string>();
   public readonly finished: OutputEmitterRef<string> = output<string>();
 
@@ -47,6 +48,11 @@ export class FlowOverlayComponent {
       observer.observe(this.container());
       onCleanup(() => observer.disconnect());
     });
+  }
+
+  protected colorOf(flow: OrganizationFlow): string | null {
+    const colors = this.colors();
+    return colors.get(flow.toKey) ?? colors.get(flow.fromKey) ?? null;
   }
 
   private redraw(): void {

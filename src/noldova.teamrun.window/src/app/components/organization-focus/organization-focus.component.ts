@@ -36,14 +36,14 @@ import { OrganizationCardComponent } from "../organization-card/organization-car
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
-import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationAddTeammateDirective } from "../organization-add-teammate.directive";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, FlowOverlayComponent, IconButtonComponent, OrganizationCardComponent, OrganizationChatComponent,
-    OrganizationDetailsComponent, OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent,
+    OrganizationDetailsComponent, OrganizationAddTeammateDirective, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent,
     TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   providers: [OrganizationFlowService.provider],
@@ -67,7 +67,6 @@ export class OrganizationFocusComponent {
   protected readonly chatPanel: Signal<ElementRef<HTMLElement> | undefined> = viewChild("conversation", { read: ElementRef });
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
-  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly below: OverlaySide = OverlaySide.below;
   protected readonly end: OverlayAlignment = OverlayAlignment.End;
   protected readonly person: OrganizationParent = OrganizationParent.person;

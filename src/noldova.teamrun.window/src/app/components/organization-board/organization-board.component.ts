@@ -33,7 +33,7 @@ import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
-import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationAddTeammateDirective } from "../organization-add-teammate.directive";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -42,7 +42,7 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 @Component({
   selector: "nol-teamrun-organization-board",
   imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, FlowOverlayComponent, IconButtonComponent, OrganizationCardComponent, OrganizationDetailsComponent,
-    OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TeammateAvatarComponent,
+    OrganizationAddTeammateDirective, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TeammateAvatarComponent,
     TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   providers: [OrganizationFlowService.provider],
@@ -73,7 +73,6 @@ export class OrganizationBoardComponent {
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
-  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly below: OverlaySide = OverlaySide.below;
   protected readonly start: OverlayAlignment = OverlayAlignment.Start;
   protected readonly person: OrganizationParent = OrganizationParent.person;

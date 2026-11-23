@@ -6,13 +6,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, type InputSignal, type Signal, computed, input } from "@angular/core";
+import { Component, type InputSignal, type Signal, computed, inject, input } from "@angular/core";
 
 import "@noldova/context.core";
 import { type Teammate, TeammateName } from "@noldova/teamrun.protocol";
 import { AvatarComponent, AvatarSize } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
+import { TeammateColor } from "../../models/teammate-color";
+import { ChatStoreService } from "../../services/chat-store.service";
 
 @Component({
   selector: "nol-teamrun-teammate-avatar",
@@ -32,5 +34,9 @@ export class TeammateAvatarComponent {
     const teammate = this.teammate();
     return Object.isNull(teammate) ? null : TeammateName.initials(teammate.name);
   });
-  protected readonly colorKey: Signal<string | null> = computed(() => this.teammate()?.id ?? null);
+  private readonly store: ChatStoreService | null = inject(ChatStoreService, { optional: true });
+  protected readonly color: Signal<number | null> = computed(() => {
+    const id = this.teammate()?.id ?? null;
+    return Object.isNull(this.store) ? TeammateColor.of(id) : this.store.teammateColor(id);
+  });
 }

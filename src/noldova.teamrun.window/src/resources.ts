@@ -1271,6 +1271,13 @@ export class Resources {
     TeammateStatus.Stopped];
   public static readonly organizationDepartmentNameLabel: string = "Unit name";
   public static readonly organizationLeaderLabel: string = "Leader";
+  public static readonly organizationUnitNameField: string = "Name";
+  public static readonly organizationTeammateLabel: string = "Teammate";
+  public static readonly organizationChooseTeammate: string = "Choose a teammate";
+  public static readonly organizationAddLabel: string = "Add";
+  public static readonly organizationEditUnitIcon: string = "edit";
+  public static readonly organizationUnitEditorLabel: string = "Edit unit";
+  public static readonly organizationChooseUnit: string = "Select a unit to change its name, type, leader or who it reports to.";
   public static readonly organizationNoLeader: string = "No leader";
   public static readonly organizationAddMemberIcon: string = "person_add";
   public static readonly organizationAddDepartment: string = "Add unit";
@@ -1916,7 +1923,7 @@ export class Resources {
   }
 
   public static formatOrganizationHeadcount(teammates: number, departments: number): string {
-    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 unit" : `${departments} units`}`;
+    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} · ${departments === 1 ? "1 unit" : `${departments} units`}`;
   }
 
   public static formatOrganizationOwnerRole(reports: number): string {
@@ -1950,6 +1957,10 @@ export class Resources {
 
   public static formatOrganizationRemoveUnit(type: NodeType | null): string {
     return Object.isNull(type) ? "Remove unit" : `Remove ${type.name}`;
+  }
+
+  public static formatOrganizationEditNamed(name: string): string {
+    return `Edit ${name}`;
   }
 
   public static formatOrganizationDeleteNamed(name: string): string {

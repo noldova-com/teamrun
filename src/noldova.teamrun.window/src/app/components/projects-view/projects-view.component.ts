@@ -118,6 +118,7 @@ export class ProjectsViewComponent {
   }
 
   protected open(conversation: Conversation): void {
+    this.store.leaveOrganization();
     ConversationActions.open(this.context, this.store, conversation);
     if (conversation.id === this.store.shownConversationId())
       void this.store.selectConversation(conversation.id);
@@ -171,8 +172,18 @@ export class ProjectsViewComponent {
     return !Object.isNull(chat) && chat.id === this.store.markedConversationId();
   }
 
+  protected isOrganizationMarked(organizationId: string): boolean {
+    return this.store.organizationInView() === organizationId;
+  }
+
   protected openOrganization(organization: OrganizationExplorer): void {
     this.context.openDocument(Resources.organizationDocumentName, organization.id, organization.name);
+    this.store.showOrganization(organization.id, true);
+  }
+
+  protected chooseOrganization(organization: OrganizationExplorer): void {
+    this.layout.toggleProject(organization.key);
+    this.openOrganization(organization);
   }
 
   protected createOrganization(): void {
@@ -237,7 +248,7 @@ export class ProjectsViewComponent {
   }
 
   protected isMarked(projectId: string): boolean {
-    return Object.isNull(this.store.markedConversationId()) && projectId === this.store.selectedProjectId();
+    return Object.isNull(this.store.markedConversationId()) && Object.isNull(this.store.organizationInView()) && projectId === this.store.selectedProjectId();
   }
 
   protected keepOpen(conversation: Conversation): void {

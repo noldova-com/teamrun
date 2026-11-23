@@ -7,18 +7,15 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <header class="top">
-  <div class="heading">
-    <h1 class="title">{{ organization.organization().name }}</h1>
-    <span class="headcount">{{ headcount() }}</span>
+  <h1 class="title">{{ organization.organization().name }}</h1>
+  <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
+    @for (status of resources.organizationStatusKey; track status) {
+      <nol-teamrun-teammate-status [status]="status" />
+    }
   </div>
   <span class="spacer"></span>
   <div class="tools">
-    <nol-choice-pills class="views" [options]="viewOptions" [value]="mode()" [label]="resources.organizationViewLabel" (valueChange)="showView($event)" />
-    <div class="status-key" role="group" [attr.aria-label]="resources.organizationStatusKeyLabel">
-      @for (status of resources.organizationStatusKey; track status) {
-        <nol-teamrun-teammate-status [status]="status" />
-      }
-    </div>
+    <span class="headcount">{{ headcount() }}</span>
     <button type="button" nol-button class="cards-show" [variant]="outlined" [nolMenuTriggerFor]="cardsShowMenu"><span nolButtonIcon class="material-symbols-rounded"
       aria-hidden="true">{{ resources.organizationCardsShowIcon }}</span>{{ resources.organizationCardsShowLabel }}</button>
     @if (editing()) {
@@ -56,78 +53,69 @@ LICENSE file in the root directory of this source tree.
   </div>
 }
 <div class="body">
-  <main class="chart" [class.focused]="mode() === modes.Focus">
-    @if (mode() === modes.Focus) {
-      <nol-teamrun-organization-focus class="focus" [tree]="root().subDepartments" [reports]="reports()" [managers]="root().managers" [editing]="editing()" />
-    } @else {
-      <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
-        @if (mode() === modes.Board) {
-          <nol-teamrun-organization-board [tree]="root().subDepartments" [reports]="reports()" [managers]="root().managers" [editing]="editing()" [target]="target()"
-            [chat]="messagesPanel()?.nativeElement ?? null" (chosen)="chosen.set($event)" />
-        } @else {
-          <div class="tree" #flowArea>
-            <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
-            <div class="owner" nolCanvasItem [attr.data-flow-node]="resources.organizationFlowPersonKey" [attr.data-flow-shape]="lines.Root"
-              [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
-              <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
-              <div class="who">
-                <span class="name">{{ resources.organizationOwnerName }}</span>
-                <span class="role">{{ ownerRole() }}</span>
-              </div>
-            </div>
-            @if (editing()) {
-              <div class="adds">
-                <button #search="nolPopoverTrigger" type="button" nol-button class="add-member" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
-                  [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
-                  aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
-                <ng-template #teammateSearch>
-                  <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
-                </ng-template>
-                <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
-                  class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
-              </div>
-            }
-            @if (root().reports.length > 0) {
-              <div class="reports" [style.--nol-teamrun-organization-columns]="root().columns">
-                @for (node of root().reports; track node.id) {
-                  <nol-teamrun-organization-department class="report" [class.first-row]="$index < root().columns" [class.row-start]="$index === 0"
-                    [class.row-end]="$index === root().columns - 1" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
-                }
-              </div>
-            }
-            @if (root().departments.length > 0) {
-              <div class="kids">
-                @for (node of root().departments; track node.id) {
-                  <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
-                }
-              </div>
-            } @else if (root().reports.length === 0 && !editing()) {
-              <p class="empty">{{ resources.organizationEmpty }}</p>
+  <main class="chart">
+    <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+      <div class="tree" #flowArea>
+        <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" [colors]="flowColors()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
+        <div class="owner" nolCanvasItem [attr.data-flow-node]="resources.organizationFlowPersonKey" [attr.data-flow-shape]="lines.Root"
+          [nolTeamrunOrganizationDrop]="person" [nolTeamrunOrganizationDropEditing]="editing()">
+          <nol-avatar [name]="resources.organizationOwnerName" [decorative]="true" />
+          <div class="who">
+            <span class="name">{{ resources.organizationOwnerName }}</span>
+            <span class="role">{{ ownerRole() }}</span>
+          </div>
+        </div>
+        @if (editing()) {
+          <div class="adds">
+            <button type="button" nol-button class="add-member" [variant]="outlined" [nolTeamrunAddTeammate]="person" [nolTeamrunAddTeammateTitle]="resources.organizationAddTeammate"><span nolButtonIcon class="material-symbols-rounded"
+              aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
+            <button type="button" nol-button class="add-department" [variant]="outlined" (click)="addDepartment()"><span nolButtonIcon
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationAddDepartmentIcon }}</span>{{ resources.organizationAddDepartment }}</button>
+          </div>
+        }
+        @if (root().reports.length > 0 && root().departments.length === 0) {
+          <div class="reports" [style.--nol-teamrun-organization-columns]="root().columns">
+            @for (node of root().reports; track node.id) {
+              <nol-teamrun-organization-department class="report" [class.first-row]="$index < root().columns" [class.row-start]="$index === 0"
+                [class.row-end]="$index === root().columns - 1" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
             }
           </div>
         }
-      </nol-canvas>
-    }
+        @if (root().departments.length > 0) {
+          <div class="kids">
+            @for (node of root().reports; track node.id) {
+              <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+            }
+            @for (node of root().departments; track node.id) {
+              <nol-teamrun-organization-department class="kid" [node]="node" [editing]="editing()" (chosen)="chosen.set($event)" />
+            }
+          </div>
+        } @else if (root().reports.length === 0 && !editing()) {
+          <p class="empty">{{ resources.organizationEmpty }}</p>
+        }
+      </div>
+    </nol-canvas>
   </main>
-  @if (mode() !== modes.Focus) {
-    <aside #messages class="messages" [class.inbox]="mode() === modes.Board" [attr.aria-label]="resources.organizationMessagesLabel">
-      @if (mode() === modes.Board) {
-        <nol-teamrun-organization-chats class="chats" [selectedTeammateId]="selectedTeammateId()" (chosen)="chooseTeammate($event)" />
+  @if (editing()) {
+    <aside class="messages editor" [attr.aria-label]="resources.organizationUnitEditorLabel">
+      @if (editedUnit(); as unit) {
+        <nol-teamrun-organization-unit-editor [node]="unit" (closed)="selection.select(null)" />
+      } @else {
+        <p class="nol-teamrun-organization-empty">{{ resources.organizationChooseUnit }}</p>
       }
+    </aside>
+  } @else {
+    <aside class="messages" [attr.aria-label]="resources.organizationMessagesLabel">
       @if (target(); as current) {
         <nol-teamrun-organization-chat class="thread" [target]="current" (targetChange)="chosen.set($event)">
-          @if (mode() === modes.Tree) {
-            <div class="to" nolTeamrunOrganizationTo>
-              <ng-container *ngTemplateOutlet="to" />
-            </div>
-          }
-        </nol-teamrun-organization-chat>
-      } @else {
-        @if (mode() === modes.Tree) {
-          <div class="to">
+          <div class="to" nolTeamrunOrganizationTo>
             <ng-container *ngTemplateOutlet="to" />
           </div>
-        }
+        </nol-teamrun-organization-chat>
+      } @else {
+        <div class="to">
+          <ng-container *ngTemplateOutlet="to" />
+        </div>
         <p class="nol-teamrun-organization-empty">{{ resources.organizationChooseTarget }}</p>
       }
       <ng-template #to>

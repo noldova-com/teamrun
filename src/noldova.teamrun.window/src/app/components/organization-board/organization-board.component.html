@@ -66,12 +66,8 @@ LICENSE file in the root directory of this source tree.
     }
   </div>
   @if (editing()) {
-    <button #search="nolPopoverTrigger" type="button" nol-button class="add-member add-report" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
-      [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+    <button type="button" nol-button class="add-member add-report" [variant]="outlined" [nolTeamrunAddTeammate]="person" [nolTeamrunAddTeammateTitle]="resources.organizationAddTeammate"><span nolButtonIcon class="material-symbols-rounded"
       aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
-    <ng-template #teammateSearch>
-      <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="person" (done)="search.close()" />
-    </ng-template>
   }
 </section>
 <section class="section departments-section" aria-labelledby="organization-board-departments">
@@ -118,12 +114,8 @@ LICENSE file in the root directory of this source tree.
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
         }
         @if (editing()) {
-          <button #search="nolPopoverTrigger" type="button" nol-button class="add-member" [variant]="outlined" [nolPopoverTrigger]="teammateSearch"
-            [nolPopoverOpenOn]="clickOpening" [nolPopoverSide]="below" [nolPopoverAlignment]="start"><span nolButtonIcon class="material-symbols-rounded"
+          <button type="button" nol-button class="add-member" [variant]="outlined" [nolTeamrunAddTeammate]="node.key" [nolTeamrunAddTeammateTitle]="resources.organizationAddTeammate"><span nolButtonIcon class="material-symbols-rounded"
             aria-hidden="true">{{ resources.organizationAddMemberIcon }}</span>{{ resources.organizationAddTeammate }}</button>
-          <ng-template #teammateSearch>
-            <nol-teamrun-organization-teammate-search [label]="resources.organizationAddTeammate" [parent]="node.key" (done)="search.close()" />
-          </ng-template>
         }
       </div>
     }

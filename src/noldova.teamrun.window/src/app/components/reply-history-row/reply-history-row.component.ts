@@ -86,7 +86,7 @@ export class ReplyHistoryRowComponent {
   protected readonly author: Signal<string> = computed(() => this.formatter.authorLabel(this.summary().preview, this.store.kinds(), this.store.providers()));
   protected readonly replyAuthor: Signal<Author> = computed(() =>
     this.formatter.replyAuthor(this.summary().preview, this.store.kinds(), this.store.providers(),
-      this.store.isReplyAuthorUnavailable(this.summary().preview.teammateId)));
+      this.store.isReplyAuthorUnavailable(this.summary().preview.teammateId), this.store.teammateColor(this.summary().preview.teammateId)));
   protected readonly createdAt: Signal<Date> = computed(() => new Date(this.summary().preview.createdAt));
   protected readonly plan: Signal<ReplyPlan | null> = computed(() => this.formatter.planOf(this.summary().preview));
   protected readonly planBlocks: readonly MessageBlock[] = [new MessageSlot(Resources.planBlockSlot)];

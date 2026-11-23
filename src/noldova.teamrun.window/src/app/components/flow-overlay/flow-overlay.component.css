@@ -20,7 +20,7 @@
 }
 .route {
   fill: none;
-  stroke: var(--nol-accent);
+  stroke: var(--nol-teamrun-flow-color, var(--nol-accent));
   stroke-width: 2;
 }
 .writing {
@@ -41,7 +41,7 @@
   width: var(--nol-space-2);
   height: var(--nol-space-2);
   border-radius: 50%;
-  background: var(--nol-accent);
+  background: var(--nol-teamrun-flow-color, var(--nol-accent));
   offset-rotate: 0deg;
   animation: nol-teamrun-flow-pulse ease-in-out forwards;
 }
@@ -50,7 +50,7 @@
   z-index: -1;
   box-sizing: border-box;
   border-radius: var(--nol-radius-medium);
-  box-shadow: 0 0 0 var(--nol-space-1) var(--nol-accent);
+  box-shadow: 0 0 0 var(--nol-space-1) var(--nol-teamrun-flow-color, var(--nol-accent));
   opacity: 0;
   animation: nol-teamrun-flow-glow ease-out forwards;
 }

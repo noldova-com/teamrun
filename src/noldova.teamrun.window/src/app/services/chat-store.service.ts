@@ -139,6 +139,7 @@ import {
 import { LinkGesture } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../resources";
+import { TeammateColor } from "../models/teammate-color";
 import { ChatAction } from "../enums/chat-action";
 import { SendKey } from "../enums/send-key";
 import { TeammateStopReason } from "../enums/teammate-stop-reason";
@@ -231,6 +232,7 @@ export class ChatStoreService {
   private readonly missingFoldersSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly setAsideConversationIdSignal: WritableSignal<string | null> = signal(null);
   private readonly openingConversationIdSignal: WritableSignal<string | null> = signal(null);
+  private readonly organizationInViewSignal: WritableSignal<string | null> = signal(null);
   private readonly conversationsByProjectSignal: WritableSignal<ReadonlyMap<string | null, readonly Conversation[]>> = signal(new Map());
   private readonly windowsSignal: WritableSignal<ReadonlyMap<string, ConversationWindow>> = signal(new Map());
   private readonly messageIndexes: Map<string, MessageIndex> = new Map();
@@ -322,6 +324,12 @@ export class ChatStoreService {
   public readonly openSignInTerminals: Signal<ReadonlySet<string>> = this.openSignInTerminalsSignal.asReadonly();
   public readonly terminalSignOuts: Signal<ReadonlySet<string>> = this.terminalSignOutsSignal.asReadonly();
   public readonly teammates: Signal<readonly Teammate[]> = computed(() => NameOrder.sort(this.teammatesSignal(), t => t.name));
+  private readonly teammateColors: Signal<ReadonlyMap<string, number>> = computed(() => TeammateColor.byCreation(this.teammatesSignal()),
+    { equal: (t, u) => t.size === u.size && [...t].every(([id, color]) => u.get(id) === color) });
+
+  public teammateColor(teammateId: string | null): number | null {
+    return TeammateColor.of(teammateId, this.teammateColors());
+  }
   public readonly teammateMoves: Signal<ReadonlyMap<string, ProviderChoice>> = this.teammateMovesSignal.asReadonly();
   public readonly defaultTeammate: Signal<DefaultTeammate | null> = this.defaultTeammateSignal.asReadonly();
   public readonly onlyTeammateChoice: Signal<ComposerSettings | null> = computed(() => {
@@ -344,8 +352,20 @@ export class ChatStoreService {
   });
   public readonly markedConversationId: Signal<string | null> = computed(() => {
     const shown = this.shownConversationId();
-    return this.openingConversationIdSignal() ?? (shown === this.setAsideConversationIdSignal() ? null : shown);
+    return this.openingConversationIdSignal() ?? (!Object.isNull(this.organizationInViewSignal()) || shown === this.setAsideConversationIdSignal() ? null : shown);
   });
+  public readonly organizationInView: Signal<string | null> = this.organizationInViewSignal.asReadonly();
+
+  public showOrganization(organizationId: string, active: boolean): void {
+    if (active)
+      this.organizationInViewSignal.set(organizationId);
+    else if (this.organizationInViewSignal() === organizationId)
+      this.organizationInViewSignal.set(null);
+  }
+
+  public leaveOrganization(): void {
+    this.organizationInViewSignal.set(null);
+  }
   public readonly screenConversationId: Signal<string | null> = computed(() => {
     const shown = this.shownConversationId();
     return !Object.isNull(shown) && shown === this.setAsideConversationIdSignal() ? shown : this.selectedConversationId();

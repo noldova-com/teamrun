@@ -29,16 +29,15 @@ import { SustainHandover } from "../models/sustain-handover";
 import { WakeReceived } from "../models/wake-received";
 import { WakeReply } from "../models/wake-reply";
 import { WakeTask } from "../models/wake-task";
-import { TeammateColor } from "../models/teammate-color";
 import { ViewedImage } from "../models/viewed-image";
 import { Resources } from "../../resources";
 
 @Injectable({ providedIn: "root" })
 export class FormatterService {
-  public replyAuthor(message: Message, kinds: readonly ProviderKind[], providers: readonly Provider[], isUnavailable: boolean): Author {
+  public replyAuthor(message: Message, kinds: readonly ProviderKind[], providers: readonly Provider[], isUnavailable: boolean, color: number | null): Author {
     const name = this.authorLabel(message, kinds, providers);
     return new Author(message.teammateId ?? name, name, MessageAuthorKind.Agent, null, this.authorInitials(message.teammateId, name),
-      TeammateColor.of(message.teammateId), null, isUnavailable);
+      color, null, isUnavailable);
   }
 
   public authorInitials(teammateId: string | null, name: string): string {

@@ -17,7 +17,6 @@ import { AvatarComponent, AvatarSize, ButtonComponent, ButtonVariant, IconButton
 import { AbilityRefusal } from "../../models/ability-refusal";
 import { MessageFocus } from "../../models/message-focus";
 import { SubAgentCard } from "../../models/sub-agent-card";
-import { TeammateColor } from "../../models/teammate-color";
 import { Resources } from "../../../resources";
 import { BackgroundTaskStoreService } from "../../services/background-task-store.service";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -140,7 +139,7 @@ export class SubAgentsViewComponent {
     return preview.details.filter(t => t.kind === DetailKind.SubAgent && Object.isNull(t.parentSequence)).flatMap(t => {
       const agent = this.formatter.subAgentOf(t);
       return Object.isNull(agent) ? [] : [new SubAgentCard(new MessageFocus(preview.conversationId, preview.id, preview.sequence, false, t.sequence), agent,
-        Date.parse(t.createdAt), author, initials, TeammateColor.of(preview.teammateId), isUnavailable, FormatterService.subAgentModel(agent, catalog),
+        Date.parse(t.createdAt), author, initials, this.store.teammateColor(preview.teammateId), isUnavailable, FormatterService.subAgentModel(agent, catalog),
         agent.isTeamRun ? null : stopRefusal)];
     });
   }

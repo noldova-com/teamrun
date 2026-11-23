@@ -23,10 +23,6 @@ LICENSE file in the root directory of this source tree.
     <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
   }
 } @else {
-  <nol-teamrun-composer class="composer" [conversationId]="fanOutKey()" [fanOut]="fanOut" />
-  @if (error(); as shown) {
-    <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
-  }
   <ul class="nol-teamrun-organization-recipients" [attr.aria-label]="resources.organizationRecipientsLabel">
     @for (row of rows(); track row.teammateId) {
       <li>
@@ -37,4 +33,8 @@ LICENSE file in the root directory of this source tree.
       </li>
     }
   </ul>
+  @if (error(); as shown) {
+    <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
+  }
+  <nol-teamrun-composer class="composer" [conversationId]="fanOutKey()" [fanOut]="fanOut" />
 }

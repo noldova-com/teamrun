@@ -24,13 +24,30 @@
 
 .dot {
   flex: none;
-  border: 0.25rem solid currentColor;
+  border: 0.1875rem solid currentColor;
   border-radius: 50%;
   color: var(--nol-badge);
 }
 
 .working {
   color: var(--nol-status-ok);
+  animation: pulse 1.6s ease-out infinite;
+}
+
+@keyframes pulse {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--nol-status-ok) 60%, transparent);
+  }
+
+  to {
+    box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--nol-status-ok) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .working {
+    animation: none;
+  }
 }
 
 .waiting {
