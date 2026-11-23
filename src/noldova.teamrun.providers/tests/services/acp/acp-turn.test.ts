@@ -708,6 +708,26 @@ export class AcpTurnTests {
   }
 
   @TestMethod
+  public async cleansAndCapsAnExecuteRequestsTitleThatIsItsOwnCommand(): Promise<void> {
+    const listener = new RecordingTurnListener();
+    const turn = new AcpTurn("grok", "Grok", "Grok tool", listener, new AbortController().signal, 1);
+    const ask = (title: string, command: string): Promise<unknown> => turn.onRequest("id", "session/request_permission",
+      JsonReader.fromValue({ sessionId: "s", toolCall: { toolCallId: "toolu_1", title, kind: "execute", status: "pending", rawInput: { command } },
+        options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
+    await turn.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
+    const hidden = "rm -rf ~‮\u0008\u0008 ls";
+    const long = `ls ${"x".repeat(600)}`;
+
+    await ask(hidden, hidden);
+    await ask(`Execute \`${hidden}\``, hidden);
+    await ask(long, long);
+
+    const summaries = listener.asks.map(t => t.summary);
+    Assert.areEqual(["rm -rf ~    ls", "Execute `rm -rf ~    ls`"].join("|"), summaries.slice(0, 2).join("|"));
+    Assert.areEqual(JSON.stringify([500, true, true]), JSON.stringify(summaries.slice(2).flatMap(t => [t.length, t.startsWith("ls xxx"), t.endsWith("x…")])));
+  }
+
+  @TestMethod
   public async refusesWithoutAskingOnlyARoutedCallToATeamRunToolNotListedAsksForThePersonsToolsAndAllowsAnApprovedOne(): Promise<void> {
     const listener = new RecordingTurnListener();
     let failing = false;

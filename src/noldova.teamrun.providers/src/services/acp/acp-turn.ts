@@ -430,8 +430,8 @@ export class AcpTurn implements IAcpClientListener {
     if (!Object.isUndefined(allowed))
       return { outcome: { outcome: Resources.acpSelected, optionId: allowed.id } };
     const command = kind === Resources.acpExecuteKind ? AcpTurn.commandOf(tool) : null;
-    const summary = Object.isNull(command) || title === command || title === Resources.formatGrokExecuteTitle(command) ? title
-      : AcpTurn.cleaned(Resources.formatToolWithCommand(title, command));
+    const summary = AcpTurn.cleaned(Object.isNull(command) || title === command || title === Resources.formatGrokExecuteTitle(command) ? title
+      : Resources.formatToolWithCommand(title, command));
     const choice = await this.listener.onApprovalRequested(new ApprovalAsk(`${this.sessionId}:${id}`,
       kind === Resources.acpExecuteKind ? ApprovalKind.Command : ApprovalKind.Tool, kind, summary, Object.isUndefined(asking) ? params.toJson()
         : { ...params.toJson(), [Resources.subAgentField]: asking?.agent.description ?? Resources.acpUnnamedSubAgent }, options)).catch((error: unknown) => {
