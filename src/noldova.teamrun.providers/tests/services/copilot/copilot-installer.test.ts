@@ -505,12 +505,13 @@ export class CopilotInstallerTests {
       const script = directory.resolve("copilot.cjs");
       writeFileSync(script, "console.log(\"GitHub Copilot CLI 1.0.102\");");
       const found = (source: ExecutableSource) => (): LocatedExecutable => new LocatedExecutable(process.execPath, source, [script]);
-      const cases: readonly [string, ExecutableSource, string][] = [
-        ["linux", ExecutableSource.Path, "1.0.102 null"], ["linux", ExecutableSource.GlobalNpm, "1.0.102 null"], ["linux", ExecutableSource.Override, "1.0.102 null"],
-        ["win32", ExecutableSource.LocalBin, "1.0.102 null"], ["win32", ExecutableSource.Path, "1.0.102 null"]
+      const cases = [
+        new FoundCopilot("linux", ExecutableSource.Path, "1.0.102 null"), new FoundCopilot("linux", ExecutableSource.GlobalNpm, "1.0.102 null"),
+        new FoundCopilot("linux", ExecutableSource.Override, "1.0.102 null"), new FoundCopilot("win32", ExecutableSource.LocalBin, "1.0.102 null"),
+        new FoundCopilot("win32", ExecutableSource.Path, "1.0.102 null")
       ];
 
-      for (const [platform, source, versions] of cases) {
+      for (const { platform, source, versions } of cases) {
         const installer = CopilotInstallerTests.installer(server.url("/c"), directory, platform, undefined, undefined, undefined, found(source));
         Assert.isTrue(installer.isInstalled, `${platform} ${source}`);
         Assert.areEqual(process.execPath, installer.foundPath, `${platform} ${source}`);
@@ -637,5 +638,17 @@ export class CopilotInstallerTests {
 
   private static versions(versions: ProviderKindVersions): string {
     return `${versions.installed} ${versions.latest}`;
+  }
+}
+
+class FoundCopilot {
+  public readonly platform: string;
+  public readonly source: ExecutableSource;
+  public readonly versions: string;
+
+  public constructor(platform: string, source: ExecutableSource, versions: string) {
+    this.platform = platform;
+    this.source = source;
+    this.versions = versions;
   }
 }

@@ -719,9 +719,16 @@ export interface IProviderAdapter {
  */
 export interface IToolUpdateChecks {
   /**
-   * Whether a read of the installations' versions may ask the network for the latest ones before the person asks for it.
+   * Whether a read of the installations' versions may ask the network for the latest ones now, before the person asks for it; a `true`
+   * counts as that check, so a choice that allows one check only gives `false` after it.
    */
-  readonly runWithoutAsking: boolean;
+  takeCheck(): boolean;
+
+  /**
+   * Calls `listener` each time the choice turns to allow a check that it didn't allow before.
+   * @param listener What to call.
+   */
+  onAllowed(listener: () => void): void;
 }
 
 /**
@@ -2097,7 +2104,8 @@ export interface IProviderKindsService {
    * Lists the providers TeamRun installs at once, each with where its installation stands and the versions last read, and reads each one's
    * versions again in the background unless it is installing or already reading them, publishing `EventName.ProviderKindInstallationChanged`
    * when a read ends; a read that fails keeps the versions it had. The read asks the network for the latest versions only when
-   * `IToolUpdateChecks.runWithoutAsking` says so; otherwise it keeps the latest version an earlier check found.
+   * `IToolUpdateChecks.takeCheck` allows it; otherwise it keeps the latest version an earlier check found. Once the installations have been
+   * listed, the service reads them again, with that check, each time `IToolUpdateChecks.onAllowed` says a check is allowed.
    */
   listInstallations(): Promise<readonly ProviderKindInstallation[]>;
 
@@ -8107,13 +8115,13 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @param registry The registered adapters.
    * @param providers The providers, for `listModelsAsync` through a provider.
    * @param events Where `ProviderKindInstallationChanged` is published.
+   * @param updateChecks Whether `listInstallations` and an install's end may ask the network for the latest versions.
    * @param planUsage Where `readPlanUsageAsync` keeps what it reads; a `PlanUsageService` on `events` by default.
    * @param teammates Whose speeds `modelCatalogAsync` clears when the catalog no longer lists them; none by default.
    * @param log Where `listAsync` writes a kind whose `refreshDescriptorAsync` failed, with the kind of failure; none by default.
-   * @param updateChecks Whether `listInstallations` and an install's end may ask the network for the latest versions; they may by default.
    */
-  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, planUsage?: IPlanUsageService,
-    teammates?: ITeammatesService | null, log?: ILog | null, updateChecks?: IToolUpdateChecks);
+  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, updateChecks: IToolUpdateChecks,
+    planUsage?: IPlanUsageService, teammates?: ITeammatesService | null, log?: ILog | null);
 
   /**
    * Lists the registered kinds, each saying whether it can name a chat: whether its adapter has `askIsolated`.

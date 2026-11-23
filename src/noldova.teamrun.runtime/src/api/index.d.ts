@@ -1964,17 +1964,24 @@ export declare class HopLimitSetting {
  */
 export declare class ToolUpdateChecks implements IToolUpdateChecks {
   /**
-   * Starts following the setting.
+   * Takes the setting's stored value, when `read` gives one, and starts following the setting's changes.
    * @param settings The module's settings.
    */
   public constructor(settings: IModuleSettings);
 
   /**
-   * `true` once a change of the setting has given this device's choice and it is `Automatic` or `AtStart`; `false` for `OnRequest`, and until
-   * a change comes, since the runtime reads the default until it knows its device and Noldova Desktop raises no change for a device with no
-   * stored value (noldova-com/desktop#96), so a person who never changed the setting is checked only when they ask, for now.
+   * `true` for `Automatic`, and for `AtStart` until the first check; `false` for `OnRequest`. The choice is the value `read` gives at
+   * construction when it is a stored one, anything but the default, and then each change. Until one of those gives it, the answer is `false`,
+   * since the runtime reads the default until it knows its device (noldova-com/desktop#96), so a person who never changed the setting is
+   * checked only when they ask, for now.
    */
-  public get runWithoutAsking(): boolean;
+  public takeCheck(): boolean;
+
+  /**
+   * Calls `listener` each time a change of the setting turns it to allow a check that it didn't allow before.
+   * @param listener What to call.
+   */
+  public onAllowed(listener: () => void): void;
 }
 
 /**

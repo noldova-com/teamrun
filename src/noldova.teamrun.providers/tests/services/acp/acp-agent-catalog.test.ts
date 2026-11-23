@@ -7,10 +7,31 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import "@noldova/context.core";
 import { JsonReader, type JsonObject } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AcpStoredAgent, type IProviderAdapter, type IProviderKindInstallation, type ISharedMcpSecrets } from "@noldova/teamrun.core";
-import { AcpLocalCommandAddParams, SharedMcpSecret } from "@noldova/teamrun.protocol";
+import {
+  AcpStoredAgent,
+  type ForkRequest,
+  type IProviderAdapter,
+  type IProviderKindInstallation,
+  type ISharedMcpSecrets,
+  type ISignInListener,
+  type ITurnListener,
+  type SignInCheck,
+  type TurnRequest,
+  type TurnResult
+} from "@noldova/teamrun.core";
+import {
+  type AcpAgentEntry,
+  AcpLocalCommandAddParams,
+  type ForkedSession,
+  type Provider,
+  type ProviderKind,
+  type ProviderMode,
+  ProviderModelList,
+  SharedMcpSecret
+} from "@noldova/teamrun.protocol";
 import {
   AcpAgentCatalog,
   AcpInstallTools,
@@ -34,10 +55,44 @@ const SHA256 = "ab".repeat(32);
 const KEY = `teamrun.mcpSecret${"a".repeat(32)}`;
 const OTHER_KEY = `teamrun.mcpSecret${"b".repeat(32)}`;
 
-const binary = (id: string, target: string, sha256?: string): object => ({ id, name: `Agent ${id}`, version: "1.0.0", description: `About ${id}`, website: `https://example.com/${id}`,
-  distribution: { binary: { [target]: { archive: "https://example.com/a.tar.gz", cmd: "./agent", ...sha256 === undefined ? {} : { sha256 } } } } });
-const npx = (id: string, name: string = `${id}@1.0.0`): object => ({ id, name: `Agent ${id}`, version: "1.0.0", distribution: { npx: { package: name } } });
-const uvx = (id: string): object => ({ id, name: `Agent ${id}`, version: "1.0.0", distribution: { uvx: { package: `${id}==1.0.0` } } });
+const binary = (id: string, target: string, sha256?: string): JsonObject => ({ id, name: `Agent ${id}`, version: "1.0.0", description: `About ${id}`, website: `https://example.com/${id}`,
+  distribution: { binary: { [target]: { archive: "https://example.com/a.tar.gz", cmd: "./agent", ...Object.isUndefined(sha256) ? {} : { sha256 } } } } });
+const npx = (id: string, name: string = `${id}@1.0.0`): JsonObject => ({ id, name: `Agent ${id}`, version: "1.0.0", distribution: { npx: { package: name } } });
+const uvx = (id: string): JsonObject => ({ id, name: `Agent ${id}`, version: "1.0.0", distribution: { uvx: { package: `${id}==1.0.0` } } });
+
+class DescribedAdapter implements IProviderAdapter {
+  public readonly descriptor: ProviderKind;
+  public readonly modes: readonly ProviderMode[] = [];
+  public readonly defaultMode: string | null = null;
+
+  public constructor(descriptor: ProviderKind) {
+    this.descriptor = descriptor;
+  }
+
+  public checkSignIn(_provider: Provider): Promise<SignInCheck> {
+    return Promise.reject(new Error("The fixture checks no sign-in."));
+  }
+
+  public signIn(_provider: Provider, _signal: AbortSignal, _listener: ISignInListener): Promise<void> {
+    return Promise.reject(new Error("The fixture signs no one in."));
+  }
+
+  public listModels(_provider: Provider | null): Promise<ProviderModelList> {
+    return Promise.resolve(new ProviderModelList([], true));
+  }
+
+  public runTurn(_request: TurnRequest, _listener: ITurnListener, _signal: AbortSignal): Promise<TurnResult> {
+    return Promise.reject(new Error("The fixture runs no turns."));
+  }
+
+  public forkSession(_request: ForkRequest): Promise<ForkedSession> {
+    return Promise.reject(new Error("The fixture forks no sessions."));
+  }
+
+  public shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 class Opened {
   public readonly agents: GeneralAcpAgent[] = [];
@@ -45,8 +100,21 @@ class Opened {
   public readonly adapterOf = (agent: GeneralAcpAgent, installation: IProviderKindInstallation | null): IProviderAdapter => {
     this.agents.push(agent);
     this.installations.push(installation);
-    return { descriptor: agent.descriptor } as IProviderAdapter;
+    return new DescribedAdapter(agent.descriptor);
   };
+
+  public agent(index: number): GeneralAcpAgent {
+    const agent = this.agents[index];
+    Assert.isDefined(agent);
+    return agent;
+  }
+
+  public installation(index: number): IProviderKindInstallation {
+    const installation = this.installations[index];
+    Assert.isDefined(installation);
+    Assert.isNotNull(installation);
+    return installation;
+  }
 }
 
 @TestClass
@@ -59,10 +127,10 @@ export class AcpAgentCatalogTests {
   }
 
   private static secrets(values: Readonly<Record<string, string>>): ISharedMcpSecrets {
-    return { readAsync: name => Promise.resolve(values[name] ?? null), removeAsync: () => Promise.resolve(), isSetAsync: name => Promise.resolve(values[name] !== undefined) };
+    return { readAsync: name => Promise.resolve(values[name] ?? null), removeAsync: () => Promise.resolve(), isSetAsync: name => Promise.resolve(!Object.isUndefined(values[name])) };
   }
 
-  private static serveRegistry(server: LocalHttpServer, ...agents: readonly object[]): void {
+  private static serveRegistry(server: LocalHttpServer, ...agents: readonly JsonObject[]): void {
     server.serve("/registry.json", Buffer.from(JSON.stringify({ agents })));
   }
 
@@ -87,14 +155,20 @@ export class AcpAgentCatalogTests {
       const listing = await catalog.listAsync([added, AcpAgentCatalogTests.local("mine")]);
 
       Assert.areEqual("checked,hashless,droid,fast", listing.agents.map(t => t.id).join(","));
-      const of = (id: string) => listing.agents.find(t => t.id === id)!;
+      const of = (id: string): AcpAgentEntry => {
+        const agent = listing.agents.find(t => t.id === id);
+        Assert.isDefined(agent);
+        return agent;
+      };
       Assert.areEqual("Agent checked|1.0.0|About checked|https://example.com/checked", [of("checked").name, of("checked").version, of("checked").description, of("checked").about].join("|"));
       Assert.areEqual(Resources.formatAcpAgentNoExtractor("Agent checked"), of("checked").unavailable);
       Assert.areEqual("false,true,false,false", ["checked", "hashless", "droid", "fast"].map(t => of(t).notChecked).join(","));
       Assert.areEqual("false,false,true,false", ["checked", "hashless", "droid", "fast"].map(t => of(t).added).join(","));
       Assert.areEqual(Resources.formatAcpAgentNoNpm("Agent droid"), of("droid").unavailable);
       Assert.areEqual(Resources.formatAcpAgentUvx("Agent fast"), of("fast").unavailable);
-      Assert.areEqual("local-mine|Command mine|true", [listing.localCommands[0]!.id, listing.localCommands[0]!.name, listing.localCommands[0]!.added].join("|"));
+      const local = listing.localCommands[0];
+      Assert.isDefined(local);
+      Assert.areEqual("local-mine|Command mine|true", [local.id, local.name, local.added].join("|"));
       Assert.isNull(listing.failure);
       Assert.isFalse(Object.isNull(listing.fetchedAt));
     });
@@ -108,7 +182,8 @@ export class AcpAgentCatalogTests {
       const listing = await AcpAgentCatalogTests.catalog(server, directory).listAsync([new AcpStoredAgent("gone", "Gone agent", {})]);
 
       Assert.areEqual("droid,gone", listing.agents.map(t => t.id).join(","));
-      const gone = listing.agents[1]!;
+      const gone = listing.agents[1];
+      Assert.isDefined(gone);
       Assert.areEqual("Gone agent|true|false||", [gone.name, gone.added, gone.notChecked, gone.unavailable, gone.about].join("|"));
     });
   }
@@ -164,7 +239,8 @@ export class AcpAgentCatalogTests {
       Assert.areEqual(Resources.formatAcpAgentNoNpm("Agent droid"), refused?.unavailable);
       Assert.isNull(offered?.unavailable);
       Assert.areEqual("droid|Agent droid", [offered?.stored.kind, offered?.stored.name].join("|"));
-      Assert.areEqual("droid@1.0.0", JsonReader.fromValue(offered!.stored.json).readObject("distribution").readObject("npx").readNonBlankString("package"));
+      Assert.isNotNull(offered);
+      Assert.areEqual("droid@1.0.0", JsonReader.fromValue(offered.stored.json).readObject("distribution").readObject("npx").readNonBlankString("package"));
       Assert.isNull(await refusing.readOfferAsync("elsewhere"));
       Assert.isNull(await refusing.readOfferAsync("missing"));
     });
@@ -197,7 +273,7 @@ export class AcpAgentCatalogTests {
 
       Assert.areEqual("local-mine", adapter.descriptor.id);
       Assert.isNull(opened.installations[0]);
-      const launch = opened.agents[0]!.launch(null, null);
+      const launch = opened.agent(0).launch(null, null);
       Assert.areEqual("value|node|agent.js", [launch.environment["KEY"], launch.command.executable, launch.command.arguments.join(",")].join("|"));
     });
   }
@@ -224,23 +300,23 @@ export class AcpAgentCatalogTests {
       using tools = new TemporaryDirectory();
       const name = "droid";
       const npm = new FakeNpm(tools.path, FakeNpm.package(name, "2.0.0", "cli.js", [name]));
-      const entry = (version: string): object => ({ id: name, name: "Droid", version, distribution: { npx: { package: `${name}@${version}`, args: ["--acp"], env: { DROID_MODE: "acp" } } } });
+      const entry = (version: string): JsonObject => ({ id: name, name: "Droid", version, distribution: { npx: { package: `${name}@${version}`, args: ["--acp"], env: { DROID_MODE: "acp" } } } });
       AcpAgentCatalogTests.serveRegistry(server, entry("2.0.0"));
       const opened = new Opened();
       const saved: JsonObject[] = [];
       const catalog = AcpAgentCatalogTests.catalog(server, directory, opened, new AcpInstallTools(null, null, npm.executable), undefined, process.platform);
 
-      await catalog.openAsync(new AcpStoredAgent(name, "Droid", entry("1.0.0") as JsonObject), async t => { saved.push(t); });
-      const installation = opened.installations[0]!;
+      await catalog.openAsync(new AcpStoredAgent(name, "Droid", entry("1.0.0")), async t => { saved.push(t); });
+      const installation = opened.installation(0);
       Assert.areEqual(Resources.formatGeneralAcpNotFound("Droid"), Assert.throws(() => opened.agents.at(0)?.launch(null, null), ExecutableNotFoundException).message);
       await installation.install(() => undefined, new AbortController().signal, () => undefined);
 
       Assert.areEqual("2.0.0", JsonReader.fromValue(saved[0]).readNonBlankString("version"));
-      const launch = opened.agents[0]!.launch(null, null);
+      const launch = opened.agent(0).launch(null, null);
       Assert.areEqual("acp", launch.environment["DROID_MODE"]);
       Assert.isTrue(launch.command.arguments.join(" ").includes("--acp"));
       Assert.isTrue(existsSync(directory.resolve("agents", name, "2.0.0")));
-      const terminal = opened.agents[0]!.readTerminalSignIn(JsonReader.fromValue({ authMethods: [{ type: "terminal", id: "login" }] }));
+      const terminal = opened.agent(0).readTerminalSignIn(JsonReader.fromValue({ authMethods: [{ type: "terminal", id: "login" }] }));
       Assert.isTrue((terminal?.command ?? "").startsWith(name));
     });
   }
@@ -251,8 +327,8 @@ export class AcpAgentCatalogTests {
       server.serve("/registry.json", Buffer.from("no"), 500);
       const opened = new Opened();
 
-      await AcpAgentCatalogTests.catalog(server, directory, opened).openAsync(new AcpStoredAgent("droid", "Droid", npx("droid") as JsonObject), async () => undefined);
-      const versions = await opened.installations[0]!.readVersions(true);
+      await AcpAgentCatalogTests.catalog(server, directory, opened).openAsync(new AcpStoredAgent("droid", "Droid", npx("droid")), async () => undefined);
+      const versions = await opened.installation(0).readVersions(true);
 
       Assert.areEqual("null 1.0.0", `${versions.installed} ${versions.latest}`);
     });
@@ -264,7 +340,7 @@ export class AcpAgentCatalogTests {
       const catalog = AcpAgentCatalogTests.catalog(server, directory);
 
       Assert.areEqual(`${KEY},${OTHER_KEY}`, catalog.referencesOf(AcpAgentCatalogTests.local("mine", [new SharedMcpSecret("A", KEY), new SharedMcpSecret("B", OTHER_KEY)])).join(","));
-      Assert.areEqual(0, catalog.referencesOf(new AcpStoredAgent("droid", "Droid", npx("droid") as JsonObject)).length);
+      Assert.areEqual(0, catalog.referencesOf(new AcpStoredAgent("droid", "Droid", npx("droid"))).length);
     });
   }
 

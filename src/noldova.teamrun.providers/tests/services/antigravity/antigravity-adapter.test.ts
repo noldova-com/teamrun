@@ -8,6 +8,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { JsonObject } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ForkRequest, Resources as CoreResources, SharedMcpValues, TurnOutcome, TurnRequest } from "@noldova/teamrun.core";
 import { AuthStatus, Provider, ProviderAbility, ProviderModel, RequestedSettings, SharedMcpServerDefinition, SharedMcpTransport } from "@noldova/teamrun.protocol";
@@ -341,11 +342,11 @@ export class AntigravityAdapterTests {
 
   @TestMethod
   public async countsACompatibleServerOnPathAsInstalledAndSaysWhyAnotherDoesNotCount(): Promise<void> {
-    for (const [version, installed] of [["1.3.1", true], ["1.4.0", false]] as const) {
+    for (const { version, installed } of [new ServerOnPath("1.3.1", true), new ServerOnPath("1.4.0", false)]) {
       await using host = new GrokTestHost();
       const installer = new AntigravityInstaller(null, host.directory.resolve("providers"), null, process.platform, process.arch,
         new ProcessCommand("/usr/bin/codesign", []), new CommandRunner(host.starter), 1000, 1000);
-      const capabilities = { agentCapabilities: {}, authMethods: [], agentInfo: { name: "antigravity-acp", version } };
+      const capabilities: JsonObject = { agentCapabilities: {}, authMethods: [], agentInfo: { name: "antigravity-acp", version } };
       const adapter = new AntigravityAdapter(() => new AntigravityServer(host.command, host.directory.resolve("harness"), ExecutableSource.Path), installer,
         process.platform, { ...host.environment, TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) }, host.directory.resolve("default"),
         host.directory.resolve("tmp"), host.info, host.programs.wrap(host.starter), host.timings, host.timer);
@@ -652,5 +653,15 @@ export class AntigravityAdapterTests {
   private static request(host: GrokTestHost, provider: Provider, prompt: string, resume: string | null = null, model: string | null = null,
     effort: string | null = null, compacts: boolean = false, mode: string | null = null): TurnRequest {
     return new TurnRequest(provider, host.directory.path, prompt, new RequestedSettings("antigravity", model, effort, null, mode), resume, [], null, null, {}, compacts);
+  }
+}
+
+class ServerOnPath {
+  public readonly version: string;
+  public readonly installed: boolean;
+
+  public constructor(version: string, installed: boolean) {
+    this.version = version;
+    this.installed = installed;
   }
 }

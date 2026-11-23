@@ -33,6 +33,7 @@ import { ProviderKindVersions } from "../../models/provider-kind-versions.js";
 import type { IProviderKindsService } from "../../interfaces/i-provider-kinds.service.js";
 import type { ITeammatesService } from "../../interfaces/i-teammates.service.js";
 import type { IToolUpdateChecks } from "../../interfaces/i-tool-update-checks.js";
+import { InstalledKind } from "../../models/installed-kind.js";
 import { ProviderKindInstallRun } from "../../models/provider-kind-install-run.js";
 import { ProviderKindsRead } from "../../models/provider-kinds-read.js";
 import { Resources } from "../../resources.js";
@@ -40,8 +41,6 @@ import { PlanUsageService } from "./plan-usage.service.js";
 import type { ProviderKindRegistry } from "./provider-kind-registry.js";
 
 export class ProviderKindsService implements IProviderKindsService {
-  private static readonly CHECKS_WITHOUT_ASKING: IToolUpdateChecks = { runWithoutAsking: true };
-
   private readonly registry: ProviderKindRegistry;
   private readonly providers: IProvidersService;
   private readonly events: IEventSink;
@@ -53,17 +52,18 @@ export class ProviderKindsService implements IProviderKindsService {
   private readonly failures: Map<string, string> = new Map();
   private readonly versions: Map<string, ProviderKindVersions> = new Map();
   private readonly reads: Map<string, ProviderKindsRead> = new Map();
+  private listed: boolean = false;
 
-  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink,
-    planUsage: IPlanUsageService = new PlanUsageService(events), teammates: ITeammatesService | null = null, log: ILog | null = null,
-    updateChecks: IToolUpdateChecks = ProviderKindsService.CHECKS_WITHOUT_ASKING) {
+  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, updateChecks: IToolUpdateChecks,
+    planUsage: IPlanUsageService = new PlanUsageService(events), teammates: ITeammatesService | null = null, log: ILog | null = null) {
     this.registry = registry;
     this.providers = providers;
     this.events = events;
+    this.updateChecks = updateChecks;
     this.planUsage = planUsage;
     this.teammates = teammates;
     this.log = log;
-    this.updateChecks = updateChecks;
+    updateChecks.onAllowed(() => this.checkListed());
   }
 
   public list(): readonly ProviderKind[] {
@@ -94,16 +94,17 @@ export class ProviderKindsService implements IProviderKindsService {
 
   public listInstallations(): Promise<readonly ProviderKindInstallation[]> {
     const installed = this.installed();
-    const checksLatest = this.updateChecks.runWithoutAsking;
-    for (const [kind, installation] of installed)
-      void this.readVersions(kind, installation, checksLatest);
-    return Promise.resolve(installed.map(([kind, installation]) => this.describe(kind, installation)));
+    this.listed = true;
+    const checksLatest = this.updateChecks.takeCheck();
+    for (const entry of installed)
+      void this.readVersions(entry.kind, entry.installation, checksLatest);
+    return Promise.resolve(installed.map(t => this.describe(t.kind, t.installation)));
   }
 
   public async checkInstallationsAsync(): Promise<readonly ProviderKindInstallation[]> {
     const installed = this.installed();
-    await Promise.all(installed.map(([kind, installation]) => this.readVersions(kind, installation, true)));
-    return installed.map(([kind, installation]) => this.describe(kind, installation));
+    await Promise.all(installed.map(t => this.readVersions(t.kind, t.installation, true)));
+    return installed.map(t => this.describe(t.kind, t.installation));
   }
 
   public listTools(): Promise<readonly ProviderTool[]> {
@@ -112,20 +113,21 @@ export class ProviderKindsService implements IProviderKindsService {
 
   public install(params: ProviderKindParams): Promise<ProviderKindInstallation> {
     const installation = this.requireInstallation(params.kind);
-    const running = this.installs.get(params.kind);
-    if (!Object.isUndefined(running))
-      return running.done!;
+    const running = this.installs.get(params.kind)?.done ?? null;
+    if (!Object.isNull(running))
+      return running;
     const current = this.describe(params.kind, installation);
     if (current.state === ProviderKindInstallState.Installed && Object.isNull(current.update))
       return Promise.resolve(current);
     if (current.state === ProviderKindInstallState.Unavailable)
-      throw new ServiceException(ErrorCode.Unavailable, current.reason!, [params.kind]);
+      throw new ServiceException(ErrorCode.Unavailable, current.reason ?? Resources.installFailed, [params.kind]);
     const run = new ProviderKindInstallRun();
     this.installs.set(params.kind, run);
     this.reads.delete(params.kind);
-    run.done = this.run(params.kind, installation, run);
+    const done = this.run(params.kind, installation, run);
+    run.done = done;
     this.publish(params.kind, installation);
-    return run.done;
+    return done;
   }
 
   public isInstalling(kind: string): boolean {
@@ -174,13 +176,21 @@ export class ProviderKindsService implements IProviderKindsService {
     finally {
       this.installs.delete(kind);
       this.publish(kind, installation);
-      void this.readVersions(kind, installation, this.updateChecks.runWithoutAsking);
+      void this.readVersions(kind, installation, this.updateChecks.takeCheck());
     }
     return this.describe(kind, installation);
   }
 
-  private installed(): readonly (readonly [string, IProviderKindInstallation])[] {
-    return this.registry.all().flatMap(t => Object.isNullOrUndefined(t.installation) ? [] : [[t.descriptor.id, t.installation] as const]);
+  private installed(): readonly InstalledKind[] {
+    return this.registry.all().flatMap(t => Object.isNullOrUndefined(t.installation) ? [] : [new InstalledKind(t.descriptor.id, t.installation)]);
+  }
+
+  private checkListed(): void {
+    if (!this.listed)
+      return;
+    const checksLatest = this.updateChecks.takeCheck();
+    for (const entry of this.installed())
+      void this.readVersions(entry.kind, entry.installation, checksLatest);
   }
 
   private readVersions(kind: string, installation: IProviderKindInstallation, checksLatest: boolean): Promise<void> {

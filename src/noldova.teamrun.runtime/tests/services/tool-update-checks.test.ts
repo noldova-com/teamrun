@@ -6,33 +6,140 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { QualifiedName, SettingChange, SettingKey } from "@noldova/desktop.protocol";
-import type { IModuleSettings } from "@noldova/desktop.runtime";
-import { ToolUpdateChecks } from "@noldova/teamrun.runtime";
+import { RequestContext } from "@noldova/desktop.runtime";
+import { FakeModuleSettings } from "@noldova/desktop.runtime/testing";
+import { ProviderKindRegistry } from "@noldova/teamrun.core";
+import { HostedMigrations, RuntimePart, ToolUpdateChecks } from "@noldova/teamrun.runtime";
+
+import { CheckpointsModule } from "../fixtures/checkpoints-module.fixture.js";
+import { DeclaredSettings } from "../fixtures/declared-settings.fixture.js";
+import { GivenRegistries } from "../fixtures/given-registries.fixture.js";
+import { InstalledAdapter } from "../fixtures/installed-adapter.fixture.js";
+import { MemoryModuleDatabase } from "../fixtures/memory-module-database.fixture.js";
+import { RecordingInstallation } from "../fixtures/recording-installation.fixture.js";
+import { RecordingPartContext } from "../fixtures/recording-part-context.fixture.js";
+import { TemporaryDirectory } from "../fixtures/temporary-directory.fixture.js";
 
 @TestClass
 export class ToolUpdateChecksTests {
+  private static readonly setting: string = "desktop.updateChecks";
+
   @TestMethod
-  public runsWithoutAskingOnlyOnceTheDevicesUpdateChecksSettingIsKnownAndIsntOnRequest(): void {
-    const names: string[] = [];
-    let listener: (change: SettingChange) => void = () => undefined;
-    const settings = { onChanged: (name: string, changed: (change: SettingChange) => void) => {
-      names.push(name);
-      listener = changed;
-    } } as IModuleSettings;
+  public followsTheChangesOfTheDevicesSettingAndChecksOnlyOnceUnderAtStart(): void {
+    const settings = ToolUpdateChecksTests.settingsOf("Automatic");
     const checks = new ToolUpdateChecks(settings);
-    const change = (value: JsonValue): boolean => {
-      listener(new SettingChange(new SettingKey(QualifiedName.parse("desktop.updateChecks"), null, "device-1"), value, true));
-      return checks.runWithoutAsking;
+    let allowed = 0;
+    checks.onAllowed(() => allowed++);
+    const takes = (value: JsonValue): string => {
+      ToolUpdateChecksTests.change(settings, value);
+      return [checks.takeCheck(), checks.takeCheck()].join(",");
     };
 
-    Assert.areEqual("desktop.updateChecks", names.join(","));
-    Assert.isFalse(checks.runWithoutAsking);
-    Assert.isTrue(change("Automatic"));
-    Assert.isFalse(change("OnRequest"));
-    Assert.isTrue(change("AtStart"));
-    Assert.isFalse(change(null));
+    Assert.areEqual(ToolUpdateChecksTests.setting, settings.callsOf("onChanged").map(t => t[0]).join(","));
+    Assert.isFalse(checks.takeCheck());
+    Assert.areEqual("true,false", takes("AtStart"));
+    Assert.areEqual("true,true", takes("Automatic"));
+    Assert.areEqual("false,false", takes("OnRequest"));
+    Assert.areEqual("false,false", takes("AtStart"));
+    Assert.areEqual("false,false", takes(null));
+    Assert.areEqual(2, allowed);
+  }
+
+  @TestMethod
+  public takesTheValueReadGivesAtConstructionWhenItCanOnlyBeAStoredOne(): void {
+    const atStart = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("AtStart"));
+    const onRequest = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("OnRequest"));
+    const unknown = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("Automatic"));
+
+    Assert.areEqual("true,false", [atStart.takeCheck(), atStart.takeCheck()].join(","));
+    Assert.isFalse(onRequest.takeCheck());
+    Assert.isFalse(unknown.takeCheck());
+  }
+
+  @TestMethod
+  public async listsTheInstallationsAtStartWithoutTheirLatestVersionsWhileTheSettingIsOnRequestOrNotKnownYet(): Promise<void> {
+    const onRequest = await ToolUpdateChecksTests.checksAsync("OnRequest", async listAsync => {
+      await listAsync();
+      await listAsync();
+    });
+    const unknown = await ToolUpdateChecksTests.checksAsync("Automatic", async listAsync => {
+      await listAsync();
+      await listAsync();
+    });
+
+    Assert.areEqual("false,false", onRequest);
+    Assert.areEqual("false,false", unknown);
+  }
+
+  @TestMethod
+  public async checksTheLatestVersionsAtTheFirstListingOnlyWhenTheDeviceHoldsAtStart(): Promise<void> {
+    const checks = await ToolUpdateChecksTests.checksAsync("AtStart", async listAsync => {
+      await listAsync();
+      await listAsync();
+    });
+
+    Assert.areEqual("true,false", checks);
+  }
+
+  @TestMethod
+  public async readsTheLatestVersionsOfTheListedInstallationsWhenTheDevicesAutomaticArrivesAfterTheFirstListing(): Promise<void> {
+    const checks = await ToolUpdateChecksTests.checksAsync("Automatic", async (listAsync, changeAsync) => {
+      await listAsync();
+      await changeAsync("Automatic");
+      await listAsync();
+    });
+
+    Assert.areEqual("false,true,true", checks);
+  }
+
+  private static async checksAsync(stored: string,
+    act: (listAsync: () => Promise<void>, changeAsync: (value: JsonValue) => Promise<void>) => Promise<void>): Promise<string> {
+    using directory = new TemporaryDirectory();
+    using database = new MemoryModuleDatabase(HostedMigrations.all);
+    await using checkpoints = await CheckpointsModule.startAsync();
+    const context = new RecordingPartContext(directory.path, database, directory.path, checkpoints.services);
+    const settings = ToolUpdateChecksTests.settingsOf(stored);
+    context.settings = settings;
+    const installation = new RecordingInstallation();
+    const registry = new ProviderKindRegistry();
+    registry.register(new InstalledAdapter(installation));
+    const part = new RuntimePart(new GivenRegistries(registry), "1.2.3");
+    await part.activateAsync(context);
+    try {
+      await act(async () => {
+        await ToolUpdateChecksTests.listAsync(context);
+        await installation.read;
+      }, async value => {
+        ToolUpdateChecksTests.change(settings, value);
+        await installation.read;
+      });
+    }
+    finally {
+      await part.deactivateAsync();
+    }
+    return installation.checks.join(",");
+  }
+
+  private static settingsOf(stored: string): FakeModuleSettings {
+    const declared = new DeclaredSettings();
+    const settings = new FakeModuleSettings();
+    settings.answer("read", (name, scope, device) => name === ToolUpdateChecksTests.setting ? stored : declared.read(name, scope, device));
+    return settings;
+  }
+
+  private static change(settings: FakeModuleSettings, value: JsonValue): void {
+    const key = new SettingKey(QualifiedName.parse(ToolUpdateChecksTests.setting), null, "device-1");
+    settings.raiseChanged(ToolUpdateChecksTests.setting, new SettingChange(key, value, true));
+  }
+
+  private static async listAsync(context: RecordingPartContext): Promise<void> {
+    const handler = context.methods.get("teamrun.providerKindInstallationList");
+    if (Object.isUndefined(handler))
+      throw new Error("The part did not register the installation list.");
+    await handler.handleAsync(new RequestContext("tests", null, new AbortController().signal, 1));
   }
 }

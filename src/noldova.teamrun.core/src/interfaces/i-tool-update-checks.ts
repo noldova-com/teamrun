@@ -7,5 +7,6 @@
  */
 
 export interface IToolUpdateChecks {
-  readonly runWithoutAsking: boolean;
+  takeCheck(): boolean;
+  onAllowed(listener: () => void): void;
 }

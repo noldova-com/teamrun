@@ -9,15 +9,12 @@
 import { type IProviderKindInstallation, ProviderKindVersions } from "@noldova/teamrun.core";
 
 import { ChangeSignal } from "./change-signal.fixture.js";
+import { HeldInstall } from "./held-install.fixture.js";
+import { PendingRead } from "./pending-read.fixture.js";
 
 export class FakeProviderKindInstallation implements IProviderKindInstallation {
-  private settle: { readonly resolve: (path: string) => void; readonly reject: (error: unknown) => void } | null = null;
-  private readonly pending: {
-    readonly promise: Promise<ProviderKindVersions>;
-    readonly resolve: (versions: ProviderKindVersions) => void;
-    readonly reject: (error: unknown) => void;
-    readonly checksLatest: boolean;
-  }[] = [];
+  private held: HeldInstall | null = null;
+  private readonly pending: PendingRead[] = [];
 
   public unavailable: string | null = null;
   public missingTool: string | null = null;
@@ -42,13 +39,9 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
       this.read = Promise.resolve(this.versionsFor(checksLatest));
       return this.read;
     }
-    let resolve: (versions: ProviderKindVersions) => void = () => undefined;
-    let reject: (error: unknown) => void = () => undefined;
-    this.read = new Promise((answer, fail) => {
-      resolve = answer;
-      reject = fail;
-    });
-    this.pending.push({ promise: this.read, resolve, reject, checksLatest });
+    const reading = new PendingRead(checksLatest);
+    this.read = reading.promise;
+    this.pending.push(reading);
     ChangeSignal.notify();
     return this.read;
   }
@@ -59,32 +52,41 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
     this.progress = progress;
     this.commit = commit;
     this.signal = signal;
-    return new Promise((resolve, reject) => {
-      this.settle = { resolve, reject };
-      signal.addEventListener("abort", () => reject(new Error("The install was stopped.")), { once: true });
-    });
+    const held = new HeldInstall(signal);
+    this.held = held;
+    return held.promise;
   }
 
   public answerRead(): Promise<ProviderKindVersions> {
-    const reading = this.pending.shift()!;
-    reading.resolve(this.versionsFor(reading.checksLatest));
-    return reading.promise;
+    const reading = this.nextRead();
+    return reading.answer(this.versionsFor(reading.checksLatest));
   }
 
-  public async failRead(): Promise<void> {
-    const reading = this.pending.shift()!;
-    reading.reject(new Error("The release channel didn't answer."));
-    await reading.promise.catch(() => undefined);
+  public failRead(): Promise<void> {
+    return this.nextRead().fail(new Error("The release channel didn't answer."));
   }
 
   public complete(): void {
     this.isInstalled = true;
     ChangeSignal.notify();
-    this.settle!.resolve("/opt/provider/server");
+    this.heldInstall().complete("/opt/provider/server");
   }
 
   public fail(error: unknown): void {
-    this.settle!.reject(error);
+    this.heldInstall().fail(error);
+  }
+
+  private nextRead(): PendingRead {
+    const reading = this.pending.shift();
+    if (Object.isUndefined(reading))
+      throw new Error("No read is waiting for an answer.");
+    return reading;
+  }
+
+  private heldInstall(): HeldInstall {
+    if (Object.isNull(this.held))
+      throw new Error("No install is running.");
+    return this.held;
   }
 
   private versionsFor(checksLatest: boolean): ProviderKindVersions {

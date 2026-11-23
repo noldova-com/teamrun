@@ -247,7 +247,7 @@ export class RuntimePart implements IRuntimePart {
     const teammates = new TeammatesService(database, providers, conversations, organization);
     const planUsage = new PlanUsageService(events);
     this.planUsage = planUsage;
-    const kinds = new ProviderKindsService(registry, providers, events, planUsage, teammates, context.log, new ToolUpdateChecks(context.settings));
+    const kinds = new ProviderKindsService(registry, providers, events, new ToolUpdateChecks(context.settings), planUsage, teammates, context.log);
     const sharedServers = new SharedMcpServersService(database, providers, teammates, registry, () => context.readEnvironmentAsync(), context.secrets,
       new SharedMcpOauth(context.secrets), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
       events, context.log);

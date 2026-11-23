@@ -72,28 +72,30 @@ export class ClaudeInstallerTests {
       const sha256 = createHash("sha256").update(program).digest("hex");
       const manifest = (build: unknown): Buffer => Buffer.from(JSON.stringify({ version: "2.1.212", platforms: { "linux-x64": build } }));
       server.serve("/unreadable/latest", Buffer.from("<html>sign in</html>"));
-      for (const [channel, body] of [["/no-build", manifest(undefined)], ["/bad-checksum", manifest({ checksum: "ABC", size: program.length })],
-        ["/bad-size", manifest({ checksum: sha256, size: "1" })], ["/no-size", manifest({ checksum: sha256, size: 0 })], ["/not-json", Buffer.from("{")],
-        ["/no-platforms", Buffer.from("null")], ["/mismatch", manifest({ checksum: "0".repeat(64), size: program.length })],
-        ["/missing", manifest({ checksum: sha256, size: program.length })]] as const) {
-        server.serve(`${channel}/latest`, Buffer.from("2.1.212\n")).serve(`${channel}/2.1.212/manifest.json`, body);
-        if (channel === "/mismatch")
-          server.serve(`${channel}/2.1.212/linux-x64/claude`, program);
+      const manifests = [new ServedManifest("/no-build", manifest(undefined)), new ServedManifest("/bad-checksum", manifest({ checksum: "ABC", size: program.length })),
+        new ServedManifest("/bad-size", manifest({ checksum: sha256, size: "1" })), new ServedManifest("/no-size", manifest({ checksum: sha256, size: 0 })),
+        new ServedManifest("/not-json", Buffer.from("{")), new ServedManifest("/no-platforms", Buffer.from("null")),
+        new ServedManifest("/mismatch", manifest({ checksum: "0".repeat(64), size: program.length })),
+        new ServedManifest("/missing", manifest({ checksum: sha256, size: program.length }))];
+      for (const served of manifests) {
+        server.serve(`${served.channel}/latest`, Buffer.from("2.1.212\n")).serve(`${served.channel}/2.1.212/manifest.json`, served.body);
+        if (served.channel === "/mismatch")
+          server.serve(`${served.channel}/2.1.212/linux-x64/claude`, program);
       }
-      const cases: readonly [string, string][] = [
-        ["/gone", Resources.formatReleaseChannelFailed("Claude Code", 404)],
-        ["/unreadable", Resources.formatReleaseChannelUnreadable("Claude Code")],
-        ["/no-build", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/bad-checksum", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/bad-size", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/no-size", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/not-json", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/no-platforms", Resources.formatClaudeBuildMissing("2.1.212")],
-        ["/mismatch", Resources.formatDownloadMismatch("Claude Code")],
-        ["/missing", Resources.formatDownloadFailed("Claude Code", 404)]
+      const cases = [
+        new ChannelFailure("/gone", Resources.formatReleaseChannelFailed("Claude Code", 404)),
+        new ChannelFailure("/unreadable", Resources.formatReleaseChannelUnreadable("Claude Code")),
+        new ChannelFailure("/no-build", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/bad-checksum", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/bad-size", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/no-size", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/not-json", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/no-platforms", Resources.formatClaudeBuildMissing("2.1.212")),
+        new ChannelFailure("/mismatch", Resources.formatDownloadMismatch("Claude Code")),
+        new ChannelFailure("/missing", Resources.formatDownloadFailed("Claude Code", 404))
       ];
 
-      for (const [channel, message] of cases) {
+      for (const { channel, message } of cases) {
         const installer = ClaudeInstallerTests.installer(server.url(channel), directory);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channel);
         Assert.isFalse(installer.isInstalled, channel);
@@ -109,12 +111,12 @@ export class ClaudeInstallerTests {
   @TestMethod
   public saysWhyItsSetupFailedOrLeftNoClaudeCodeToFind(): Promise<void> {
     return ClaudeInstallerTests.withChannel(async (server, directory) => {
-      const cases: readonly [string, Buffer, string][] = [
-        ["/fails", ClaudeInstallerTests.script("process.exit(3);"), Resources.formatClaudeSetupFailed("2.1.212", 3)],
-        ["/vanishes", ClaudeInstallerTests.script(""), Resources.claudeNotFoundAfterSetup]
+      const cases = [
+        new ChannelFailure("/fails", Resources.formatClaudeSetupFailed("2.1.212", 3), ClaudeInstallerTests.script("process.exit(3);")),
+        new ChannelFailure("/vanishes", Resources.claudeNotFoundAfterSetup, ClaudeInstallerTests.script(""))
       ];
 
-      for (const [channel, program, message] of cases) {
+      for (const { channel, program, message } of cases) {
         ClaudeInstallerTests.publish(server, channel, "2.1.212", "linux-x64", "claude", program);
         const installer = ClaudeInstallerTests.installer(server.url(channel), directory);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channel);
@@ -143,13 +145,13 @@ export class ClaudeInstallerTests {
   @TestMethod
   public saysWhichVersionIsStillInstalledWhenItsSetupAndTheInstalledClaudeCodeLeaveAnotherOne(): Promise<void> {
     return ClaudeInstallerTests.withChannel(async (server, directory) => {
-      const cases: readonly [string, string, string][] = [
-        ["/keeps", "2.1.211 (Claude Code)", Resources.formatClaudeSetupKept("2.1.212", "2.1.211")],
-        ["/unreadable", "", Resources.formatClaudeSetupKept("2.1.212", null)]
+      const cases = [
+        new ChannelFailure("/keeps", Resources.formatClaudeSetupKept("2.1.212", "2.1.211"), ClaudeInstallerTests.program(directory, "2.1.212", "2.1.211 (Claude Code)")),
+        new ChannelFailure("/unreadable", Resources.formatClaudeSetupKept("2.1.212", null), ClaudeInstallerTests.program(directory, "2.1.212", ""))
       ];
 
-      for (const [channel, output, message] of cases) {
-        ClaudeInstallerTests.publish(server, channel, "2.1.212", "linux-x64", "claude", ClaudeInstallerTests.program(directory, "2.1.212", output));
+      for (const { channel, program, message } of cases) {
+        ClaudeInstallerTests.publish(server, channel, "2.1.212", "linux-x64", "claude", program);
         const installer = ClaudeInstallerTests.installer(server.url(channel), directory);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channel);
         Assert.areEqual(0, readdirSync(directory.resolve("staging")).length, channel);
@@ -291,13 +293,13 @@ if (process.argv[4] === "--force") require("node:fs").writeFileSync(${installed}
 
   @TestMethod
   public namesTheBuildForEachSupportedComputerWithMuslLinuxApart(): void {
-    const cases: readonly [string, string, boolean, string | null][] = [
-      ["darwin", "arm64", false, "darwin-arm64"], ["darwin", "x64", true, "darwin-x64"], ["linux", "x64", false, "linux-x64"],
-      ["linux", "arm64", true, "linux-arm64-musl"], ["linux", "x64", true, "linux-x64-musl"], ["win32", "x64", true, "win32-x64"],
-      ["win32", "arm64", false, "win32-arm64"], ["win32", "ia32", false, null], ["freebsd", "x64", false, null]
+    const cases = [
+      new BuildTarget("darwin", "arm64", false, "darwin-arm64"), new BuildTarget("darwin", "x64", true, "darwin-x64"), new BuildTarget("linux", "x64", false, "linux-x64"),
+      new BuildTarget("linux", "arm64", true, "linux-arm64-musl"), new BuildTarget("linux", "x64", true, "linux-x64-musl"), new BuildTarget("win32", "x64", true, "win32-x64"),
+      new BuildTarget("win32", "arm64", false, "win32-arm64"), new BuildTarget("win32", "ia32", false, null), new BuildTarget("freebsd", "x64", false, null)
     ];
 
-    for (const [platform, architecture, isMusl, target] of cases)
+    for (const { platform, architecture, isMusl, target } of cases)
       Assert.areEqual(target, ClaudeInstaller.targetOf(platform, architecture, isMusl), `${platform} ${architecture} ${isMusl}`);
   }
 
@@ -348,5 +350,41 @@ require("node:fs").writeFileSync(require("node:path").join(${bin}, "claude.cjs")
 
   private static versions(versions: ProviderKindVersions): string {
     return `${versions.installed} ${versions.latest}`;
+  }
+}
+
+class ServedManifest {
+  public readonly channel: string;
+  public readonly body: Buffer;
+
+  public constructor(channel: string, body: Buffer) {
+    this.channel = channel;
+    this.body = body;
+  }
+}
+
+class ChannelFailure {
+  public readonly channel: string;
+  public readonly message: string;
+  public readonly program: Buffer;
+
+  public constructor(channel: string, message: string, program: Buffer = Buffer.alloc(0)) {
+    this.channel = channel;
+    this.message = message;
+    this.program = program;
+  }
+}
+
+class BuildTarget {
+  public readonly platform: string;
+  public readonly architecture: string;
+  public readonly isMusl: boolean;
+  public readonly target: string | null;
+
+  public constructor(platform: string, architecture: string, isMusl: boolean, target: string | null) {
+    this.platform = platform;
+    this.architecture = architecture;
+    this.isMusl = isMusl;
+    this.target = target;
   }
 }
