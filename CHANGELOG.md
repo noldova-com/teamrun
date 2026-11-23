@@ -11,6 +11,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Organization:** while editing, every teammate's card takes it out of the organization once you confirm, saying whom the teammates and units under it will report to; the teammate keeps its chats and can be added back, and a unit member's card still moves it out of its unit, now named Move out of unit (#154).
 - **Organization:** the Board's and Focus's cards open their teammate's details when pointed at or reached with the keyboard, as the Tree's do (#134).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
+- **Organization:** a message to several teammates shows Stop beside Send while it is sent or answered: the teammates not yet sent to get nothing and show Stopped, each recipient's running reply stops, a copy queued behind one is taken back, and the next message can go at once (#140).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
 - **Explorer:** an Organizations group lists each organization, whose name opens its own Organization view, then the teammates it places in no department and each of its departments by its path, such as `DevOps › Infra`, with its teammates; a teammate's row opens its Organization chat in that organization and shows when it waits or works, and Organization chats no longer show under Chats, Pinned or a project, even one pinned or moved there before (#402).
@@ -37,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
+- **Organization:** the view's title and the Focus view's root crumb name the organization, and follow a rename, rather than reading Organization in every organization's view (#145).
 - **Organization:** while you edit the structure, each person's Add teammate and Add unit sit right under that person's card, or a unit's leader, on the line to the people below, rather than after everyone below; Reports to stays on one line, and a single report's line runs straight down with no stub (#146).
 - **Organization:** a failed change shows its reason once, in the view's header, and a failed message to a teammate or a group once, in the chat beside the tree, rather than in both places (#138).
 - **Organization:** removing a member from a unit now says the teammate will report to you, where it goes, rather than that it stays in no unit (#137).

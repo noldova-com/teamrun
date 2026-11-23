@@ -1345,13 +1345,19 @@ export class ChatStoreService {
 
   public async addWaiting(text: string, settings: ComposerSettings, conversationId: string, delivery: MessageDelivery,
     attachments: readonly AttachmentInput[] = [], mentionedTeammateIds: readonly string[] = [], responderTeammateId: string | null = null): Promise<boolean> {
+    return !Object.isNull(await this.addWaitingMessage(text, settings, conversationId, delivery, attachments, mentionedTeammateIds, responderTeammateId));
+  }
+
+  public async addWaitingMessage(text: string, settings: ComposerSettings, conversationId: string, delivery: MessageDelivery, attachments: readonly AttachmentInput[],
+    mentionedTeammateIds: readonly string[], responderTeammateId: string | null): Promise<WaitingMessage | null> {
     const params = ChatStoreService.sendParams(text, settings, conversationId, attachments, mentionedTeammateIds, responderTeammateId);
+    let added: WaitingMessage | null = null;
     const succeeded = await this.perform(async () => {
-      await this.request(MethodName.WaitingMessageAdd, new WaitingMessageAddParams(params, delivery).toJson());
+      added = WaitingMessage.fromJson(await this.request(MethodName.WaitingMessageAdd, new WaitingMessageAddParams(params, delivery).toJson()));
     }, (message, error) => this.notSent(conversationId, message, error));
     if (succeeded)
       this.dismissUnsent(t => t === conversationId);
-    return succeeded;
+    return added;
   }
 
   public editWaiting(waiting: WaitingMessage, text: string, attachments: readonly AttachmentInput[], mentioned: readonly string[]): Promise<boolean> {

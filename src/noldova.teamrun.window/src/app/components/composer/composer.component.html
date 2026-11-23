@@ -119,10 +119,12 @@ LICENSE file in the root directory of this source tree.
           <span #pickerGlyph class="nol-teamrun-composer-glyph material-symbols-rounded" aria-hidden="true">{{ resources.expandGlyph }}</span>
         </span>
       </button>
-      @if (runningReply(); as reply) {
+      @if (canStop()) {
         <button type="button" nol-icon-button class="nol-teamrun-composer-stop" [icon]="resources.stopGlyph"
           [label]="stopping() ? resources.stoppingLabel : resources.stopLabel" [nolTooltip]="stopping() ? resources.stoppingLabel : resources.stopLabel"
           [disabled]="stopping()" (click)="stop()"></button>
+      }
+      @if (runningReply(); as reply) {
         @let chosen = editing() !== null ? null : store.whileReplying();
         <nol-split-button #end class="nol-teamrun-composer-deliver" [icon]="chosen === null ? resources.sendGlyph : resources.deliveryGlyphs[chosen]"
           [label]="chosen === null ? resources.saveWaitingLabel : resources.deliveryLabels[chosen]" [menuLabel]="resources.deliveryMenuLabel" [menu]="deliveryMenu"

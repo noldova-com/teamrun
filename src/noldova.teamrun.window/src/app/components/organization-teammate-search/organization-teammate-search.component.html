@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <nol-quick-input [label]="resources.organizationAddTeammateSearch" [icon]="resources.organizationAddTeammateSearchIcon" [items]="items()" [(query)]="query"
-  [emptyText]="emptyText()" (chosen)="choose($event)" (dismissed)="done.emit()" />
+  [emptyText]="resources.organizationAddTeammateEmpty" (chosen)="choose($event)" (dismissed)="done.emit()" />
 @if (error(); as message) {
   <nol-field-message class="error">{{ message }}</nol-field-message>
 }
