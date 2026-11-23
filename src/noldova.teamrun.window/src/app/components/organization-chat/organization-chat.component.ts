@@ -10,7 +10,7 @@ import { NgComponentOutlet } from "@angular/common";
 import { Component, computed, createEnvironmentInjector, DestroyRef, effect, EnvironmentInjector, inject, linkedSignal, model, type ModelSignal, type Signal, signal,
   type Type, untracked, type WritableSignal } from "@angular/core";
 import "@noldova/context.core";
-import { type AttachmentInput, MessageAuthor, MessageStatus, OrganizationTarget, OrganizationTargetKind, type WaitingMessage } from "@noldova/teamrun.protocol";
+import { type AttachmentInput, MessageAuthor, MessageDelivery, MessageStatus, OrganizationTarget, OrganizationTargetKind, type WaitingMessage } from "@noldova/teamrun.protocol";
 import { provideCodeHighlighting } from "@noldova/ui.components.angular/code-highlighting";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 
@@ -53,6 +53,7 @@ export class OrganizationChatComponent {
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly history: Type<HistoryComponent> = HistoryComponent;
+  protected readonly queue: MessageDelivery = MessageDelivery.Queue;
   protected readonly environment: EnvironmentInjector = createEnvironmentInjector([provideMarkdown(), provideCodeHighlighting({ preload: Resources.preloadedCodeLanguages })],
     inject(EnvironmentInjector));
   protected readonly teammateId: Signal<string | null> = computed(() => {
@@ -217,7 +218,7 @@ export class OrganizationChatComponent {
   private async deliver(text: string, settings: ComposerSettings, chatId: string, attachments: readonly AttachmentInput[], teammateId: string): Promise<boolean> {
     if (Object.isNull(this.store.runningReplyOf(chatId)))
       return this.store.send(text, settings, chatId, attachments, [], teammateId);
-    const waiting = await this.store.addWaitingMessage(text, settings, chatId, this.store.whileReplying(), attachments, [], teammateId);
+    const waiting = await this.store.addWaitingMessage(text, settings, chatId, MessageDelivery.Queue, attachments, [], teammateId);
     if (Object.isNull(waiting))
       return false;
     this.queued.set(chatId, waiting);

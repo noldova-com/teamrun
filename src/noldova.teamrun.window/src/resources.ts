@@ -1272,7 +1272,6 @@ export class Resources {
   public static readonly organizationDepartmentNameLabel: string = "Unit name";
   public static readonly organizationLeaderLabel: string = "Leader";
   public static readonly organizationNoLeader: string = "No leader";
-  public static readonly organizationAddMember: string = "Add member";
   public static readonly organizationAddMemberIcon: string = "person_add";
   public static readonly organizationAddDepartment: string = "Add unit";
   public static readonly organizationAddDepartmentIcon: string = "add";

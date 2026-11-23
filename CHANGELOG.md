@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Organization:** while editing, the Board and Focus choose a unit's leader and add teammates through the same Find a teammate search as the Tree, to a unit or directly under you (#135).
 - **Organization:** while editing, every teammate's card takes it out of the organization once you confirm, saying whom the teammates and units under it will report to; the teammate keeps its chats and can be added back, and a unit member's card still moves it out of its unit, now named Move out of unit (#154).
 - **Organization:** the Board's and Focus's cards open their teammate's details when pointed at or reached with the keyboard, as the Tree's do (#134).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
@@ -38,6 +39,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and the Focus view's root crumb name the organization, and follow a rename, rather than reading Organization in every organization's view (#145).
 - **Organization:** while you edit the structure, each person's Add teammate and Add unit sit right under that person's card, or a unit's leader, on the line to the people below, rather than after everyone below; Reports to stays on one line, and a single report's line runs straight down with no stub (#146).
 - **Organization:** a failed change shows its reason once, in the view's header, and a failed message to a teammate or a group once, in the chat beside the tree, rather than in both places (#138).

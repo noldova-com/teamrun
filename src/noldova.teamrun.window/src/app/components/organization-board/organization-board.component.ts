@@ -10,8 +10,8 @@ import { Component, computed, effect, ElementRef, inject, type InputSignal, inpu
 
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-  OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
+import { ButtonComponent, ButtonVariant, CanvasItemDirective, ChipComponent, ChoicePillsComponent, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide, PopoverOpening,
+  PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { FlowLayout } from "../../enums/flow-layout";
@@ -33,6 +33,7 @@ import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
+import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 import { TeammateAvatarComponent } from "../teammate-avatar/teammate-avatar.component";
@@ -40,8 +41,8 @@ import { TeammateStatusComponent } from "../teammate-status/teammate-status.comp
 
 @Component({
   selector: "nol-teamrun-organization-board",
-  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, FlowOverlayComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective,
-    OrganizationCardComponent, OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TeammateAvatarComponent,
+  imports: [ButtonComponent, CanvasItemDirective, ChipComponent, ChoicePillsComponent, FlowOverlayComponent, IconButtonComponent, OrganizationCardComponent, OrganizationDetailsComponent,
+    OrganizationTeammateSearchComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, SelectComponent, TeammateAvatarComponent,
     TeammateStatusComponent, TextFieldComponent],
   host: { class: "nol-teamrun-organization-board" },
   providers: [OrganizationFlowService.provider],
@@ -72,6 +73,10 @@ export class OrganizationBoardComponent {
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
+  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
+  protected readonly below: OverlaySide = OverlaySide.below;
+  protected readonly start: OverlayAlignment = OverlayAlignment.Start;
+  protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly sortOptions: readonly SelectOption[] = Object.values(OrganizationBoardSort).map(t => new SelectOption(t, Resources.organizationBoardSortLabels[t]));
   protected readonly departments: Signal<readonly OrganizationNode[]> = computed(() => OrganizationBoardComponent.flatten(this.tree()));
@@ -146,16 +151,16 @@ export class OrganizationBoardComponent {
     return Resources.formatOrganizationBoardSummary(node.leader?.name ?? null, counts);
   }
 
-  protected addable(node: OrganizationNode): readonly Teammate[] {
-    return OrganizationEdits.addable(node, this.chats.teammates());
+  protected leaderOptions(node: OrganizationNode): readonly SelectOption[] {
+    return OrganizationEdits.leaderOptions(node, this.chats.teammates());
+  }
+
+  protected setLeader(node: OrganizationNode, value: string): void {
+    void OrganizationEdits.setLeaderAsync(this.organization, node, value);
   }
 
   protected rename(department: Department, event: Event): void {
     void OrganizationEdits.renameAsync(event, department.name, name => this.organization.renameDepartment(department.id, name));
-  }
-
-  protected addMember(node: OrganizationNode, teammate: Teammate): void {
-    void this.organization.setMember(teammate.id, node.id);
   }
 
   protected addDepartment(): void {
