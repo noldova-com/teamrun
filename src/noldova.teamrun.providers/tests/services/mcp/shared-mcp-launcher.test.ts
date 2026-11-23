@@ -27,6 +27,7 @@ export class SharedMcpLauncherTests {
   private static readonly INPUT_SCRIPT: string = "process.stdin.resume(); process.stdin.on(\"end\", () => process.exit(0))";
   private static readonly NO_SUCH_PROGRAM: string = "teamrun-no-such-program";
   private static readonly VERSION_OPTION: string = "--version";
+  private static readonly POWERSHELL: string = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
   private static readonly HANDED: string = "4321\n";
   private static readonly EXITED: string = "4321\nexited\n";
   private static readonly HOLD: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
@@ -379,7 +380,7 @@ export class SharedMcpLauncherTests {
     await running;
 
     Assert.areEqual(JSON.stringify([0]), JSON.stringify(host.codes));
-    Assert.areEqual(JSON.stringify(["pipe", "ignore", "inherit"]), JSON.stringify(recorder.starts[0]?.options.stdio));
+    Assert.areEqual(JSON.stringify([["pipe", "ignore", "inherit"], "C:\\Windows\\System32"]), JSON.stringify([recorder.starts[0]?.options.stdio, recorder.starts[0]?.options.cwd]));
     Assert.areEqual(JSON.stringify({ command: path.join("C:\\tools\\server.exe"), args: ["--stdio"], options: { env: { Path: "C:\\Windows", SystemRoot: "C:\\Windows",
       search_key: "s1" }, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: false, detached: false } }), JSON.stringify(recorder.starts[1]));
     Assert.areEqual(JSON.stringify([[recorder.children[1]?.pid, "SIGTERM"]]), JSON.stringify(host.signals));
@@ -494,7 +495,8 @@ export class SharedMcpLauncherTests {
       }
     }
 
-    Assert.areEqual(JSON.stringify(Array.from({ length: 5 }, () => [["linux", [], [], [0]], ["win32", [], ["powershell.exe"], [0]]]).flat()), JSON.stringify(outcomes));
+    Assert.areEqual(JSON.stringify(Array.from({ length: 5 }, () => [["linux", [], [], [0]], ["win32", [], [SharedMcpLauncherTests.POWERSHELL], [0]]]).flat()),
+      JSON.stringify(outcomes));
   }
 
   @TestMethod
@@ -514,7 +516,7 @@ export class SharedMcpLauncherTests {
   public async endsTheServerAndEachProcessUnderItThatStartedAfterTheWatchByTheKernelsTimesOnWindows(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
-    const environment = { SystemRoot: "C:\\Windows" };
+    const environment = { SystemRoot: "D:\\Windows", Path: ".;C:\\tools" };
 
     const running = new SharedMcpLauncher("win32", environment, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
     host.stdin.end(SharedMcpLauncherTests.HANDED);
@@ -522,7 +524,8 @@ export class SharedMcpLauncherTests {
 
     const [powershell] = recorder.starts;
     const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
-    Assert.areEqual(JSON.stringify(["powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand"], { env: environment, stdio: "ignore", windowsHide: true }]),
+    Assert.areEqual(JSON.stringify(["D:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand"],
+      { cwd: "D:\\Windows\\System32", env: environment, stdio: "ignore", windowsHide: true }]),
       JSON.stringify([powershell?.command, powershell?.args.slice(0, 3), powershell?.options]));
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true, true, false, false]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ",
       "Created = $_.CreationDate.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
@@ -598,7 +601,7 @@ export class SharedMcpLauncherTests {
     await running;
     const [stalled, second] = recorder.starts;
 
-    Assert.areEqual(JSON.stringify([2, "powershell.exe", true, [SharedMcpLauncher.powershellAnswerMilliseconds,
+    Assert.areEqual(JSON.stringify([2, SharedMcpLauncherTests.POWERSHELL, true, [SharedMcpLauncher.powershellAnswerMilliseconds,
       SharedMcpLauncher.windowsEndMilliseconds - SharedMcpLauncher.powershellAnswerMilliseconds], [true, false], [0],
     "TeamRun's MCP watch: PowerShell 1 of 2 didn't end and was ended after 10000 ms.\n"]),
     JSON.stringify([recorder.starts.length, second?.command, second?.args[3] === stalled?.args[3], limits, recorder.children.map(t => t.killed), host.codes,
@@ -683,8 +686,29 @@ export class SharedMcpLauncherTests {
     const found = `${path.join("C:\\b", "server")}.EXE`;
     const launcher = new SharedMcpLauncher("win32", {}, "node", "launch.js", new FakeLauncherHost(), undefined, t => t === found);
 
-    Assert.areEqual(JSON.stringify([{ command: found, args: ["--stdio"], verbatim: false }, { command: "missing", args: [], verbatim: false }]),
-      JSON.stringify([launcher.commandOf("server", ["--stdio"], { Path: "C:\\a;;C:\\b" }), launcher.commandOf("missing", [], {})]));
+    Assert.areEqual(JSON.stringify({ command: found, args: ["--stdio"], verbatim: false }), JSON.stringify(launcher.commandOf("server", ["--stdio"], { Path: "C:\\a;;C:\\b" })));
+  }
+
+  @TestMethod
+  public findsACommandNamedWithoutAFolderOnlyInPathsAbsoluteFoldersOnWindowsNeverTheWorkingFolder(): void {
+    const located = `${path.join("C:\\bin", "git")}.exe`;
+    const inWorkingFolder = (file: string): boolean => !path.win32.isAbsolute(file);
+    const launcher = new SharedMcpLauncher("win32", {}, "node", "launch.js", new FakeLauncherHost(), undefined, t => t === located || inWorkingFolder(t));
+    const commandOf = (folders: string): string | null => launcher.commandOf("git", ["status"], { PATH: folders, PATHEXT: ".exe" })?.command ?? null;
+
+    Assert.areEqual(JSON.stringify([null, null, located, located, located]),
+      JSON.stringify([commandOf(""), commandOf(".;bin;"), commandOf("C:\\bin"), commandOf(".;C:\\bin"), commandOf("bin;C:\\bin")]));
+  }
+
+  @TestMethod
+  public async refusesACommandNamedWithoutAFolderThatPathDoesntHoldOnWindowsAndStartsNothing(): Promise<void> {
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder();
+
+    await new SharedMcpLauncher("win32", { PATH: ".", PATHEXT: ".EXE" }, "node", "launch.js", host, recorder.start, () => true)
+      .runAsync(true, ["--variables", "", "--", "search-server", "--stdio"]);
+
+    Assert.areEqual(JSON.stringify([[1], "spawn search-server ENOENT\n", 0]), JSON.stringify([host.codes, host.errors, recorder.starts.length]));
   }
 
   @TestMethod
@@ -694,7 +718,7 @@ export class SharedMcpLauncherTests {
 
     const command = launcher.commandOf("tool.cmd", ["a b", "a\"b", "&calc", "50%", "back\\"], { PATHEXT: ".EXE;.CMD", PATH: "C:\\bin" });
 
-    Assert.areEqual(JSON.stringify({ command: "cmd.exe", args: ["/d", "/s", "/c",
+    Assert.areEqual(JSON.stringify({ command: "C:\\Windows\\System32\\cmd.exe", args: ["/d", "/s", "/c",
       `"${located} ^^^"a^^^ b^^^" ^^^"a\\^^^"b^^^" ^^^"^^^&calc^^^" ^^^"50^^^%^^^" ^^^"back\\\\^^^""`], verbatim: true }), JSON.stringify(command));
   }
 
@@ -732,7 +756,7 @@ export class SharedMcpLauncherTests {
 
     const command = launcher.commandOf("tool", [], { PATH: directory.path, PATHEXT: ".EXE;.cmd" });
 
-    Assert.areEqual(JSON.stringify(["cmd.exe", true, true]), JSON.stringify([command.command, command.verbatim, String(command.args[3]).includes("tool.cmd")]));
+    Assert.areEqual(JSON.stringify(["C:\\Windows\\System32\\cmd.exe", true, true]), JSON.stringify([command?.command, command?.verbatim, String(command?.args[3]).includes("tool.cmd")]));
   }
 
   private static async listeningAtStartAsync(platform: string, environment: Readonly<Record<string, string>>, program: string, script: string,

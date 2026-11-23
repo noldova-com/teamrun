@@ -3614,6 +3614,10 @@ export class Resources {
     return `The ${name} download left HTTPS, and it has no SHA-256 to check it against, so it was stopped.`;
   }
 
+  public static formatCommandNotOnPath(command: string): string {
+    return `No ${command} is on PATH, and TeamRun runs a command named without a folder only from PATH, never from the chat's folder.`;
+  }
+
   public static formatAcpArgumentLineBreak(command: string): string {
     return `${command} is a batch file, and Windows ends a batch file's command line at a line break, so an argument with one can't reach it.`;
   }

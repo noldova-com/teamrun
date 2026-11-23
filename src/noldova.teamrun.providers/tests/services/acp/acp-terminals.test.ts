@@ -7,14 +7,17 @@
  */
 
 import { once } from "node:events";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 import { JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { TaskEnd, TaskStart } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
-import { AcpTerminals, type IProcessTree, StartedProcess } from "@noldova/teamrun.providers";
+import { AcpRequestException, AcpTerminals, type IProcessTree, Resources, StartedProcess } from "@noldova/teamrun.providers";
 
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
+import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
 class HeldTaskListener extends RecordingTurnListener {
@@ -44,7 +47,8 @@ export class AcpTerminalsTests {
     const errors = new PassThrough();
     const tree: IProcessTree = { endTree: () => Promise.resolve(true), endOwnTree: () => Promise.resolve(true), endDescendants: () => Promise.resolve(),
       endLeftovers: () => Promise.resolve() };
-    const terminals = new AcpTerminals(listener, "Agent", { start: () => started, readEnvironmentAsync: own => Promise.resolve(own) }, new ManualTimer(), process.cwd(), () => ({}), null, tree);
+    const terminals = new AcpTerminals(listener, "Agent", { start: () => started, readEnvironmentAsync: own => Promise.resolve(own) }, new ManualTimer(), process.cwd(), () => ({}), null, tree,
+      "linux");
     let settled = 0;
     const failures: unknown[] = [];
     terminals.begin("s", () => settled++, t => failures.push(t));
@@ -86,7 +90,7 @@ export class AcpTerminalsTests {
       endOwnTree: (processId, startedBy) => { asked.push([processId, startedBy]); return Promise.resolve(true); },
       endLeftovers: () => { after.push("leftovers"); return Promise.resolve(); } };
     const terminals = new AcpTerminals(new RecordingTurnListener(), "Agent", { start: () => started, readEnvironmentAsync: own => Promise.resolve(own) }, timer, process.cwd(),
-      () => ({}), null, tree);
+      () => ({}), null, tree, "linux");
     terminals.begin("s", () => undefined, () => undefined);
     const created = await terminals.request("terminal/create", JsonReader.fromValue({ sessionId: "s", command: "node" }));
     const terminalId = JsonReader.fromValue(created).readNonBlankString("terminalId");
@@ -98,5 +102,30 @@ export class AcpTerminalsTests {
     const killed = await terminals.request("terminal/kill", JsonReader.fromValue({ sessionId: "s", terminalId }));
 
     Assert.areEqual(JSON.stringify([{}, [[7, spawned]], []]), JSON.stringify([killed, asked, after]));
+  }
+
+  @TestMethod
+  public async runsACommandNamedWithoutAFolderOnWindowsOnlyFromTheTurnsPathAndRefusesOneOnlyTheChatsFolderHolds(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const bin = directory.resolve("bin");
+    mkdirSync(bin);
+    writeFileSync(directory.resolve("git.exe"), "");
+    writeFileSync(path.join(bin, "git.exe"), "");
+    const tree: IProcessTree = { endTree: () => Promise.resolve(true), endOwnTree: () => Promise.resolve(true), endDescendants: () => Promise.resolve(),
+      endLeftovers: () => Promise.resolve() };
+    const starts: string[] = [];
+    const terminalsWith = (folders: string): AcpTerminals => {
+      const made = new AcpTerminals(new RecordingTurnListener(), "Agent", { start: command => { starts.push(command.executable); return new StartedProcess(); },
+        readEnvironmentAsync: own => Promise.resolve(own) }, new ManualTimer(), directory.path, () => ({ PATH: folders, PATHEXT: ".exe" }), null, tree, "win32");
+      made.begin("s", () => undefined, () => undefined);
+      return made;
+    };
+    const create = { sessionId: "s", command: "git", args: ["status"], env: [{ name: "PATH", value: directory.path }] };
+
+    await terminalsWith(bin).request("terminal/create", JsonReader.fromValue(create));
+    const refused = await Assert.throwsAsync(() => terminalsWith(".").request("terminal/create", JsonReader.fromValue(create)), AcpRequestException);
+
+    Assert.areEqual(JSON.stringify([[`${path.join(bin, "git")}.exe`], -32602, Resources.formatCommandNotOnPath("git")]),
+      JSON.stringify([starts, refused.code, refused.message]));
   }
 }
