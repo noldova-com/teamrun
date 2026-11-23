@@ -72,6 +72,7 @@ import { ChatAction } from "../../enums/chat-action";
 import { ReplyActivity } from "../../enums/reply-activity";
 import { SegmentKind } from "../../enums/segment-kind";
 import { ActivityEntry } from "../../models/activity-entry";
+import { ApprovalGroup } from "../../models/approval-group";
 import type { IRowReveal } from "../../interfaces/i-row-reveal";
 import type { IShellRunAt } from "../../interfaces/i-shell-run-at";
 import type { ActivityStep } from "../../models/activity-step";
@@ -79,12 +80,15 @@ import { ScrollReveal } from "../../models/scroll-reveal";
 import { ApprovalPermission } from "../../models/approval-permission";
 import { ChatIds } from "../../models/chat-ids";
 import { ChatLinks } from "../../models/chat-links";
+import { KeyedImage } from "../../models/keyed-image";
+import { KeyedMissingImage } from "../../models/keyed-missing-image";
+import { MarkdownImageSource } from "../../models/markdown-image-source";
 import { MessageControlState } from "../../models/message-control-state";
-import type { MissingImage } from "../../models/missing-image";
 import type { ModelCatalog } from "../../models/model-catalog";
 import type { ReplySegment } from "../../models/reply-segment";
 import type { ReplyStats } from "../../models/reply-stats";
 import type { SustainHandover } from "../../models/sustain-handover";
+import { TimedSegment } from "../../models/timed-segment";
 import { TitleReveal } from "../../models/title-reveal";
 import type { WakeReceived } from "../../models/wake-received";
 import { Resources } from "../../../resources";
@@ -209,8 +213,8 @@ export class HistoryMessageComponent implements OnInit {
   protected readonly errorSegments: Signal<readonly ReplySegment[]> = computed(() => this.segments().filter(t => t.detail?.kind === DetailKind.Error));
   protected readonly stoppedErrors: Signal<ReadonlySet<MessageDetail | null>> = computed(() =>
     new Set(this.message().details.filter(t => t.kind === DetailKind.Error && FormatterService.stopsSustain(t))));
-  protected readonly timedSegments: Signal<readonly (readonly [number, number])[]> = computed(() => this.segments().flatMap(t =>
-    (Object.isNull(t.detail) ? t.entries.map(u => u.detail) : [t.detail]).slice(0, 1).map(u => [t.key, Date.parse(u.createdAt)] as const)));
+  protected readonly timedSegments: Signal<readonly TimedSegment[]> = computed(() => this.segments().flatMap(t =>
+    (Object.isNull(t.detail) ? t.entries.map(u => u.detail) : [t.detail]).slice(0, 1).map(u => new TimedSegment(t.key, Date.parse(u.createdAt)))));
   protected readonly hasActivity: Signal<boolean> = computed(() => this.activitySegments().length > 0);
   protected readonly isActivityOpen: Signal<boolean> = computed(() => this.state().activityChoice() ?? false);
   protected readonly foldedKeys: Signal<ReadonlySet<number>> = computed(() => {
@@ -245,51 +249,60 @@ export class HistoryMessageComponent implements OnInit {
     return this.isPerson() || this.isActive() || Object.isNull(rootPath) ? []
       : new WrittenImageReader().pathsOf(message, rootPath).map(t => ViewedImage.written(message.conversationId, message.id, t));
   });
-  protected readonly markdownImageSources: Signal<readonly (readonly [string, ViewedImage])[]> = computed(() => {
+  protected readonly markdownImageSources: Signal<readonly MarkdownImageSource[]> = computed(() => {
     const message = this.message();
     const rootPath = this.rootPath();
     const reader = new WrittenImageReader();
     return this.isPerson() || this.isActive() ? [] : reader.markdownImageSourcesOf(message).flatMap((t, i) => {
       const path = Object.isNull(rootPath) ? null : reader.markdownImagePathOf(t, rootPath);
       const image = Object.isNull(path) ? ViewedImage.fromDataUrl(message.conversationId, message.id, i, t) : ViewedImage.written(message.conversationId, message.id, path);
-      return Object.isNull(image) ? [] : [[t, image] as const];
+      return Object.isNull(image) ? [] : [new MarkdownImageSource(t, image)];
     });
   });
-  protected readonly markdownImages: Signal<readonly ViewedImage[]> = computed(() => this.markdownImageSources().map(t => t[1])
+  protected readonly markdownImages: Signal<readonly ViewedImage[]> = computed(() => this.markdownImageSources().map(t => t.image)
     .filter((t, i, all) => all.findIndex(u => u.key === t.key) === i));
   protected readonly generatedImages: Signal<ReadonlyMap<number, ViewedImage>> = computed(() => {
     const message = this.message();
     const rootPath = this.rootPath();
-    return new Map(this.segments().filter(t => t.kind === SegmentKind.Image).flatMap(t => {
+    const images = new Map<number, ViewedImage>();
+    for (const t of this.segments().filter(u => u.kind === SegmentKind.Image)) {
       const image = this.formatter.generatedImageOf(message, t.detail!, rootPath);
-      return Object.isNull(image) ? [] : [[t.key, image] as const];
-    }));
+      if (!Object.isNull(image))
+        images.set(t.key, image);
+    }
+    return images;
   });
-  protected readonly missingImages: Signal<readonly (readonly [number, MissingImage])[]> = computed(() => {
+  protected readonly missingImages: Signal<readonly KeyedMissingImage[]> = computed(() => {
     const message = this.message();
     const rootPath = this.rootPath();
     return this.segments().filter(t => t.kind === SegmentKind.Image).flatMap(t => {
       const missing = this.formatter.missingImageOf(message, t.detail!, rootPath);
-      return Object.isNull(missing) ? [] : [[t.key, missing] as const];
+      return Object.isNull(missing) ? [] : [new KeyedMissingImage(t.key, missing)];
     });
   });
   protected readonly plan: Signal<ReplyPlan | null> = computed(() => this.formatter.planOf(this.message()));
   protected readonly planKey: Signal<number> = computed(() => this.segments().find(t => t.kind === SegmentKind.Plan)!.key);
   protected readonly isPlanOpen: Signal<boolean> = computed(() => this.state().expansion.plan());
-  protected readonly approvalGroups: Signal<readonly (readonly [number, readonly string[]])[]> = computed(() => {
+  protected readonly approvalGroups: Signal<readonly ApprovalGroup[]> = computed(() => {
     const timed = this.timedSegments();
     const groups = new Map<number, string[]>();
     for (const approval of this.store.approvalsOf(this.message().id).filter(t => t.kind === ApprovalKind.Question || t.status === ApprovalStatus.Pending)) {
       const createdAt = Date.parse(approval.createdAt);
-      const key = timed.findLast(t => t[1] <= createdAt)?.[0] ?? -1;
+      const key = timed.findLast(t => t.at <= createdAt)?.key ?? -1;
       groups.set(key, [...(groups.get(key) ?? []), approval.id]);
     }
-    return [...groups.entries()];
+    const shown: ApprovalGroup[] = [];
+    groups.forEach((ids, key) => shown.push(new ApprovalGroup(key, ids)));
+    return shown;
   });
   protected readonly awaitsPlanApproval: Signal<boolean> = computed(() => this.store.awaitsPlanApproval(this.message()));
   protected readonly approvingPlan: WritableSignal<boolean> = signal(false);
   protected readonly folderLinks: WritableSignal<ReadonlySet<string>> = signal(new Set());
-  protected readonly generatedImageEntries: Signal<readonly (readonly [number, ViewedImage])[]> = computed(() => [...this.generatedImages().entries()]);
+  protected readonly generatedImageEntries: Signal<readonly KeyedImage[]> = computed(() => {
+    const entries: KeyedImage[] = [];
+    this.generatedImages().forEach((image, key) => entries.push(new KeyedImage(key, image)));
+    return entries;
+  });
   protected readonly generatedImageList: Signal<readonly ViewedImage[]> = computed(() => [...this.generatedImages().values()]);
   protected readonly attachedImages: Signal<readonly ViewedImage[]> = computed(() => {
     const message = this.message();
@@ -379,7 +392,7 @@ export class HistoryMessageComponent implements OnInit {
       });
     });
     effect(() => {
-      const shown = this.approvalGroups().flatMap(t => t[1]);
+      const shown = this.approvalGroups().flatMap(t => t.ids);
       const pending = new Set(this.store.pendingApprovalsOf(this.message().id).map(t => t.id));
       untracked(() => this.keepApprovalFocus(shown.filter(t => pending.has(t)), shown));
     });
@@ -387,7 +400,9 @@ export class HistoryMessageComponent implements OnInit {
       const step = this.latestStep();
       if (this.isActivityOpen())
         this.stepEntries().forEach(t => this.shownSteps.add(String(t.detail.sequence)));
-      const titles: ReadonlyMap<string, string> = new Map(Object.isNull(step) ? [] : [[String(step.sequence), step.title] as const]);
+      const titles = new Map<string, string>();
+      if (!Object.isNull(step))
+        titles.set(String(step.sequence), step.title);
       this.stepReveal.follow(titles, this.shownSteps, this.isActive(), !this.motion.reduced());
       titles.forEach((_, key) => this.shownSteps.add(key));
       this.stepFrame.update(t => t + 1);
@@ -469,7 +484,7 @@ export class HistoryMessageComponent implements OnInit {
     const sources = this.markdownImageSources();
     const rootPath = this.rootPath();
     const path = sources.length === 0 || Object.isNull(rootPath) ? null : new WrittenImageReader().markdownImagePathOf(source, rootPath);
-    return sources.find(([address, image]) => Object.isNull(path) ? address === source.trim() : image.path === path)?.[1] ?? null;
+    return sources.find(t => Object.isNull(path) ? t.source === source.trim() : t.image.path === path)?.image ?? null;
   }
 
   protected isWebAddress(source: string): boolean {
@@ -632,8 +647,8 @@ export class HistoryMessageComponent implements OnInit {
       blocks.push(new MessageSlot(Resources.activitySlot));
     if (this.hasActivity() && this.isActivityOpen())
       blocks.push(new MessageSlot(Resources.stepsSlot));
-    const latest = this.timedSegments().at(-1)?.[0] ?? -1;
-    const unplaced = new Set(this.approvalGroups().map(t => t[0]));
+    const latest = this.timedSegments().at(-1)?.key ?? -1;
+    const unplaced = new Set(this.approvalGroups().map(t => t.key));
     const approvalsAfter = (key: number): readonly MessageBlock[] => key !== latest && unplaced.delete(key) ? [new MessageSlot(this.approvalsSlotOf(key))] : [];
     blocks.push(...this.attachmentBlocks(), ...approvalsAfter(-1));
     for (const segment of segments)
@@ -686,7 +701,7 @@ export class HistoryMessageComponent implements OnInit {
       return [new MessageText(this.linkedText(segment.key, segment.detail.text))];
     if (segment.kind === SegmentKind.Plan)
       return this.planBlocks(segment.key);
-    if (this.generatedImages().has(segment.key) || this.missingImages().some(t => t[0] === segment.key))
+    if (this.generatedImages().has(segment.key) || this.missingImages().some(t => t.key === segment.key))
       return [new MessageSlot(this.imageSlotOf(segment.key))];
     return [];
   }
@@ -696,7 +711,7 @@ export class HistoryMessageComponent implements OnInit {
   }
 
   private steersBefore(key: number | null): readonly MessageBlock[] {
-    const placeOf = (steer: Message): number | null => this.timedSegments().find(t => t[1] > Date.parse(steer.createdAt))?.[0] ?? null;
+    const placeOf = (steer: Message): number | null => this.timedSegments().find(t => t.at > Date.parse(steer.createdAt))?.key ?? null;
     return this.steers().filter(t => placeOf(t) === key).map(t => new MessageSlot(Resources.formatSteerSlot(t.id)));
   }
 

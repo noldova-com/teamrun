@@ -656,8 +656,9 @@ export class FormatterService {
       return false;
     for (const entries of activities.toReversed()) {
       const answered = entries.findLastIndex(t => Object.isNull(t.result) && this.toolUseIdOf(t.detail) === id);
-      if (answered >= 0) {
-        entries[answered] = new ActivityEntry((entries[answered] as ActivityEntry).detail, detail);
+      const entry = entries[answered];
+      if (!Object.isUndefined(entry)) {
+        entries[answered] = new ActivityEntry(entry.detail, detail);
         return true;
       }
     }

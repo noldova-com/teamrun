@@ -18,6 +18,7 @@ import { ChatStoreService } from "../../../../src/app/services/chat-store.servic
 import { TeammateStatusStoreService } from "../../../../src/app/services/teammate-status-store.service";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import type { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
@@ -29,7 +30,7 @@ describe("TeammateStatusComponent", () => {
 
   const reply = (id: string, status: MessageStatus): Message =>
     new Message(id, "c1", 1, MessageAuthor.Provider, null, status, [], SampleData.provenance, started, started, null, [], "alice", "alice");
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
   const dot = (): HTMLElement => {
     const found = element().querySelector<HTMLElement>(".dot");
     if (Object.isNull(found))

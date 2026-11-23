@@ -54,6 +54,7 @@ import {
 } from "@noldova/teamrun.protocol";
 import { AnnouncementPoliteness, Announcer, DefaultTheme, ThemeMode, TooltipDirective } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme, PointerFixture } from "@noldova/ui.components.angular/testing";
+import type { MockInstance } from "vitest";
 import { userEvent } from "vitest/browser";
 
 import { ConversationComponent } from "../../../../src/app/components/conversation/conversation.component";
@@ -74,8 +75,16 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { HeadingIcon } from "../../../fixtures/heading-icon.fixture";
+import { HeadingRowText } from "../../../fixtures/heading-row-text.fixture";
+import { HeadingRow } from "../../../fixtures/heading-row.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
+import { PointerPoint } from "../../../fixtures/pointer-point.fixture";
 import { RefusedError } from "../../../fixtures/refused-error.fixture";
 import { Required } from "../../../fixtures/required.fixture";
+import { RowAsk } from "../../../fixtures/row-ask.fixture";
+import { RowEnd } from "../../../fixtures/row-end.fixture";
+import { RowPair } from "../../../fixtures/row-pair.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
 
@@ -196,11 +205,11 @@ describe("ProjectsViewComponent", () => {
     document.querySelector<HTMLButtonElement>(selector)?.click();
     await settle();
   };
-  const pointAt = (target: Element, share: number): { clientX: number; clientY: number } => {
+  const pointAt = (target: Element, share: number): PointerPoint => {
     const box = target.getBoundingClientRect();
-    return { clientX: box.left + box.width / 2, clientY: box.top + box.height * share };
+    return new PointerPoint(box.left + box.width / 2, box.top + box.height * share);
   };
-  const moveHeldAsync = async (start: { clientX: number; clientY: number }, end: { clientX: number; clientY: number }): Promise<() => Promise<void>> => {
+  const moveHeldAsync = async (start: PointerPoint, end: PointerPoint): Promise<() => Promise<void>> => {
     for (const step of [0.25, 0.5, 0.75, 1]) {
       const clientX = start.clientX + (end.clientX - start.clientX) * step;
       const clientY = start.clientY + (end.clientY - start.clientY) * step;
@@ -208,13 +217,13 @@ describe("ProjectsViewComponent", () => {
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     }
     return async () => {
-      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, ...end }));
+      document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: end.clientX, clientY: end.clientY }));
       await settle();
     };
   };
   const holdDragAsync = async (handle: Element, target: Element, share: number = 0.25): Promise<() => Promise<void>> => {
     const start = pointAt(handle, 0.5);
-    handle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0, buttons: 1, detail: 1, ...start }));
+    handle.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0, buttons: 1, detail: 1, clientX: start.clientX, clientY: start.clientY }));
     return moveHeldAsync(start, pointAt(target, share));
   };
   const dragAsync = async (handle: Element, target: Element, share: number = 0.25): Promise<void> => {
@@ -473,7 +482,7 @@ describe("ProjectsViewComponent", () => {
     const selectedRows = (): readonly HTMLElement[] => [...element().querySelectorAll<HTMLElement>("[aria-selected='true']")];
 
     await store.openProject(SampleData.otherProject.rootPath);
-    const history = (tab.nativeElement as HTMLElement).querySelector(".history");
+    const history = PartReads.elementOf(tab.nativeElement).querySelector(".history");
     expect([history?.dispatchEvent(new FocusEvent("focusin", { bubbles: true })), history?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))]).toEqual([true, true]);
     await settle();
 
@@ -514,7 +523,7 @@ describe("ProjectsViewComponent", () => {
     try {
       const tooltip = (): string => {
         const found = fixture.debugElement.queryAll(By.css(".nol-teamrun-conversation-row")).find(t => t.nativeElement === conversationRow(second.title));
-        return found!.injector.get(TooltipDirective).text();
+        return Required.of(found).injector.get(TooltipDirective).text();
       };
       const before = tooltip();
       const at = new Date(second.updatedAt);
@@ -951,10 +960,10 @@ describe("ProjectsViewComponent", () => {
     const isDanger = (): boolean => part(document, "nol-teamrun-confirm-dialog .nol-teamrun-confirm").classList.contains("nol-button-danger");
     const looks: boolean[] = [];
 
-    const asks: readonly (readonly [() => HTMLElement, string])[] = [[() => conversationRow(SampleData.conversation.title), Resources.deleteConversationLabel],
-      [() => conversationRow(scratch.title), Resources.deleteConversationLabel], [() => projectRow(SampleData.otherProject.name), Resources.forgetProjectLabel]];
-    for (const [row, label] of asks) {
-      await choose(row(), label);
+    const asks: readonly RowAsk[] = [new RowAsk(() => conversationRow(SampleData.conversation.title), Resources.deleteConversationLabel),
+      new RowAsk(() => conversationRow(scratch.title), Resources.deleteConversationLabel), new RowAsk(() => projectRow(SampleData.otherProject.name), Resources.forgetProjectLabel)];
+    for (const ask of asks) {
+      await choose(ask.row(), ask.label);
       looks.push(isDanger());
       await answerDialog("nol-teamrun-confirm-dialog .nol-teamrun-cancel");
     }
@@ -1657,7 +1666,7 @@ describe("ProjectsViewComponent", () => {
     };
     const up = (): Promise<boolean> => run(Resources.moveRowUpCommand);
     const down = (): Promise<boolean> => run(Resources.moveRowDownCommand);
-    const said = (announce: { mock: { calls: unknown[][] } }): unknown[] => announce.mock.calls.map(t => t[0]);
+    const said = (announce: MockInstance<Announcer["announce"]>): unknown[] => announce.mock.calls.map(t => t[0]);
 
     it("makes Pinned, Projects and Chats named trees with one Tab stop each, on the shown chat, else on the first row", async () => {
       conversations = [SampleData.conversation, second, other, scratch];
@@ -2119,7 +2128,7 @@ describe("ProjectsViewComponent", () => {
       element().style.width = "16rem";
       element().style.height = "12rem";
       await settle();
-      const list = element().querySelector<HTMLElement>(".nol-teamrun-projects") as HTMLElement;
+      const list = Required.of(element().querySelector<HTMLElement>(".nol-teamrun-projects"));
       const panel = box(element());
       const inline = AppearanceFixture.measureLook("content-padding-inline");
       const block = AppearanceFixture.measureLook("view-padding-block");
@@ -2128,8 +2137,10 @@ describe("ProjectsViewComponent", () => {
 
       expect([getComputedStyle(list).overflowY, list.scrollHeight > list.clientHeight, list.clientLeft, list.clientTop]).toEqual(["auto", true, 0, 0]);
       expect(inline).toBeGreaterThan(0);
-      for (const [edge, of] of [[box(list).top, panel.top], [box(list).bottom, panel.bottom], [box(list).left, panel.left], [box(list).right, panel.right]] as const)
-        AppearanceFixture.expectPixels(edge, of);
+      AppearanceFixture.expectPixels(box(list).top, panel.top);
+      AppearanceFixture.expectPixels(box(list).bottom, panel.bottom);
+      AppearanceFixture.expectPixels(box(list).left, panel.left);
+      AppearanceFixture.expectPixels(box(list).right, panel.right);
       AppearanceFixture.expectPixels(first.top - panel.top, block);
       AppearanceFixture.expectPixels(first.left - panel.left, inline);
       AppearanceFixture.expectPixels(panel.left + list.clientWidth - first.right, inline);
@@ -2156,13 +2167,15 @@ describe("ProjectsViewComponent", () => {
       await create();
       await choose(conversationRow(kept.title), Resources.pinLabel);
       await choose(conversationRow(saved.title), Resources.pinLabel);
-      const [pinAbove, pinBelow] = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row")];
+      const pins = element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row");
+      const pinAbove = itemAt(pins, 0);
+      const pinBelow = itemAt(pins, 1);
       const nestedAbove = conversationRow(second.title);
       const nestedBelow = conversationRow(SampleData.conversation.title);
       const next = projectRow(SampleData.otherProject.name);
-      const pairs = [[pinAbove, pinBelow], [projectRow(SampleData.project.name), nestedAbove],
-        [nestedAbove, nestedBelow], [nestedBelow, next], [next, find<HTMLElement>(".nol-teamrun-conversation-list .nol-teamrun-muted", Resources.noConversations)],
-        [conversationRow(later.title), conversationRow(scratch.title)]];
+      const pairs = [new RowPair(pinAbove, pinBelow), new RowPair(projectRow(SampleData.project.name), nestedAbove),
+        new RowPair(nestedAbove, nestedBelow), new RowPair(nestedBelow, next), new RowPair(next, find<HTMLElement>(".nol-teamrun-conversation-list .nol-teamrun-muted", Resources.noConversations)),
+        new RowPair(conversationRow(later.title), conversationRow(scratch.title))];
       const gap = 2 * AppearanceFixture.measureLook("tab-inset");
 
       await store.conversationInView(SampleData.conversation.id);
@@ -2174,11 +2187,9 @@ describe("ProjectsViewComponent", () => {
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       expect(gap).toBeGreaterThan(0);
-      for (const [above, below] of pairs) {
-        if (above === undefined || below === undefined)
-          throw new Error("A pair of rows is missing.");
-        AppearanceFixture.expectPixels(box(below).top - box(above).bottom, gap);
-        AppearanceFixture.expectPixels(box(below).height, AppearanceFixture.measureLook("tree-row-height"));
+      for (const pair of pairs) {
+        AppearanceFixture.expectPixels(box(pair.below).top - box(pair.above).bottom, gap);
+        AppearanceFixture.expectPixels(box(pair.below).height, AppearanceFixture.measureLook("tree-row-height"));
       }
       expect(nestedBelow.classList).toContain("nol-teamrun-selected");
       if (forcedColors === "none")
@@ -2191,10 +2202,8 @@ describe("ProjectsViewComponent", () => {
         return new Conversation(`n${i}`, "p1", `Talk ${i}`, at, at);
       });
       await create();
-      const lastShown = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-project-list .nol-teamrun-conversation-row")].at(-1);
+      const lastShown = Required.of([...element().querySelectorAll<HTMLElement>(".nol-teamrun-project-list .nol-teamrun-conversation-row")].at(-1));
       const showMore = part(element(), ".nol-teamrun-project-list .nol-teamrun-show-more");
-      if (lastShown === undefined)
-        throw new Error("The project shows no chats.");
 
       expect(matchMedia("(forced-colors: active)").matches).toBe(forcedColors === "active");
       expect(showMore.textContent?.trim()).toBe(Resources.formatShowMore(2));
@@ -2329,11 +2338,11 @@ describe("ProjectsViewComponent", () => {
       await create();
       await choose(conversationRow(second.title), Resources.pinLabel);
 
-      const headings: readonly (readonly [string, string])[] = [
-        [Resources.pinnedTitle, Resources.pinnedIcon], [Resources.projectsViewTitle, Resources.projectsIcon], [Resources.chatsTitle, Resources.chatsIcon]
+      const headings: readonly HeadingIcon[] = [
+        new HeadingIcon(Resources.pinnedTitle, Resources.pinnedIcon), new HeadingIcon(Resources.projectsViewTitle, Resources.projectsIcon), new HeadingIcon(Resources.chatsTitle, Resources.chatsIcon)
       ];
 
-      for (const [title, glyph] of headings) {
+      for (const { title, glyph } of headings) {
         const header = find<HTMLElement>("nol-section-header", title);
         const icon = part(header, ".nol-section-header-icon");
         const label = part(header, ".nol-section-header-label");
@@ -2351,13 +2360,14 @@ describe("ProjectsViewComponent", () => {
       await choose(conversationRow(second.title), Resources.pinLabel);
       const labelOf = (title: string): DOMRect => box(part(find<HTMLElement>("nol-section-header", title), ".nol-section-header-label"));
       const end = box(part(element(), ".nol-teamrun-action")).right;
-      const rows: [string, HTMLElement, HTMLElement][] = [
-        [Resources.pinnedTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row"), 0), part(element(), ".nol-teamrun-pins .nol-teamrun-conversation-title")],
-        [Resources.projectsViewTitle, projectRow(SampleData.project.name), part(projectRow(SampleData.project.name), ".nol-teamrun-project-name")],
-        [Resources.chatsTitle, conversationRow(scratch.title), part(conversationRow(scratch.title), ".nol-teamrun-conversation-title")]
+      const rows: readonly HeadingRowText[] = [
+        new HeadingRowText(Resources.pinnedTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row"), 0),
+          part(element(), ".nol-teamrun-pins .nol-teamrun-conversation-title")),
+        new HeadingRowText(Resources.projectsViewTitle, projectRow(SampleData.project.name), part(projectRow(SampleData.project.name), ".nol-teamrun-project-name")),
+        new HeadingRowText(Resources.chatsTitle, conversationRow(scratch.title), part(conversationRow(scratch.title), ".nol-teamrun-conversation-title"))
       ];
 
-      for (const [title, row, text] of rows) {
+      for (const { title, row, text } of rows) {
         AppearanceFixture.expectPixels(box(text).left, labelOf(title).left);
         AppearanceFixture.expectPixels(box(text).left - box(row).left, space(2));
         AppearanceFixture.expectPixels(box(row).right, end);
@@ -2385,12 +2395,13 @@ describe("ProjectsViewComponent", () => {
         }
         document.documentElement.style.setProperty("--nol-text-panel", "1rem");
         try {
-          const sizes = { small: AppearanceFixture.measureLook("text-small"), label: AppearanceFixture.measureLook("text-label"),
-            row: Number.parseFloat(getComputedStyle(part(conversationRow(scratch.title), ".nol-teamrun-conversation-title")).fontSize) };
+          const small = AppearanceFixture.measureLook("text-small");
+          const label = AppearanceFixture.measureLook("text-label");
+          const row = Number.parseFloat(getComputedStyle(part(conversationRow(scratch.title), ".nol-teamrun-conversation-title")).fontSize);
 
-          expect([sizes.small < sizes.label, sizes.label < sizes.row]).toEqual([true, true]);
+          expect([small < label, label < row]).toEqual([true, true]);
           for (const title of titles)
-            AppearanceFixture.expectPixels(Number.parseFloat(labelOf(title).fontSize), sizes.small);
+            AppearanceFixture.expectPixels(Number.parseFloat(labelOf(title).fontSize), small);
         } finally {
           document.documentElement.style.removeProperty("--nol-text-panel");
         }
@@ -2404,11 +2415,11 @@ describe("ProjectsViewComponent", () => {
       return gap;
     };
 
-    const expectGapsBelowHeadings = async (firsts: [string, HTMLElement][]): Promise<void> => {
+    const expectGapsBelowHeadings = async (firsts: readonly HeadingRow[]): Promise<void> => {
       const gap = rowGap();
 
       expect(gap).toBeGreaterThan(0);
-      for (const [title, row] of firsts) {
+      for (const { title, row } of firsts) {
         const header = find<HTMLElement>("nol-section-header", title);
         AppearanceFixture.expectPixels(box(row).top - box(header).bottom, gap);
         await userEvent.hover(part(header, ".nol-section-header-toggle"));
@@ -2421,10 +2432,10 @@ describe("ProjectsViewComponent", () => {
       conversations = [SampleData.conversation, second, scratch];
       await create();
       await choose(conversationRow(second.title), Resources.pinLabel);
-      const firsts: [string, HTMLElement][] = [
-        [Resources.pinnedTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row"), 0)],
-        [Resources.projectsViewTitle, projectRow(SampleData.project.name)],
-        [Resources.chatsTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-chat-list .nol-teamrun-conversation-row"), 0)]
+      const firsts: readonly HeadingRow[] = [
+        new HeadingRow(Resources.pinnedTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row"), 0)),
+        new HeadingRow(Resources.projectsViewTitle, projectRow(SampleData.project.name)),
+        new HeadingRow(Resources.chatsTitle, itemAt(element().querySelectorAll<HTMLElement>(".nol-teamrun-chat-list .nol-teamrun-conversation-row"), 0))
       ];
       await store.conversationInView(scratch.id);
       await settle();
@@ -2436,7 +2447,7 @@ describe("ProjectsViewComponent", () => {
       conversations = [];
       await create(t => t.answer(MethodName.ProjectList, () => []));
 
-      await expectGapsBelowHeadings([[Resources.projectsViewTitle, part(element(), ".nol-teamrun-projects > .nol-teamrun-muted")]]);
+      await expectGapsBelowHeadings([new HeadingRow(Resources.projectsViewTitle, part(element(), ".nol-teamrun-projects > .nol-teamrun-muted"))]);
     });
 
     it("shows chat titles in the muted colour, and the marked or hovered one in the full text colour", async () => {
@@ -2547,17 +2558,18 @@ describe("ProjectsViewComponent", () => {
       await settle();
       element().dir = direction;
       await settle();
-      const ends = (row: HTMLElement): [number, number] => {
-        const [frame, more] = [box(row), box(part(row, ".nol-teamrun-row-actions"))];
-        return direction === "rtl" ? [more.left - frame.left, more.width] : [frame.right - more.right, more.width];
+      const ends = (row: HTMLElement): RowEnd => {
+        const frame = box(row);
+        const more = box(part(row, ".nol-teamrun-row-actions"));
+        return new RowEnd(direction === "rtl" ? more.left - frame.left : frame.right - more.right, more.width);
       };
       const running = conversationRow(SampleData.conversation.title);
       const [spinner, more] = [box(part(running, ".nol-teamrun-working")), box(part(running, ".nol-teamrun-row-actions"))];
 
       for (const row of [projectRow(SampleData.project.name), running, conversationRow(scratch.title), find<HTMLElement>(".nol-teamrun-pins .nol-teamrun-conversation-row", second.title)]) {
-        const [inset, width] = ends(row);
-        AppearanceFixture.expectPixels(inset, closeInset());
-        AppearanceFixture.expectPixels(width, AppearanceFixture.measureLook("tab-action-slot"));
+        const end = ends(row);
+        AppearanceFixture.expectPixels(end.inset, closeInset());
+        AppearanceFixture.expectPixels(end.width, AppearanceFixture.measureLook("tab-action-slot"));
         const fill = getComputedStyle(part(row, ".nol-teamrun-row-actions"), "::before");
         AppearanceFixture.expectPixels(parseFloat(fill.width), AppearanceFixture.measureLook("tab-close"));
         AppearanceFixture.expectPixels(parseFloat(fill.height), AppearanceFixture.measureLook("tab-close"));

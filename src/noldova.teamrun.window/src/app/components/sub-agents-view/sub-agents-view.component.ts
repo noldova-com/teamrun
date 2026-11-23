@@ -60,10 +60,15 @@ export class SubAgentsViewComponent {
   protected readonly running: Signal<readonly SubAgentCard[]> = computed(() => this.cards().filter(t => t.agent.isRunning));
   protected readonly finished: Signal<readonly SubAgentCard[]> = computed(() => this.cards().filter(t => !t.agent.isRunning));
   protected readonly hasRunning: Signal<boolean> = computed(() => this.running().length > 0);
-  protected readonly stops: Signal<ReadonlyMap<string, BackgroundTask>> = computed(() => new Map(this.running().flatMap(card => {
-    const task = this.tasks.subAgentTaskOf(card.focus.conversationId, card.focus.messageId, card.agent.toolUseId);
-    return Object.isNull(task) ? [] : [[card.key, task] as const];
-  })));
+  protected readonly stops: Signal<ReadonlyMap<string, BackgroundTask>> = computed(() => {
+    const stops = new Map<string, BackgroundTask>();
+    for (const card of this.running()) {
+      const task = this.tasks.subAgentTaskOf(card.focus.conversationId, card.focus.messageId, card.agent.toolUseId);
+      if (!Object.isNull(task))
+        stops.set(card.key, task);
+    }
+    return stops;
+  });
   protected readonly selected: Signal<MessageFocus | null> = this.store.subAgentFocus;
   protected readonly isEmpty: Signal<boolean> = computed(() => this.cards().length === 0 && !this.history.loading() && Object.isNull(this.history.error()));
 

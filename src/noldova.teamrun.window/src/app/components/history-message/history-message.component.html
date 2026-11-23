@@ -159,21 +159,21 @@ LICENSE file in the root directory of this source tree.
       }
     </ng-template>
   }
-  @for (entry of generatedImageEntries(); track entry[0]) {
-    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+  @for (entry of generatedImageEntries(); track entry.key) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry.key)">
       @if (areSlotsShown()) {
-        <nol-teamrun-image-preview class="reply-image" [image]="entry[1]" [images]="generatedImageList()" />
+        <nol-teamrun-image-preview class="reply-image" [image]="entry.image" [images]="generatedImageList()" />
       }
     </ng-template>
   }
-  @for (entry of missingImages(); track entry[0]) {
-    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+  @for (entry of missingImages(); track entry.key) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry.key)">
       @if (areSlotsShown()) {
         <div class="reply-error reply-image-missing">
           <span class="reply-error-glyph material-symbols-rounded" aria-hidden="true">{{ resources.replyErrorGlyph }}</span>
           <div class="reply-error-body">
-            <p class="reply-error-text">{{ entry[1].text }}</p>
-            @if (entry[1].reason; as reason) {
+            <p class="reply-error-text">{{ entry.missing.text }}</p>
+            @if (entry.missing.reason; as reason) {
               <p class="reply-error-text">{{ reason }}</p>
             }
           </div>
@@ -222,10 +222,10 @@ LICENSE file in the root directory of this source tree.
       </div>
     }
   </ng-template>
-  @for (group of approvalGroups(); track group[0]) {
-    <ng-template [nolMessageSlot]="approvalsSlotOf(group[0])">
+  @for (group of approvalGroups(); track group.key) {
+    <ng-template [nolMessageSlot]="approvalsSlotOf(group.key)">
       @if (areSlotsShown()) {
-        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" [controls]="state()" (focused)="approachApproval($event)" />
+        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group.ids" [controls]="state()" (focused)="approachApproval($event)" />
       }
     </ng-template>
   }

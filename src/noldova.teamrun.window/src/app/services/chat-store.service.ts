@@ -234,7 +234,7 @@ export class ChatStoreService {
   private readonly openingConversationIdSignal: WritableSignal<string | null> = signal(null);
   private readonly organizationInViewSignal: WritableSignal<string | null> = signal(null);
   private readonly teammateColors: Signal<ReadonlyMap<string, number>> = computed(() => TeammateColor.byCreation(this.teammatesSignal()),
-    { equal: (t, u) => t.size === u.size && [...t].every(([id, color]) => u.get(id) === color) });
+    { equal: (t, u) => t.size === u.size && [...t.keys()].every(id => u.get(id) === t.get(id)) });
   private readonly conversationsByProjectSignal: WritableSignal<ReadonlyMap<string | null, readonly Conversation[]>> = signal(new Map());
   private readonly windowsSignal: WritableSignal<ReadonlyMap<string, ConversationWindow>> = signal(new Map());
   private readonly messageIndexes: Map<string, MessageIndex> = new Map();
@@ -1241,7 +1241,7 @@ export class ChatStoreService {
     this.settleOpening(conversationId);
     const inView = this.conversationsInViewSignal().filter(t => t !== conversationId);
     this.conversationsInViewSignal.set(inView);
-    [...this.arrivedMessages].filter(t => t[1] === conversationId).forEach(t => this.arrivedMessages.delete(t[0]));
+    [...this.arrivedMessages.keys()].filter(t => this.arrivedMessages.get(t) === conversationId).forEach(t => this.arrivedMessages.delete(t));
     this.announceShown();
     const next = inView.at(-1);
     if (!Object.isUndefined(next) && this.requestedConversationId === conversationId && Object.isNull(this.openingConversationIdSignal()))
