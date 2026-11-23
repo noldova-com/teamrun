@@ -39,6 +39,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Chats:** on a short window, such as 905×616, the members bar and the composer give way, so the history keeps the chat's largest share: the message box starts one line high and grows to four, and the paddings around them tighten; Desktop's default window keeps today's look (#31).
 - **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).

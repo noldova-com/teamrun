@@ -73,3 +73,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@container nol-teamrun-chat (height < 25rem) {
+  .nol-teamrun-default,
+  .nol-teamrun-add-member {
+    margin-block: var(--nol-space-1);
+  }
+}
