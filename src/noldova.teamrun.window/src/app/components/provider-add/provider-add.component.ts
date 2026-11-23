@@ -80,7 +80,6 @@ export class ProviderAddComponent {
   protected readonly folder: WritableSignal<string | null> = signal(null);
   protected readonly saving: WritableSignal<boolean> = signal(false);
   protected readonly installingKind: WritableSignal<string | null> = signal(null);
-  protected readonly waitingKind: WritableSignal<string | null> = signal(null);
   protected readonly waitingTool: WritableSignal<ProviderKindCard | null> = signal(null);
   protected readonly error: WritableSignal<string | null> = signal(null);
   protected readonly shownAs: Signal<string | null> = computed(() => {
@@ -120,11 +119,10 @@ export class ProviderAddComponent {
   });
   protected readonly addLabel: Signal<string> = computed(() => Object.isNull(this.folder()) && this.chosen().row?.kind.supportsSignIn === true
     ? Resources.addAndSignInLabel : Resources.addOnlyLabel);
-  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.installingKind()) || !Object.isNull(this.waitingKind())
-    || !Object.isNull(this.waitingTool()));
+  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.installingKind()) || !Object.isNull(this.waitingTool()));
   protected readonly canAdd: Signal<boolean> = computed(() => {
     const label = this.label().trim();
-    return !this.saving() && Object.isNull(this.installingKind()) && Object.isNull(this.waitingKind()) && Object.isNull(this.waitingTool())
+    return !this.saving() && Object.isNull(this.installingKind()) && Object.isNull(this.waitingTool())
       && !Object.isNull(this.chosen().row) && Object.isNull(this.unavailable()) && Object.isNull(this.progress()) && !this.store().isBusy()
       && (Object.isNull(this.folder()) ? !Object.isNull(ProfileFolderName.of(label)) : label.length > 0);
   });
@@ -144,21 +142,6 @@ export class ProviderAddComponent {
     effect(() => {
       const kind = this.kind();
       untracked(() => this.chosenKind.emit(kind));
-    });
-    effect(() => {
-      const kind = this.waitingKind();
-      if (Object.isNull(kind))
-        return;
-      const state = this.store().installations().get(kind);
-      if (Object.isUndefined(state) || state.state === ProviderKindInstallState.Installing)
-        return;
-      untracked(() => {
-        this.waitingKind.set(null);
-        if (state.state === ProviderKindInstallState.Installed)
-          void this.save(kind);
-        else if (state.state === ProviderKindInstallState.NotInstalled)
-          this.error.set(state.reason);
-      });
     });
     effect(() => {
       const card = this.waitingTool();
@@ -227,7 +210,6 @@ export class ProviderAddComponent {
   }
 
   protected cancelInstall(kind: string): void {
-    this.waitingKind.set(null);
     this.error.set(null);
     void this.store().cancelInstall(kind, this.showError);
   }
@@ -251,7 +233,6 @@ export class ProviderAddComponent {
     if (this.saving())
       return;
     this.dropped = true;
-    this.waitingKind.set(null);
     this.closed.emit();
   }
 
@@ -263,9 +244,7 @@ export class ProviderAddComponent {
     if (this.dropped)
       return;
     const installation = store.installations().get(kind);
-    if (installation?.state === ProviderKindInstallState.Installing)
-      this.waitingKind.set(kind);
-    else if (installation?.state === ProviderKindInstallState.Installed)
+    if (installation?.state === ProviderKindInstallState.Installed)
       await this.save(kind);
     else if (installation?.state === ProviderKindInstallState.NotInstalled && !Object.isNull(installation.reason))
       this.error.set(installation.reason);
@@ -277,8 +256,6 @@ export class ProviderAddComponent {
   }
 
   private async save(kind: string): Promise<void> {
-    if (this.dropped)
-      return;
     this.saving.set(true);
     const saved = await this.store().addProvider(kind, this.label().trim(), this.folder(), this.showError, false);
     this.saving.set(false);
