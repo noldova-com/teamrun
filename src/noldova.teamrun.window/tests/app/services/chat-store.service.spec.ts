@@ -638,6 +638,30 @@ describe("ChatStoreService", () => {
     expect(kept).toEqual([first.id, second.id]);
   });
 
+  it("tells the reply watchers of a working reply that ended while its end was missed, once a resync no longer lists it, and of none still working, gone or unread", async () => {
+    const reply = (id: string, status: MessageStatus): Message => new Message(id, "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id, status, [],
+      SampleData.reply.provenance, SampleData.timestamp, null, null);
+    context.answer(MethodName.MessageListOpen, () => ["ended", "gone", "running", "unread"].map(t => reply(t, MessageStatus.Running).toJson()))
+      .answer(MethodName.MessageSummary, t => {
+        const messageId = MessageIdParams.fromJson(t).messageId;
+        if (messageId === "unread")
+          throw new RuntimeRequestException(FailureCode.Internal, "Summary failed");
+        return messageId === "gone" ? null
+          : ReplySummary.fromMessage(reply(messageId, messageId === "ended" ? MessageStatus.Completed : MessageStatus.Running)).toJson();
+      });
+    await store.initialize();
+    const ended: string[] = [];
+    store.onReplyEnded(t => ended.push(`${t.id}:${t.status}`));
+    const asked = context.count(MethodName.MessageSummary);
+
+    context.answer(MethodName.MessageListOpen, () => []);
+    await expect(store.resync()).resolves.toBe(true);
+
+    await Wait.until(() => expect(context.count(MethodName.MessageSummary)).toBe(asked + 4));
+    await Wait.until(() => expect(ended).toEqual([`ended:${MessageStatus.Completed}`]));
+    expect(store.workingReplies()).toEqual([]);
+  });
+
   it("keeps a conversation busy across queued replies and follows their terminal updates", async () => {
     const first = SampleData.withStatus(SampleData.reply, MessageStatus.Pending);
     const queued = new Message("second", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id,

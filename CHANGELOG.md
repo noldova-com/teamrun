@@ -38,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Chats:** a reply that ends while the window has lost touch with TeamRun shows as ended once the window reads its state again: the composer reloads its models, and the Organization view and the teammate dialog see the reply end (#66).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).
