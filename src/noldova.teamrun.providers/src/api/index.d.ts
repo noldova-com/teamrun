@@ -4051,6 +4051,38 @@ export declare class Resources {
   public static readonly codexReleasesDirectoryName: string;
   public static readonly codexArchiveName: string;
   /**
+   * Where `CodexAppServerDownload` reads a Codex release by its tag, `https://api.github.com/repos/openai/codex/releases/tags/`, followed by `rust-v<version>`.
+   */
+  public static readonly codexAppServerReleaseAddress: string;
+  /**
+   * The start of a release's app server package name, `codex-app-server-package-`, followed by the target and `.tar.gz`.
+   */
+  public static readonly codexAppServerPackagePrefix: string;
+  public static readonly codexAppServerDisplayName: string;
+  /**
+   * The program in an app server package, `bin/codex-app-server`, with `.exe` on Windows.
+   */
+  public static readonly codexAppServerProgram: string;
+  /**
+   * The folder an app server package is unpacked into while it is staged, `package`.
+   */
+  public static readonly codexAppServerUnpackedName: string;
+  /**
+   * The files of an app server package made executable outside Windows: its programs, `rg` and `bwrap`.
+   */
+  public static readonly codexAppServerExecutableMembers: readonly string[];
+  /**
+   * The app-server's option that sets the source it records for the threads it creates, `--session-source`.
+   */
+  public static readonly codexSessionSourceArgument: string;
+  /**
+   * The source TeamRun's Codex threads are recorded with, `app-server`, which Codex stores as `mcp`: the Codex app lists only interactive sources,
+   * so it doesn't list these threads, and a later resume keeps the source the thread was created with.
+   */
+  public static readonly codexHiddenSessionSource: string;
+  public static readonly helpArgument: string;
+  public static readonly windowsExecutableExtension: string;
+  /**
    * The program in a Codex package, `bin/codex`, or `bin/codex.exe` on Windows.
    */
   public static readonly codexPackageProgram: string;
@@ -6516,6 +6548,41 @@ export declare class Resources {
    * Explains that a downloaded Claude Code build's own setup failed with its exit code, or was stopped from outside before it ended (`null`).
    */
   public static formatClaudeSetupFailed(version: string, exitCode: number | null): string;
+
+  /**
+   * Explains that a Codex release lists no app server package for this computer with a SHA-256.
+   */
+  public static formatCodexAppServerPackageMissing(version: string): string;
+
+  /**
+   * Explains that reading a Codex release by its tag failed with an HTTP status.
+   */
+  public static formatCodexAppServerReleaseFailed(version: string, status: number): string;
+
+  /**
+   * Explains that unpacking the app server package failed with tar's exit code, or was stopped (`null`).
+   */
+  public static formatCodexAppServerUnpackFailed(exitCode: number | null): string;
+
+  /**
+   * Explains that an app server package held no `Resources.codexAppServerProgram`.
+   */
+  public static formatCodexAppServerIncomplete(version: string): string;
+
+  /**
+   * The log line when the app server of a Codex version wasn't downloaded, so the threads TeamRun starts still show in the Codex app.
+   */
+  public static formatCodexAppServerNotDownloaded(version: string, reason: string): string;
+
+  /**
+   * The log line when an older app server download couldn't be removed.
+   */
+  public static formatCodexAppServerNotRemoved(path: string, reason: string): string;
+
+  /**
+   * The log line when a downloaded app server didn't start, so `codex app-server` runs in its place.
+   */
+  public static formatCodexAppServerRefused(program: string, reason: string): string;
 
   /**
    * Explains that a Codex release lists no package for this computer with a SHA-256.
@@ -9125,9 +9192,12 @@ export declare class CodexAdapter implements IProviderAdapter {
    * `CommandRunner` on the starter, with `Resources.processListTimeout` for each listing and the timings' `stopGrace` as its grace.
    * @param idleTimer Tells the time a thread held by its background work has been silent, for `timings.silenceLimit`, and an app-server has had no
    * thread or request, for `timings.idleLimit`; a `NodeTimer` by default.
+   * @param serverProgram Picks the app-server each start runs, so the threads it creates stay out of the Codex app; when the picked program is a
+   * download that fails to start, it is stopped and refused for the rest of the run, and `codex app-server` starts instead, unless the adapter
+   * is shutting down. `null` by default, which runs `codex app-server`.
    */
   public constructor(command: ProcessCommand | null, baseEnvironment: NodeJS.ProcessEnv, clientInfo: AppServerClientInfo, starter: IProcessStarter, timings: ProviderTimings, versionReader: ExecutableVersionReader, timer?: ITimer, locate?: () => ProcessCommand | null,
-    installation?: IProviderKindInstallation | null, log?: ILog | null, platform?: string, sweep?: IOrphanSweep, idleTimer?: ITimer);
+    installation?: IProviderKindInstallation | null, log?: ILog | null, platform?: string, sweep?: IOrphanSweep, idleTimer?: ITimer, serverProgram?: CodexAppServerProgram | null);
 
   /**
    * How TeamRun installs and updates Codex, when it was given one.
@@ -15042,6 +15112,87 @@ export declare class ClaudeInstaller implements IProviderKindInstallation {
    * @returns The build's name, or `null` when Claude Code publishes none for it.
    */
   public static targetOf(platform: string, architecture: string, isMusl: boolean): string | null;
+}
+
+/**
+ * What `CodexAppServerProgram` read from a Codex command: whether its `app-server` accepts `--session-source`, and otherwise its version.
+ */
+export declare class CodexServerReading {
+  public readonly acceptsSource: boolean;
+  /** The installed Codex's version, or `null` when its `app-server` accepts the option or the version couldn't be read. */
+  public readonly version: string | null;
+  public constructor(acceptsSource: boolean, version: string | null);
+  /** Whether the reading can be kept: the option was found or the version was read. */
+  public get isKnown(): boolean;
+}
+
+/**
+ * The app-server command `CodexAppServerProgram` picked for a start.
+ */
+export declare class CodexServerChoice {
+  /** The command, without the `-c` settings a start adds. */
+  public readonly command: ProcessCommand;
+  /** The downloaded program the command runs, refused when it fails to start, or `null` when it runs the installed Codex. */
+  public readonly download: string | null;
+  public constructor(command: ProcessCommand, download: string | null);
+}
+
+/**
+ * Picks the app-server a Codex start runs so the threads it creates are recorded with `Resources.codexHiddenSessionSource` and stay out of the
+ * Codex app's lists: `codex app-server --session-source app-server` when the installed Codex's `app-server --help` names the option; otherwise
+ * the downloaded app server of the installed Codex's version, when `CodexAppServerDownload` holds it and it wasn't refused; otherwise
+ * `codex app-server`, and it starts that version's download in the background. What it read is kept per stamp of the Codex executable, and read
+ * again when the stamp changes or the last read found neither the option nor the version.
+ */
+export declare class CodexAppServerProgram {
+  /**
+   * @param runner Runs `codex app-server --help`.
+   * @param versionReader Stamps the Codex executable and reads its version.
+   * @param download Holds and downloads the app server of a Codex version.
+   * @param helpTimeout How long `--help` may take, in milliseconds.
+   * @param log Where a refused download is noted; nowhere by default.
+   */
+  public constructor(runner: CommandRunner, versionReader: ExecutableVersionReader, download: CodexAppServerDownload, helpTimeout: number, log?: ILog | null);
+  /** The shared app-server command, `codex app-server`. */
+  public static sharedOf(command: ProcessCommand): ProcessCommand;
+  /**
+   * Picks the app-server command for a start, as the class says.
+   * @param signal Stops the reads, and the download it starts.
+   */
+  public choose(command: ProcessCommand, environment: NodeJS.ProcessEnv, signal: AbortSignal): Promise<CodexServerChoice>;
+  /** Stops using a downloaded program that failed to start, for the rest of the run, and logs why. */
+  public refuse(program: string, reason: string): void;
+}
+
+/**
+ * Downloads the app server Codex publishes beside each release, the program that takes `--session-source`: it reads the release of a version from
+ * `Resources.codexAppServerReleaseAddress`, downloads this computer's `codex-app-server-package-<target>.tar.gz`, checks it against the SHA-256
+ * the release lists, and unpacks it with tar into `<root>/<version>-<target>`, in place of an incomplete folder there, then removes the other
+ * versions. The download is staged in
+ * `root` and removed whether it succeeds or not. One download runs per version at a time; a failed one is logged and tried again on the next run.
+ */
+export declare class CodexAppServerDownload {
+  /**
+   * @param root The folder downloads are kept in, `<data>/providers/codex-app-server`.
+   * @param releaseAddress Where a release is read by its tag, `Resources.codexAppServerReleaseAddress`.
+   * @param target This computer's package target, `CodexInstaller.targetOf`, or `null` when there is none.
+   * @param platform The platform, which decides the program's name and whether files are made executable.
+   * @param extractor The program `ExecutableLocator.locateTar` found, or `null`, which downloads nothing.
+   * @param runner Runs tar.
+   * @param unpackTimeout How long tar may take, in milliseconds.
+   * @param log Where a failed download, and an older version that couldn't be removed, is noted; nowhere by default.
+   * @param remove Removes a version's folder: the incomplete one a download replaces, and the other versions once it is in place; by default
+   * `rmSync`, recursive and forced, with `Resources.removeRetries`.
+   */
+  public constructor(root: string, releaseAddress: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
+    unpackTimeout: number, log?: ILog | null, remove?: (path: string) => void);
+  /** The downloaded program of a version, or `null` when it isn't there. */
+  public programOf(version: string): string | null;
+  /**
+   * Downloads the app server of a version unless it is there, one download per version at a time.
+   * @returns The program, or `null` when the download failed, after logging why.
+   */
+  public fetch(version: string, signal: AbortSignal): Promise<string | null>;
 }
 
 /**

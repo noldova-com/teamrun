@@ -15,7 +15,7 @@ export class StampedVersionReader extends ExecutableVersionReader {
   private readonly starter: WatchingProcessStarter;
   private readonly ending: CountWaiter = new CountWaiter();
 
-  public stamp: string = "1";
+  public stamp: string | null = "1";
   public ended: number = 0;
 
   public constructor(starter: WatchingProcessStarter = new WatchingProcessStarter(() => undefined)) {

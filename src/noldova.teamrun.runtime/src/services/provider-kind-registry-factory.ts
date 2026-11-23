@@ -26,6 +26,8 @@ import {
   ClaudeAdapter,
   ClaudeInstaller,
   CodexAdapter,
+  CodexAppServerDownload,
+  CodexAppServerProgram,
   CodexInstaller,
   CommandLineTool,
   CommandRunner,
@@ -85,8 +87,11 @@ export class ProviderKindRegistryFactory implements IProviderKindRegistryFactory
       UsualFolder.of(this.baseEnvironment, ProviderResources.codexHomeVariable, ProviderResources.codexHomeFolderName), this.locator.codexInstallDirectory(),
       CodexInstaller.targetOf(process.platform, process.arch), process.platform, this.locator.locateTar(), runner, CodexInstaller.programOf, symlinkSync,
       renameSync, settle, Resources.codexUnpackTimeout, Resources.releaseChannelTimeout);
+    const codexServerProgram = new CodexAppServerProgram(runner, versionReader, new CodexAppServerDownload(join(dataDirectory, ...Resources.codexAppServerSegments),
+      ProviderResources.codexAppServerReleaseAddress, CodexInstaller.targetOf(process.platform, process.arch), process.platform, this.locator.locateTar(), runner,
+      Resources.codexUnpackTimeout, log), timings.versionTimeout, log);
     registry.register(new CodexAdapter(codexCommand, this.baseEnvironment, clientInfo, starter, timings, versionReader, undefined,
-      () => ProviderKindRegistryFactory.toCommand(this.locator.locateCodex(null)), codexInstaller, log),
+      () => ProviderKindRegistryFactory.toCommand(this.locator.locateCodex(null)), codexInstaller, log, undefined, undefined, undefined, codexServerProgram),
       tool(ProviderResources.codexKindId, () => this.locator.locateCodex(null), ProviderResources.codexPosixInstallCommand, ProviderResources.codexWindowsInstallCommand,
         ProviderResources.codexSubscribeUrl));
     registry.register(new ClaudeAdapter(
