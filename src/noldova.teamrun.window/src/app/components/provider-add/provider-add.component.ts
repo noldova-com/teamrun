@@ -254,7 +254,7 @@ export class ProviderAddComponent {
       await this.save(kind);
     else if (installation?.state === ProviderKindInstallState.NotInstalled && !Object.isNull(installation.reason))
       this.error.set(installation.reason);
-    else if (installation?.state === ProviderKindInstallState.Unavailable)
+    else if (installation?.state === ProviderKindInstallState.Unavailable && this.error() === installation.reason)
       this.error.set(null);
   }
 
