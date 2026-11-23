@@ -215,6 +215,23 @@ describe("OrganizationViewComponent", () => {
     expect([mine, texts(".top .title")]).toEqual([["My organization"], ["Studio"]]);
   });
 
+  it("names the organization at the Focus view's root, in its heading and its outline's root row, and follows a rename", async () => {
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [SampleData.departmentType], [], []);
+    await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
+    const names = (): string[][] => [texts(".chart nol-teamrun-organization-focus .unit-name"), texts(".chart nol-teamrun-organization-focus .orow.root .label")];
+    await pickView("Focus");
+    const mine = names();
+
+    fixture.componentRef.setInput("instance", "o2");
+    await Wait.until(() => expect(texts(".top .title")).toEqual(["Second"]));
+    await pickView("Focus");
+    const seconds = names();
+    context.emit(EventName.OrganizationChanged, new Organization("o2", "Studio", null, 1, "c", "u2", [SampleData.departmentType], [], []).toJson());
+    await settle();
+
+    expect([mine, seconds, names()]).toEqual([[["My organization"], ["My organization"]], [["Second"], ["Second"]], [["Studio"], ["Studio"]]]);
+  });
+
   it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
     const second = new Organization("o2", "Second", null, 1, "c", "u", [SampleData.departmentType], [new Department("ops", "Ops", "department", OrganizationParent.person, null, 0, "c", "u")],
       [new TeammatePlacement("alice", OrganizationParent.department("ops"), 0)]);
@@ -315,7 +332,7 @@ describe("OrganizationViewComponent", () => {
     one(".top .views [role=radio]:last-of-type").click();
     await settle();
     expect([texts(".chart nol-teamrun-organization-focus .orow .label").slice(0, 4), texts(".chart nol-teamrun-organization-focus .orow.report .label")])
-      .toEqual([["Organization", "Code Reviewer", "Offline", "Design"], ["Code Reviewer", "Offline"]]);
+      .toEqual([["My organization", "Code Reviewer", "Offline", "Design"], ["Code Reviewer", "Offline"]]);
     const focus = element().textContent ?? "";
     await pickView("Tree");
     const tree = element().textContent ?? "";
@@ -545,7 +562,7 @@ describe("OrganizationViewComponent", () => {
     await settle();
 
     expect([pills().at(2), saves[0], texts(".chart > nol-teamrun-organization-focus .unit-name"), all("aside.messages").length])
-      .toEqual([new CheckedLabel("Focus", "true"), expect.objectContaining({ view: "Focus", focus: null }), ["Organization"], 0]);
+      .toEqual([new CheckedLabel("Focus", "true"), expect.objectContaining({ view: "Focus", focus: null }), ["My organization"], 0]);
   });
 
   it("talks in the Organization chat panel beside the Tree under To, and beside the Board under its chat list, whose leaders and department buttons choose whom", async () => {
