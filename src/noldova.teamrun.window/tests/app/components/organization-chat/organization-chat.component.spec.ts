@@ -14,7 +14,8 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AttachmentInput, Conversation, ConversationIdParams, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
+  AttachmentInput, Conversation, ConversationIdParams, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessageDelivery,
+  MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
   MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams,
   WaitingMessageIdParams, WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
@@ -404,6 +405,52 @@ describe("OrganizationChatComponent", () => {
     expect([queued().map(t => [t.message.chatId, t.message.responderTeammateId, t.message.text]), sent().map(t => t.chatId)])
       .toEqual([[["org-alice", "alice", "Status?"]], ["org-bob"]]);
   });
+
+  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a group's message behind a recipient's running reply while replying is set to %s", async setting => {
+    kept = [chatOf("alice"), chatOf("bob")];
+    running = [reply("org-alice", MessageStatus.Running)];
+    await create(OrganizationTarget.department("d1"));
+    context.changeSetting(Resources.whileReplyingSetting, setting);
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-recipient-status")).toEqual(["Replying", "No reply yet"]));
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(queued()).toHaveLength(1));
+
+    expect(queued().map(t => [t.delivery, t.message.chatId])).toEqual([[MessageDelivery.Queue, "org-alice"]]);
+  });
+
+  it.each([MessageDelivery.Steer, MessageDelivery.StopAndSend])("queues a message to a replying teammate behind its reply, by Enter and by the send button, and marks Enter on Queue in the send menu, while replying is set to %s",
+    async setting => {
+      const main = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-deliver .nol-split-button-main");
+      const arrow = (): HTMLButtonElement | null => element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-deliver .nol-split-button-arrow");
+      const offered = (): (string | null)[][] => [...document.querySelectorAll<HTMLElement>("button.nol-teamrun-deliver")]
+        .map(t => [t.dataset["delivery"] ?? null, t.querySelector(".nol-menu-item-shortcut")?.textContent?.trim() ?? null]);
+      vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+      kept = [chatOf("alice")];
+      running = [reply("org-alice", MessageStatus.Running)];
+      await create(OrganizationTarget.teammate("alice"));
+      context.changeSetting(Resources.whileReplyingSetting, setting);
+      await Wait.until(() => expect(main()?.getAttribute("aria-label")).toBe(Resources.deliveryLabels[MessageDelivery.Queue]));
+      arrow()?.click();
+      await Wait.until(() => expect(offered()).toHaveLength(3));
+      const shortcuts = offered();
+      arrow()?.click();
+      await Wait.until(() => expect(offered()).toHaveLength(0));
+
+      await type("By Enter");
+      box()?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      await Wait.until(() => expect(queued()).toHaveLength(1));
+      await Wait.until(() => expect(box()?.value).toBe(""));
+      await type("By the button");
+      await Wait.until(() => expect(main()?.disabled).toBe(false));
+      main()?.click();
+      await Wait.until(() => expect(queued()).toHaveLength(2));
+
+      expect([shortcuts, queued().map(t => [t.delivery, t.message.chatId, t.message.text])]).toEqual([
+        [[MessageDelivery.Steer, null], [MessageDelivery.Queue, "Enter"], [MessageDelivery.StopAndSend, "Ctrl+Enter"]],
+        [[MessageDelivery.Queue, "org-alice", "By Enter"], [MessageDelivery.Queue, "org-alice", "By the button"]]
+      ]);
+    });
 
   it("keeps the text when a replying recipient's chat refuses to queue the message, and queues it only there on the retry", async () => {
     kept = [chatOf("alice"), chatOf("bob")];

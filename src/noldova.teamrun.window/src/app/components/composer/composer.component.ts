@@ -308,8 +308,10 @@ export class ComposerComponent {
   public readonly conversationId: InputSignal<string> = input.required<string>();
   public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
   public readonly fanOut: InputSignal<ComposerFanOut | null> = input<ComposerFanOut | null>(null);
+  public readonly whileReplying: InputSignal<MessageDelivery | null> = input<MessageDelivery | null>(null);
 
   protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
+  protected readonly replyingDelivery: Signal<MessageDelivery> = computed(() => this.whileReplying() ?? this.store.whileReplying());
   protected readonly reachId: string = `${Resources.composerReachIdPrefix}${ComposerComponent.count++}`;
 
   public constructor() {
@@ -763,7 +765,7 @@ export class ComposerComponent {
   protected shortcutOf(delivery: MessageDelivery): string | null {
     const modifier = this.isMac ? Resources.macModifierKey : Resources.ctrlModifierKey;
     const modEnter = this.store.sendKey() === SendKey.ModEnter;
-    if (delivery === this.store.whileReplying())
+    if (delivery === this.replyingDelivery())
       return modEnter ? Resources.formatShortcut(modifier, Resources.enterKey) : Resources.enterKey;
     if (delivery === MessageDelivery.Queue)
       return Resources.formatShortcut(Resources.altModifierKey, Resources.enterKey);
@@ -1341,7 +1343,7 @@ export class ComposerComponent {
       return this.saveEdit(editing, text, conversationId, mentioned);
     if (Object.isNull(this.runningReply()))
       return this.store.send(text, settings, conversationId, attachments, mentioned, this.activeResponderId());
-    return this.store.addWaiting(text, settings, conversationId, delivery ?? this.store.whileReplying(), attachments, mentioned, this.activeResponderId());
+    return this.store.addWaiting(text, settings, conversationId, delivery ?? this.replyingDelivery(), attachments, mentioned, this.activeResponderId());
   }
 
   private async saveEdit(editing: WaitingMessage, text: string, conversationId: string, mentioned: readonly string[]): Promise<boolean> {

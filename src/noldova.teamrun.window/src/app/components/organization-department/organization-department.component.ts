@@ -9,7 +9,7 @@
 import { NgTemplateOutlet } from "@angular/common";
 import { Component, ElementRef, computed, inject, type InputSignal, input, type OutputEmitterRef, output, type Signal, viewChild } from "@angular/core";
 
-import { type Department, NameOrder, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
+import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasItemDirective, DialogService, IconButtonComponent, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent, SelectOption, TextFieldComponent }
   from "@noldova/ui.components.angular";
 
@@ -71,12 +71,7 @@ export class OrganizationDepartmentComponent {
     const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];
     return Resources.formatOrganizationDepartmentSummary(people.map(t => this.statuses.statusOf(t.id)()));
   });
-  protected readonly leaderOptions: Signal<readonly SelectOption[]> = computed(() => {
-    const node = this.node();
-    const people = NameOrder.sort(Object.isNull(node.leader) ? node.members : [node.leader, ...node.members], t => t.name);
-    const others = NameOrder.sort(this.store.teammates().filter(t => !people.some(u => u.id === t.id)), t => t.name);
-    return [new SelectOption(String.empty, Resources.organizationNoLeader), ...[...people, ...others].map(t => new SelectOption(t.id, t.name))];
-  });
+  protected readonly leaderOptions: Signal<readonly SelectOption[]> = computed(() => OrganizationEdits.leaderOptions(this.node(), this.store.teammates()));
   protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly placeChoices: Signal<readonly OrganizationPlaceChoice[]> = computed(() =>
     OrganizationPlaceChoice.of(OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()), this.node().key));
@@ -104,7 +99,7 @@ export class OrganizationDepartmentComponent {
   }
 
   protected setLeader(value: string): void {
-    void this.organization.setLeader(this.node().id, value.length === 0 ? null : value);
+    void OrganizationEdits.setLeaderAsync(this.organization, this.node(), value);
   }
 
   protected move(department: Department, key: string): void {
