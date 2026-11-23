@@ -133,7 +133,7 @@ describe("Resources", () => {
 
   it("counts the organization's teammates and departments, one in the singular", () => {
     expect([Resources.formatOrganizationHeadcount(0, 0), Resources.formatOrganizationHeadcount(1, 1), Resources.formatOrganizationHeadcount(2, 3)])
-      .toEqual(["0 teammates in 0 units", "1 teammate in 1 unit", "2 teammates in 3 units"]);
+      .toEqual(["0 teammates · 0 units", "1 teammate · 1 unit", "2 teammates · 3 units"]);
   });
 
   it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
