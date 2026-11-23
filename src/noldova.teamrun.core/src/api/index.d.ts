@@ -4800,8 +4800,6 @@ export declare class Resources {
   public static formatOrganizationLayoutPreference(organizationId: string): string;
   /** Says no organization has the id. */
   public static formatOrganizationNotFound(id: string): string;
-  /** Says the only organization can't be deleted. */
-  public static formatLastOrganization(name: string): string;
   /** Returns a placement's key in the change feed: the organization's id and the teammate's. */
   public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string;
   /** Says no node type of the organization has the id. */
@@ -10287,7 +10285,8 @@ export interface IOrganizationService {
 
   /**
    * Deletes an organization with its departments, placements and layout, in one transaction; its teammates and their chats stay.
-   * @throws ServiceException `NotFound` for an unknown organization, `Conflict` for the last one.
+   * The last one too, which leaves none.
+   * @throws ServiceException `NotFound` for an unknown organization.
    */
   deleteOrganizationAsync(params: OrganizationIdParams): Promise<void>;
 

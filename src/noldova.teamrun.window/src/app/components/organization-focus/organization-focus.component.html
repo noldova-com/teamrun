@@ -92,14 +92,16 @@ LICENSE file in the root directory of this source tree.
         @if (editing() && focus().teammate; as teammate) {
           @if (removable() && focus().department?.department; as department) {
             <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, department)"><span nolButtonIcon
-              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationLeaveUnitIcon }}</span>{{ resources.organizationRemoveMemberTitle }}</button>
           }
         }
       </div>
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {
-          <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)"
-            [departmentName]="departmentNames().get(card.id)" (message)="go(teammate(card))" />
+          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="card.name" [teammate]="card" [shape]="fluid" [editing]="editing()"
+            [department]="departmentOf(card)" [departmentName]="departmentNames().get(card.id)" [nolPopoverTrigger]="cardDetails" [nolPopoverOpenOn]="detailsOpening"
+            [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="go(teammate(card))" />
+          <ng-template #cardDetails><nol-teamrun-organization-details [teammate]="card" [department]="departmentOf(card)" /></ng-template>
         } @empty {
           <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
         }
