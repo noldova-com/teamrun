@@ -11,6 +11,9 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+import { ClassMetadataCoverage } from "../../scripts/angular/class-metadata-coverage.ts";
+import { ShortScreenshotNames } from "../../scripts/angular/short-screenshot-names.ts";
+
 const compilerOptions: { paths: Record<string, string[]> } = JSON.parse(readFileSync(new URL("./tsconfig.json", import.meta.url), "utf8")).compilerOptions;
 const wildcard = "*";
 const special = /[.*+?^${}()|[\]\\]/gu;
@@ -20,6 +23,9 @@ const aliasOf = (name: string, target: string): { find: string | RegExp; replace
   : { find: name, replacement: fileURLToPath(new URL(target, import.meta.url)) };
 
 export default defineConfig({
+  plugins: [
+    new ClassMetadataCoverage()
+  ],
   resolve: {
     alias: Object.entries(compilerOptions.paths).map(([name, targets]) => aliasOf(name, String(targets[0])))
   },
@@ -28,6 +34,7 @@ export default defineConfig({
     expect: { poll: { timeout: 15_000 } },
     hookTimeout: 30_000,
     testTimeout: 30_000,
+    browser: { commands: { __vitest_screenshot: new ShortScreenshotNames().screenshot } },
     coverage: {
       reportsDirectory: fileURLToPath(new URL("../../_build/docs-coverage", import.meta.url))
     }
