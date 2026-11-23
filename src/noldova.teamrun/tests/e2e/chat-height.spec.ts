@@ -30,7 +30,18 @@ interface IMeasuredChat {
 
 async function measureAsync(page: Page, width: number, height: number): Promise<IMeasuredChat> {
   await page.setViewportSize({ width, height });
-  await expect.poll(() => page.evaluate(() => `${innerWidth}×${innerHeight}`), TeamRunApp.pollOf(30_000)).toBe(`${width}×${height}`);
+  let previous = String.empty;
+  const unsettled = async (): Promise<string> => {
+    const shown = JSON.stringify([await page.evaluate(() => `${innerWidth}×${innerHeight}`), await readAsync(page)]);
+    const isSettled = shown === previous && shown.startsWith(`["${width}×${height}"`);
+    previous = shown;
+    return isSettled ? String.empty : shown;
+  };
+  await expect.poll(unsettled, { message: `the chat laid out again in a ${width}×${height} window`, ...TeamRunApp.pollOf(30_000) }).toBe(String.empty);
+  return readAsync(page);
+}
+
+function readAsync(page: Page): Promise<IMeasuredChat> {
   return page.evaluate(() => {
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     const one = (selector: string): Element => document.querySelector(selector) ?? document.documentElement;
@@ -74,7 +85,8 @@ test("a chat keeps its members bar and composer at their size on Desktop's defau
     const wide = await measureAsync(page, 1280, 800);
     const small = await measureAsync(page, 905, 616);
 
-    expect([wide.chat >= 25, small.chat < 25]).toEqual([true, true]);
+    expect([wide.chat >= 25, small.chat < 25], `the chat's ${wide.chat} rem at 1280×800 and ${small.chat} rem at 905×616: ${JSON.stringify([wide, small])}`)
+      .toEqual([true, true]);
     expectRem(wide.members, wide.memberControl + 2 * wide.space2, "the members bar at 1280×800");
     expectRem(wide.composerEnd, wide.space6, "the composer's end padding at 1280×800");
     expectRem(wide.textMinimum, 2 * wide.line + wide.space3, "the message box's least height at 1280×800");
