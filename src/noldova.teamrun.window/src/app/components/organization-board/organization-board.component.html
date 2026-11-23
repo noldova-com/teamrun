@@ -48,14 +48,20 @@ LICENSE file in the root directory of this source tree.
       class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationBoardMessageLeadersIcon }}</span>{{ resources.organizationBoardMessageLeaders }}</button>
   </div>
   <div class="leaders">
-    @for (leader of leaders(); track leader.id) {
-      <nol-teamrun-organization-card class="leader" nolCanvasItem [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row"
-        [editing]="editing()" (message)="chosen.emit(teammateTarget(leader))" />
+    @for (node of led(); track node.id) {
+      @if (node.leader; as leader) {
+        <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [class.selected]="isOpen(teammateTarget(leader))"
+          [teammate]="leader" [shape]="row" [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
+          [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(leader))" />
+        <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node.department" /></ng-template>
+      }
     }
     @for (report of reports(); track report.id) {
-      <nol-teamrun-organization-card class="leader report" nolCanvasItem [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row"
-        [reportsTo]="reportsToOf(report)"
-        [editing]="editing()" (message)="chosen.emit(teammateTarget(report))" />
+      <nol-teamrun-organization-card class="leader report" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name"
+        [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row" [reportsTo]="reportsToOf(report)" [editing]="editing()"
+        [nolPopoverTrigger]="reportDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment"
+        (message)="chosen.emit(teammateTarget(report))" />
+      <ng-template #reportDetails><nol-teamrun-organization-details [teammate]="report" [department]="null" /></ng-template>
     }
   </div>
 </section>
@@ -93,8 +99,10 @@ LICENSE file in the root directory of this source tree.
             (valueChange)="sort(node, $event)" />
         }
         @for (member of membersOf(node); track member.id) {
-          <nol-teamrun-organization-card nolCanvasItem [class.selected]="isOpen(teammateTarget(member))" [teammate]="member" [shape]="row" [editing]="editing()"
-            [department]="node.department" (message)="chosen.emit(teammateTarget(member))" />
+          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [class.selected]="isOpen(teammateTarget(member))"
+            [teammate]="member" [shape]="row" [editing]="editing()" [department]="node.department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening"
+            [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(member))" />
+          <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" [department]="node.department" /></ng-template>
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>
         }

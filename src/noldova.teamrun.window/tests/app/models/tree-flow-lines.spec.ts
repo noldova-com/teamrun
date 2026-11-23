@@ -13,7 +13,7 @@ import { TreeFlowLines } from "../../../src/app/models/tree-flow-lines";
 describe("TreeFlowLines", () => {
   const at = (left: number, top: number, width: number, height: number): string => `position: absolute; left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px`;
   const markup = [
-    `<style>.reports::after { position: absolute; top: 12px; content: ""; }</style>`,
+    `<style>.reports::before { position: absolute; top: 0; height: 12px; content: ""; }</style>`,
     `<div data-flow-node="you" data-flow-shape="Root" style="${at(0, 0, 40, 20)}"></div>`,
     `<div class="stem" style="${at(100, 10, 2, 20)}"></div>`,
     `<div data-flow-node="leader" data-flow-parent="department" data-flow-shape="Stem" style="${at(60, 30, 100, 40)}"></div>`,

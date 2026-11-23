@@ -13,16 +13,17 @@ LICENSE file in the root directory of this source tree.
     [department]="department()" [nolPopoverTrigger]="selfDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
     [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(target.teammate(teammate.id))" />
   <ng-template #selfDetails><nol-teamrun-organization-details [teammate]="teammate" [department]="department()" /></ng-template>
+  @if (editing()) {
+    <ng-container *ngTemplateOutlet="adds" />
+  }
   @if (node().reports.length > 0) {
     <div class="reports" [style.--nol-teamrun-organization-columns]="node().columns">
       @for (report of node().reports; track report.id) {
-        <nol-teamrun-organization-department class="report" [node]="report" [department]="department()" [flowParent]="flowHead()" [editing]="editing()"
+        <nol-teamrun-organization-department class="report" [class.first-row]="$index < node().columns" [class.row-start]="$index === 0"
+          [class.row-end]="$index === node().columns - 1" [node]="report" [department]="department()" [flowParent]="flowHead()" [editing]="editing()"
           (chosen)="chosen.emit($event)" />
       }
     </div>
-  }
-  @if (editing()) {
-    <ng-container *ngTemplateOutlet="adds" />
   }
   @if (node().departments.length > 0) {
     <div class="kids">
@@ -72,16 +73,17 @@ LICENSE file in the root directory of this source tree.
     <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node().department" /></ng-template>
   }
   @if (isOpen()) {
+    @if (editing()) {
+      <ng-container *ngTemplateOutlet="adds" />
+    }
     @if (node().reports.length > 0) {
       <div class="reports" [style.--nol-teamrun-organization-columns]="node().columns">
         @for (report of node().reports; track report.id) {
-          <nol-teamrun-organization-department class="report" [node]="report" [department]="node().department" [flowParent]="flowHead()" [editing]="editing()"
+          <nol-teamrun-organization-department class="report" [class.first-row]="$index < node().columns" [class.row-start]="$index === 0"
+          [class.row-end]="$index === node().columns - 1" [node]="report" [department]="node().department" [flowParent]="flowHead()" [editing]="editing()"
             (chosen)="chosen.emit($event)" />
         }
       </div>
-    }
-    @if (editing()) {
-      <ng-container *ngTemplateOutlet="adds" />
     }
     @if (node().departments.length > 0) {
       <div class="kids">
