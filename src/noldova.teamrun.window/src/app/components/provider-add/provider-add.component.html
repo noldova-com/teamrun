@@ -21,7 +21,7 @@ LICENSE file in the root directory of this source tree.
     <span class="nol-teamrun-field-label">{{ resources.providerNameLabel }}</span>
     <span class="nol-teamrun-name-row">
       <input nol-text-field class="nol-teamrun-add-name" name="label" [attr.aria-label]="resources.providerNameLabel" [value]="label()" [disabled]="busy()"
-        [attr.aria-describedby]="shownAsId" #labelField (input)="editLabel(labelField.value)" (keydown.enter)="add()">
+        [attr.aria-describedby]="shownAsId" #labelField (input)="editLabel()" (keydown.enter)="add()">
       <span class="nol-teamrun-muted nol-teamrun-shown-as" [id]="shownAsId">{{ shownAs() }}</span>
     </span>
   </label>

@@ -10,6 +10,7 @@ import {
   computed,
   DestroyRef,
   effect,
+  ElementRef,
   inject,
   input,
   type InputSignal,
@@ -19,6 +20,7 @@ import {
   type Signal,
   signal,
   untracked,
+  viewChild,
   type WritableSignal
 } from "@angular/core";
 
@@ -131,6 +133,7 @@ export class ProviderAddComponent {
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly showError: (message: string) => void = message => this.error.set(message);
   private readonly hiddenSessions: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly labelField: Signal<ElementRef<HTMLInputElement>> = viewChild.required("labelField", { read: ElementRef });
   private dropped: boolean = false;
   private readonly toolTerminal: Signal<string | undefined> = computed(() => {
     return this.store().terminalSessions().get(this.kind());
@@ -181,8 +184,8 @@ export class ProviderAddComponent {
     }));
   }
 
-  protected editLabel(value: string): void {
-    this.edited.set(value);
+  protected editLabel(): void {
+    this.edited.set(this.labelField().nativeElement.value);
   }
 
   protected async pickFolder(): Promise<void> {
