@@ -241,6 +241,7 @@ export class ComposerComponent {
   protected readonly modelsLoading: WritableSignal<boolean> = signal(false);
   protected readonly runningReply: Signal<Message | null>;
   protected readonly stopping: Signal<boolean>;
+  protected readonly canStop: Signal<boolean>;
   protected readonly activeResponderId: Signal<string | null>;
   protected readonly responder: Signal<Teammate | null>;
   protected readonly memberSettings: Signal<ChatMemberSettings | null>;
@@ -319,7 +320,8 @@ export class ComposerComponent {
     this.ownChoice = computed(() => this.choices.choiceOf(this.conversationId()), { equal: (a, b) => a === b || (!Object.isNull(a) && a.equals(b)) });
     this.keptChoice = computed(() => store.conversation(this.conversationId())?.responder, { equal: ComposerComponent.sameResponder });
     this.runningReply = computed(() => store.runningReplyOf(this.conversationId()));
-    this.stopping = computed(() => store.isStopping(this.conversationId()));
+    this.stopping = computed(() => this.fanOut()?.stopping() ?? store.isStopping(this.conversationId()));
+    this.canStop = computed(() => this.fanOut()?.running() ?? !Object.isNull(this.runningReply()));
     this.activeResponderId = computed(() => {
       const id = this.responderId();
       return Object.isNull(id) || store.isTeammateUnavailable(id) ? null : id;
@@ -705,8 +707,7 @@ export class ComposerComponent {
       this.cancelEditing();
       return;
     }
-    const reply = this.runningReply();
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || Object.isNull(reply) || this.stopping())
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !this.canStop() || this.stopping())
       return;
     event.preventDefault();
     void this.stop();
@@ -836,7 +837,11 @@ export class ComposerComponent {
 
   protected async stop(): Promise<void> {
     this.box().nativeElement.focus();
-    await this.store.stop(this.conversationId());
+    const fanOut = this.fanOut();
+    if (Object.isNull(fanOut))
+      await this.store.stop(this.conversationId());
+    else
+      await fanOut.stop();
   }
 
   protected pickFiles(input: HTMLInputElement): void {
