@@ -8,6 +8,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### New
 
+- **Organization:** while editing, the Board and Focus choose a unit's leader and add teammates through the same Find a teammate search as the Tree, to a unit or directly under you (#135).
 - **Organization:** while editing, every teammate's card takes it out of the organization once you confirm, saying whom the teammates and units under it will report to; the teammate keeps its chats and can be added back, and a unit member's card still moves it out of its unit, now named Move out of unit (#154).
 - **Organization:** the Board's and Focus's cards open their teammate's details when pointed at or reached with the keyboard, as the Tree's do (#134).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
