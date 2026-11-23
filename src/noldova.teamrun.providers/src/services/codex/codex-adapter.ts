@@ -614,6 +614,7 @@ export class CodexAdapter implements IProviderAdapter {
   public async shutdown(): Promise<void> {
     this.stopped = true;
     this.stopping.abort();
+    this.serverProgram?.stop();
     for (const idle of [...this.idle.values(), ...this.kept.keys()])
       idle.stop();
     this.idle.clear();

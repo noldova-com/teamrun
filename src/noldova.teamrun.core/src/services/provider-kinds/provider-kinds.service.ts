@@ -211,7 +211,7 @@ export class ProviderKindsService implements IProviderKindsService {
       return;
     this.reads.delete(kind);
     const known = this.versions.get(kind)?.latest ?? null;
-    const versions = read.checksLatest || !Object.isNull(found.latest) ? found : new ProviderKindVersions(found.installed, known);
+    const versions = read.checksLatest || !Object.isNull(found.latest) ? found : new ProviderKindVersions(found.installed, known, found.notice);
     this.versions.set(kind, versions);
     if (!Object.isNull(versions.installed) && !Object.isNull(versions.latest) && Object.isNull(versions.update))
       this.failures.delete(kind);
@@ -225,7 +225,7 @@ export class ProviderKindsService implements IProviderKindsService {
       return new ProviderKindInstallation(kind, ProviderKindInstallState.Installing, null, run.received, run.total, versions.installed, null, run.cancellable);
     if (installation.isInstalled)
       return new ProviderKindInstallation(kind, ProviderKindInstallState.Installed, this.failures.get(kind) ?? null, 0, 0, versions.installed, versions.update, true,
-        null, installation.foundPath ?? null);
+        null, installation.foundPath ?? null, versions.notice);
     const unavailable = installation.unavailable;
     return Object.isNull(unavailable)
       ? new ProviderKindInstallation(kind, ProviderKindInstallState.NotInstalled, this.failures.get(kind) ?? installation.notInstalledReason ?? null)

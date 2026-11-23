@@ -448,6 +448,32 @@ export class ProviderKindsServiceTests {
   }
 
   @TestMethod
+  public async listsTheNoticeTheInstallationReadsWhileInstalledWhetherOrNotUpdateChecksAllowALatestRead(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("0.171.0", "0.171.0", "Codex chats show in the Codex app.");
+    const checks = new FakeToolUpdateChecks(false);
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, checks);
+    const notices = async (): Promise<string> => {
+      await kinds.listInstallations();
+      await installation.read;
+      const listed = (await kinds.listInstallations()).map(t => `${t.state} ${t.notice}`).join(",");
+      await installation.read;
+      return listed;
+    };
+
+    const unchecked = await notices();
+    checks.allows = true;
+    const checked = await notices();
+    installation.isInstalled = false;
+    const removed = await notices();
+
+    Assert.areEqual("Installed Codex chats show in the Codex app.|Installed Codex chats show in the Codex app.|NotInstalled null", [unchecked, checked, removed].join("|"));
+    Assert.areEqual("false,false,true,true", installation.checks.slice(0, 4).join(","));
+  }
+
+  @TestMethod
   public async readsTheListedInstallationsLatestVersionsOnceUpdateChecksAllowItAndNothingBeforeAnyListing(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const installation = ProviderKindsServiceTests.register(host);

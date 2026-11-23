@@ -247,6 +247,21 @@ export class CodexAppServerDownloadTests {
   }
 
   @TestMethod
+  public removesTheStagingFolderOfADownloadThatWasCutOffBeforeTheRunsFirstDownload(): Promise<void> {
+    return CodexAppServerDownloadTests.withReleases(async setup => {
+      setup.publish("0.171.0", CodexAppServerDownloadTests.package(CodexAppServerDownloadTests.POSIX_MEMBERS));
+      const leftover = join(setup.root, ".teamrun-staging-cut-off", "package", "bin");
+      mkdirSync(leftover, { recursive: true });
+      writeFileSync(join(leftover, "codex-app-server"), "partial");
+
+      const program = await setup.create().fetch("0.171.0", new AbortController().signal);
+
+      Assert.areEqual(join(setup.root, "0.171.0-x86_64-unknown-linux-musl", "bin", "codex-app-server"), program);
+      Assert.areEqual("0.171.0-x86_64-unknown-linux-musl", readdirSync(setup.root).join(","));
+    });
+  }
+
+  @TestMethod
   public replacesAnIncompleteFolderOfTheVersionWithAPackageThatHasOnlyItsProgram(): Promise<void> {
     return CodexAppServerDownloadTests.withReleases(async setup => {
       setup.publish("0.171.0", CodexAppServerDownloadTests.package(["bin/codex-app-server"]));

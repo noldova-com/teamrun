@@ -25,6 +25,7 @@ export class CodexAppServerProgram {
   private readonly log: ILog | null;
   private readonly readings: Map<string, Promise<CodexServerReading>> = new Map();
   private readonly refused: Set<string> = new Set();
+  private readonly stopping: AbortController = new AbortController();
 
   public constructor(runner: CommandRunner, versionReader: ExecutableVersionReader, download: CodexAppServerDownload, helpTimeout: number, log: ILog | null = null) {
     this.runner = runner;
@@ -46,12 +47,26 @@ export class CodexAppServerProgram {
     if (Object.isNull(reading.version))
       return shared;
     const program = this.download.programOf(reading.version);
-    if (Object.isNull(program)) {
-      void this.download.fetch(reading.version, signal);
-      return shared;
-    }
-    return this.refused.has(program) ? shared
+    return Object.isNull(program) || this.refused.has(program) ? shared
       : new CodexServerChoice(new ProcessCommand(program, [Resources.codexSessionSourceArgument, Resources.codexHiddenSessionSource]), program);
+  }
+
+  public async readNotice(command: ProcessCommand, environment: NodeJS.ProcessEnv, downloads: boolean): Promise<string | null> {
+    const reading = await this.read(command, environment, this.stopping.signal);
+    if (reading.acceptsSource)
+      return null;
+    if (Object.isNull(reading.version))
+      return Resources.codexThreadsListedNotice;
+    const program = this.download.programOf(reading.version);
+    if (!Object.isNull(program) && !this.refused.has(program))
+      return null;
+    if (downloads && Object.isNull(program))
+      void this.download.fetch(reading.version, this.stopping.signal);
+    return Resources.codexThreadsListedNotice;
+  }
+
+  public stop(): void {
+    this.stopping.abort();
   }
 
   public refuse(program: string, reason: string): void {

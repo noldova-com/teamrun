@@ -4080,6 +4080,8 @@ export declare class Resources {
    * so it doesn't list these threads, and a later resume keeps the source the thread was created with.
    */
   public static readonly codexHiddenSessionSource: string;
+  /** The Codex kind's notice while the Codex chats TeamRun starts would show in the Codex app, and when TeamRun downloads what keeps them out. */
+  public static readonly codexThreadsListedNotice: string;
   public static readonly helpArgument: string;
   public static readonly windowsExecutableExtension: string;
   /**
@@ -15141,8 +15143,9 @@ export declare class CodexServerChoice {
  * Picks the app-server a Codex start runs so the threads it creates are recorded with `Resources.codexHiddenSessionSource` and stay out of the
  * Codex app's lists: `codex app-server --session-source app-server` when the installed Codex's `app-server --help` names the option; otherwise
  * the downloaded app server of the installed Codex's version, when `CodexAppServerDownload` holds it and it wasn't refused; otherwise
- * `codex app-server`, and it starts that version's download in the background. What it read is kept per stamp of the Codex executable, and read
- * again when the stamp changes or the last read found neither the option nor the version.
+ * `codex app-server`. It starts a version's download only from `readNotice`, which `CodexInstaller` calls when it reads Codex's latest version, as
+ * Noldova Desktop's Check for updates setting allows and whenever the person chooses Check for updates, and after it installs or updates Codex. What it
+ * read is kept per stamp of the Codex executable, and read again when the stamp changes or the last read found neither the option nor the version.
  */
 export declare class CodexAppServerProgram {
   /**
@@ -15156,10 +15159,18 @@ export declare class CodexAppServerProgram {
   /** The shared app-server command, `codex app-server`. */
   public static sharedOf(command: ProcessCommand): ProcessCommand;
   /**
-   * Picks the app-server command for a start, as the class says.
-   * @param signal Stops the reads, and the download it starts.
+   * Picks the app-server command for a start, as the class says, without starting a download.
+   * @param signal Stops the reads.
    */
   public choose(command: ProcessCommand, environment: NodeJS.ProcessEnv, signal: AbortSignal): Promise<CodexServerChoice>;
+  /**
+   * `Resources.codexThreadsListedNotice` while the threads a start creates would show in the Codex app: the installed Codex's `app-server --help`
+   * doesn't name the option, and its version's download isn't in place or was refused, or its version can't be read; `null` otherwise.
+   * @param downloads Whether to start the version's download when it isn't in place, as when the installer checks Codex's latest version.
+   */
+  public readNotice(command: ProcessCommand, environment: NodeJS.ProcessEnv, downloads: boolean): Promise<string | null>;
+  /** Stops the reads and downloads `readNotice` started; the adapter calls it at shutdown. */
+  public stop(): void;
   /** Stops using a downloaded program that failed to start, for the rest of the run, and logs why. */
   public refuse(program: string, reason: string): void;
 }
@@ -15169,7 +15180,7 @@ export declare class CodexAppServerProgram {
  * `Resources.codexAppServerReleaseAddress`, downloads this computer's `codex-app-server-package-<target>.tar.gz`, checks it against the SHA-256
  * the release lists, and unpacks it with tar into `<root>/<version>-<target>`, in place of an incomplete folder there, then removes the other
  * versions. The download is staged in
- * `root` and removed whether it succeeds or not. One download runs per version at a time; a failed one is logged and tried again on the next run.
+ * `root` and removed whether it succeeds or not; the run's first download also removes the staging folders of downloads cut off before. One download runs per version at a time; a failed one is logged and tried again on the next run.
  */
 export declare class CodexAppServerDownload {
   /**
@@ -15224,11 +15235,13 @@ export declare class CodexInstaller implements IProviderKindInstallation {
    * `InstallRename.moveAsync`; a move back that still fails is thrown as `Resources.formatCodexReleaseSetAside`.
    * @param unpackTimeout How long tar may take, in milliseconds.
    * @param channelTimeout How long `readVersions` may wait for the release, in milliseconds.
+   * @param serverProgram Reads the versions' `notice` through `CodexAppServerProgram.readNotice`, starting the app server's download when
+   * `readVersions` checks the latest version and after an install; `null`, the default, gives no notice and downloads nothing.
    */
   public constructor(locate: () => LocatedExecutable | null, versionReader: ExecutableVersionReader, environment: NodeJS.ProcessEnv, channels: readonly string[],
     home: string, binDirectory: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
     program: (path: string) => ProcessCommand, symlink: (target: string, path: string) => void, rename: (from: string, to: string) => void,
-    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number);
+    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number, serverProgram?: CodexAppServerProgram | null);
 
   /**
    * `Resources.codexNoBuild` when this computer has no package, `Resources.codexNoTar` when it has no tar, otherwise `null`.
@@ -15253,12 +15266,13 @@ export declare class CodexInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Codex's version and the latest release's, which is `null` when no release can be read in time, and without reading
-   * a release when no Codex is installed, the one installed isn't a standalone install, or without `checksLatest`.
+   * a release when no Codex is installed, the one installed isn't a standalone install, or without `checksLatest`. With a `serverProgram` and an
+   * installed Codex, its `notice` is `CodexAppServerProgram.readNotice`'s, which starts the app server's download with `checksLatest`.
    */
   public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
-   * Installs the latest release, or updates an installed Codex to it.
+   * Installs the latest release, or updates an installed Codex to it, then starts the `serverProgram`'s app server download for it, if needed.
    * @param progress Called with the bytes received so far and the size the server sends, if any.
    * @param commit Called once, just before the release is moved into place, when the install can no longer be stopped.
    * @returns The installed Codex's path.

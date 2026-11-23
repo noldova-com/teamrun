@@ -7,7 +7,7 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { CodexAppServerProgram, type CodexServerChoice, CommandRunner, NodeProcessStarter, ProcessCommand, ProcessTerminator } from "@noldova/teamrun.providers";
+import { CodexAppServerProgram, type CodexServerChoice, CommandRunner, NodeProcessStarter, ProcessCommand, ProcessTerminator, Resources } from "@noldova/teamrun.providers";
 
 import { CodexTestHost } from "../../fixtures/codex-test-host.fixture.js";
 import { HeldAppServerDownload } from "../../fixtures/held-app-server-download.fixture.js";
@@ -61,16 +61,82 @@ export class CodexAppServerProgramTests {
   }
 
   @TestMethod
-  public async runsCodexAppServerAndStartsTheVersionsDownloadWithTheStartsSignalWhileItIsMissing(): Promise<void> {
+  public async runsCodexAppServerWithoutStartingTheDownloadWhileItIsMissing(): Promise<void> {
     const setup = CodexAppServerProgramTests.create();
-    const controller = new AbortController();
 
-    const choice = await setup.program.choose(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), controller.signal);
+    const choice = await setup.program.choose(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), new AbortController().signal);
 
     Assert.areEqual(`${process.execPath} app-server`, CodexAppServerProgramTests.describe(choice));
     Assert.isNull(choice.download);
+    Assert.areEqual(0, setup.download.fetched.length);
+  }
+
+  @TestMethod
+  public async noticesNothingWhenTheHelpNamesTheOptionAndDownloadsNothing(): Promise<void> {
+    const setup = CodexAppServerProgramTests.create();
+
+    const notice = await setup.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment({ TEAMRUN_FAKE_CODEX_SESSION_SOURCE: "true" }), true);
+
+    Assert.isNull(notice);
+    Assert.areEqual(0, setup.download.fetched.length);
+  }
+
+  @TestMethod
+  public async noticesNothingOnceTheVersionsDownloadIsInPlace(): Promise<void> {
+    const setup = CodexAppServerProgramTests.create();
+    setup.download.program = "/downloads/0.171.0/bin/codex-app-server";
+
+    const notice = await setup.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), true);
+
+    Assert.isNull(notice);
+    Assert.areEqual(0, setup.download.fetched.length);
+  }
+
+  @TestMethod
+  public async startsTheVersionsDownloadWhenAskedToAndNoticesThatChatsShowUntilItIsInPlace(): Promise<void> {
+    const setup = CodexAppServerProgramTests.create();
+
+    const notice = await setup.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), true);
+
+    Assert.areEqual(Resources.codexThreadsListedNotice, notice);
     Assert.areEqual("0.171.0", setup.download.fetched.join(","));
-    Assert.isTrue(setup.download.signals[0] === controller.signal);
+    Assert.isFalse(setup.download.signals[0]?.aborted ?? true);
+  }
+
+  @TestMethod
+  public async downloadsNothingWhenNotAskedToAndNoticesThatChatsShow(): Promise<void> {
+    const setup = CodexAppServerProgramTests.create();
+
+    const notice = await setup.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), false);
+
+    Assert.areEqual(Resources.codexThreadsListedNotice, notice);
+    Assert.areEqual(0, setup.download.fetched.length);
+  }
+
+  @TestMethod
+  public async noticesThatChatsShowWithoutDownloadingWhenTheVersionIsUnknownOrTheDownloadWasRefused(): Promise<void> {
+    const unknown = CodexAppServerProgramTests.create();
+    const refused = CodexAppServerProgramTests.create();
+    refused.download.program = "/downloads/0.171.0/bin/codex-app-server";
+    refused.program.refuse("/downloads/0.171.0/bin/codex-app-server", "it exited with code 3");
+
+    const notices = [
+      await unknown.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment({ TEAMRUN_FAKE_CODEX_VERSION: "unknown" }), true),
+      await refused.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), true)
+    ];
+
+    Assert.areEqual(`${Resources.codexThreadsListedNotice}|${Resources.codexThreadsListedNotice}`, notices.join("|"));
+    Assert.areEqual(0, unknown.download.fetched.length + refused.download.fetched.length);
+  }
+
+  @TestMethod
+  public async stopsTheDownloadsItStartedWhenStopped(): Promise<void> {
+    const setup = CodexAppServerProgramTests.create();
+    await setup.program.readNotice(CodexAppServerProgramTests.CODEX, CodexAppServerProgramTests.environment(), true);
+
+    setup.program.stop();
+
+    Assert.isTrue(setup.download.signals[0]?.aborted ?? false);
   }
 
   @TestMethod
@@ -81,7 +147,7 @@ export class CodexAppServerProgramTests {
       CodexAppServerProgramTests.environment({ TEAMRUN_FAKE_CODEX_SESSION_SOURCE: "true", TEAMRUN_FAKE_CODEX_HELP: "fails" }), new AbortController().signal);
 
     Assert.areEqual(`${process.execPath} app-server`, CodexAppServerProgramTests.describe(choice));
-    Assert.areEqual("0.171.0", setup.download.fetched.join(","));
+    Assert.areEqual(1, setup.versionReader.reads);
   }
 
   @TestMethod
@@ -126,7 +192,7 @@ export class CodexAppServerProgramTests {
     Assert.areEqual(`${process.execPath} app-server`, CodexAppServerProgramTests.describe(first));
     Assert.areEqual(2, setup.programs.started.length);
     Assert.areEqual(`${process.execPath} app-server`, CodexAppServerProgramTests.describe(second));
-    Assert.areEqual("0.171.0", setup.download.fetched.join(","));
+    Assert.areEqual(2, setup.versionReader.reads);
   }
 
   @TestMethod

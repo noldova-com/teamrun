@@ -16,6 +16,7 @@ export class ChosenAppServerProgram extends CodexAppServerProgram {
   private readonly chosen: CodexServerChoice;
 
   public readonly refusals: string[] = [];
+  public stops: number = 0;
 
   public constructor(command: ProcessCommand, download: string) {
     super(new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform))), new StampedVersionReader(), new HeldAppServerDownload(), 1);
@@ -24,6 +25,11 @@ export class ChosenAppServerProgram extends CodexAppServerProgram {
 
   public override choose(command: ProcessCommand): Promise<CodexServerChoice> {
     return Promise.resolve(this.refusals.length === 0 ? this.chosen : new CodexServerChoice(CodexAppServerProgram.sharedOf(command), null));
+  }
+
+  public override stop(): void {
+    this.stops++;
+    super.stop();
   }
 
   public override refuse(program: string, reason: string): void {

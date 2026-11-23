@@ -2827,10 +2827,10 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
-  public async stopsADownloadThatFailsToStartRefusesItAndRunsTheTurnOnCodexAppServer(): Promise<void> {
+  public async stopsADownloadThatFailsToStartRefusesItWithCodexsErrorAndRunsTheTurnOnCodexAppServer(): Promise<void> {
     using host = new CodexTestHost();
     const exiting = host.directory.resolve("exiting-app-server.cjs");
-    writeFileSync(exiting, "process.exit(3);");
+    writeFileSync(exiting, "process.stderr.write(\"error: unknown configuration key\", () => process.exit(3));");
     const program = new ChosenAppServerProgram(new ProcessCommand(process.execPath, [exiting]), "/downloads/codex-app-server");
     const adapter = host.createAdapter(host.environment, undefined, undefined, undefined, null, undefined, undefined, program);
     const listener = new RecordingTurnListener();
@@ -2839,7 +2839,7 @@ export class CodexAdapterTests {
 
       Assert.areEqual(TurnOutcome.Completed, result.outcome);
       Assert.areEqual("app-server -c features.apps=false", (JSON.parse(String(listener.texts[0])) as { argv: readonly string[] }).argv.join(" "));
-      Assert.areEqual("/downloads/codex-app-server: The Codex app-server exited (code 3, signal null)", program.refusals.join("\n"));
+      Assert.areEqual("/downloads/codex-app-server: The Codex app-server exited (code 3, signal null): error: unknown configuration key", program.refusals.join("\n"));
       Assert.areEqual(`${exiting} -c features.apps=false|app-server -c features.apps=false`,
         host.programs.started.map(t => t.arguments.filter(a => a !== CodexTestHost.FAKE_SERVER_PATH).join(" ")).join("|"));
     }
@@ -2849,7 +2849,7 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
-  public async startsNothingElseWhenTheAdapterShutsDownWhileADownloadStarts(): Promise<void> {
+  public async startsNothingElseAndStopsTheAppServerDownloadsWhenTheAdapterShutsDownWhileADownloadStarts(): Promise<void> {
     using host = new CodexTestHost();
     const silent = host.directory.resolve("silent-app-server.cjs");
     writeFileSync(silent, "process.stdin.resume();");
@@ -2864,6 +2864,7 @@ export class CodexAdapterTests {
     Assert.areEqual(TurnOutcome.Failed, result.outcome);
     Assert.areEqual(`${silent} -c features.apps=false`, host.programs.started.map(t => t.arguments.join(" ")).join("|"));
     Assert.areEqual(0, program.refusals.length);
+    Assert.areEqual(1, program.stops);
   }
 
   @TestMethod

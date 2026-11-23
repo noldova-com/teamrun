@@ -1137,6 +1137,9 @@ export class Resources {
     "codex-path/rg", "codex-resources/bwrap"];
   public static readonly codexSessionSourceArgument: string = "--session-source";
   public static readonly codexHiddenSessionSource: string = "app-server";
+  public static readonly codexThreadsListedNotice: string = "TeamRun's Codex chats show in the Codex app's recent chats until TeamRun downloads "
+    + "Codex's app server for this version from GitHub, which it does when Noldova Desktop's Check for updates setting allows it, when you choose "
+    + "Check for updates, and when you install or update Codex here.";
   public static readonly helpArgument: string = "--help";
   public static readonly windowsExecutableExtension: string = ".exe";
   public static readonly codexPreviousReleaseName: string = "previous";

@@ -15,10 +15,12 @@ export class ProviderKindVersions {
 
   public readonly installed: string | null;
   public readonly latest: string | null;
+  public readonly notice: string | null;
 
-  public constructor(installed: string | null, latest: string | null) {
+  public constructor(installed: string | null, latest: string | null, notice: string | null = null) {
     this.installed = installed;
     this.latest = latest;
+    this.notice = notice;
   }
 
   public get update(): string | null {

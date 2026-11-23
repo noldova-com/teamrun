@@ -14,6 +14,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { ProviderKindVersions } from "@noldova/teamrun.core";
 import {
+  type CodexAppServerProgram,
   CodexInstaller,
   CommandRunner,
   ExecutableSource,
@@ -28,6 +29,7 @@ import {
 
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
+import { NoticingAppServerProgram } from "../../fixtures/noticing-app-server-program.fixture.js";
 import { RecordedDelayTimer } from "../../fixtures/recorded-delay-timer.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -38,6 +40,28 @@ export class CodexInstallerTests {
   private static readonly TARGETS: Readonly<Record<string, string>> = {
     linux: "x86_64-unknown-linux-musl", darwin: "aarch64-apple-darwin", win32: "x86_64-pc-windows-msvc"
   };
+
+  @TestMethod
+  public startsTheAppServerDownloadAfterAnInstallAndWhenItChecksTheLatestVersionAndReadsItsNoticeEachTime(): Promise<void> {
+    return CodexInstallerTests.withReleases(async (server, directory) => {
+      CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
+      const program = new NoticingAppServerProgram();
+      const installer = CodexInstallerTests.installer([server.url("/c")], directory, "linux", undefined, 60_000, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, program);
+      const before = await installer.readVersions(true);
+
+      await installer.install(() => undefined, new AbortController().signal);
+      const installed = program.reads.length;
+      const listed = await installer.readVersions(false);
+      const checked = await installer.readVersions(true);
+
+      Assert.isNull(before.notice);
+      Assert.areEqual(1, installed);
+      Assert.areEqual(`${NoticingAppServerProgram.NOTICE}|${NoticingAppServerProgram.NOTICE}`, `${listed.notice}|${checked.notice}`);
+      Assert.areEqual([`${process.execPath} downloads`, `${process.execPath} reads`, `${process.execPath} downloads`].join(","), program.reads.join(","));
+      Assert.isTrue(program.environments.every(t => t === process.env));
+    });
+  }
 
   @TestMethod
   public installsTheLatestPackageOnceItPassesItsCheckAndLinksItWhereCodexsInstallerDoes(): Promise<void> {
@@ -702,7 +726,7 @@ export class CodexInstallerTests {
     program: (path: string) => ProcessCommand = path => new ProcessCommand(process.execPath, [path]), bin: string | undefined = undefined,
     locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CodexInstallerTests.TARGETS[platform]!,
     symlink: (target: string, path: string) => void = CodexInstallerTests.link, rename: (from: string, to: string) => void = renameSync,
-    settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to)): CodexInstaller {
+    settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to), serverProgram: CodexAppServerProgram | null = null): CodexInstaller {
     const root = typeof directory === "string" ? directory : directory.path;
     mkdirSync(root, { recursive: true });
     const runner = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
@@ -711,7 +735,7 @@ export class CodexInstallerTests {
     const found = (): LocatedExecutable | null => existsSync(visible) ? new LocatedExecutable(process.execPath, ExecutableSource.Path, [visible]) : null;
     return new CodexInstaller(locate ?? found, new ExecutableVersionReader(runner, 60_000), process.env, channels, join(root, "home"), binDirectory, target, platform,
       Object.isUndefined(extractor) ? FakeTar.create(root) : extractor, runner, program,
-      symlink, rename, settle, unpackTimeout, 60_000);
+      symlink, rename, settle, unpackTimeout, 60_000, serverProgram);
   }
 
   private static broken(releases: string): string {

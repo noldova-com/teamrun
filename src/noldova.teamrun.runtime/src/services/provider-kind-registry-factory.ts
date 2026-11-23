@@ -83,13 +83,13 @@ export class ProviderKindRegistryFactory implements IProviderKindRegistryFactory
       environment: NodeJS.ProcessEnv = this.baseEnvironment): CommandLineTool =>
       new CommandLineTool(kind, locate, versionReader, environment, CommandLineTool.installCommandFor(process.platform, posixCommand, windowsCommand), subscribeUrl);
     const codexCommand = ProviderKindRegistryFactory.toCommand(this.locator.locateCodex(null));
-    const codexInstaller = new CodexInstaller(() => this.locator.locateCodex(null), versionReader, this.baseEnvironment, ProviderResources.codexReleaseChannels,
-      UsualFolder.of(this.baseEnvironment, ProviderResources.codexHomeVariable, ProviderResources.codexHomeFolderName), this.locator.codexInstallDirectory(),
-      CodexInstaller.targetOf(process.platform, process.arch), process.platform, this.locator.locateTar(), runner, CodexInstaller.programOf, symlinkSync,
-      renameSync, settle, Resources.codexUnpackTimeout, Resources.releaseChannelTimeout);
     const codexServerProgram = new CodexAppServerProgram(runner, versionReader, new CodexAppServerDownload(join(dataDirectory, ...Resources.codexAppServerSegments),
       ProviderResources.codexAppServerReleaseAddress, CodexInstaller.targetOf(process.platform, process.arch), process.platform, this.locator.locateTar(), runner,
       Resources.codexUnpackTimeout, log), timings.versionTimeout, log);
+    const codexInstaller = new CodexInstaller(() => this.locator.locateCodex(null), versionReader, this.baseEnvironment, ProviderResources.codexReleaseChannels,
+      UsualFolder.of(this.baseEnvironment, ProviderResources.codexHomeVariable, ProviderResources.codexHomeFolderName), this.locator.codexInstallDirectory(),
+      CodexInstaller.targetOf(process.platform, process.arch), process.platform, this.locator.locateTar(), runner, CodexInstaller.programOf, symlinkSync,
+      renameSync, settle, Resources.codexUnpackTimeout, Resources.releaseChannelTimeout, codexServerProgram);
     registry.register(new CodexAdapter(codexCommand, this.baseEnvironment, clientInfo, starter, timings, versionReader, undefined,
       () => ProviderKindRegistryFactory.toCommand(this.locator.locateCodex(null)), codexInstaller, log, undefined, undefined, undefined, codexServerProgram),
       tool(ProviderResources.codexKindId, () => this.locator.locateCodex(null), ProviderResources.codexPosixInstallCommand, ProviderResources.codexWindowsInstallCommand,

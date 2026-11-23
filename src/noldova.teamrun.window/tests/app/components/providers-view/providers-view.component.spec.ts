@@ -2820,6 +2820,24 @@ describe("ProvidersViewComponent", () => {
       expect(update.classList).toContain("nol-button-outlined");
     });
 
+    it("puts what TeamRun says about how it runs a kind on a muted line of its own between the kind's heading and its card, from the card's left edge, half a " +
+      "rem from each", async () => {
+      const said = "TeamRun's chats show in the app's recent chats until TeamRun downloads its app server.";
+      await createWithInstall(new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", null, true, null, null, said));
+      const head = headOf("antigravity");
+      const list = part(element(), ".nol-teamrun-your-providers .nol-teamrun-provider-list[data-kind=\"antigravity\"]");
+      const name = part(head, ".nol-teamrun-group-name");
+      const notice = part(element(), ".nol-teamrun-your-providers .nol-teamrun-group-notice[data-kind=\"antigravity\"]");
+
+      expect([notice.textContent?.trim(), element().querySelectorAll(".nol-teamrun-group-notice").length, head.querySelector(".nol-teamrun-group-note")])
+        .toEqual([said, 1, null]);
+      AppearanceFixture.expectPixels(textBox(notice).left, box(list).left);
+      AppearanceFixture.expectPixels(box(notice).right, box(list).right);
+      AppearanceFixture.expectPixels(box(notice).top - box(head).bottom, space(2));
+      AppearanceFixture.expectPixels(box(list).top - box(notice).bottom, space(2));
+      expect([style(notice).color, style(notice).fontSize]).toEqual([lookOf("color: var(--nol-text-muted)", "color"), style(name).fontSize]);
+    });
+
     it("keeps a heading with Update to <n> or Installing and Cancel at a plain heading's height, so its card sits as far under its text", async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       providers.push(signedIn("c3", "codex", "Overnight builds"), spaceProvider);

@@ -32,6 +32,7 @@ export class CodexAppServerDownload {
   private readonly log: ILog | null;
   private readonly remove: (path: string) => void;
   private readonly fetching: Map<string, Promise<string | null>> = new Map();
+  private swept: boolean = false;
 
   public constructor(root: string, releaseAddress: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
     unpackTimeout: number, log: ILog | null = null, remove: (path: string) => void = CodexAppServerDownload.removeFolder) {
@@ -79,6 +80,10 @@ export class CodexAppServerDownload {
       return ready;
     const target = this.target;
     const extractor = this.extractor;
+    if (!this.swept) {
+      this.swept = true;
+      InstallStaging.tidy(this.root);
+    }
     const file = await this.readPackage(version, target, signal);
     const staging = InstallStaging.create(this.root);
     try {
