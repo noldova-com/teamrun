@@ -24,7 +24,7 @@ LICENSE file in the root directory of this source tree.
   <div class="orow root" [class.selected]="isHere(rootTarget())">
     <span class="twist"></span>
     <button type="button" class="obtn" [attr.aria-current]="isHere(rootTarget())" (click)="go(rootTarget())"><span class="material-symbols-rounded icon"
-      aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
+      aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ organization.organization().name }}</span><span
       class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
   </div>
   @for (person of reports(); track person.id) {

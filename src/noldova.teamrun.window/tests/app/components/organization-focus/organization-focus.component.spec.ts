@@ -127,7 +127,7 @@ describe("OrganizationFocusComponent", () => {
     const indent = (label: string): number => Number.parseFloat(row(label).style.paddingInlineStart);
 
     expect([texts(".outline-head"), texts(".orow.root .label"), texts(".orow.root nol-chip"), all(".orow.department").map(t => [text(one(".label", t)), texts(".asks", t), texts("nol-chip", t)])]).toEqual([
-      ["Structure"], ["Organization"], ["5"], [["Design", ["1 need you"], ["2"]], ["UI", [], ["1"]], ["Build", ["1 need you"], ["2"]]]
+      ["Structure"], ["My organization"], ["5"], [["Design", ["1 need you"], ["2"]], ["UI", [], ["1"]], ["Build", ["1 need you"], ["2"]]]
     ]);
     expect(all(".orow.person").map(t => [text(one(".label", t)), texts(".tag", t), texts(".short", t), one(".dot", t).className])).toEqual([
       ["Alice", ["leads"], ["Idle"], "dot idle"], ["Bob", [], ["Waiting for you"], "dot waiting"], ["Code Reviewer", ["leads"], ["Idle"], "dot idle"],
@@ -202,19 +202,19 @@ describe("OrganizationFocusComponent", () => {
 
   it("opens on the leaders when nothing is focused", async () => {
     await create();
-    expect(unit()).toEqual([["My organization"], ["My organization"], ["Organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["Organization"]]);
+    expect(unit()).toEqual([["My organization"], ["My organization"], ["My organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["My organization"]]);
     expect(saves).toEqual([]);
   });
 
   it("opens on the leaders when the focus kept is gone or can't be read", async () => {
     await create("Department:gone");
-    expect(unit()).toEqual([["My organization"], ["My organization"], ["Organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["Organization"]]);
+    expect(unit()).toEqual([["My organization"], ["My organization"], ["My organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["My organization"]]);
     expect(saves).toEqual([]);
   });
 
   it("opens on the leaders when the focus kept names no kind it knows", async () => {
     await create("alice");
-    expect(unit()).toEqual([["My organization"], ["My organization"], ["Organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["Organization"]]);
+    expect(unit()).toEqual([["My organization"], ["My organization"], ["My organization"], ["Your 2 direct reports · 2 idle"], ["Alice", "Code Reviewer"], false, ["My organization"]]);
   });
 
   it("names the organization in the root crumb, and follows a rename", async () => {
@@ -246,7 +246,7 @@ describe("OrganizationFocusComponent", () => {
     await click(one(".crumbs button:nth-of-type(2)"));
     expect(texts(".unit-name")).toEqual(["Design"]);
     await click(one(".crumb"));
-    expect(texts(".unit-name")).toEqual(["Organization"]);
+    expect(texts(".unit-name")).toEqual(["My organization"]);
 
     await Wait.until(() => expect(saves.map(t => t.focus)).toEqual(["Department:ui", "Department:build", "Teammate:bob", "Department:design",
       "Leaders:"]));
@@ -363,7 +363,7 @@ describe("OrganizationFocusComponent", () => {
     await settle();
     expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Bob"], 1]);
     await click(one(".crumb"));
-    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["Organization"], 2]);
+    expect([all(".unit-rename").length, texts(".unit-name"), all(".grid .move-choice").length]).toEqual([0, ["My organization"], 2]);
   });
 
   it("shows each card in full, every activity with its time and the role with its department, and focuses its teammate from the name or the chat button", async () => {

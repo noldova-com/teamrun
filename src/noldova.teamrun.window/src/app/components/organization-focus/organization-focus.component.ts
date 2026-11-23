@@ -103,7 +103,7 @@ export class OrganizationFocusComponent {
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
     return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationTargetKey.of(t.target) === here));
   });
-  protected readonly unitName: Signal<string> = computed(() => this.focus().teammate?.name ?? this.focus().department?.name ?? Resources.organizationTitle);
+  protected readonly unitName: Signal<string> = computed(() => this.focus().teammate?.name ?? this.focus().department?.name ?? this.organization.organization().name);
   protected readonly unitSummary: Signal<string> = computed(() => {
     const focus = this.focus();
     const department = focus.department;
