@@ -640,7 +640,7 @@ describe("ChatStoreService", () => {
 
   it("tells the reply watchers of a working reply that ended while its end was missed, once a resync no longer lists it, and of none still working, gone or unread", async () => {
     const reply = (id: string, status: MessageStatus): Message => new Message(id, "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id, status, [],
-      SampleData.reply.provenance, SampleData.timestamp, null, null);
+      SampleData.reply.provenance, SampleData.timestamp, SampleData.timestamp, status === MessageStatus.Running ? null : SampleData.timestamp);
     context.answer(MethodName.MessageListOpen, () => ["ended", "gone", "running", "unread"].map(t => reply(t, MessageStatus.Running).toJson()))
       .answer(MethodName.MessageSummary, t => {
         const messageId = MessageIdParams.fromJson(t).messageId;
@@ -653,6 +653,7 @@ describe("ChatStoreService", () => {
     const ended: string[] = [];
     store.onReplyEnded(t => ended.push(`${t.id}:${t.status}`));
     const asked = context.count(MethodName.MessageSummary);
+    expect(store.workingReplies().map(t => t.id)).toEqual(["ended", "gone", "running", "unread"]);
 
     context.answer(MethodName.MessageListOpen, () => []);
     await expect(store.resync()).resolves.toBe(true);
