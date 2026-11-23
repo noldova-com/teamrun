@@ -1930,6 +1930,13 @@ export class ChatStoreService {
     }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
   }
 
+  public async checkInstallations(report: (message: string) => void): Promise<void> {
+    await this.attempt(async () => {
+      const installations = ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationCheck, null), ProviderKindInstallation.fromJson);
+      this.installationsSignal.set(ChatStoreService.keyed(installations, t => t.kind));
+    }, report);
+  }
+
   public async cancelInstall(kind: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelInstall, kind)): Promise<void> {
     await this.attempt(async () => {
       await this.request(MethodName.ProviderKindInstallCancel, new ProviderKindParams(kind).toJson());

@@ -38,6 +38,9 @@ export class Resources {
   public static readonly antigravityTempSegments: readonly string[] = ["antigravity-tmp"];
   public static readonly piExtensionSegments: readonly string[] = ["providers", "pi"];
   public static readonly chainHopLimitSetting: string = "teamrun.chainHopLimit";
+  public static readonly updateChecksSetting: string = "desktop.updateChecks";
+  public static readonly automaticUpdateChecks: string = "Automatic";
+  public static readonly atStartUpdateChecks: string = "AtStart";
   public static readonly titleModelSetting: string = "teamrun.titleModel";
   public static readonly idleCompactionSetting: string = "teamrun.idleCompaction";
   public static readonly outsideSessionsSetting: string = "teamrun.outsideSessions";

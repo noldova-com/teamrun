@@ -49,14 +49,14 @@ export class CopilotInstallerTests {
       Assert.isNull(installer.missingTool);
       Assert.isFalse(installer.isInstalled);
       Assert.isNull(installer.foundPath);
-      Assert.areEqual("null null", CopilotInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("null null", CopilotInstallerTests.versions(await installer.readVersions(true)));
 
       const path = await installer.install((received, total) => progress.push([received, total]), new AbortController().signal);
 
       const bin = directory.resolve("home", ".local", "bin");
       Assert.areEqual(process.execPath, path);
       Assert.isTrue(installer.isInstalled);
-      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(JSON.stringify([archive.length, archive.length]), JSON.stringify(progress.at(-1)));
       Assert.areEqual("copilot", readdirSync(bin).join(","));
       if (process.platform !== "win32")
@@ -90,12 +90,12 @@ export class CopilotInstallerTests {
       const runner = new RecordingCommandRunner();
       const installer = CopilotInstallerTests.installer(server.url("/new"), directory, "darwin", undefined, undefined, undefined, undefined, undefined, undefined,
         undefined, runner);
-      Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await installer.readVersions()), runner.runs.join("\n"));
+      Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)), runner.runs.join("\n"));
 
       await installer.install(() => undefined, new AbortController().signal);
 
       Assert.areEqual("copilot", readdirSync(directory.resolve("home", ".local", "bin")).join(","));
-      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions()), runner.runs.join("\n"));
+      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)), runner.runs.join("\n"));
       Assert.isTrue(server.requests.some(t => t.startsWith("/releases/1.0.103/copilot-darwin-arm64.tar.gz ")));
     });
   }
@@ -130,14 +130,14 @@ export class CopilotInstallerTests {
       CopilotInstallerTests.publish(server, "/new", "1.0.103", "win32");
       await CopilotInstallerTests.installer(server.url("/old"), directory, "win32").install(() => undefined, new AbortController().signal);
       const installer = CopilotInstallerTests.installer(server.url("/new"), directory, "win32");
-      Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)));
 
       await installer.install(() => undefined, new AbortController().signal);
 
       const installs = directory.resolve("data", "providers", "copilot");
       Assert.areEqual("1.0.102,1.0.103", readdirSync(installs).sort().join(","));
       Assert.isTrue(existsSync(join(installs, "1.0.103", "copilot.exe")));
-      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)));
       Assert.isTrue(server.requests.some(t => t.startsWith("/releases/1.0.103/copilot-win32-x64.zip ")));
       await installer.install(() => undefined, new AbortController().signal);
       Assert.areEqual("1.0.102,1.0.103", readdirSync(installs).sort().join(","));
@@ -492,7 +492,7 @@ export class CopilotInstallerTests {
       Assert.areEqual(Resources.copilotNoBuild, (await Assert.throwsAsync(() => noBuild.install(() => undefined, new AbortController().signal), InstallFailedException)).message);
       Assert.areEqual(Resources.copilotNoExtractor, (await Assert.throwsAsync(() => noTar.install(() => undefined, new AbortController().signal), InstallFailedException)).message);
       CopilotInstallerTests.installedHere(directory, "linux", "GitHub Copilot CLI 1.0.102");
-      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await noBuild.readVersions()));
+      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await noBuild.readVersions(true)));
       Assert.areEqual(0, server.requests.length);
     });
   }
@@ -505,24 +505,25 @@ export class CopilotInstallerTests {
       const script = directory.resolve("copilot.cjs");
       writeFileSync(script, "console.log(\"GitHub Copilot CLI 1.0.102\");");
       const found = (source: ExecutableSource) => (): LocatedExecutable => new LocatedExecutable(process.execPath, source, [script]);
-      const cases: readonly [string, ExecutableSource, string][] = [
-        ["linux", ExecutableSource.Path, "1.0.102 null"], ["linux", ExecutableSource.GlobalNpm, "1.0.102 null"], ["linux", ExecutableSource.Override, "1.0.102 null"],
-        ["win32", ExecutableSource.LocalBin, "1.0.102 null"], ["win32", ExecutableSource.Path, "1.0.102 null"]
+      const cases = [
+        new FoundCopilot("linux", ExecutableSource.Path, "1.0.102 null"), new FoundCopilot("linux", ExecutableSource.GlobalNpm, "1.0.102 null"),
+        new FoundCopilot("linux", ExecutableSource.Override, "1.0.102 null"), new FoundCopilot("win32", ExecutableSource.LocalBin, "1.0.102 null"),
+        new FoundCopilot("win32", ExecutableSource.Path, "1.0.102 null")
       ];
 
-      for (const [platform, source, versions] of cases) {
+      for (const { platform, source, versions } of cases) {
         const installer = CopilotInstallerTests.installer(server.url("/c"), directory, platform, undefined, undefined, undefined, found(source));
         Assert.isTrue(installer.isInstalled, `${platform} ${source}`);
         Assert.areEqual(process.execPath, installer.foundPath, `${platform} ${source}`);
-        Assert.areEqual(versions, CopilotInstallerTests.versions(await installer.readVersions()), `${platform} ${source}`);
+        Assert.areEqual(versions, CopilotInstallerTests.versions(await installer.readVersions(true)), `${platform} ${source}`);
       }
       Assert.isNull(CopilotInstallerTests.installer(server.url("/c"), directory, "linux", undefined, undefined, undefined, found(ExecutableSource.LocalBin)).foundPath);
       Assert.isNull(CopilotInstallerTests.installer(server.url("/w"), directory, "win32", undefined, undefined, undefined, found(ExecutableSource.Managed)).foundPath);
       Assert.areEqual(0, server.requests.length);
       Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await CopilotInstallerTests.installer(server.url("/c"), directory, "linux", undefined,
-        undefined, undefined, found(ExecutableSource.LocalBin)).readVersions()));
+        undefined, undefined, found(ExecutableSource.LocalBin)).readVersions(true)));
       Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await CopilotInstallerTests.installer(server.url("/w"), directory, "win32", undefined,
-        undefined, undefined, found(ExecutableSource.Managed)).readVersions()));
+        undefined, undefined, found(ExecutableSource.Managed)).readVersions(true)));
     });
   }
 
@@ -533,12 +534,25 @@ export class CopilotInstallerTests {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "linux");
       CopilotInstallerTests.installedHere(directory, "linux", "GitHub Copilot CLI 1.0.102");
 
-      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await CopilotInstallerTests.installer(server.url("/down"), directory).readVersions()));
-      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await CopilotInstallerTests.installer("http://localhost:1/c", directory).readVersions()));
+      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await CopilotInstallerTests.installer(server.url("/down"), directory).readVersions(true)));
+      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await CopilotInstallerTests.installer("http://localhost:1/c", directory).readVersions(true)));
       writeFileSync(directory.resolve("home", ".local", "bin", "copilot"), "process.exit(1);\n");
-      const versions = await CopilotInstallerTests.installer(server.url("/c"), directory).readVersions();
+      const versions = await CopilotInstallerTests.installer(server.url("/c"), directory).readVersions(true);
       Assert.areEqual("null 1.0.103", CopilotInstallerTests.versions(versions));
       Assert.areEqual("1.0.103", versions.update);
+    });
+  }
+
+  @TestMethod
+  public readsNoReleaseWhenTheLatestIsntChecked(): Promise<void> {
+    return CopilotInstallerTests.withReleases(async (server, directory) => {
+      CopilotInstallerTests.publish(server, "/c", "1.0.103", "linux");
+      CopilotInstallerTests.installedHere(directory, "linux", "GitHub Copilot CLI 1.0.102");
+      const installer = CopilotInstallerTests.installer(server.url("/c"), directory);
+
+      Assert.areEqual("1.0.102 null", CopilotInstallerTests.versions(await installer.readVersions(false)));
+      Assert.areEqual(0, server.requests.length);
+      Assert.areEqual("1.0.102 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -624,5 +638,17 @@ export class CopilotInstallerTests {
 
   private static versions(versions: ProviderKindVersions): string {
     return `${versions.installed} ${versions.latest}`;
+  }
+}
+
+class FoundCopilot {
+  public readonly platform: string;
+  public readonly source: ExecutableSource;
+  public readonly versions: string;
+
+  public constructor(platform: string, source: ExecutableSource, versions: string) {
+    this.platform = platform;
+    this.source = source;
+    this.versions = versions;
   }
 }

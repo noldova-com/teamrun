@@ -16,7 +16,9 @@ import { InstallFailedException } from "../../exceptions/install-failed.exceptio
 import { ReleaseSourceException } from "../../exceptions/release-source.exception.js";
 import type { LocatedExecutable } from "../../models/located-executable.js";
 import { ProcessCommand } from "../../models/process-command.js";
+import { GitHubRelease } from "../../models/github-release.js";
 import { ReleaseFile } from "../../models/release-file.js";
+import { ToolRelease } from "../../models/tool-release.js";
 import { Resources } from "../../resources.js";
 import type { ExecutableVersionReader } from "../executables/executable-version.reader.js";
 import { InstallRename } from "../installs/install-rename.js";
@@ -91,22 +93,24 @@ export class CodexInstaller implements IProviderKindInstallation {
     return this.platform === Resources.windowsPlatform;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const standalone = !Object.isNull(located) && this.isStandalone;
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || !standalone ? null
+      !checksLatest || Object.isNull(this.target) || !standalone ? null
         : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null)
     ]);
     return new ProviderKindVersions(installed, latest);
   }
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void = () => undefined): Promise<string> {
-    const unavailable = this.unavailable;
-    if (!Object.isNull(unavailable))
-      throw new InstallFailedException(unavailable);
-    const target = this.target!;
+    const target = this.target;
+    const extractor = this.extractor;
+    if (Object.isNull(target))
+      throw new InstallFailedException(Resources.codexNoBuild);
+    if (Object.isNull(extractor))
+      throw new InstallFailedException(Resources.codexNoTar);
     const root = join(this.home, ...Resources.codexStandaloneSegments);
     const releases = join(root, Resources.codexReleasesDirectoryName);
     InstallStaging.sweepKeeping(releases, Resources.codexPreviousReleaseName);
@@ -125,7 +129,7 @@ export class CodexInstaller implements IProviderKindInstallation {
         signal.throwIfAborted();
         unpacked = join(staging, name);
         mkdirSync(unpacked);
-        const result = await this.runner.run(this.extractor!.toCommand().withArguments(...Resources.tarExtractArguments, archive, Resources.tarDirectoryArgument, unpacked),
+        const result = await this.runner.run(extractor.toCommand().withArguments(...Resources.tarExtractArguments, archive, Resources.tarDirectoryArgument, unpacked),
           {}, this.unpackTimeout, signal);
         if (!result.succeeded)
           throw new InstallFailedException(Resources.formatCodexUnpackFailed(result.timedOut ? null : result.exitCode));
@@ -246,7 +250,7 @@ export class CodexInstaller implements IProviderKindInstallation {
     symlinkSync(target, path, Resources.junctionLinkType);
   }
 
-  private async readRelease(target: string, signal: AbortSignal): Promise<{ readonly version: string; readonly archive: ReleaseFile }> {
+  private async readRelease(target: string, signal: AbortSignal): Promise<ToolRelease> {
     let failure: unknown = null;
     for (const channel of this.channels) {
       try {
@@ -269,25 +273,16 @@ export class CodexInstaller implements IProviderKindInstallation {
     });
   }
 
-  private static releaseOf(text: string, target: string): { readonly version: string; readonly archive: ReleaseFile } {
-    let release: { tag_name?: unknown; assets?: unknown } | null = null;
-    try {
-      release = JSON.parse(text) as { tag_name?: unknown; assets?: unknown } | null;
-    }
-    catch {
-      release = null;
-    }
-    const tag = release?.tag_name;
-    const version = typeof tag === "string" && tag.startsWith(Resources.codexTagPrefix) ? tag.slice(Resources.codexTagPrefix.length) : String.empty;
+  private static releaseOf(text: string, target: string): ToolRelease {
+    const release = GitHubRelease.parse(text);
+    const version = release.versionAfter(Resources.codexTagPrefix);
     if (!Resources.releaseVersionPattern.test(version))
       throw new ReleaseSourceException(Resources.formatReleaseChannelUnreadable(Resources.codexDisplayName));
     const name = `${Resources.codexPackagePrefix}${target}${Resources.codexPackageSuffix}`;
-    const assets = Array.isArray(release!.assets) ? release!.assets as ({ name?: unknown; digest?: unknown; size?: unknown; browser_download_url?: unknown } | null)[] : [];
-    const asset = assets.find(t => t?.name === name);
-    const digest = typeof asset?.digest === "string" && asset.digest.startsWith(Resources.sha256DigestPrefix) ? asset.digest.slice(Resources.sha256DigestPrefix.length) : String.empty;
-    if (!Resources.sha256Pattern.test(digest) || typeof asset?.browser_download_url !== "string")
+    const asset = release.assetNamed(name);
+    const url = asset?.url ?? null;
+    if (Object.isNull(asset) || !Resources.sha256Pattern.test(asset.sha256) || Object.isNull(url))
       throw new InstallFailedException(Resources.formatCodexPackageMissing(version));
-    const size = asset.size;
-    return { version, archive: new ReleaseFile(asset.browser_download_url, digest, typeof size === "number" && Number.isSafeInteger(size) && size > 0 ? size : null) };
+    return new ToolRelease(version, name, new ReleaseFile(url, asset.sha256, asset.knownSize));
   }
 }

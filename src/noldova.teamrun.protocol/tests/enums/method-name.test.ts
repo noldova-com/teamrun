@@ -33,6 +33,7 @@ export class MethodNameTests {
     Assert.areEqual("ProviderOwnMcpServerList", MethodName.ProviderOwnMcpServerList);
     Assert.areEqual("ProviderProfileDiscover", MethodName.ProviderProfileDiscover);
     Assert.areEqual("ProviderKindInstallationList", MethodName.ProviderKindInstallationList);
+    Assert.areEqual("ProviderKindInstallationCheck", MethodName.ProviderKindInstallationCheck);
     Assert.areEqual("ProviderToolList", MethodName.ProviderToolList);
     Assert.areEqual("ProviderKindInstall", MethodName.ProviderKindInstall);
     Assert.areEqual("ProviderKindInstallCancel", MethodName.ProviderKindInstallCancel);

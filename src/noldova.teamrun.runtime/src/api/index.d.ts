@@ -61,6 +61,7 @@ import type {
   ISharedMcpSignIn,
   ITeammatesService,
   ITimer,
+  IToolUpdateChecks,
   ITurnToolSession,
   ITurnToolSessions,
   IWindowsService,
@@ -1955,6 +1956,31 @@ export declare class HopLimitSetting {
    * @param settings The module's settings.
    */
   public static readerOf(settings: IModuleSettings): () => number;
+}
+
+/**
+ * Whether the provider kinds may look for their tools' newer versions without the person asking, following the app's Check for updates
+ * setting, `desktop.updateChecks`, for this device.
+ */
+export declare class ToolUpdateChecks implements IToolUpdateChecks {
+  /**
+   * Takes the setting's value `read` gives, `Automatic` when it gives none, and starts following the setting's changes.
+   * @param settings The module's settings.
+   */
+  public constructor(settings: IModuleSettings);
+
+  /**
+   * `true` for `Automatic`, and for `AtStart` until the first check; `false` for `OnRequest`. The choice is the value `read` gives at
+   * construction, and then each change; a value that isn't a string, such as a reset's, counts as the default, `Automatic`. The runtime
+   * reads the default until it knows its device (noldova-com/desktop#96), so until a change brings a stored choice it counts as `Automatic`.
+   */
+  public takeCheck(): boolean;
+
+  /**
+   * Calls `listener` each time a change of the setting turns it to allow a check that it didn't allow before.
+   * @param listener What to call.
+   */
+  public onAllowed(listener: () => void): void;
 }
 
 /**

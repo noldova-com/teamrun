@@ -398,6 +398,8 @@ export class RequestDispatcher {
         return (await this.kinds.modelCatalogAsync(ProviderListModelsParams.fromJson(payload))).toJson();
       case MethodName.ProviderKindInstallationList:
         return (await this.kinds.listInstallations()).map(t => t.toJson());
+      case MethodName.ProviderKindInstallationCheck:
+        return (await this.kinds.checkInstallationsAsync()).map(t => t.toJson());
       case MethodName.ProviderToolList:
         return (await this.kinds.listTools()).map(t => t.toJson());
       case MethodName.ProviderKindInstall:

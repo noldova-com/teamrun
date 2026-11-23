@@ -995,6 +995,15 @@ export class Resources {
   public static readonly codexPackagePrefix: string = "codex-package-";
   public static readonly codexPackageSuffix: string = ".tar.gz";
   public static readonly sha256DigestPrefix: string = "sha256:";
+  public static readonly releaseTagField: string = "tag_name";
+  public static readonly releaseAssetsField: string = "assets";
+  public static readonly releaseAssetNameField: string = "name";
+  public static readonly releaseAssetDigestField: string = "digest";
+  public static readonly releaseAssetSizeField: string = "size";
+  public static readonly releaseAssetUrlField: string = "browser_download_url";
+  public static readonly claudePlatformsField: string = "platforms";
+  public static readonly claudeChecksumField: string = "checksum";
+  public static readonly claudeSizeField: string = "size";
   public static readonly acceptHeader: string = "accept";
   public static readonly jsonContentType: string = "application/json";
   public static readonly acpRegistryUrl: string = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";

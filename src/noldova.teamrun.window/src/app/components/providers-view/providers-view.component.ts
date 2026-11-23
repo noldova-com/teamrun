@@ -111,6 +111,7 @@ export class ProvidersViewComponent {
   });
   protected readonly searching: Signal<boolean> = computed(() => this.searchRunning() || (!this.store.kindsLoaded() && !this.store.kindsFailed()));
   protected readonly checking: WritableSignal<boolean> = signal(false);
+  protected readonly checkingUpdates: WritableSignal<boolean> = signal(false);
   protected readonly adding: WritableSignal<ReadonlySet<string>> = signal(new Set());
   protected readonly lookingFor: Signal<string> = computed(() => Resources.formatLookingFor(this.store.kinds().map(t => t.displayName)));
   protected readonly searched: Signal<string> = computed(() => {
@@ -179,15 +180,16 @@ export class ProvidersViewComponent {
           untracked(() => void this.store.readPlanUsage(provider.kind, provider.id));
     });
     effect(() => {
-      const live = new Map([
-        ...this.installing().map(t => [JSON.stringify([t.installation.kind]), Resources.formatLiveStatus(t.name, Resources.installActionOf(t.installation))] as const),
-        ...this.rows().flatMap(t => Object.isNull(t.announcement) ? [] : [[JSON.stringify([t.provider.kind, t.provider.id]), t.announcement] as const])
-      ]);
-      untracked(() => {
-        for (const [key, text] of live)
-          if (this.announced.get(key) !== text)
-            this.announcer.announce(text, AnnouncementPoliteness.Polite);
-      });
+      const live = new Map<string, string>();
+      for (const installing of this.installing())
+        live.set(JSON.stringify([installing.installation.kind]), Resources.formatLiveStatus(installing.name, Resources.installActionOf(installing.installation)));
+      for (const row of this.rows())
+        if (!Object.isNull(row.announcement))
+          live.set(JSON.stringify([row.provider.kind, row.provider.id]), row.announcement);
+      untracked(() => live.forEach((text, key) => {
+        if (this.announced.get(key) !== text)
+          this.announcer.announce(text, AnnouncementPoliteness.Polite);
+      }));
       this.announced = live;
     });
   }
@@ -203,6 +205,13 @@ export class ProvidersViewComponent {
     this.searchedAt.set(this.clock.now());
     this.now.set(this.clock.now());
     this.searchRunning.set(false);
+  }
+
+  protected async checkUpdates(): Promise<void> {
+    this.error.set(null);
+    this.checkingUpdates.set(true);
+    await this.store.checkInstallations(this.report);
+    this.checkingUpdates.set(false);
   }
 
   protected async checkAll(): Promise<void> {

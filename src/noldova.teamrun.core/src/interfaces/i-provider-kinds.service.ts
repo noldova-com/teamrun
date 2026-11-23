@@ -23,6 +23,7 @@ export interface IProviderKindsService {
   listModelsAsync(params: ProviderListModelsParams): Promise<readonly string[]>;
   modelCatalogAsync(params: ProviderListModelsParams): Promise<ProviderModelList>;
   listInstallations(): Promise<readonly ProviderKindInstallation[]>;
+  checkInstallationsAsync(): Promise<readonly ProviderKindInstallation[]>;
   listTools(): Promise<readonly ProviderTool[]>;
   install(params: ProviderKindParams): Promise<ProviderKindInstallation>;
   isInstalling(kind: string): boolean;
