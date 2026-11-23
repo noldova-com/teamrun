@@ -185,6 +185,21 @@ describe("OrganizationViewComponent", () => {
     document.head.append(still);
     onTestFinished(() => still.remove());
   };
+  const createTeal = async (): Promise<string> => {
+    holdFlows();
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    await create(() => {
+      organization = new Organization("my-organization", "My organization", null, 0, SampleData.timestamp, SampleData.timestamp,
+        [SampleData.departmentType, new NodeType("team", "Team", "groups", "teal", SampleData.timestamp, SampleData.timestamp)],
+        sample.departments.map(t => t.id === "design" ? new Department("design", "Design", "team", OrganizationParent.person, "alice", 0, "c", "u") : t), sample.placements);
+    });
+    const probe = document.createElement("span");
+    probe.style.color = "var(--nol-swatch-teal)";
+    element().append(probe);
+    const teal = getComputedStyle(probe).color;
+    probe.remove();
+    return teal;
+  };
 
   beforeEach(() => page.viewport(1600, 1300));
 
@@ -599,24 +614,22 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("draws a message to a unit's people in the unit type's colour, and one to a unit whose type has none in the accent colour", async () => {
-    holdFlows();
-    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
-    await create(() => {
-      organization = new Organization("my-organization", "My organization", null, 0, SampleData.timestamp, SampleData.timestamp,
-        [SampleData.departmentType, new NodeType("team", "Team", "groups", "teal", SampleData.timestamp, SampleData.timestamp)],
-        sample.departments.map(t => t.id === "design" ? new Department("design", "Design", "team", OrganizationParent.person, "alice", 0, "c", "u") : t), sample.placements);
-    });
-    const probe = document.createElement("span");
-    probe.style.color = "var(--nol-swatch-teal)";
-    element().append(probe);
-    const teal = getComputedStyle(probe).color;
-    probe.remove();
+    const teal = await createTeal();
     await flow(asked, answer("r1", asked, "bob", MessageStatus.Pending), answer("r2", asked, "alice", MessageStatus.Pending),
       answer("r3", asked, "offline", MessageStatus.Pending));
 
     expect(all(".nol-teamrun-flow-overlay path").map(t => getComputedStyle(t).stroke))
       .toEqual([teal, teal, AppearanceFixture.readColor(FixtureTheme.theme, ThemeMode.Light, "accent")]);
     expect(teal).not.toBe(AppearanceFixture.readColor(FixtureTheme.theme, ThemeMode.Light, "accent"));
+  });
+
+  it("draws a reply from a unit's people back to you in the colour of the unit it comes from, and one from a unit whose type has none in the accent colour", async () => {
+    const teal = await createTeal();
+    await flow(asked, answer("r1", asked, "bob", MessageStatus.Running), answer("r2", asked, "alice", MessageStatus.Running),
+      answer("r3", asked, "offline", MessageStatus.Running));
+
+    expect(all(".nol-teamrun-flow-overlay path.writing").map(t => getComputedStyle(t).stroke))
+      .toEqual([teal, teal, AppearanceFixture.readColor(FixtureTheme.theme, ThemeMode.Light, "accent")]);
   });
 
   it.each([ThemeMode.Light, ThemeMode.Dark])("draws a message being written in the default theme's %s mode at 3:1 or more against the Tree's background", async mode => {
