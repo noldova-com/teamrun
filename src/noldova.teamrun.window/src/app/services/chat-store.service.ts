@@ -273,6 +273,7 @@ export class ChatStoreService {
   private readonly thinkingSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly savingCheckpointSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly busySignal: WritableSignal<number> = signal(0);
+  private readonly reloadsSignal: WritableSignal<number> = signal(0);
   private readonly loadedSignal: WritableSignal<boolean> = signal(false);
   private readonly resyncsSignal: WritableSignal<number> = signal(0);
   private readonly invalidationsSignal: WritableSignal<number> = signal(0);
@@ -359,7 +360,8 @@ export class ChatStoreService {
   public readonly focus: Signal<MessageFocus | null> = this.focusSignal.asReadonly();
   public readonly planFocus: Signal<MessageFocus | null> = this.planFocusSignal.asReadonly();
   public readonly subAgentFocus: Signal<MessageFocus | null> = this.subAgentFocusSignal.asReadonly();
-  public readonly isBusy: Signal<boolean> = computed(() => this.busySignal() > 0);
+  public readonly isBusy: Signal<boolean> = computed(() => this.busySignal() > 0 || this.reloadsSignal() > 0);
+  public readonly isActing: Signal<boolean> = computed(() => this.busySignal() > 0);
   public readonly selectedProject: Signal<Project | null> = computed(() => this.projects().find(t => t.id === this.selectedProjectId()) ?? null);
   public readonly selectedConversation: Signal<Conversation | null> = computed(() => this.findConversation(this.selectedConversationId()));
   public readonly screenConversation: Signal<Conversation | null> = computed(() => this.findConversation(this.screenConversationId()));
@@ -2317,7 +2319,7 @@ export class ChatStoreService {
           this.resyncsSignal.update(t => t + 1);
         }
       } while (this.catalogDirty && !this.disposed);
-    }, this.loadFailed(Resources.catalogLoad, Resources.catalogNotLoaded, null, () => this.reloadCatalog())).then(t => {
+    }, this.loadFailed(Resources.catalogLoad, Resources.catalogNotLoaded, null, () => this.reloadCatalog()), this.reloadsSignal).then(t => {
       if (t)
         this.markLoaded(Resources.catalogLoad);
       return t;
@@ -3158,13 +3160,14 @@ export class ChatStoreService {
     return { ...environment, ...profile.signInValues };
   }
 
-  private async perform(action: () => Promise<void>, report: (message: string, error: unknown) => void): Promise<boolean> {
-    this.busySignal.update(t => t + 1);
+  private async perform(action: () => Promise<void>, report: (message: string, error: unknown) => void,
+    count: WritableSignal<number> = this.busySignal): Promise<boolean> {
+    count.update(t => t + 1);
     try {
       return await this.attempt(action, report);
     }
     finally {
-      this.busySignal.update(t => t - 1);
+      count.update(t => t - 1);
     }
   }
 
