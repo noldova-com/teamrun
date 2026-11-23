@@ -580,6 +580,30 @@ describe("DocsShellComponent", () => {
       expect(size(DocsFixture.one(host, "main h1"))).toBe(resolve(host, "font-size", "var(--nol-text-heading)"));
     });
 
+    it("keeps the header at the window's top and the menu right below it, in front of the page and in the window, wherever the page is scrolled", async () => {
+      const host = await pageAsync();
+      const header = DocsFixture.one(host, ".nol-docs-header");
+      const menu = DocsFixture.one(host, "nav#nol-docs-menu");
+      const button = DocsFixture.one(host, "button.nol-docs-menu-button");
+      if (button.getBoundingClientRect().width > 0) {
+        await userEvent.click(button);
+        await DocsFixture.untilAsync(() => expect(menu.getBoundingClientRect().height).toBeGreaterThan(0));
+      }
+      const expectInView = (): void => {
+        const box = menu.getBoundingClientRect();
+
+        expect(header.getBoundingClientRect().top).toBe(0);
+        expect(Math.abs(box.top - header.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0.5);
+        expect(box.bottom).toBeLessThanOrEqual(window.innerHeight + 0.5);
+        expect(menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
+      };
+
+      expectInView();
+      window.scrollTo(0, document.documentElement.scrollHeight / 2);
+      await DocsFixture.untilAsync(() => expect(window.scrollY).toBeGreaterThan(0));
+      expectInView();
+    });
+
     it("lays the menu, the page and the list across at most 108rem centered in the window, 3.5rem in from its sides from 75rem wide, the page filling the space between them", async () => {
       const host = await pageAsync();
       const rem = DocsFixture.rem();
