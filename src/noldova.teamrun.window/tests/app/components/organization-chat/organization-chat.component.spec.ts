@@ -229,6 +229,39 @@ describe("OrganizationChatComponent", () => {
       release();
     });
 
+  it("shows a teammate's new chat's first message, sent before the window listed the chat, once the window has read its chats, and then the reply", async () => {
+    const first = new Message("org-alice-u", "org-alice", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "First words")],
+      null, SampleData.timestamp, null, SampleData.timestamp);
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    pages = new Map([["org-alice", []]]);
+    openAnswer = id => {
+      kept = [chatOf(id)];
+      listing = held;
+      context.emit(EventName.StateInvalidated, null);
+      return chatOf(id).toJson();
+    };
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(box()).not.toBeNull());
+    await type("First words");
+    await sendNow();
+    await Wait.until(() => expect(sent().map(t => [t.chatId, t.text])).toEqual([["org-alice", "First words"]]));
+    pages = new Map([["org-alice", [first]]]);
+    context.emit(EventName.MessageCreated, first.toJson());
+    await fixture.whenStable();
+    const whileListing = texts("nol-teamrun-history-message");
+
+    release();
+
+    await Wait.until(() => expect(texts("nol-teamrun-history-message").some(t => t.includes("First words"))).toBe(true));
+    context.emit(EventName.MessageCreated, reply("org-alice", MessageStatus.Completed).toJson());
+    await Wait.until(() => expect(texts("nol-teamrun-history-message").some(t => t.includes("Working"))).toBe(true));
+
+    expect([whileListing, ChatStoreService.of(context).selectedConversationId()]).toEqual([[], "org-alice"]);
+  });
+
   it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
     const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>
       new Conversation(`${organizationId}-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null,

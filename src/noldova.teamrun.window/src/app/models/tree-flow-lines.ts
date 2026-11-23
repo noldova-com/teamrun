@@ -10,23 +10,16 @@ import "@noldova/context.core";
 
 import { Resources } from "../../resources";
 import { FlowLineShape } from "../enums/flow-line-shape";
-import { FlowBox } from "./flow-box";
+import type { FlowBox } from "./flow-box";
+import { FlowFrame } from "./flow-frame";
 import { FlowNode } from "./flow.node";
 import { FlowPoint } from "./flow-point";
 
 export class TreeFlowLines {
-  private readonly origin: DOMRect;
-  private readonly scale: number;
+  private readonly frame: FlowFrame;
 
   private constructor(container: HTMLElement) {
-    this.origin = container.getBoundingClientRect();
-    this.scale = this.origin.width > 0 ? this.origin.width / TreeFlowLines.layoutWidthOf(container) : 1;
-  }
-
-  public static layoutWidthOf(element: HTMLElement): number {
-    const style = getComputedStyle(element);
-    const sides = style.boxSizing === Resources.borderBox ? [] : [style.paddingLeft, style.paddingRight, style.borderLeftWidth, style.borderRightWidth];
-    return [style.width, ...sides].reduce((t, u) => t + Number.parseFloat(u), 0);
+    this.frame = new FlowFrame(container);
   }
 
   public static nodesIn(container: HTMLElement): ReadonlyMap<string, FlowNode> {
@@ -120,11 +113,6 @@ export class TreeFlowLines {
   }
 
   private boxOf(element: Element): FlowBox {
-    const rect = element.getBoundingClientRect();
-    return new FlowBox(this.toLocal(rect.left - this.origin.left), this.toLocal(rect.top - this.origin.top), this.toLocal(rect.width), this.toLocal(rect.height));
-  }
-
-  private toLocal(value: number): number {
-    return value / this.scale;
+    return this.frame.boxOf(element);
   }
 }

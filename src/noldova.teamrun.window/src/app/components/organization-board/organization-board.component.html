@@ -6,6 +6,7 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
+<nol-teamrun-flow-overlay [container]="host" [layout]="cards" [chat]="chat()" [flows]="flows.flows()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
 <section class="section needs-section" aria-labelledby="organization-board-needs">
   <div class="section-head">
     <span class="material-symbols-rounded icon" aria-hidden="true">{{ resources.organizationBoardNeedsIcon }}</span>
@@ -50,14 +51,14 @@ LICENSE file in the root directory of this source tree.
   <div class="leaders">
     @for (node of led(); track node.id) {
       @if (node.leader; as leader) {
-        <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [class.selected]="isOpen(teammateTarget(leader))"
-          [teammate]="leader" [shape]="row" [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide"
-          [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(leader))" />
+        <nol-teamrun-organization-card class="leader" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="leader.name" [attr.data-flow-node]="leader.id"
+          [class.selected]="isOpen(teammateTarget(leader))" [teammate]="leader" [shape]="row" [editing]="editing()" [nolPopoverTrigger]="leaderDetails" [nolPopoverOpenOn]="detailsOpening"
+          [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(leader))" />
         <ng-template #leaderDetails><nol-teamrun-organization-details [teammate]="leader" [department]="node.department" /></ng-template>
       }
     }
     @for (report of reports(); track report.id) {
-      <nol-teamrun-organization-card class="leader report" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name"
+      <nol-teamrun-organization-card class="leader report" nolCanvasItem tabindex="0" role="group" [attr.aria-label]="report.name" [attr.data-flow-node]="report.id"
         [class.selected]="isOpen(teammateTarget(report))" [teammate]="report" [shape]="row" [reportsTo]="reportsToOf(report)" [editing]="editing()"
         [nolPopoverTrigger]="reportDetails" [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment"
         (message)="chosen.emit(teammateTarget(report))" />
@@ -109,9 +110,9 @@ LICENSE file in the root directory of this source tree.
             (valueChange)="sort(node, $event)" />
         }
         @for (member of membersOf(node); track member.id) {
-          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [class.selected]="isOpen(teammateTarget(member))"
-            [teammate]="member" [shape]="row" [editing]="editing()" [department]="node.department" [nolPopoverTrigger]="memberDetails" [nolPopoverOpenOn]="detailsOpening"
-            [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(member))" />
+          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="member.name" [attr.data-flow-node]="member.id"
+            [class.selected]="isOpen(teammateTarget(member))" [teammate]="member" [shape]="row" [editing]="editing()" [department]="node.department" [nolPopoverTrigger]="memberDetails"
+            [nolPopoverOpenOn]="detailsOpening" [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="chosen.emit(teammateTarget(member))" />
           <ng-template #memberDetails><nol-teamrun-organization-details [teammate]="member" [department]="node.department" /></ng-template>
         } @empty {
           <span class="note lane-empty">{{ resources.organizationBoardNoMembers }}</span>

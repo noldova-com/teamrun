@@ -7,10 +7,11 @@
  */
 
 import "@noldova/context.core";
+import type { SqlTransaction } from "@noldova/context.data.sql";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources, UsageLimit } from "@noldova/teamrun.core";
-import { type Conversation, ConversationMemberParams, Harness, MessageAuthor, MessageListParams, MessageSendParams, type Provider, ProviderEnabledParams,
-  type Teammate, TeammateCreateParams, TeammateFallback, TeammateUpdateParams } from "@noldova/teamrun.protocol";
+import { type Conversation, ConversationMemberParams, Harness, type Message, MessageAuthor, MessageIdParams, MessageListParams, MessageSendParams, MessageStatus,
+  type Provider, ProviderEnabledParams, type Teammate, TeammateCreateParams, TeammateFallback, TeammateUpdateParams } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 
@@ -266,6 +267,62 @@ export class UsageHandOffTurnsTests {
     Assert.areEqual([work.id, spare.id, other.id].join(","), host.adapter.requests.map(t => t.provider?.id).join(","));
     Assert.areEqual("Bob:Failed,Bob:Failed,Bob:Completed,Rita:Completed", await UsageHandOffTurnsTests.repliesAsync(host, conversation));
     Assert.areEqual(Resources.formatUsageHandedOff("Bob", "Rita"), (await UsageHandOffTurnsTests.linesAsync(host, conversation, true)).join("|"));
+  }
+
+  @TestMethod
+  public async endsTheReplyStoppedWithNoNextReplyWhenStopComesWhileTheCandidatesAreRead(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const work = await host.createProviderAsync("fake", "Work");
+    const spare = await host.createProviderAsync("fake", "Spare");
+    const rita = await UsageHandOffTurnsTests.teammateAsync(host, "Rita", spare, []);
+    const bob = await UsageHandOffTurnsTests.teammateAsync(host, "Bob", work, [rita]);
+    await UsageHandOffTurnsTests.runOut(host, conversation, bob, null);
+    const before = new Set((await host.messages.listAsync(new MessageListParams(conversation.id, null))).map(t => t.id));
+    const list = host.teammates.listAsync.bind(host.teammates);
+    const stops: Promise<Message>[] = [];
+    host.teammates.listAsync = async (transaction?: SqlTransaction): Promise<readonly Teammate[]> => {
+      if (!Object.isUndefined(transaction) || stops.length > 0)
+        return list(transaction);
+      const reply = (await host.messages.listAsync(new MessageListParams(conversation.id, null))).find(t => t.author === MessageAuthor.Provider && !before.has(t.id));
+      if (!Object.isUndefined(reply))
+        stops.push(host.engine.cancelAsync(new MessageIdParams(reply.id)));
+      return list(transaction);
+    };
+
+    await UsageHandOffTurnsTests.ask(host, conversation, bob, "stopped");
+    await Promise.all(stops);
+
+    Assert.areEqual(1, stops.length);
+    Assert.areEqual(work.id, host.adapter.requests.map(t => t.provider?.id).join(","));
+    Assert.areEqual("Bob:Failed,Bob:Cancelled", await UsageHandOffTurnsTests.repliesAsync(host, conversation));
+    Assert.areEqual(0, [...await UsageHandOffTurnsTests.linesAsync(host, conversation, true), ...await UsageHandOffTurnsTests.linesAsync(host, conversation, false)].length);
+    Assert.isNull(await host.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, rita.id)));
+  }
+
+  @TestMethod
+  public async stopsTheNextTeammatesReplyWhenStopComesWhileTheHandOffIsWritten(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const conversation = await host.createConversationAsync();
+    const work = await host.createProviderAsync("fake", "Work");
+    const spare = await host.createProviderAsync("fake", "Spare");
+    const rita = await UsageHandOffTurnsTests.teammateAsync(host, "Rita", spare, []);
+    const bob = await UsageHandOffTurnsTests.teammateAsync(host, "Bob", work, [rita]);
+    await UsageHandOffTurnsTests.runOut(host, conversation, bob, null);
+    const update = host.messages.updateAsync.bind(host.messages);
+    const stops: Promise<Message>[] = [];
+    host.messages.updateAsync = async (message: Message, transaction?: SqlTransaction): Promise<void> => {
+      await update(message, transaction);
+      if (message.teammateId === bob.id && message.status === MessageStatus.Completed && stops.length === 0)
+        stops.push(host.engine.cancelAsync(new MessageIdParams(message.id)));
+    };
+
+    await UsageHandOffTurnsTests.ask(host, conversation, bob, "stopped");
+    await Promise.all(stops);
+
+    Assert.areEqual(1, stops.length);
+    Assert.areEqual(work.id, host.adapter.requests.map(t => t.provider?.id).join(","));
+    Assert.areEqual("Bob:Failed,Bob:Completed,Rita:Cancelled", await UsageHandOffTurnsTests.repliesAsync(host, conversation));
   }
 
   private static async teammateAsync(host: CoreHost, name: string, provider: Provider, handOffs: readonly Teammate[]): Promise<Teammate> {

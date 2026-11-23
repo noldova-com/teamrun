@@ -1784,6 +1784,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     for (const candidate of await this.teammates.listAsync())
       if (order.includes(candidate.id) && this.canReply(await this.providers.findAsync(candidate.providerId)) && !await this.sustain.isOutAsync(candidate))
         candidates.push(candidate);
+    if (item.run.isCancelled) {
+      await this.cancelPendingAsync(item);
+      return true;
+    }
     const target = candidates.toSorted((a, b) => order.indexOf(a.id) - order.indexOf(b.id))[0] ?? null;
     const limit = this.readHopLimit();
     const to = Object.isNull(target) || item.hop >= limit ? null : target;
@@ -1808,6 +1812,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     if (!Object.isNull(next)) {
       work.splice(index + 1, 0, next);
       this.state.runs.set(next.message.id, next.run);
+      if (item.run.isCancelled)
+        next.run.cancel();
     }
     this.events.publish(new Event(EventName.MessageUpdated, ended.toJson()));
     if (!Object.isNull(next))

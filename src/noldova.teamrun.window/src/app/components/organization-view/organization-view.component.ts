@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, inject, input, type InputSignal, linkedSignal, signal, type Signal, type WritableSignal } from "@angular/core";
+import { Component, computed, ElementRef, inject, input, type InputSignal, linkedSignal, signal, type Signal, viewChild, type WritableSignal } from "@angular/core";
 
 import { OrganizationParent, OrganizationTarget, OrganizationTargetKind, type Teammate } from "@noldova/teamrun.protocol";
 
@@ -61,6 +61,7 @@ export class OrganizationViewComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly lines: typeof FlowLineShape = FlowLineShape;
   protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
+  protected readonly messagesPanel: Signal<ElementRef<HTMLElement> | undefined> = viewChild("messages", { read: ElementRef });
   protected readonly person: OrganizationParent = OrganizationParent.person;
   protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
   protected readonly below: OverlaySide = OverlaySide.below;

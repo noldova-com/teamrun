@@ -1249,6 +1249,7 @@ export class Resources {
   public static readonly flowKidSelector: string = ".kid";
   public static readonly flowKidsSelector: string = ".kids";
   public static readonly flowReportsSelector: string = ".reports";
+  public static readonly flowCanvasSelector: string = "nol-canvas";
   public static readonly flowNodeData: string = "flowNode";
   public static readonly flowParentData: string = "flowParent";
   public static readonly flowShapeData: string = "flowShape";

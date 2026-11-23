@@ -13,6 +13,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Organization:** the Board's and Focus's cards open their teammate's details when pointed at or reached with the keyboard, as the Tree's do (#134).
 - **Organization:** a message to several teammates says how many it goes to before it is sent (#139).
 - **Organization:** a message to several teammates shows Stop beside Send while it is sent or answered: the teammates not yet sent to get nothing and show Stopped, each recipient's running reply stops, a copy queued behind one is taken back, and the next message can go at once (#140).
+- **Organization:** the Board and Focus show each message moving between teammates' cards, as the Tree does: a faint flow while it is written, a pulse once it is sent and a glow on its receiver's card; your messages come in from the side of the chat panel, and the setting and reduced motion turn it off there too (#148).
 - **Several organizations:** TeamRun keeps organizations, each with its name, an optional default folder, its own departments, placements and layout, and its own Organization chats; your current organization, its teammates and its layout become My organization.
   A new teammate joins no organization, and an Organization chat with no folder of its own runs in its organization's folder; the window still shows only My organization, and the views to add, switch and remove organizations come in their own changes (#401).
 - **Explorer:** an Organizations group lists each organization, whose name opens its own Organization view, then the teammates it places in no department and each of its departments by its path, such as `DevOps › Infra`, with its teammates; a teammate's row opens its Organization chat in that organization and shows when it waits or works, and Organization chats no longer show under Chats, Pinned or a project, even one pinned or moved there before (#402).
@@ -38,8 +39,10 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
 - **Runtime:** a failure of the page server or of a shared MCP sign-in's listener after it starts is logged instead of ending Noldova Desktop's runtime; an attached file whose close fails after its copy keeps the copy; a page whose save fails to commit keeps the copy of the version still saved; and an outside session's wait reads its replies no more once it ends (#90).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
+- **Organization:** the chat beside the tree shows a teammate's new Organization chat, your message and its reply, once the window has read its chats again, rather than staying empty (#175).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).
 - **Organization:** while you edit the structure, each person's Add teammate and Add unit sit right under that person's card, or a unit's leader, on the line to the people below, rather than after everyone below; Reports to stays on one line, and a single report's line runs straight down with no stub (#146).
