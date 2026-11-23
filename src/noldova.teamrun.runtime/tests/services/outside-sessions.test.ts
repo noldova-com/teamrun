@@ -533,6 +533,19 @@ export class OutsideSessionsTests {
   }
 
   @TestMethod
+  public async answersAWaitWhoseCallerWentBeforeItStartedWithWhatItHasAndKeepsNoListener(): Promise<void> {
+    await using rig = await Rig.onAsync();
+    rig.outside.replies.set("m1", new OutsideReply("m1", OutsideReplyState.Working));
+    const caller = new AbortController();
+    caller.abort();
+
+    const answer = await rig.read(["m1"], 5, caller.signal);
+
+    Assert.areEqual(OutsideSessionsTests.result([{ message_id: "m1", state: "working" }]), JSON.stringify(answer));
+    Assert.areEqual("1 0", `${rig.outside.reads} ${rig.events.listenerCount}`);
+  }
+
+  @TestMethod
   public async appliesASwitchMadeWhileATokenIsResetOnlyAfterTheResetSoTheShownTokenIsTheOneAccepted(): Promise<void> {
     const secrets = new MemorySecrets();
     secrets.saved.set(Resources.outsideTokenSecret, "old");
