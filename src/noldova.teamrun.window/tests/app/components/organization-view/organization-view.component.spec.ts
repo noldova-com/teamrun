@@ -1088,6 +1088,18 @@ describe("OrganizationViewComponent", () => {
         [new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", name: "Craft" })]]);
     });
 
+    it("asks for a unit again once the unit open in the editor leaves the organization", async () => {
+      await editAsync();
+      await editUnitAsync("Build");
+      const opened = texts(".title", editor());
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf(sample.departments.filter(t => t.id !== "build"),
+        sample.placements.filter(t => t.teammateId !== "offline")).toJson());
+      await settle();
+
+      expect([opened, all("nol-teamrun-organization-unit-editor").length, texts("aside.messages.editor .nol-teamrun-organization-empty")])
+        .toEqual([["Build"], 0, ["Select a unit to change its name, type, leader or who it reports to."]]);
+    });
+
     it("chooses a unit's leader in the editor among its people in name order, then any other teammate, who joins it, or none", async () => {
       await editAsync();
       await editUnitAsync("Design");

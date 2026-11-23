@@ -3258,19 +3258,6 @@ export class Resources {
     return `${Resources.lowRiskLead}${requester} ${steps.join(Resources.browserStepSeparator)}`;
   }
 
-  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>, under: number = 0): string {
-    const reports = `Your ${count} ${count === 1 ? "direct report" : "direct reports"}`;
-    return [under === 0 ? reports : `${reports} and ${under} under them`, ...Resources.statusCountParts(counts)].join(" · ");
-  }
-
-  public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`${count} ${count === 1 ? "teammate" : "teammates"}`, ...Resources.statusCountParts(counts)].join(" · ");
-  }
-
-  private static statusCountParts(counts: ReadonlyMap<TeammateStatus, number>): readonly string[] {
-    return Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
-  }
-
   private static browserStep(words: BrowserStepWords, phase: BrowserStepPhase, notes: readonly (string | null)[]): string {
     const shown = phase === BrowserStepPhase.Running ? words.doing : phase === BrowserStepPhase.Done ? words.done : words.undone;
     return [shown, ...notes.filter(t => !Object.isNull(t))].join(Resources.browserStepSeparator);

@@ -67,14 +67,14 @@ export class OrganizationDepartmentComponent {
     const people = Object.isNull(node.leader) ? node.members : [node.leader, ...node.members];
     return Resources.formatOrganizationDepartmentSummary(people.map(t => this.statuses.statusOf(t.id)()));
   });
-  protected readonly isSelected: Signal<boolean> = computed(() => this.selection.unitId() === this.node().department?.id);
+  protected readonly isSelected: Signal<boolean> = computed(() => this.selection.unitId() === this.node().id);
 
   protected keyOf(teammate: Teammate): OrganizationParent {
     return OrganizationParent.teammate(teammate.id);
   }
 
   protected select(): void {
-    this.selection.select(this.node().department?.id ?? null);
+    this.selection.select(this.node().id);
   }
 
   protected selectFromCard(event: MouseEvent): void {

@@ -20,8 +20,9 @@ LICENSE file in the root directory of this source tree.
   @if (drawing.flow.stage === stages.Sent) {
     <span class="pulse" [style.--nol-teamrun-flow-color]="colorOf(drawing.flow)" [style.offset-path]="drawing.offsetPath" [style.animation-duration.ms]="resources.organizationFlowPulseDuration"
       (animationend)="arrived.emit(drawing.flow.id)"></span>
-  } @else if (drawing.flow.stage === stages.Arrived && drawing.route.target; as target) {
-    <span class="glow" [style.--nol-teamrun-flow-color]="colorOf(drawing.flow)" [style.left.px]="target.left" [style.top.px]="target.top" [style.width.px]="target.width" [style.height.px]="target.height"
+  } @else if (drawing.flow.stage === stages.Arrived) {
+    <span class="glow" [style.--nol-teamrun-flow-color]="colorOf(drawing.flow)" [style.left.px]="drawing.route.target.left" [style.top.px]="drawing.route.target.top"
+      [style.width.px]="drawing.route.target.width" [style.height.px]="drawing.route.target.height"
       [style.animation-duration.ms]="resources.organizationFlowGlowDuration" (animationend)="finished.emit(drawing.flow.id)"></span>
   }
 }
