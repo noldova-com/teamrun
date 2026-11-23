@@ -4,11 +4,9 @@ TeamRun has a command line.
 You can use it to list and open projects and chats, send messages, and check providers, and your teammates use it to message teammates in other chats.
 
 Each command runs as the app's command followed by `teamrun` and the command's name.
-On this page, `<app command>` stands for the app's command:
+On this page, `<app command>` stands for the app's command.
 
-```
-<app command> teamrun list-chats
-```
+For example: `<app command> teamrun list-chats`
 
 Add `--json` to any command to get its result as JSON.
 
@@ -38,9 +36,7 @@ The command works on the same data as the TeamRun window, in the [data folder](s
 
 ## Sending a message
 
-```
-<app command> teamrun send <chatId> <text…>
-```
+To send a message: `<app command> teamrun send <chatId> <text…>`
 
 `send` sends a message as the window does: `@` mentions name teammates.
 It prints the ids of the message and of the replies it started, without waiting for the replies.
@@ -54,9 +50,7 @@ It prints the ids of the message and of the replies it started, without waiting 
 - `--kind <kind>` needs a `--provider` of that kind.
 - With `-` alone as the text, `send` reads the message from standard input, such as a file piped into it.
 
-```
-<app command> teamrun cancel <chatId>
-```
+To stop a chat's replies: `<app command> teamrun cancel <chatId>`
 
 `cancel` stops the chat's working replies, hand-offs among them, and names the ones it stopped.
 

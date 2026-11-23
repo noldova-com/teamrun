@@ -61,7 +61,7 @@ describe("DocsSearchIndex", () => {
     const install = DocsCatalog.pages.find(t => t.file === "install");
     const entry = DocsSearchIndex.entries.find(t => t.page === install);
 
-    expect(DocsSearchIndex.search(" Install ").map(t => t.title)).toEqual(["Install"]);
+    expect(DocsSearchIndex.search(" Install ").map(t => t.title)).toEqual(["Install", "Providers and sign-in"]);
     expect(DocsSearchIndex.search("start").map(t => t.title)).toEqual(["TeamRun", "Getting started", "Install"]);
     expect(entry?.terms.slice(0, 2)).toEqual(["install", "start"]);
   });
