@@ -1441,6 +1441,7 @@ Product names and trademarks, such as the providers' names above, belong to thei
   Its package must be an exact `name@version` that passes the name rule, so a tag, a flag or a git URL is refused before npm sees it, and the installed package's manifest must show that version.
   The entry's variables reach the agent's process only, never the npm step.
   A program started through a batch file on Windows, as npm's shim is, takes its arguments through `SharedMcpLauncher`'s batch escaping, the same as a shared MCP server's; `cmd.exe` can't carry a line break, so an argument with one is refused with a reason.
+  On Windows an agent's command named without a folder is found the same way, only in the absolute folders `PATH` lists, never in the chat's folder the agent starts in, and refused with the reason when `PATH` doesn't hold it.
 - A local ACP command keeps its name, command, arguments and, for each variable, the name and a saved secret's reference.
   The window saves each value through `context.secrets` before it sends the command, sends references only, and removes what it saved when the add fails.
   `LocalAcpCommand.toJson` writes those references, never a value; the values are read each time the kind opens, and a value that's gone or can't be read refuses the agent's start with its reason.

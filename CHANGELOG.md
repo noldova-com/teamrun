@@ -40,7 +40,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
-- **Windows:** an added ACP agent's terminal command and a shared stdio MCP server named without a folder are found only through `PATH`, never in the chat's folder, and refused when `PATH` doesn't hold them; the MCP launcher's watch runs Windows PowerShell from the system folder, in that folder.
+- **Windows:** an added ACP agent's own command, its terminal commands and a shared stdio MCP server named without a folder are found only through `PATH`, never in the chat's folder, and refused when `PATH` doesn't hold them; the MCP launcher's watch runs Windows PowerShell from the system folder, in that folder (#186).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).
