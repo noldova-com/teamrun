@@ -933,12 +933,15 @@ describe("ProvidersViewComponent", () => {
       "adds it", async () => {
       const install = (received: number, cancellable: boolean = true, total: number = 100_000_000): ProviderKindInstallation =>
         new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, received, total, null, null, cancellable);
-      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => install(0, true, 0).toJson()));
+      const ended = new DeferredResponse();
+      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => ended.promise));
       await openPanel();
       card("claude").click();
       await settle();
 
       button(".nol-teamrun-add-save").click();
+      await settle();
+      context.emit(EventName.ProviderKindInstallationChanged, install(0, true, 0).toJson());
       await settle();
 
       expect(ProviderKindParams.fromJson(context.parametersOf(MethodName.ProviderKindInstall)).kind).toBe("claude");
@@ -965,25 +968,76 @@ describe("ProvidersViewComponent", () => {
 
       expect([texts(".nol-teamrun-add-progress-text"), element().querySelector(".nol-teamrun-add-cancel-install")]).toEqual([["Installing Claude Code: setting up"], null]);
       expect(button(".nol-teamrun-add-bar").getAttribute("aria-valuenow")).toBeNull();
-      context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.Installed, null, 0, 0, "2.1.0").toJson());
+      const installed = new ProviderKindInstallation("claude", ProviderKindInstallState.Installed, null, 0, 0, "2.1.0").toJson();
+      context.emit(EventName.ProviderKindInstallationChanged, installed);
+      ended.resolve(installed);
       await settle();
 
       expect(created()).toEqual([["claude", "Personal", null]]);
       expect(element().querySelector(".nol-teamrun-add-panel")).toBeNull();
     });
 
-    it("stops an install from the panel's Cancel without adding, and shows a failed install's reason in the panel", async () => {
-      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () =>
-        new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, 0, 1000).toJson()).answer(MethodName.ProviderKindInstallCancel, () => null));
+    it("adds nothing when the panel's Cancel closes it during an install, once the install ends", async () => {
+      const ended = new DeferredResponse();
+      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => ended.promise));
       await openPanel();
       card("claude").click();
       await settle();
       button(".nol-teamrun-add-save").click();
       await settle();
+      context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, 0, 1000).toJson());
+      await settle();
+
+      button(".nol-teamrun-add-cancel").click();
+      await settle();
+      const installed = new ProviderKindInstallation("claude", ProviderKindInstallState.Installed, null, 0, 0, "2.1.0").toJson();
+      context.emit(EventName.ProviderKindInstallationChanged, installed);
+      ended.resolve(installed);
+      await settle();
+
+      expect([created(), element().querySelector(".nol-teamrun-add-panel")]).toEqual([[], null]);
+    });
+
+    it("installs and adds a type once when Add is pressed twice before its install shows progress", async () => {
+      const ended = new DeferredResponse();
+      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => ended.promise));
+      await openPanel();
+      card("claude").click();
+      await settle();
+
+      button(".nol-teamrun-add-save").click();
+      button(".nol-teamrun-add-save").click();
+      await settle();
+      const installed = new ProviderKindInstallation("claude", ProviderKindInstallState.Installed, null, 0, 0, "2.1.0").toJson();
+      context.emit(EventName.ProviderKindInstallationChanged, installed);
+      ended.resolve(installed);
+      await settle();
+
+      expect([context.count(MethodName.ProviderKindInstall), created()]).toEqual([1, [["claude", "Personal", null]]]);
+    });
+
+    it("stops an install from the panel's Cancel without adding, and shows a failed install's reason in the panel", async () => {
+      const installs: DeferredResponse[] = [];
+      const end = (installation: ProviderKindInstallation): void => {
+        context.emit(EventName.ProviderKindInstallationChanged, installation.toJson());
+        installs.at(-1)?.resolve(installation.toJson());
+      };
+      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => {
+        const install = new DeferredResponse();
+        installs.push(install);
+        return install.promise;
+      }).answer(MethodName.ProviderKindInstallCancel, () => null));
+      await openPanel();
+      card("claude").click();
+      await settle();
+      button(".nol-teamrun-add-save").click();
+      await settle();
+      context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, 0, 1000).toJson());
+      await settle();
 
       button(".nol-teamrun-add-cancel-install").click();
       await settle();
-      context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled).toJson());
+      end(new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled));
       await settle();
 
       expect(ProviderKindParams.fromJson(context.parametersOf(MethodName.ProviderKindInstallCancel)).kind).toBe("claude");
@@ -991,8 +1045,7 @@ describe("ProvidersViewComponent", () => {
 
       button(".nol-teamrun-add-save").click();
       await settle();
-      context.emit(EventName.ProviderKindInstallationChanged,
-        new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled, "The download stopped: the connection closed.").toJson());
+      end(new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled, "The download stopped: the connection closed."));
       await settle();
 
       expect([created(), texts(".nol-teamrun-add-error")]).toEqual([[], ["The download stopped: the connection closed."]]);

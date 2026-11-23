@@ -8,6 +8,7 @@
 import {
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   input,
@@ -78,6 +79,7 @@ export class ProviderAddComponent {
     ?? Resources.nextProviderName(this.store().providers().filter(t => t.kind === this.kind()).map(t => t.label)));
   protected readonly folder: WritableSignal<string | null> = signal(null);
   protected readonly saving: WritableSignal<boolean> = signal(false);
+  protected readonly installingKind: WritableSignal<string | null> = signal(null);
   protected readonly waitingKind: WritableSignal<string | null> = signal(null);
   protected readonly waitingTool: WritableSignal<ProviderKindCard | null> = signal(null);
   protected readonly error: WritableSignal<string | null> = signal(null);
@@ -118,21 +120,27 @@ export class ProviderAddComponent {
   });
   protected readonly addLabel: Signal<string> = computed(() => Object.isNull(this.folder()) && this.chosen().row?.kind.supportsSignIn === true
     ? Resources.addAndSignInLabel : Resources.addOnlyLabel);
-  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.waitingKind()) || !Object.isNull(this.waitingTool()));
+  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.installingKind()) || !Object.isNull(this.waitingKind())
+    || !Object.isNull(this.waitingTool()));
   protected readonly canAdd: Signal<boolean> = computed(() => {
     const label = this.label().trim();
-    return !this.saving() && Object.isNull(this.waitingKind()) && Object.isNull(this.waitingTool()) && !Object.isNull(this.chosen().row) && Object.isNull(this.unavailable())
-      && Object.isNull(this.progress()) && !this.store().isBusy() && (Object.isNull(this.folder()) ? !Object.isNull(ProfileFolderName.of(label)) : label.length > 0);
+    return !this.saving() && Object.isNull(this.installingKind()) && Object.isNull(this.waitingKind()) && Object.isNull(this.waitingTool())
+      && !Object.isNull(this.chosen().row) && Object.isNull(this.unavailable()) && Object.isNull(this.progress()) && !this.store().isBusy()
+      && (Object.isNull(this.folder()) ? !Object.isNull(ProfileFolderName.of(label)) : label.length > 0);
   });
 
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly showError: (message: string) => void = message => this.error.set(message);
   private readonly hiddenSessions: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private dropped: boolean = false;
   private readonly toolTerminal: Signal<string | undefined> = computed(() => {
     return this.store().terminalSessions().get(this.kind());
   });
 
   public constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.dropped = true;
+    });
     effect(() => {
       const kind = this.kind();
       untracked(() => this.chosenKind.emit(kind));
@@ -240,18 +248,27 @@ export class ProviderAddComponent {
   }
 
   protected close(): void {
-    if (!this.saving())
-      this.closed.emit();
+    if (this.saving())
+      return;
+    this.dropped = true;
+    this.waitingKind.set(null);
+    this.closed.emit();
   }
 
   private async install(kind: string): Promise<void> {
     const store = this.store();
+    this.installingKind.set(kind);
     await store.installKind(kind, this.showError);
-    const state = store.installations().get(kind)?.state;
-    if (state === ProviderKindInstallState.Installing)
+    this.installingKind.set(null);
+    if (this.dropped)
+      return;
+    const installation = store.installations().get(kind);
+    if (installation?.state === ProviderKindInstallState.Installing)
       this.waitingKind.set(kind);
-    else if (state === ProviderKindInstallState.Installed)
+    else if (installation?.state === ProviderKindInstallState.Installed)
       await this.save(kind);
+    else if (installation?.state === ProviderKindInstallState.NotInstalled && !Object.isNull(installation.reason))
+      this.error.set(installation.reason);
   }
 
   private installTool(card: ProviderKindCard): void {
@@ -260,6 +277,8 @@ export class ProviderAddComponent {
   }
 
   private async save(kind: string): Promise<void> {
+    if (this.dropped)
+      return;
     this.saving.set(true);
     const saved = await this.store().addProvider(kind, this.label().trim(), this.folder(), this.showError, false);
     this.saving.set(false);
