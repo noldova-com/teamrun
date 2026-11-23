@@ -23,6 +23,7 @@ import { HolderListing } from "./holder-listing.ts";
 import { PollTiming } from "./poll-timing.ts";
 import { ProcessStatus } from "./process-status.ts";
 import { StartedProcess } from "./started-process.ts";
+import { WindowSize } from "./window-size.ts";
 
 declare global {
   interface Window {
@@ -425,7 +426,7 @@ export class TeamRunApp {
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
     window.on("console", t => this.console.push(`${t.type()}: ${t.text()}`));
     this.window = window;
-    const wanted = { width: TeamRunApp.DESKTOP_DEFAULT_WIDTH, height: TeamRunApp.DESKTOP_DEFAULT_HEIGHT };
+    const wanted = new WindowSize(TeamRunApp.DESKTOP_DEFAULT_WIDTH, TeamRunApp.DESKTOP_DEFAULT_HEIGHT);
     const area = await application.evaluate(({ BrowserWindow, screen }, { width, height }) => {
       for (const shown of BrowserWindow.getAllWindows()) {
         shown.setContentSize(width, height);
