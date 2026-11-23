@@ -194,31 +194,37 @@ describe("OrganizationChatComponent", () => {
     expect(opened).toEqual(["alice", "bob"]);
   });
 
-  it.each([
-    ["just after it opened", false],
-    ["while the window still reads the chats again after it opened", true]
-  ])("sends the first message to a teammate's new chat %s, and clears the box", async (_, holds) => {
-    let release = (): void => undefined;
-    const held = new Promise<void>(resolve => {
-      release = resolve;
-    });
-    openAnswer = id => {
-      kept = [chatOf(id)];
-      if (holds)
-        listing = held;
-      context.emit(EventName.StateInvalidated, null);
-      return chatOf(id).toJson();
-    };
-    await create(OrganizationTarget.teammate("alice"));
-    await Wait.until(() => expect(box()).not.toBeNull());
-    await type("Hello");
-    await sendNow();
+  it.each([false, true])("offers no message box while a teammate's new chat opens, then sends the first message once it opened, the window still reading its chats: %s",
+    async holds => {
+      let open = (): void => undefined;
+      const opening = new Promise<void>(resolve => {
+        open = resolve;
+      });
+      let release = (): void => undefined;
+      const held = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      openAnswer = async id => {
+        await opening;
+        kept = [chatOf(id)];
+        if (holds)
+          listing = held;
+        context.emit(EventName.StateInvalidated, null);
+        return chatOf(id).toJson();
+      };
+      await create(OrganizationTarget.teammate("alice"));
+      await Wait.until(() => expect(opened).toEqual(["alice"]));
+      const whileOpening = box();
+      open();
+      await Wait.until(() => expect(box()).not.toBeNull());
+      await type("Hello");
+      await sendNow();
 
-    await Wait.until(() => expect(sent().map(t => [t.chatId, t.responderTeammateId, t.text])).toEqual([["org-alice", "alice", "Hello"]]));
-    await Wait.until(() => expect(box()?.value).toBe(""));
-    expect(context.count(MethodName.ConversationList)).toBeGreaterThan(1);
-    release();
-  });
+      await Wait.until(() => expect(sent().map(t => [t.chatId, t.responderTeammateId, t.text])).toEqual([["org-alice", "alice", "Hello"]]));
+      await Wait.until(() => expect(box()?.value).toBe(""));
+      expect([whileOpening, context.count(MethodName.ConversationList) > 1]).toEqual([null, true]);
+      release();
+    });
 
   it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
     const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>

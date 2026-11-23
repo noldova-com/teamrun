@@ -425,7 +425,7 @@ export class ComposerComponent {
       }
     });
     this.canCompose = computed(() => !this.preparing() && !this.restoring());
-    this.canSend = computed(() => this.canCompose() && !store.isBusy() && !this.modelsLoading() && !this.imagesUnsupported() && !Object.isNull(this.kind())
+    this.canSend = computed(() => this.canCompose() && !store.isActing() && !this.modelsLoading() && !this.imagesUnsupported() && !Object.isNull(this.kind())
       && !this.needsProvider()
       && (!String.isNullOrWhitespace(this.text()) || this.attachments().length > 0));
     this.unavailableReason = computed(() => {
