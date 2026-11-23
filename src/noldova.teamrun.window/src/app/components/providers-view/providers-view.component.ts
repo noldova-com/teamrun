@@ -180,15 +180,16 @@ export class ProvidersViewComponent {
           untracked(() => void this.store.readPlanUsage(provider.kind, provider.id));
     });
     effect(() => {
-      const live = new Map([
-        ...this.installing().map(t => [JSON.stringify([t.installation.kind]), Resources.formatLiveStatus(t.name, Resources.installActionOf(t.installation))] as const),
-        ...this.rows().flatMap(t => Object.isNull(t.announcement) ? [] : [[JSON.stringify([t.provider.kind, t.provider.id]), t.announcement] as const])
-      ]);
-      untracked(() => {
-        for (const [key, text] of live)
-          if (this.announced.get(key) !== text)
-            this.announcer.announce(text, AnnouncementPoliteness.Polite);
-      });
+      const live = new Map<string, string>();
+      for (const installing of this.installing())
+        live.set(JSON.stringify([installing.installation.kind]), Resources.formatLiveStatus(installing.name, Resources.installActionOf(installing.installation)));
+      for (const row of this.rows())
+        if (!Object.isNull(row.announcement))
+          live.set(JSON.stringify([row.provider.kind, row.provider.id]), row.announcement);
+      untracked(() => live.forEach((text, key) => {
+        if (this.announced.get(key) !== text)
+          this.announcer.announce(text, AnnouncementPoliteness.Polite);
+      }));
       this.announced = live;
     });
   }

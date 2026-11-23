@@ -29,8 +29,8 @@ export class ToolUpdateChecksTests {
   private static readonly setting: string = "desktop.updateChecks";
 
   @TestMethod
-  public followsTheChangesOfTheDevicesSettingAndChecksOnlyOnceUnderAtStart(): void {
-    const settings = ToolUpdateChecksTests.settingsOf("Automatic");
+  public followsTheChangesOfTheDevicesSettingChecksOnlyOnceUnderAtStartAndCountsAResetAsAutomatic(): void {
+    const settings = ToolUpdateChecksTests.settingsOf("OnRequest");
     const checks = new ToolUpdateChecks(settings);
     let allowed = 0;
     checks.onAllowed(() => allowed++);
@@ -45,34 +45,41 @@ export class ToolUpdateChecksTests {
     Assert.areEqual("true,true", takes("Automatic"));
     Assert.areEqual("false,false", takes("OnRequest"));
     Assert.areEqual("false,false", takes("AtStart"));
-    Assert.areEqual("false,false", takes(null));
-    Assert.areEqual(2, allowed);
+    Assert.areEqual("true,true", takes(null));
+    Assert.areEqual(3, allowed);
   }
 
   @TestMethod
-  public takesTheValueReadGivesAtConstructionWhenItCanOnlyBeAStoredOne(): void {
+  public takesTheValueReadGivesAtConstructionAndTheDefaultAsAutomatic(): void {
     const atStart = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("AtStart"));
     const onRequest = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("OnRequest"));
-    const unknown = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("Automatic"));
+    const automatic = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf("Automatic"));
+    const unreadable = new ToolUpdateChecks(ToolUpdateChecksTests.settingsOf(null));
 
     Assert.areEqual("true,false", [atStart.takeCheck(), atStart.takeCheck()].join(","));
     Assert.isFalse(onRequest.takeCheck());
-    Assert.isFalse(unknown.takeCheck());
+    Assert.areEqual("true,true", [automatic.takeCheck(), automatic.takeCheck()].join(","));
+    Assert.areEqual("true,true", [unreadable.takeCheck(), unreadable.takeCheck()].join(","));
   }
 
   @TestMethod
-  public async listsTheInstallationsAtStartWithoutTheirLatestVersionsWhileTheSettingIsOnRequestOrNotKnownYet(): Promise<void> {
-    const onRequest = await ToolUpdateChecksTests.checksAsync("OnRequest", async listAsync => {
-      await listAsync();
-      await listAsync();
-    });
-    const unknown = await ToolUpdateChecksTests.checksAsync("Automatic", async listAsync => {
+  public async listsTheInstallationsWithoutTheirLatestVersionsWhileTheSettingIsOnRequest(): Promise<void> {
+    const checks = await ToolUpdateChecksTests.checksAsync("OnRequest", async listAsync => {
       await listAsync();
       await listAsync();
     });
 
-    Assert.areEqual("false,false", onRequest);
-    Assert.areEqual("false,false", unknown);
+    Assert.areEqual("false,false", checks);
+  }
+
+  @TestMethod
+  public async checksTheLatestVersionsAtEveryListingWhileTheSettingIsTheDefault(): Promise<void> {
+    const checks = await ToolUpdateChecksTests.checksAsync("Automatic", async listAsync => {
+      await listAsync();
+      await listAsync();
+    });
+
+    Assert.areEqual("true,true", checks);
   }
 
   @TestMethod
@@ -87,7 +94,7 @@ export class ToolUpdateChecksTests {
 
   @TestMethod
   public async readsTheLatestVersionsOfTheListedInstallationsWhenTheDevicesAutomaticArrivesAfterTheFirstListing(): Promise<void> {
-    const checks = await ToolUpdateChecksTests.checksAsync("Automatic", async (listAsync, changeAsync) => {
+    const checks = await ToolUpdateChecksTests.checksAsync("OnRequest", async (listAsync, changeAsync) => {
       await listAsync();
       await changeAsync("Automatic");
       await listAsync();
@@ -96,7 +103,7 @@ export class ToolUpdateChecksTests {
     Assert.areEqual("false,true,true", checks);
   }
 
-  private static async checksAsync(stored: string,
+  private static async checksAsync(stored: JsonValue,
     act: (listAsync: () => Promise<void>, changeAsync: (value: JsonValue) => Promise<void>) => Promise<void>): Promise<string> {
     using directory = new TemporaryDirectory();
     using database = new MemoryModuleDatabase(HostedMigrations.all);
@@ -124,7 +131,7 @@ export class ToolUpdateChecksTests {
     return installation.checks.join(",");
   }
 
-  private static settingsOf(stored: string): FakeModuleSettings {
+  private static settingsOf(stored: JsonValue): FakeModuleSettings {
     const declared = new DeclaredSettings();
     const settings = new FakeModuleSettings();
     settings.answer("read", (name, scope, device) => name === ToolUpdateChecksTests.setting ? stored : declared.read(name, scope, device));

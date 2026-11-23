@@ -7,6 +7,7 @@
  */
 
 import "@noldova/context.core";
+import type { JsonValue } from "@noldova/context.json";
 import type { IModuleSettings } from "@noldova/desktop.runtime";
 import type { IToolUpdateChecks } from "@noldova/teamrun.core";
 
@@ -14,14 +15,12 @@ import { Resources } from "../resources.js";
 
 export class ToolUpdateChecks implements IToolUpdateChecks {
   private readonly listeners: (() => void)[] = [];
-  private choice: string | null = null;
+  private choice: string;
   private hasChecked: boolean = false;
 
   public constructor(settings: IModuleSettings) {
-    const stored = settings.read(Resources.updateChecksSetting);
-    if (Object.isString(stored) && stored !== Resources.automaticUpdateChecks)
-      this.choice = stored;
-    settings.onChanged(Resources.updateChecksSetting, t => this.choose(Object.isString(t.value) ? t.value : null));
+    this.choice = ToolUpdateChecks.choiceOf(settings.read(Resources.updateChecksSetting));
+    settings.onChanged(Resources.updateChecksSetting, t => this.choose(ToolUpdateChecks.choiceOf(t.value)));
   }
 
   public takeCheck(): boolean {
@@ -35,7 +34,7 @@ export class ToolUpdateChecks implements IToolUpdateChecks {
     this.listeners.push(listener);
   }
 
-  private choose(choice: string | null): void {
+  private choose(choice: string): void {
     const allowed = this.allows();
     this.choice = choice;
     if (!allowed && this.allows())
@@ -45,5 +44,9 @@ export class ToolUpdateChecks implements IToolUpdateChecks {
 
   private allows(): boolean {
     return this.choice === Resources.automaticUpdateChecks || (this.choice === Resources.atStartUpdateChecks && !this.hasChecked);
+  }
+
+  private static choiceOf(value: JsonValue): string {
+    return Object.isString(value) ? value : Resources.automaticUpdateChecks;
   }
 }
