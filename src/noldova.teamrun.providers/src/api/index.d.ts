@@ -2272,7 +2272,11 @@ export declare class AcpAgentInstaller implements IProviderKindInstallation {
    * The command that starts the installed entry, or `null` when it isn't installed.
    */
   public commandOf(): ProcessCommand | null;
-  public readVersions(): Promise<ProviderKindVersions>;
+  /**
+   * Reads the installed entry's version and, with `checksLatest`, the registry's latest one, which is the installed one when the registry can't
+   * be read; without it, the latest is `null` and the registry isn't read.
+   */
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
   public install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string>;
 }
 
@@ -14702,9 +14706,9 @@ export declare class AntigravityInstallation implements IProviderKindInstallatio
     readVersion: () => Promise<string | null>);
 
   /**
-   * TeamRun's own versions, with the server on `PATH` as the installed one while it is compatible.
+   * TeamRun's own versions, read with `checksLatest`, with the server on `PATH` as the installed one while it is compatible.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
   public install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string>;
 }
 
@@ -15013,9 +15017,9 @@ export declare class ClaudeInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Claude Code's version and the channel's latest one, which is `null` when the channel can't be read in time, and for an
-   * installed Claude Code that isn't a native one (`ExecutableSource.LocalBin`), without reading the channel.
+   * installed Claude Code that isn't a native one (`ExecutableSource.LocalBin`) or without `checksLatest`, without reading the channel.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the channel's latest version, or updates an installed Claude Code to it.
@@ -15098,9 +15102,9 @@ export declare class CodexInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Codex's version and the latest release's, which is `null` when no release can be read in time, and without reading
-   * a release when no Codex is installed or the one installed isn't a standalone install.
+   * a release when no Codex is installed, the one installed isn't a standalone install, or without `checksLatest`.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the latest release, or updates an installed Codex to it.
@@ -15184,9 +15188,9 @@ export declare class CopilotInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Copilot's version and the latest release's, which is `null` when no release can be read in time, and without reading
-   * a release when no Copilot is installed or the one installed isn't one it installs.
+   * a release when no Copilot is installed, the one installed isn't one it installs, or without `checksLatest`.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the latest release, or updates an installed Copilot to it.

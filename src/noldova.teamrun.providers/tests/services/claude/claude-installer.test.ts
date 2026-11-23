@@ -39,14 +39,14 @@ export class ClaudeInstallerTests {
       Assert.isNull(installer.unavailable);
       Assert.isFalse(installer.isInstalled);
       Assert.isNull(installer.foundPath);
-      Assert.areEqual("null null", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("null null", ClaudeInstallerTests.versions(await installer.readVersions(true)));
       mkdirSync(directory.resolve("staging", ".teamrun-staging-left-by-a-stopped-install"), { recursive: true });
 
       const path = await installer.install((received, total) => progress.push([received, total]), new AbortController().signal);
 
       Assert.areEqual(process.execPath, path);
       Assert.isTrue(installer.isInstalled);
-      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(JSON.stringify([program.length, program.length]), JSON.stringify(progress.at(-1)));
       Assert.areEqual(0, readdirSync(directory.resolve("staging")).length);
       Assert.areEqual("/c/latest,/c/2.1.212/manifest.json,/c/2.1.212/linux-x64/claude,/c/latest", ClaudeInstallerTests.paths(server));
@@ -135,7 +135,7 @@ export class ClaudeInstallerTests {
 
       Assert.areEqual(process.execPath, await installer.install(() => undefined, new AbortController().signal));
       Assert.areEqual("null,60000,null,60000", runner.timeouts.map(String).join(","));
-      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(0, readdirSync(directory.resolve("staging")).length);
     });
   }
@@ -203,7 +203,7 @@ export class ClaudeInstallerTests {
       Assert.areEqual(Resources.claudeNoBuild, installer.unavailable);
       Assert.isNull(installer.missingTool);
       Assert.areEqual(Resources.claudeNoBuild, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), InstallFailedException)).message);
-      Assert.areEqual("null null", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("null null", ClaudeInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(0, server.requests.length);
     });
   }
@@ -214,8 +214,8 @@ export class ClaudeInstallerTests {
       server.serve("/down/latest", Buffer.from("busy"), 503);
       ClaudeInstallerTests.installed(directory, "2.1.211");
 
-      Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer(server.url("/down"), directory).readVersions()));
-      Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer("http://localhost:1/c", directory).readVersions()));
+      Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer(server.url("/down"), directory).readVersions(true)));
+      Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer("http://localhost:1/c", directory).readVersions(true)));
       Assert.areEqual("/down/latest", ClaudeInstallerTests.paths(server));
     });
   }
@@ -227,7 +227,7 @@ export class ClaudeInstallerTests {
       ClaudeInstallerTests.installed(directory, "2.1.211");
       writeFileSync(directory.resolve("bin", "claude.cjs"), "process.exit(1);\n");
 
-      const versions = await ClaudeInstallerTests.installer(server.url("/c"), directory).readVersions();
+      const versions = await ClaudeInstallerTests.installer(server.url("/c"), directory).readVersions(true);
 
       Assert.areEqual("null 2.1.212", ClaudeInstallerTests.versions(versions));
       Assert.areEqual("2.1.212", versions.update);
@@ -244,9 +244,9 @@ if (process.argv[4] === "--force") require("node:fs").writeFileSync(${installed}
       writeFileSync(directory.resolve("bin", "claude.cjs"), "console.log(\"error: \\\"/versions/2.1.212\\\" is truncated\"); process.exit(1);");
       const installer = ClaudeInstallerTests.installer(server.url("/c"), directory);
 
-      Assert.areEqual("null 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("null 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(process.execPath, await installer.install(() => undefined, new AbortController().signal));
-      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("2.1.212 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -260,11 +260,24 @@ if (process.argv[4] === "--force") require("node:fs").writeFileSync(${installed}
         const installer = ClaudeInstallerTests.installer(server.url("/c"), directory, "linux-x64", undefined, source);
         Assert.isTrue(installer.isInstalled, source);
         Assert.areEqual(process.execPath, installer.foundPath, source);
-        Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await installer.readVersions()), source);
+        Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await installer.readVersions(true)), source);
       }
       Assert.isNull(ClaudeInstallerTests.installer(server.url("/c"), directory).foundPath);
       Assert.areEqual(0, server.requests.length);
-      Assert.areEqual("2.1.211 2.1.212", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer(server.url("/c"), directory).readVersions()));
+      Assert.areEqual("2.1.211 2.1.212", ClaudeInstallerTests.versions(await ClaudeInstallerTests.installer(server.url("/c"), directory).readVersions(true)));
+    });
+  }
+
+  @TestMethod
+  public readsNoChannelWhenTheLatestIsntChecked(): Promise<void> {
+    return ClaudeInstallerTests.withChannel(async (server, directory) => {
+      ClaudeInstallerTests.publish(server, "/c", "2.1.212", "linux-x64", "claude", ClaudeInstallerTests.program(directory, "2.1.212"));
+      ClaudeInstallerTests.installed(directory, "2.1.211");
+      const installer = ClaudeInstallerTests.installer(server.url("/c"), directory);
+
+      Assert.areEqual("2.1.211 null", ClaudeInstallerTests.versions(await installer.readVersions(false)));
+      Assert.areEqual(0, server.requests.length);
+      Assert.areEqual("2.1.211 2.1.212", ClaudeInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 

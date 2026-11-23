@@ -252,7 +252,7 @@ export class AcpAgentCatalogTests {
       const opened = new Opened();
 
       await AcpAgentCatalogTests.catalog(server, directory, opened).openAsync(new AcpStoredAgent("droid", "Droid", npx("droid") as JsonObject), async () => undefined);
-      const versions = await opened.installations[0]!.readVersions();
+      const versions = await opened.installations[0]!.readVersions(true);
 
       Assert.areEqual("null 1.0.0", `${versions.installed} ${versions.latest}`);
     });

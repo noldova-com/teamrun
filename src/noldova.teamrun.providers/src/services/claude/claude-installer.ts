@@ -65,11 +65,11 @@ export class ClaudeInstaller implements IProviderKindInstallation {
     return Object.isNull(located) || located.source === ExecutableSource.LocalBin ? null : located.path;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || located?.source !== ExecutableSource.LocalBin ? null
+      !checksLatest || Object.isNull(this.target) || located?.source !== ExecutableSource.LocalBin ? null
         : this.readLatest(AbortSignal.timeout(this.channelTimeout)).catch(() => null)
     ]);
     return new ProviderKindVersions(installed, latest);

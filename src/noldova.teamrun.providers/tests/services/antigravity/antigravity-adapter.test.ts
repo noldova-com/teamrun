@@ -351,8 +351,8 @@ export class AntigravityAdapterTests {
         host.directory.resolve("tmp"), host.info, host.programs.wrap(host.starter), host.timings, host.timer);
       try {
         Assert.isFalse(adapter.installation.isInstalled, version);
-        const versions = await adapter.installation.readVersions();
-        const again = await adapter.installation.readVersions();
+        const versions = await adapter.installation.readVersions(true);
+        const again = await adapter.installation.readVersions(true);
 
         Assert.areEqual(installed, adapter.installation.isInstalled, version);
         Assert.areEqual(installed ? version : null, versions.installed, version);

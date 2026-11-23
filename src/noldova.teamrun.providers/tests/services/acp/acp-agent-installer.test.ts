@@ -61,6 +61,7 @@ class Install {
   public readonly directory: string;
   public readonly saved: AcpRegistryAgent[] = [];
   public readonly installer: AcpAgentInstaller;
+  public latestReads: number = 0;
 
   public constructor(agent: AcpRegistryAgent, directory: string, tools: AcpInstallTools, options: { readonly platform?: string; readonly runner?: CommandRunner;
     readonly rename?: (from: string, to: string) => void; readonly settle?: (from: string, to: string) => Promise<void>; readonly latest?: AcpRegistryAgent | null;
@@ -68,7 +69,10 @@ class Install {
     this.directory = directory;
     const rename = options.rename ?? renameSync;
     this.installer = new AcpAgentInstaller(agent, directory, options.target === undefined ? TARGET : options.target, options.platform ?? "linux", options.environment ?? process.env,
-      tools, options.runner ?? REAL_RUNNER, rename, options.settle ?? (async (from, to) => rename(from, to)), () => Promise.resolve(options.latest === undefined ? null : options.latest),
+      tools, options.runner ?? REAL_RUNNER, rename, options.settle ?? (async (from, to) => rename(from, to)), () => {
+        this.latestReads++;
+        return Promise.resolve(options.latest === undefined ? null : options.latest);
+      },
       async t => { this.saved.push(t); });
   }
 
@@ -111,7 +115,7 @@ export class AcpAgentInstallerTests {
     Assert.isFalse(install.installer.isInstalled);
     Assert.isNull(install.installer.program);
     Assert.isNull(install.installer.commandOf());
-    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     const folder = await install.installer.install(t => progress.push(t), new AbortController().signal, () => commits.push(existsSync(directory.resolve("installs", "1.0.0"))));
 
     Assert.areEqual(directory.resolve("installs", "1.0.0"), folder);
@@ -125,7 +129,7 @@ export class AcpAgentInstallerTests {
     Assert.areEqual(join(folder, "bin", "agent"), install.installer.program);
     Assert.areEqual(`${join(folder, "bin", "agent")}|acp`, [install.installer.commandOf()!.executable, install.installer.commandOf()!.arguments.join(",")].join("|"));
     Assert.areEqual(JSON.stringify({ AGENT_MODE: "acp" }), JSON.stringify(install.installer.variables));
-    Assert.areEqual("1.0.0 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("1.0.0 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     if (process.platform !== "win32")
       Assert.areEqual(0o755, statSync(join(folder, "bin", "agent")).mode & 0o777);
   }
@@ -260,14 +264,14 @@ export class AcpAgentInstallerTests {
     mkdirSync(directory.resolve("installs", "0.9.0"), { recursive: true });
     mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
 
-    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     const folder = await install.run();
 
     Assert.areEqual(directory.resolve("installs", "2.0.0"), folder);
     Assert.areEqual("1.0.0,2.0.0", readdirSync(directory.resolve("installs")).sort().join(","));
     Assert.areEqual("2.0.0", install.saved.map(t => t.version).join(","));
     Assert.areEqual(join(folder, "bin", "agent"), install.installer.program);
-    Assert.areEqual("2.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("2.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
   }
 
   @TestMethod
@@ -571,8 +575,21 @@ export class AcpAgentInstallerTests {
     const install = new Install(AcpAgentInstallerTests.agent(server.url("/agent.tar.gz"), hashOf(archive)), directory.resolve("installs"), new AcpInstallTools(FakeTar.create(tools.path), null, null),
       { latest: null });
 
-    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     Assert.areEqual(directory.resolve("installs", "1.0.0"), await install.run());
+  }
+
+  @TestMethod
+  public async readsNoListWhenTheLatestIsntChecked(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const install = new Install(AcpAgentInstallerTests.agent("https://example.invalid/agent.tar.gz", null), directory.resolve("installs"), new AcpInstallTools(null, null, null),
+      { latest: AcpAgentInstallerTests.agent("https://example.invalid/agent.tar.gz", null, "2.0.0") });
+    mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
+
+    Assert.areEqual("1.0.0 null", AcpAgentInstallerTests.versions(await install.installer.readVersions(false)));
+    Assert.areEqual(0, install.latestReads);
+    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
+    Assert.areEqual(1, install.latestReads);
   }
 
   private static versions(versions: { readonly installed: string | null; readonly latest: string | null }): string {

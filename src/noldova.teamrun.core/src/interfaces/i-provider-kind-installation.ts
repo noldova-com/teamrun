@@ -15,6 +15,6 @@ export interface IProviderKindInstallation {
   readonly foundPath?: string | null;
   readonly notInstalledReason?: string | null;
 
-  readVersions(): Promise<ProviderKindVersions>;
+  readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
   install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string>;
 }

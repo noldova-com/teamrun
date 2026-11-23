@@ -16,6 +16,7 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
     readonly promise: Promise<ProviderKindVersions>;
     readonly resolve: (versions: ProviderKindVersions) => void;
     readonly reject: (error: unknown) => void;
+    readonly checksLatest: boolean;
   }[] = [];
 
   public unavailable: string | null = null;
@@ -27,16 +28,18 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
   public holdReads: boolean = false;
   public read: Promise<ProviderKindVersions> = Promise.resolve(ProviderKindVersions.unknown);
   public reads: number = 0;
+  public readonly checks: boolean[] = [];
   public installs: number = 0;
   public progress: (received: number, total: number) => void = () => undefined;
   public commit: () => void = () => undefined;
   public signal: AbortSignal | null = null;
 
-  public readVersions(): Promise<ProviderKindVersions> {
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     this.reads++;
+    this.checks.push(checksLatest);
     ChangeSignal.notify();
     if (!this.holdReads) {
-      this.read = Promise.resolve(this.versions);
+      this.read = Promise.resolve(this.versionsFor(checksLatest));
       return this.read;
     }
     let resolve: (versions: ProviderKindVersions) => void = () => undefined;
@@ -45,7 +48,7 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
       resolve = answer;
       reject = fail;
     });
-    this.pending.push({ promise: this.read, resolve, reject });
+    this.pending.push({ promise: this.read, resolve, reject, checksLatest });
     ChangeSignal.notify();
     return this.read;
   }
@@ -64,7 +67,7 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
 
   public answerRead(): Promise<ProviderKindVersions> {
     const reading = this.pending.shift()!;
-    reading.resolve(this.versions);
+    reading.resolve(this.versionsFor(reading.checksLatest));
     return reading.promise;
   }
 
@@ -82,5 +85,9 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
 
   public fail(error: unknown): void {
     this.settle!.reject(error);
+  }
+
+  private versionsFor(checksLatest: boolean): ProviderKindVersions {
+    return checksLatest ? this.versions : new ProviderKindVersions(this.versions.installed, null);
   }
 }

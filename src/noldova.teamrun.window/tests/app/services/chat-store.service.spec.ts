@@ -4344,6 +4344,22 @@ describe("ChatStoreService", () => {
     expect(store.installations().get("antigravity")?.state).toBe(ProviderKindInstallState.Installed);
   });
 
+  it("checks the installations for their latest versions on request, and reports a failed check while keeping the ones it has", async () => {
+    context.answer(MethodName.ProviderKindInstallationList, () =>
+      [new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", null).toJson()]);
+    context.answer(MethodName.ProviderKindInstallationCheck, () =>
+      [new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", "1.21.0").toJson()]);
+    const reports: string[] = [];
+    await store.initialize();
+
+    await store.checkInstallations(t => reports.push(t));
+
+    expect([context.count(MethodName.ProviderKindInstallationCheck), store.installations().get("antigravity")?.update, reports]).toEqual([1, "1.21.0", []]);
+    context.fail(MethodName.ProviderKindInstallationCheck, "The release channel didn't answer.");
+    await store.checkInstallations(t => reports.push(t));
+    expect([store.installations().get("antigravity")?.update, reports]).toEqual(["1.21.0", ["The release channel didn't answer."]]);
+  });
+
   it("installs a provider once while it installs, cancels it, and shows a failed install in the error line", async () => {
     const install = new DeferredResponse();
     context.answer(MethodName.ProviderKindInstallationList, () => [new ProviderKindInstallation("antigravity", ProviderKindInstallState.NotInstalled).toJson()]);

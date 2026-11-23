@@ -423,6 +423,57 @@ export class ProviderKindsServiceTests {
   }
 
   @TestMethod
+  public async readsNoLatestVersionWhileUpdateChecksDontRunWithoutAskingAndKeepsTheLatestItKnows(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    const checks = { runWithoutAsking: false };
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, undefined, null, null, checks);
+    const versions = async (): Promise<string> => {
+      await kinds.listInstallations();
+      await installation.read;
+      const listed = ProviderKindsServiceTests.versionsOf(await kinds.listInstallations());
+      await installation.read;
+      return listed;
+    };
+
+    Assert.areEqual("Installed 2.1.211 null", await versions());
+    checks.runWithoutAsking = true;
+    Assert.areEqual("Installed 2.1.211 2.1.212", await versions());
+    checks.runWithoutAsking = false;
+    Assert.areEqual("Installed 2.1.211 2.1.212", await versions());
+    Assert.areEqual("false,false,true,true,false,false", installation.checks.join(","));
+  }
+
+  @TestMethod
+  public async checksTheLatestVersionWhenAskedOvertakingARunningReadThatDoesntAndWaitsForIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.holdReads = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, undefined, null, null, { runWithoutAsking: false });
+    await kinds.listInstallations();
+    let ended = false;
+
+    const checked = kinds.checkInstallationsAsync().then(t => {
+      ended = true;
+      return t;
+    });
+    const again = kinds.checkInstallationsAsync();
+    await installation.answerRead();
+    await kinds.listInstallations();
+
+    Assert.isFalse(ended);
+    Assert.areEqual("false,true", installation.checks.join(","));
+    await installation.answerRead();
+    Assert.areEqual("Installed 2.1.211 2.1.212", ProviderKindsServiceTests.versionsOf(await checked));
+    Assert.areEqual("Installed 2.1.211 2.1.212", ProviderKindsServiceTests.versionsOf(await again));
+    Assert.areEqual("Installed 2.1.211", ProviderKindsServiceTests.versionsPublished(host));
+  }
+
+  @TestMethod
   public async listsAtOnceWhileAVersionReadDoesntAnswerAndPublishesTheVersionsOnceItDoes(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const installation = ProviderKindsServiceTests.register(host);

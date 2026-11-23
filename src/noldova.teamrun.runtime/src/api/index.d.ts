@@ -61,6 +61,7 @@ import type {
   ISharedMcpSignIn,
   ITeammatesService,
   ITimer,
+  IToolUpdateChecks,
   ITurnToolSession,
   ITurnToolSessions,
   IWindowsService,
@@ -1955,6 +1956,25 @@ export declare class HopLimitSetting {
    * @param settings The module's settings.
    */
   public static readerOf(settings: IModuleSettings): () => number;
+}
+
+/**
+ * Whether the provider kinds may look for their tools' newer versions without the person asking, following the app's Check for updates
+ * setting, `desktop.updateChecks`, for this device.
+ */
+export declare class ToolUpdateChecks implements IToolUpdateChecks {
+  /**
+   * Starts following the setting.
+   * @param settings The module's settings.
+   */
+  public constructor(settings: IModuleSettings);
+
+  /**
+   * `true` once a change of the setting has given this device's choice and it is `Automatic` or `AtStart`; `false` for `OnRequest`, and until
+   * a change comes, since the runtime reads the default until it knows its device and Noldova Desktop raises no change for a device with no
+   * stored value (noldova-com/desktop#96), so a person who never changed the setting is checked only when they ask, for now.
+   */
+  public get runWithoutAsking(): boolean;
 }
 
 /**

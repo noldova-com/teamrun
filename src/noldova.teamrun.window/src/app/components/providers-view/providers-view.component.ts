@@ -111,6 +111,7 @@ export class ProvidersViewComponent {
   });
   protected readonly searching: Signal<boolean> = computed(() => this.searchRunning() || (!this.store.kindsLoaded() && !this.store.kindsFailed()));
   protected readonly checking: WritableSignal<boolean> = signal(false);
+  protected readonly checkingUpdates: WritableSignal<boolean> = signal(false);
   protected readonly adding: WritableSignal<ReadonlySet<string>> = signal(new Set());
   protected readonly lookingFor: Signal<string> = computed(() => Resources.formatLookingFor(this.store.kinds().map(t => t.displayName)));
   protected readonly searched: Signal<string> = computed(() => {
@@ -203,6 +204,13 @@ export class ProvidersViewComponent {
     this.searchedAt.set(this.clock.now());
     this.now.set(this.clock.now());
     this.searchRunning.set(false);
+  }
+
+  protected async checkUpdates(): Promise<void> {
+    this.error.set(null);
+    this.checkingUpdates.set(true);
+    await this.store.checkInstallations(this.report);
+    this.checkingUpdates.set(false);
   }
 
   protected async checkAll(): Promise<void> {

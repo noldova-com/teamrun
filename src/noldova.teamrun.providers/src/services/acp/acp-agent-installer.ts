@@ -111,9 +111,12 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
     return AcpCommandLine.of(this.platform, this.environment, npx.environment, this.programOf(this.current, folder, npx), npx.arguments);
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
+    const installed = this.isInstalled ? this.current.version : null;
+    if (!checksLatest)
+      return new ProviderKindVersions(installed, null);
     const latest = await this.latest();
-    return new ProviderKindVersions(this.isInstalled ? this.current.version : null, latest?.version ?? this.current.version);
+    return new ProviderKindVersions(installed, latest?.version ?? this.current.version);
   }
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string> {

@@ -89,11 +89,11 @@ export class CopilotInstaller implements IProviderKindInstallation {
     return this.isWindows ? Resources.copilotWindowsExecutableName : Resources.copilotExecutableName;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || Object.isNull(located) || !this.isOwn(located) ? null
+      !checksLatest || Object.isNull(this.target) || Object.isNull(located) || !this.isOwn(located) ? null
         : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null)
     ]);
     return new ProviderKindVersions(installed, latest);

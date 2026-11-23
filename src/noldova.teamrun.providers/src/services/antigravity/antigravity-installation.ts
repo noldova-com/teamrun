@@ -50,8 +50,8 @@ export class AntigravityInstallation implements IProviderKindInstallation {
       : Resources.formatAntigravityPathUnsupported(found.path, found.version);
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
-    const own = await this.installer.readVersions();
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
+    const own = await this.installer.readVersions(checksLatest);
     const path = this.onPath();
     if (Object.isNull(path))
       return own;

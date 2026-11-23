@@ -91,12 +91,12 @@ export class CodexInstaller implements IProviderKindInstallation {
     return this.platform === Resources.windowsPlatform;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const standalone = !Object.isNull(located) && this.isStandalone;
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || !standalone ? null
+      !checksLatest || Object.isNull(this.target) || !standalone ? null
         : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null)
     ]);
     return new ProviderKindVersions(installed, latest);
