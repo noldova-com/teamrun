@@ -7,10 +7,9 @@
  */
 
 import "@noldova/context.core";
-import { ServiceException } from "@noldova/teamrun.services";
-import { ErrorCode, type Message, type Provenance, type Provider } from "@noldova/teamrun.protocol";
-import { Resources } from "../resources.js";
+import type { Message, Provenance, Provider } from "@noldova/teamrun.protocol";
 import { ActiveRun } from "./active-run.js";
+import { ReplyProvenance } from "./reply-provenance.js";
 import type { WakeTurn } from "./wake-turn.js";
 
 export class ReplyWork {
@@ -52,10 +51,7 @@ export class ReplyWork {
   }
 
   public get provenance(): Provenance {
-    const provenance = this.message.provenance;
-    if (Object.isNull(provenance))
-      throw new ServiceException(ErrorCode.Internal, Resources.formatReplyWithoutProvenance(this.message.id), [this.message.id]);
-    return provenance;
+    return ReplyProvenance.of(this.message);
   }
 
   public get handOffs(): readonly Message[] {

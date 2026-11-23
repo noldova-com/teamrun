@@ -21,11 +21,11 @@ LICENSE file in the root directory of this source tree.
       aria-hidden="true">{{ resources.organizationFocusRootIcon }}</span><span class="label strong">{{ resources.organizationTitle }}</span><span
       class="spacer"></span><nol-chip>{{ headcount() }}</nol-chip></button>
   </div>
-  @for (person of directReports(); track person.id) {
+  @for (person of reports(); track person.id) {
     <div class="orow person report" [class.selected]="isHere(teammate(person))">
       <span class="twist"></span>
       <button type="button" class="obtn" [attr.aria-current]="isHere(teammate(person))" (click)="go(teammate(person))"><span class="icon slot" aria-hidden="true"><span class="dot"
-        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span><span class="spacer"></span><span
+        [class]="resources.teammateStatusTones[status(person)]"></span></span><span class="label">{{ person.name }}</span>@if (reportsToOf(person); as note) {<span class="note reports-to">{{ note }}</span>}<span class="spacer"></span><span
         class="note short">{{ resources.teammateStatusLabels[status(person)] }}</span></button>
     </div>
   }
@@ -92,14 +92,16 @@ LICENSE file in the root directory of this source tree.
         @if (editing() && focus().teammate; as teammate) {
           @if (removable() && focus().department?.department; as department) {
             <button type="button" nol-button class="remove-teammate" [variant]="outlined" (click)="removeTeammate(teammate, department)"><span nolButtonIcon
-              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.organizationRemoveTeammate }}</button>
+              class="material-symbols-rounded" aria-hidden="true">{{ resources.organizationLeaveUnitIcon }}</span>{{ resources.organizationRemoveMemberTitle }}</button>
           }
         }
       </div>
       <div class="grid" [class.one]="cards().length === 1">
         @for (card of cards(); track card.id) {
-          <nol-teamrun-organization-card nolCanvasItem [teammate]="card" [shape]="fluid" [editing]="editing()" [department]="departmentOf(card)"
-            [departmentName]="departmentNames().get(card.id)" (message)="go(teammate(card))" />
+          <nol-teamrun-organization-card nolCanvasItem tabindex="0" role="group" [attr.aria-label]="card.name" [teammate]="card" [shape]="fluid" [editing]="editing()"
+            [department]="departmentOf(card)" [departmentName]="departmentNames().get(card.id)" [nolPopoverTrigger]="cardDetails" [nolPopoverOpenOn]="detailsOpening"
+            [nolPopoverSide]="detailsSide" [nolPopoverAlignment]="detailsAlignment" (message)="go(teammate(card))" />
+          <ng-template #cardDetails><nol-teamrun-organization-details [teammate]="card" [department]="departmentOf(card)" /></ng-template>
         } @empty {
           <span class="note grid-empty">{{ resources.organizationFocusNobody }}</span>
         }

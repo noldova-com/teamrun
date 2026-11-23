@@ -11,7 +11,7 @@ import { Component, computed, inject, type InputSignal, input, type Signal } fro
 import { WindowPartTokens } from "@noldova/desktop.window";
 import { type Department, OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChipComponent, DialogService, IconButtonComponent, MenuComponent, MenuItemComponent,
-  MenuTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
+  MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { OrganizationCardShape } from "../../enums/organization-card-shape";
@@ -32,13 +32,14 @@ import { ConfirmDialogComponent } from "../confirm-dialog/confirm-dialog.compone
 import { OrganizationCardComponent } from "../organization-card/organization-card.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
+import { OrganizationDetailsComponent } from "../organization-details/organization-details.component";
 import { OrganizationTypeChoiceComponent } from "../organization-type-choice/organization-type-choice.component";
 import { OrganizationTypeIconComponent } from "../organization-type-icon/organization-type-icon.component";
 
 @Component({
   selector: "nol-teamrun-organization-focus",
   imports: [ButtonComponent, CanvasComponent, CanvasItemDirective, ChipComponent, IconButtonComponent, MenuComponent, MenuItemComponent, MenuTriggerDirective, OrganizationCardComponent,
-    OrganizationChatComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, TextFieldComponent],
+    OrganizationChatComponent, OrganizationDetailsComponent, OrganizationTypeChoiceComponent, OrganizationTypeIconComponent, PopoverTriggerDirective, TextFieldComponent],
   host: { class: "nol-teamrun-organization-focus" },
   templateUrl: "./organization-focus.component.html",
   styleUrl: "./organization-focus.component.css"
@@ -50,18 +51,22 @@ export class OrganizationFocusComponent {
   private readonly dialogs: DialogService = inject(DialogService);
 
   public readonly tree: InputSignal<readonly OrganizationNode[]> = input.required<readonly OrganizationNode[]>();
-  public readonly directReports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly reports: InputSignal<readonly Teammate[]> = input<readonly Teammate[]>([]);
+  public readonly managers: InputSignal<ReadonlyMap<string, Teammate>> = input<ReadonlyMap<string, Teammate>>(new Map<string, Teammate>());
   public readonly editing: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fluid: OrganizationCardShape = OrganizationCardShape.Fluid;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly detailsOpening: PopoverOpening = PopoverOpening.Hover;
+  protected readonly detailsSide: OverlaySide = OverlaySide.below;
+  protected readonly detailsAlignment: OverlayAlignment = OverlayAlignment.Start;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly rows: Signal<readonly OrganizationOutlineRow[]> = computed(() => OrganizationFocusComponent.flatten(this.tree(), 0));
-  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, this.directReports().length));
-  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.directReports(), this.layout.layout().focus));
+  protected readonly headcount: Signal<number> = computed(() => this.rows().reduce((total, t) => total + t.node.headcount, this.reports().length));
+  protected readonly focus: Signal<OrganizationFocus> = computed(() => OrganizationFocus.resolve(this.tree(), this.reports(), this.layout.layout().focus));
   protected readonly unit: Signal<OrganizationNode | null> = computed(() => Object.isNull(this.focus().teammate) ? this.focus().department : null);
   protected readonly removable: Signal<boolean> = computed(() => {
     const focus = this.focus();
@@ -70,8 +75,8 @@ export class OrganizationFocusComponent {
   protected readonly key: Signal<string> = computed(() => OrganizationTargetKey.of(this.focus().target));
   protected readonly departmentNames: Signal<ReadonlyMap<string, string>> = computed(() => {
     const names = new Map<string, string>();
-    for (const person of this.directReports())
-      names.set(person.id, Resources.organizationReportsToYou);
+    for (const person of this.reports())
+      names.set(person.id, this.reportsToOf(person) ?? Resources.organizationReportsToYou);
     for (const row of this.rows())
       for (const person of row.people)
         names.set(person.id, row.node.name);
@@ -83,7 +88,7 @@ export class OrganizationFocusComponent {
     if (!Object.isNull(focus.teammate))
       return [focus.teammate];
     const department = focus.department;
-    return Object.isNull(department) ? [...this.leaders(), ...this.directReports()] : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
+    return Object.isNull(department) ? [...this.leaders(), ...this.reports()] : [...Object.isNull(department.leader) ? [] : [department.leader], ...department.members];
   });
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
@@ -97,10 +102,17 @@ export class OrganizationFocusComponent {
     const focus = this.focus();
     const department = focus.department;
     if (!Object.isNull(focus.teammate))
-      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, focus.departmentName, focus.teammate.model);
+      return Resources.formatOrganizationFocusTeammate(focus.teammate.role, this.reportsToOf(focus.teammate) ?? focus.departmentName, focus.teammate.model);
     const counts = this.countsOf(this.cards());
-    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length, counts) : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
+    const under = this.cards().filter(t => this.managers().has(t.id)).length;
+    return Object.isNull(department) ? Resources.formatOrganizationFocusLeaders(this.cards().length - under, counts, under)
+      : Resources.formatOrganizationFocusDepartment(this.cards().length, counts);
   });
+
+  protected reportsToOf(teammate: Teammate): string | null {
+    const manager = this.managers().get(teammate.id);
+    return Object.isUndefined(manager) ? null : Resources.formatOrganizationReportsTo(manager.name);
+  }
 
   protected addable(row: OrganizationOutlineRow): readonly Teammate[] {
     return OrganizationEdits.addable(row.node, this.chats.teammates());
@@ -120,7 +132,7 @@ export class OrganizationFocusComponent {
 
   protected removeTeammate(teammate: Teammate, department: Department): void {
     this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, department.name),
-      Resources.organizationRemoveLabel, null, true), () => {
+      Resources.organizationLeaveUnitLabel, null, true), () => {
       this.go(OrganizationTarget.department(department.id));
       void this.organization.setMember(teammate.id, null);
     });

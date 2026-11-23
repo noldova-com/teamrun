@@ -88,7 +88,7 @@ export class TreeFlowLines {
     const reports = this.boxOf(grid);
     const row = this.firstRowOf(grid);
     const outside = x < Math.min(...row.map(t => t.left)) || x > Math.max(...row.map(t => t.left + t.width));
-    const y = outside ? reports.top - TreeFlowLines.gapOf(grid) : reports.top + TreeFlowLines.pixels(getComputedStyle(grid, Resources.afterPseudo).top);
+    const y = outside ? reports.top - TreeFlowLines.gapOf(grid) : reports.top + TreeFlowLines.pixels(getComputedStyle(grid, Resources.beforePseudo).height);
     const middle = reports.left + reports.width / 2;
     return [new FlowPoint(x, y), new FlowPoint(middle, y), new FlowPoint(middle, reports.top)];
   }

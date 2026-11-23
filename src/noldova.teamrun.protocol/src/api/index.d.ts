@@ -573,7 +573,7 @@ export declare enum MethodName {
   OrganizationUpdate = "OrganizationUpdate",
   /**
    * Deletes an organization with its departments, placements and layout, and publishes `OrganizationRemoved`; its teammates
-   * and their chats stay. Deleting the last organization fails with `Conflict`. Parameters: `OrganizationIdParams`.
+   * and their chats stay; the last one too, which leaves none. Parameters: `OrganizationIdParams`.
    * Result: `null`.
    */
   OrganizationDelete = "OrganizationDelete",
@@ -13645,6 +13645,26 @@ export declare class NameOrder {
    * ignored and accents kept, so "Émile" sorts beside "emile" after "edgar"; items whose names all tie keep their order.
    */
   public static sort<T>(items: readonly T[], ...names: readonly ((item: T) => string)[]): readonly T[];
+}
+
+/**
+ * Cuts text to a length without splitting a character a person sees as one: a cut ends on a grapheme boundary, so a surrogate pair,
+ * a joiner sequence such as 👩‍💻, a flag, a skin tone, a keycap and a decomposed accent stay whole or go whole.
+ */
+export declare class TextCut {
+  /**
+   * Returns the longest start of the text that ends on a grapheme boundary and is at most the limit in UTF-16 code units.
+   * @param text The text.
+   * @param limit The most UTF-16 code units the start may hold.
+   */
+  public static toUnits(text: string, limit: number): string;
+
+  /**
+   * Returns the longest start of the text that ends on a grapheme boundary and is at most the limit in code points.
+   * @param text The text.
+   * @param limit The most code points the start may hold.
+   */
+  public static toPoints(text: string, limit: number): string;
 }
 
 /**

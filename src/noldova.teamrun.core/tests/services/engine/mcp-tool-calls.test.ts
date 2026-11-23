@@ -27,6 +27,7 @@ import {
   McpToolListParams,
   Message,
   MessageIdParams,
+  MessageListParams,
   MessageSendParams,
   MessageStatus,
   ObservedSettings,
@@ -40,6 +41,7 @@ import {
 import { ServiceException } from "@noldova/teamrun.services";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { FailingDelivery } from "../../fixtures/failing-delivery.fixture.js";
 import { FakeTurnToolSessions } from "../../fixtures/fake-turn-tool-sessions.fixture.js";
 
 @TestClass
@@ -529,7 +531,7 @@ export class McpToolCallsTests {
     host.adapter.extraDetails = [];
     const [reply] = sent.replies;
     Assert.isDefined(reply);
-    const broken = host.events.subscribe({
+    const broken = FailingDelivery.on(host.events, {
       onEvent: event => {
         if (event.name === EventName.MessageCreated && Message.fromJson(event.payload).details[0]?.text === Resources.planApprovedPrompt)
           throw new RangeError("The window is gone.");
@@ -739,6 +741,36 @@ export class McpToolCallsTests {
     Assert.areEqual("0,2", McpToolCallsTests.callsOf(tools).join(","));
     Assert.isTrue(tools.opened.every(t => t.ends === 1));
     Assert.areEqual(JSON.stringify([conversation.id, conversation.id]), JSON.stringify(tools.openings.map(t => t.conversationId)));
+  }
+
+  @TestMethod
+  public async failsAWakesFollowAsNotFoundWhenItsChatIsGoneBeforeItsToolsOpenAndLeavesNoRun(): Promise<void> {
+    const tools = new FakeTurnToolSessions();
+    await using host = await McpToolCallsTests.hostAsync(tools);
+    const conversation = await host.createConversationAsync();
+    await host.engine.sendAsync(new MessageSendParams(conversation.id, "Watch it", new RequestedSettings("fake", null, null), (await host.providerOfAsync()).id));
+    await host.engine.waitForIdle();
+    const findAsync = host.conversations.findAsync.bind(host.conversations);
+    const insertAsync = host.messages.insertAsync.bind(host.messages);
+    let gone = false;
+    host.conversations.findAsync = async (id, transaction) => gone && id === conversation.id ? null : await findAsync(id, transaction);
+    host.messages.insertAsync = async (message, transaction): Promise<void> => {
+      await insertAsync(message, transaction);
+      gone = true;
+    };
+
+    await host.adapter.lastListener?.onWakeAsync(new TurnWake("item-1", "npm run dev"));
+    await host.engine.waitForIdle();
+    host.conversations.findAsync = findAsync;
+    host.messages.insertAsync = insertAsync;
+    const replies = await host.messages.listAsync(new MessageListParams(conversation.id, null));
+    const wake = replies.at(-1);
+
+    Assert.areEqual(3, replies.length);
+    Assert.areEqual(MessageStatus.Failed, wake?.status);
+    Assert.areEqual(Resources.formatConversationNotFound(conversation.id), wake?.details.at(-1)?.text);
+    Assert.areEqual(1, tools.opened.length);
+    Assert.areEqual(0, host.engine.activeRunCount);
   }
 
   @TestMethod

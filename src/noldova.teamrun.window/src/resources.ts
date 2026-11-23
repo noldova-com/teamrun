@@ -963,6 +963,7 @@ export class Resources {
   public static readonly backgroundTasksViewIcon: string = "pending_actions";
   public static readonly noBackgroundTasksText: string = "No background tasks in this chat.";
   public static readonly backgroundTasksIdPrefix: string = "nol-teamrun-tasks-";
+  public static readonly composerReachIdPrefix: string = "nol-teamrun-composer-reach-";
   public static readonly backgroundTasksHeadingLevel: number = 3;
   public static readonly runningTasksTitle: string = "Running";
   public static readonly finishedTasksTitle: string = "Finished";
@@ -1251,7 +1252,7 @@ export class Resources {
   public static readonly flowNodeData: string = "flowNode";
   public static readonly flowParentData: string = "flowParent";
   public static readonly flowShapeData: string = "flowShape";
-  public static readonly afterPseudo: string = "::after";
+  public static readonly beforePseudo: string = "::before";
   public static readonly borderBox: string = "border-box";
   public static readonly organizationEmpty: string = "No units yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";
@@ -1302,6 +1303,7 @@ export class Resources {
   public static readonly organizationAddTeammateEmpty: string = "Type a teammate's name.";
   public static readonly organizationDeleteIcon: string = "delete";
   public static readonly organizationRemoveIcon: string = "person_remove";
+  public static readonly organizationLeaveUnitIcon: string = "group_remove";
   public static readonly organizationNowRunningIcon: string = "progress_activity";
   public static readonly organizationNowIdleIcon: string = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
@@ -1322,7 +1324,9 @@ export class Resources {
   public static readonly organizationMessageIcon: string = "chat";
   public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteLabel: string = "Delete";
-  public static readonly organizationRemoveMemberTitle: string = "Remove member";
+  public static readonly organizationRemoveMemberTitle: string = "Move out of unit";
+  public static readonly organizationLeaveUnitLabel: string = "Move out";
+  public static readonly organizationRemoveReportsToYou: string = "you";
   public static readonly organizationRemoveLabel: string = "Remove";
   public static readonly organizationRemoveTeammate: string = "Remove teammate";
   public static readonly organizationOfferedFields: readonly OrganizationCardField[] =
@@ -1947,7 +1951,16 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveNamed(name: string): string {
-    return `Remove ${name}`;
+    return `Remove ${name} from the organization`;
+  }
+
+  public static formatOrganizationLeaveUnitNamed(name: string, unit: string): string {
+    return `Move ${name} out of ${unit}`;
+  }
+
+  public static formatOrganizationRemoveFrom(teammate: string, organization: string, reportsTo: string | null): string {
+    const reports = Object.isNull(reportsTo) ? String.empty : ` The teammates and units under ${teammate} will report to ${reportsTo}.`;
+    return `Remove ${teammate} from ${organization}? ${teammate} keeps its chats and can be added back.${reports}`;
   }
 
   public static formatOrganizationMoveLabel(name: string): string {
@@ -1955,7 +1968,7 @@ export class Resources {
   }
 
   public static formatOrganizationRemoveMember(teammate: string, department: string): string {
-    return `Remove ${teammate} from ${department}? ${teammate} will report to you.`;
+    return `Move ${teammate} out of ${department}? ${teammate} will report to you.`;
   }
 
   public static formatOrganizationHidden(count: number): string {
@@ -1972,6 +1985,10 @@ export class Resources {
 
   public static formatOrganizationCardMenu(name: string): string {
     return `Choose what ${name}'s card shows and where ${name} works`;
+  }
+
+  public static formatOrganizationReportsTo(manager: string): string {
+    return `Reports to ${manager}`;
   }
 
   public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
@@ -2194,6 +2211,10 @@ export class Resources {
 
   public static formatOrganizationLastLine(author: string, text: string): string {
     return `${author}: ${text}`;
+  }
+
+  public static formatOrganizationReach(count: number): string {
+    return count === 1 ? "Goes to 1 teammate" : `Goes to ${count} teammates`;
   }
 
   public static formatOrganizationFanOutKey(organizationId: string, teammateIds: readonly string[]): string {
@@ -3300,8 +3321,9 @@ export class Resources {
     return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
   }
 
-  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`Your ${count} ${count === 1 ? "direct report" : "direct reports"}`, ...Resources.statusCountParts(counts)].join(" · ");
+  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>, under: number = 0): string {
+    const reports = `Your ${count} ${count === 1 ? "direct report" : "direct reports"}`;
+    return [under === 0 ? reports : `${reports} and ${under} under them`, ...Resources.statusCountParts(counts)].join(" · ");
   }
 
   public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {

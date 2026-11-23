@@ -79,17 +79,18 @@ export class OrganizationViewComponent {
   protected readonly focusKey: Signal<string | null> = computed(() => this.layout.layout().focus);
   protected readonly chosen: WritableSignal<OrganizationTarget | null> = linkedSignal<string | null, OrganizationTarget | null>({ source: this.focusKey, computation: () => null });
   protected readonly root: Signal<OrganizationNode> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
-  protected readonly directReports: Signal<readonly Teammate[]> = computed(() => this.root().directReports);
+  protected readonly reports: Signal<readonly Teammate[]> = computed(() => this.root().members);
   protected readonly headcount: Signal<string> = computed(() =>
     Resources.formatOrganizationHeadcount(this.store.teammates().length - this.organization.organization().unplaced(this.store.teammates().map(t => t.id)).length,
       OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
     const first = OrganizationNode.walk(this.root()).flatMap(t => t.department ?? [])[0];
     const key = this.focusKey();
-    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.root().subDepartments, this.directReports(), key).target)
+    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.root().subDepartments, this.reports(), key).target)
       ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
-  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments, this.directReports()));
+  protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments,
+    [...this.root().directReports, ...this.reports().filter(t => this.root().managers.has(t.id))]));
   protected readonly options: Signal<readonly SelectOption[]> = computed(() => this.choices().map(t => new SelectOption(t.key, t.label)));
   protected readonly targetKey: Signal<string> = computed(() => {
     const target = this.target();

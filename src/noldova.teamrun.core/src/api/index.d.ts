@@ -1675,7 +1675,8 @@ export interface IBackgroundTasksService {
 
   /**
    * Adds output to a running task, keeping the latest `Resources.maximumBackgroundTaskOutput`
-   * characters, and publishes it; nothing for an unknown or ended task or empty text.
+   * characters, and publishes it, the output gathered since the last publish cut to its latest that many characters too;
+   * nothing for an unknown or ended task or empty text.
    * @param messageId The id of the reply that started the task.
    * @param taskId The provider's id of the task.
    * @param text The new output.
@@ -2295,6 +2296,8 @@ export interface IConversationEngine {
    * message's; refused, or with a file that can't be copied, it waits as Queue. Until a reply offers a steer, it waits like Queue.
    * A message from outside goes only after `refuseRaisedModeAsync` passes its send again, so a mode the person changed since it was
    * added refuses it, kept with that failure.
+   * Once the message is kept, a delivery that throws is logged with `Resources.formatWaitingMessageNotDelivered` and the message waits,
+   * so the request still answers with it.
    * @param params The send and how it goes.
    * @param fromOutside Whether a client other than TeamRun's window added it; by default, it didn't.
    * @returns The waiting message, as added.
@@ -2331,7 +2334,7 @@ export interface IConversationEngine {
 
   /**
    * Makes a waiting message Stop and send, clearing its failure, publishes `WaitingMessagesChanged`, and stops the chat's running
-   * replies, or sends it when there are none.
+   * replies, or sends it when there are none; a stop or a send that throws is logged, as for `addWaitingAsync`, and the message waits.
    * @param params The waiting message.
    * @returns The waiting message, as Stop and send.
    * @throws ServiceException named `ErrorCode.NotFound` for an unknown waiting message.
@@ -3276,6 +3279,8 @@ export declare class Resources {
   public static formatChatSendingStopped(chatId: string, reason: string): string;
   /** The log line for a tool call's record that couldn't be stored; the records after it are still stored. */
   public static formatToolCallNotKept(chatId: string, failureKind: string): string;
+  /** The log line for a waiting message whose delivery failed after it was kept; the request still answers with it, and it waits. */
+  public static formatWaitingMessageNotDelivered(chatId: string, failureKind: string): string;
   /** The log line for a message the provider took as a steer that couldn't be kept in the chat; the next waiting message goes on. */
   public static formatSteeredMessageNotKept(chatId: string, failureKind: string): string;
   /** The log line for a steer the provider refused with an error; the message waits as Queue. */
@@ -3492,6 +3497,11 @@ export declare class Resources {
    * The `HEAD` of a chat folder's Git root, on a `main` branch with no commit.
    */
   public static readonly chatGitHead: string;
+  /**
+   * The file a chat folder's `HEAD` is written to before it is renamed to `HEAD`, so a write cut short never leaves a broken one:
+   * `HEAD.teamrun`.
+   */
+  public static readonly chatGitHeadDraftFileName: string;
   /**
    * The `config` of a chat folder's Git root.
    */
@@ -4790,8 +4800,6 @@ export declare class Resources {
   public static formatOrganizationLayoutPreference(organizationId: string): string;
   /** Says no organization has the id. */
   public static formatOrganizationNotFound(id: string): string;
-  /** Says the only organization can't be deleted. */
-  public static formatLastOrganization(name: string): string;
   /** Returns a placement's key in the change feed: the organization's id and the teammate's. */
   public static formatTeammatePlacementKey(organizationId: string, teammateId: string): string;
   /** Says no node type of the organization has the id. */
@@ -5326,6 +5334,16 @@ export declare class Resources {
   public static formatDraftFilesNotRemoved(conversationId: string, reason: string): string;
 
   /**
+   * Composes the log line for an event listener that threw; the hub goes on with the next listener.
+   */
+  public static formatEventListenerFailed(eventName: string, reason: string): string;
+
+  /**
+   * Composes the log line for a cleanup step after a chat's deletion that failed; the deletion stands and the next step runs.
+   */
+  public static formatDeleteCleanupFailed(reason: string): string;
+
+  /**
    * Composes the log line for a draft the start-up sweep could not read, naming the conversation by its id's last
    * `loggedIdLength` characters.
    */
@@ -5390,6 +5408,11 @@ export declare class Resources {
    * Composes the internal error for a reply whose message holds no provenance.
    */
   public static formatReplyWithoutProvenance(messageId: string): string;
+
+  /**
+   * Composes the internal error for a stored Ready wake without the text it delivers; the chat's wakes are then not settled, and the log says so.
+   */
+  public static formatReadyWakeWithoutText(wakeId: string): string;
 
   /**
    * Composes the invalid-parameters message for a relative profile directory.
@@ -7168,7 +7191,9 @@ export declare class ChatFolders {
   public exists(conversationId: string): boolean;
 
   /**
-   * Makes the folder and its Git root when either is missing, keeping what the folder holds.
+   * Makes the folder and its Git root when either is missing, keeping what the folder holds; the Git root's `HEAD`, which tells
+   * whether the root is made, is written beside it as `Resources.chatGitHeadDraftFileName` and renamed, so a write cut short is
+   * made again by the next call.
    * @param conversationId The conversation id.
    * @returns The folder's path.
    * @throws {Error} When the system refuses to make it.
@@ -8530,9 +8555,15 @@ export declare class ProvidersService implements IProvidersService {
 
 /**
  * The in-process event bus: the core publishes, the runtime subscribes. Listeners are called in
- * registration order, synchronously.
+ * registration order, synchronously; a listener that throws is logged and the next one still receives the event.
  */
 export declare class EventHub implements IEventSink {
+  /**
+   * Initializes the hub.
+   * @param log Where a listener's failure is written; the other listeners still receive the event.
+   */
+  public constructor(log?: ILog | null);
+
   /**
    * The number of active subscriptions.
    */
@@ -9174,14 +9205,15 @@ export declare class ToolWindows {
  */
 export declare class ConversationTitle {
   /**
-   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis, so a character
-   * outside the Basic Multilingual Plane, such as an emoji, is never split.
+   * The first line with text, trimmed and cut to `Resources.maximumTitleLength` code points with an ellipsis. The cut ends on a
+   * grapheme boundary, so a character a person sees as one, such as 👩‍💻, a flag or a keycap, is never split.
    */
   public readonly text: string;
 
   /**
    * Initializes the title from a chat's first message.
-   * @param message The message.
+   * @param message The message, with at least one line that isn't blank.
+   * @throws {ArgumentException} The message has no line that isn't blank.
    */
   public constructor(message: string);
 
@@ -9884,7 +9916,8 @@ export declare class ConversationEngine implements IConversationEngine, IOutside
  * `ArgumentException`, `ErrorCode.UnknownMethod` for a method outside the catalog, and
  * `ErrorCode.Internal` for anything else, with the error's message. A deleted conversation, on its
  * own or with its project, publishes `ConversationDeleted` for each, then a catalog change publishes
- * `StateInvalidated`. A teammate created with a context window, or updated so that its provider, model or window changes while it has one,
+ * `StateInvalidated`; once the deletion is committed, each cleanup step after it runs on its own, and a step that fails is
+ * logged rather than failing the request. A teammate created with a context window, or updated so that its provider, model or window changes while it has one,
  * is first checked against the windows its provider's model catalog offers for the model, and refused with `ErrorCode.InvalidParams`
  * when the model offers none or the size is outside them.
  */
@@ -9907,6 +9940,7 @@ export declare class RequestDispatcher {
    * @param sharedServers The shared MCP server methods; without them the `SharedMcp` methods are unknown.
    * @param acpAgents The added ACP agents' methods; without them the `AcpAgent` and `AcpLocalCommand` methods are unknown.
    * @param organization The organization's methods; without them `OrganizationList` and the `Department` methods are unknown.
+   * @param log Where a failed cleanup step after a chat's deletion is written; the deletion still succeeds.
    */
   public constructor(
     kinds: IProviderKindsService,
@@ -9927,7 +9961,8 @@ export declare class RequestDispatcher {
     sharedServers?: ISharedMcpServersService | null,
     computerUseGrants?: IComputerUseGrantsService | null,
     acpAgents?: IAcpAgentsService | null,
-    organization?: IOrganizationService | null);
+    organization?: IOrganizationService | null,
+    log?: ILog | null);
 
   /**
    * Answers one request; never throws.
@@ -10250,7 +10285,8 @@ export interface IOrganizationService {
 
   /**
    * Deletes an organization with its departments, placements and layout, in one transaction; its teammates and their chats stay.
-   * @throws ServiceException `NotFound` for an unknown organization, `Conflict` for the last one.
+   * The last one too, which leaves none.
+   * @throws ServiceException `NotFound` for an unknown organization.
    */
   deleteOrganizationAsync(params: OrganizationIdParams): Promise<void>;
 

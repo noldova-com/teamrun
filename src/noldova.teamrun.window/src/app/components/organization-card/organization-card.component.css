@@ -74,7 +74,8 @@
   flex: none;
 }
 
-.remove {
+.remove,
+.remove-from-organization {
   flex: none;
 }
 
@@ -87,7 +88,9 @@
 }
 
 .move-label {
+  flex: none;
   color: var(--nol-text-muted);
+  white-space: nowrap;
 }
 
 .move-choice {
@@ -187,6 +190,19 @@
 .model {
   color: var(--nol-text-muted);
   font-size: var(--nol-text-small);
+}
+
+:host(:focus-visible),
+:host([data-nol-state="Focus"]) {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  :host(:focus-visible),
+  :host([data-nol-state="Focus"]) {
+    outline: calc(var(--nol-border-width) * 2) solid Highlight;
+  }
 }
 
 :host(.fluid) {

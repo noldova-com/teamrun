@@ -137,7 +137,7 @@ describe("OrganizationFocusComponent", () => {
 
   it("outlines a teammate in no department as a top-level row of its own, first, counted under Organization, which focuses it under Organization alone", async () => {
     await create();
-    fixture.componentRef.setInput("directReports", [carol]);
+    fixture.componentRef.setInput("reports", [carol]);
     fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
       ChatStoreService.of(context).teammates()).subDepartments);
     await settle();
@@ -157,6 +157,46 @@ describe("OrganizationFocusComponent", () => {
 
     await click(one(".obtn", one(".orow.root")));
     expect([texts(".grid nol-teamrun-organization-card .name"), texts(".unit-summary")[0]?.startsWith("Your 3 direct reports")]).toEqual([["Alice", "Code Reviewer", "Carol"], true]);
+  });
+
+  it("outlines a teammate who reports to your direct report outside a department as a top-level row, saying whom it reports to there and when focused", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => t.teammateId !== "carol" && t.teammateId !== "offline"),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0)]),
+      ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 1 under them · ")])
+      .toEqual([["Carol", "Offline"], [[], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Carol", "Offline"], true]);
+    const button = one(".obtn", row("Offline")).getBoundingClientRect();
+    const note = one(".reports-to", row("Offline")).getBoundingClientRect();
+    const label = one(".label", row("Offline")).getBoundingClientRect();
+    expect([note.left >= label.right, note.right <= button.right, note.top >= button.top, note.bottom <= button.bottom]).toEqual([true, true, true, true]);
+
+    await click(one(".obtn", row("Offline")));
+    expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Carol")]).toEqual([["Offline"], true]);
+  });
+
+  it("outlines a three-level chain outside departments as top-level rows by name, each saying whom it reports to there and when focused", async () => {
+    await create();
+    const root = OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, [...sample.placements.filter(t => !["bob", "carol", "offline"].includes(t.teammateId)),
+      new TeammatePlacement("carol", OrganizationParent.person, 0), new TeammatePlacement("offline", OrganizationParent.teammate("carol"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("offline"), 0)]), ChatStoreService.of(context).teammates());
+    fixture.componentRef.setInput("reports", root.members);
+    fixture.componentRef.setInput("managers", root.managers);
+    fixture.componentRef.setInput("tree", root.subDepartments);
+    await settle();
+
+    expect([texts(".orow.report .label"), all(".orow.report").map(t => texts(".reports-to", t)), texts(".grid nol-teamrun-organization-card .name"),
+      texts(".unit-summary")[0]?.startsWith("Your 3 direct reports and 2 under them · ")])
+      .toEqual([["Bob", "Carol", "Offline"], [["Reports to Offline"], [], ["Reports to Carol"]], ["Alice", "Code Reviewer", "Bob", "Carol", "Offline"], true]);
+
+    await click(one(".obtn", row("Bob")));
+    expect([texts(".unit-name"), texts(".unit-summary")[0]?.includes("Reports to Offline")]).toEqual([["Bob"], true]);
   });
 
   it("opens on the leaders when nothing is focused", async () => {
@@ -356,7 +396,7 @@ describe("OrganizationFocusComponent", () => {
     await click(one(".remove-teammate"));
     await answer(".nol-teamrun-confirm");
     await Wait.until(() => expect(edits()).toEqual([["teamrun.departmentMemberSet", { organizationId: "my-organization", teammateId: "bob", departmentId: null }]]));
-    expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["deleteRemove teammate"]], 0]);
+    expect([leader, member, context.count(MethodName.TeammateUpdate)]).toEqual([[0, ["Alice"], []], [0, ["Bob"], ["group_removeMove out of unit"]], 0]);
     expect(all(".unit-rename").map(t => t.getAttribute("aria-label"))).toEqual(["Department name"]);
   });
 
@@ -397,7 +437,7 @@ describe("OrganizationFocusComponent", () => {
 
     it("sets a direct report's row right under Organization, its dot where a top-level department's icon sits, at a person's row height and spacing", async () => {
       await create();
-      fixture.componentRef.setInput("directReports", [carol]);
+      fixture.componentRef.setInput("reports", [carol]);
       fixture.componentRef.setInput("tree", OrganizationNode.treeOf(SampleData.organizationOf(sample.departments, sample.placements.filter(t => t.teammateId !== "carol")),
         ChatStoreService.of(context).teammates()).subDepartments);
       await settle();

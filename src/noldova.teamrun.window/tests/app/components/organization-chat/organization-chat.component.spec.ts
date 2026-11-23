@@ -14,8 +14,8 @@ import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 import { WindowPartTokens } from "@noldova/desktop.window";
 import {
-  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
-  MethodName, type Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
+  AttachmentInput, Conversation, ConversationListParams, Department, DetailKind, EventName, Message, MessageAttachment, MessageAuthor, MessagePageParams, MessageSendParams, MessageSendResult, MessageStatus,
+  MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
@@ -23,9 +23,11 @@ import { OrganizationChatComponent } from "../../../../src/app/components/organi
 import { ComposerSettings } from "../../../../src/app/models/composer-settings";
 import { ChatStoreService } from "../../../../src/app/services/chat-store.service";
 import { OrganizationCatalog } from "../../../../src/app/services/organization-catalog";
+import { OrganizationScope } from "../../../../src/app/services/organization-scope";
 import { OrganizationStoreService } from "../../../../src/app/services/organization-store.service";
 import { Resources } from "../../../../src/resources";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
@@ -42,6 +44,7 @@ describe("OrganizationChatComponent", () => {
   let opened: string[];
   let refused: readonly string[];
   let organization: Organization;
+  let scope: string;
   let running: readonly Message[];
   let lastReplies: readonly TeammateLastReply[];
   let pages: ReadonlyMap<string, readonly Message[]>;
@@ -56,6 +59,11 @@ describe("OrganizationChatComponent", () => {
   };
   const sent = (): MessageSendParams[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.MessageSend))
     .map(t => MessageSendParams.fromJson(t.parameters));
+  const scopeOf = (id: string): OrganizationScope => {
+    const made = new OrganizationScope();
+    made.follow(signal(id));
+    return made;
+  };
   const create = async (target: OrganizationTarget): Promise<void> => {
     context = SampleData.createContext();
     const data = new TeammateFixture(context);
@@ -85,7 +93,7 @@ describe("OrganizationChatComponent", () => {
       .answer(MethodName.MessageSend, t => refused.includes(MessageSendParams.fromJson(t).chatId) ? Promise.reject(new Error("Not sent."))
         : new MessageSendResult(SampleData.userMessage, []).toJson());
     TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }, { provide: WindowPartTokens.shown, useValue: signal(true).asReadonly() },
-      ChatStoreService.provider] });
+      ChatStoreService.provider, { provide: OrganizationScope, useFactory: (): OrganizationScope => scopeOf(scope) }] });
     fixture = TestBed.createComponent(OrganizationChatComponent);
     fixture.componentRef.setInput("target", target);
     element().style.height = "40rem";
@@ -103,7 +111,7 @@ describe("OrganizationChatComponent", () => {
     await Wait.until(() => expect(element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled).toBe(false));
     element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
   };
-  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
+  const texts = (selector: string): string[] => [...element().querySelectorAll(selector)].map(t => Required.of(t.textContent).trim());
   const type = async (text: string): Promise<void> => {
     const box = element().querySelector<HTMLTextAreaElement>("nol-teamrun-composer textarea");
     if (Object.isNull(box))
@@ -120,6 +128,7 @@ describe("OrganizationChatComponent", () => {
     opened = [];
     refused = [];
     organization = pair;
+    scope = "my-organization";
     running = [];
     lastReplies = [];
     pages = new Map();
@@ -128,6 +137,7 @@ describe("OrganizationChatComponent", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await fixture?.whenStable();
     OrganizationStoreService.release(context);
     ChatStoreService.release(context);
@@ -180,12 +190,80 @@ describe("OrganizationChatComponent", () => {
     expect(opened).toEqual(["alice", "bob"]);
   });
 
+  it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
+    const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>
+      new Conversation(`${organizationId}-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null,
+        false, [], false, false, null, chat);
+    const others = [...["my-organization", "studio"].filter(t => t !== id).map(t => own(t, "alice")), own("gone", "alice", null)];
+    const openings = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.OrganizationChatOpen))
+      .map(t => OrganizationChat.fromJson(t.parameters).organizationId);
+    scope = id;
+    organization = new Organization(id, id, null, 0, SampleData.timestamp, SampleData.timestamp, [SampleData.departmentType], [design], placed("alice", "bob"));
+    kept = others;
+    openAnswer = teammateId => own(id, teammateId).toJson();
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(box()).not.toBeNull());
+
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(sent()).toHaveLength(1));
+
+    expect([openings(), sent().map(t => t.chatId)]).toEqual([[id], [`${id}-alice`]]);
+  });
+
   it("says why the teammate's chat couldn't open, with no composer", async () => {
     openAnswer = () => Promise.reject(new Error("There is no teammate alice."));
     await create(OrganizationTarget.teammate("alice"));
 
     await Wait.until(() => expect(element().querySelector("[role=alert]")?.textContent?.trim()).toBe("There is no teammate alice."));
     expect([element().querySelector("nol-teamrun-composer"), element().querySelector("nol-teamrun-history"), opened]).toEqual([null, null, ["alice"]]);
+  });
+
+  it("forgets why a chat couldn't open once another is chosen under To", async () => {
+    openAnswer = () => Promise.reject(new Error("There is no teammate alice."));
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["There is no teammate alice."]));
+
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    expect(texts("[role=alert]")).toEqual([]);
+  });
+
+  it("forgets a teammate's chat failing to open once another target is chosen while it opens", async () => {
+    let refuse: (error: Error) => void = () => undefined;
+    openAnswer = () => new Promise<JsonValue>((_, reject) => {
+      refuse = reject;
+    });
+    const requested = vi.spyOn(OrganizationStoreService.prototype, "requestOrganizationChat");
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(opened).toEqual(["alice"]));
+    fixture.componentRef.setInput("target", OrganizationTarget.department("d1"));
+    await Wait.until(() => expect(texts(".nol-teamrun-organization-chat-title")).toEqual(["Chat with Design"]));
+
+    const request = requested.mock.results[0];
+    if (request?.type !== "return")
+      throw new Error("The panel didn't request Alice's chat.");
+    refuse(new Error("There is no teammate alice."));
+    await request.value.then(() => undefined, () => undefined);
+    await fixture.whenStable();
+
+    expect([requested.mock.calls, texts("[role=alert]")]).toEqual([[["alice"]], []]);
+  });
+
+  it("says why a send to a group failed until a send reaches every recipient", async () => {
+    openAnswer = () => Promise.reject(new Error("The runtime is busy."));
+    await create(OrganizationTarget.department("d1"));
+    await type("Status?");
+    await sendNow();
+    await Wait.until(() => expect(texts("[role=alert]")).toEqual(["The runtime is busy."]));
+
+    openAnswer = id => chatOf(id).toJson();
+    await sendNow();
+    await Wait.until(() => expect(sent()).toHaveLength(2));
+    await fixture.whenStable();
+
+    expect(texts("[role=alert]")).toEqual([]);
   });
 
   it("sends one message to each recipient's own Organization chat, answered by that recipient, lists them with their reply status, and opens one's chat", async () => {
@@ -220,7 +298,7 @@ describe("OrganizationChatComponent", () => {
     await sendNow();
     await Wait.until(() => expect(sent()).toHaveLength(3));
     await fixture.whenStable();
-    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey) ?? "{}"))];
+    const failed = [sent().map(t => t.chatId), box()?.value, Object.values(JSON.parse(Required.of(globalThis.localStorage.getItem(Resources.keptComposerDraftsStorageKey))))];
 
     refused = [];
     await sendNow();
@@ -332,6 +410,44 @@ describe("OrganizationChatComponent", () => {
     await typeAndSettle(element(), "@");
 
     expect([toOne.every(t => t > 0), shown()]).toEqual([true, [0, 0]]);
+  });
+
+  it.each([
+    { title: "a department, its member under its leader included", target: OrganizationTarget.department("d1"), expected: "Goes to 2 teammates" },
+    { title: "the leaders and your direct reports", target: OrganizationTarget.leaders, expected: "Goes to 1 teammate" },
+    { title: "everyone", target: OrganizationTarget.everyone, expected: "Goes to 2 teammates" }
+  ])("says before sending how many teammates a message to $title goes to", async ({ target, expected }) => {
+    organization = SampleData.organizationOf([design], [new TeammatePlacement("alice", OrganizationParent.department("d1"), 0),
+      new TeammatePlacement("bob", OrganizationParent.teammate("alice"), 0)]);
+    await create(target);
+
+    await Wait.until(() => expect(texts(".nol-teamrun-composer-reach")).toEqual([expected]));
+    expect(sent()).toEqual([]);
+  });
+
+  it("gives the message box the count as its description, follows a change of structure, and shows none for one teammate's chat", async () => {
+    await create(OrganizationTarget.department("d1"));
+    const reach = (): HTMLElement | null => element().querySelector<HTMLElement>(".nol-teamrun-composer-reach");
+    await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 2 teammates"));
+    const described = [box()?.getAttribute("aria-describedby"), reach()?.id];
+    const shown = (found: HTMLElement | null): HTMLElement => {
+      if (Object.isNull(found))
+        throw new Error("The count or the message box isn't shown.");
+      return found;
+    };
+    const [line, field] = [shown(reach()), shown(box())];
+    const textStart = (on: HTMLElement): number => on.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(on).borderInlineStartWidth)
+      + Number.parseFloat(getComputedStyle(on).paddingInlineStart);
+    expect([textStart(line) - textStart(field), line.getBoundingClientRect().bottom <= field.getBoundingClientRect().top]).toEqual([0, true]);
+
+    context.emit(EventName.OrganizationChanged, SampleData.organizationOf([design], placed("alice")).toJson());
+    await Wait.until(() => expect(reach()?.textContent?.trim()).toBe("Goes to 1 teammate"));
+    fixture.componentRef.setInput("target", OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(element().querySelector(".nol-teamrun-composer-fan-out")).toBeNull());
+    await Wait.until(() => expect(box()).not.toBeNull());
+
+    expect([described[0] === described[1], described[0]?.startsWith(Resources.composerReachIdPrefix), reach(), box()?.hasAttribute("aria-describedby")])
+      .toEqual([true, true, null, false]);
   });
 
   it("shows no reply yet for recipients whose chats exist but who never replied", async () => {

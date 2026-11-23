@@ -57,6 +57,13 @@ describe("Resources", () => {
       .toEqual(["Sign-in didn't finish: the terminal closed before cursor-agent login ended.", Resources.signInUnfinished]);
   });
 
+  it.each([
+    { count: 1, expected: "Goes to 1 teammate" },
+    { count: 3, expected: "Goes to 3 teammates" }
+  ])("says a message to several goes to $count teammate(s)", ({ count, expected }) => {
+    expect(Resources.formatOrganizationReach(count)).toBe(expected);
+  });
+
   it("names an Organization chat after whom it talks to", () => {
     expect(Resources.formatOrganizationChat("Ada")).toBe("Chat with Ada");
   });
@@ -115,12 +122,12 @@ describe("Resources", () => {
       .toEqual([["Team name", "Delete Team", "Remove Team"], ["Unit name", "Delete unit", "Remove unit"]]);
   });
 
-  it("asks before deleting a department or removing a member, saying where what it held goes", () => {
+  it("asks before deleting a department or moving a member out of its unit, saying where what it held goes", () => {
     expect([Resources.formatOrganizationDeleteDepartment("Design", null), Resources.formatOrganizationDeleteDepartment("Web", "Build"),
       Resources.formatOrganizationRemoveMember("Alice", "Design")]).toEqual([
       "Delete Design? Its units move up to report to you, and its members leave every unit.",
       "Delete Web? Its units and members move to Build.",
-      "Remove Alice from Design? Alice will report to you."
+      "Move Alice out of Design? Alice will report to you."
     ]);
   });
 
@@ -241,10 +248,11 @@ describe("Resources", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
   });
 
-  it("counts Focus's direct reports and a department's teammates in the singular for one and the plural for more", () => {
+  it("counts Focus's direct reports, and those under them, and a department's teammates in the singular for one and the plural for more", () => {
     expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
+      Resources.formatOrganizationFocusLeaders(3, new Map(), 1),
       Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
-      .toEqual(["Your 1 direct report", "Your 2 direct reports", "1 teammate", "2 teammates"]);
+      .toEqual(["Your 1 direct report", "Your 2 direct reports", "Your 3 direct reports and 1 under them", "1 teammate", "2 teammates"]);
   });
 
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {
