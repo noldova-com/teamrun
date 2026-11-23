@@ -1326,6 +1326,72 @@ describe("OrganizationViewComponent", () => {
         [new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })]]);
     });
 
+    const lane = (name: string): HTMLElement => Required.of(all(".lane").find(t => t.querySelector<HTMLInputElement>(".lane-rename")?.value === name));
+    const outlineRow = (name: string): HTMLElement => Required.of(all(".orow.department").find(t => t.querySelector(".obtn .label")?.textContent?.trim() === name));
+    const inside = (inner: HTMLElement, outer: HTMLElement): boolean => {
+      const a = inner.getBoundingClientRect();
+      const b = outer.getBoundingClientRect();
+      return a.width > 0 && a.left >= b.left - 0.5 && a.right <= b.right + 0.5 && a.top >= b.top - 0.5 && a.bottom <= b.bottom + 0.5;
+    };
+    const leaderChoiceAsync = async (view: string): Promise<[HTMLElement, HTMLElement]> => {
+      await pickView(view);
+      if (view === "Board")
+        return [one(".leader-choice", lane("Design")), lane("Design")];
+      one(".obtn", outlineRow("Design")).click();
+      await settle();
+      if (all(".focus nol-canvas-map").length > 0) {
+        one(".focus .nol-canvas-map-toggle").click();
+        await settle();
+      }
+      await Wait.until(() => expect(all(".focus nol-canvas-map").length).toBe(0));
+      return [one(".unit-head .leader-choice"), one(".unit-head")];
+    };
+
+    it.each(["Board", "Focus"])("chooses a unit's leader on the %s while editing, among its people in name order, then the team, or none, inside the unit", async view => {
+      await editAsync();
+      const [choice, unit] = await leaderChoiceAsync(view);
+      const fits = inside(choice, unit);
+      const shown = one(".nol-select-value", choice).textContent?.trim();
+
+      const options = await optionsAsync(choice);
+      await closeOptionsAsync();
+      await chooseAsync(choice, "Bob");
+      await chooseAsync(choice, "Offline");
+      await chooseAsync(choice, "No leader");
+      one(".top .edit").click();
+      await settle();
+
+      expect([fits, shown, options, all(".leader-choice").length]).toEqual([true, "Alice", ["No leader", "Alice", "Bob", "Code Reviewer", "Offline"], 0]);
+      expect(asked).toEqual([
+        new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: "bob" }),
+        new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: "offline" }),
+        new RecordedRequest(MethodName.DepartmentUpdate, { organizationId: "my-organization", departmentId: "design", leaderId: null })
+      ]);
+    });
+
+    it.each(["Board", "Focus"])("adds a teammate to a unit and directly under you from Find a teammate on the %s, as in the Tree", async view => {
+      await editAsync();
+      await pickView(view);
+      const unitAdd = view === "Board" ? one(".add-member", lane("Design")) : one(".add-member", outlineRow("Design"));
+
+      const before = await searchAsync(unitAdd, "");
+      const hint = searchTexts(".nol-quick-input-empty");
+      await userEvent.type(searchField(), "off");
+      await settle();
+      const found = searchTexts(".nol-quick-input-option .nol-quick-input-title");
+      await pickAsync("Offline");
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
+      await searchAsync(one(".add-report"), "al");
+      await pickAsync("Alice");
+      await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
+
+      expect([before, hint, found, all(".add-report").length]).toEqual([[], ["Type a teammate's name."], ["Offline", "New teammate…"], 1]);
+      expect(asked).toEqual([
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Department", id: "design" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })
+      ]);
+    });
+
     it("creates a teammate with the typed name from the search, in this organization only, under a department, under a teammate and under you", async () => {
       await editAsync();
       const store = ChatStoreService.of(context);

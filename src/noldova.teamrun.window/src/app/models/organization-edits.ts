@@ -7,16 +7,23 @@
  */
 
 import { type Department, NameOrder, type NodeType, type Teammate } from "@noldova/teamrun.protocol";
+import { SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../resources";
 import type { INamedParent } from "../interfaces/i-named-parent";
 import { ConfirmRequest } from "./confirm-request";
+import type { OrganizationStoreService } from "../services/organization-store.service";
 import type { OrganizationNode } from "./organization.node";
 
 export class OrganizationEdits {
-  public static addable(node: OrganizationNode, teammates: readonly Teammate[]): readonly Teammate[] {
-    const inside = new Set([...Object.isNull(node.leader) ? [] : [node.leader.id], ...node.members.map(t => t.id)]);
-    return NameOrder.sort(teammates.filter(t => !inside.has(t.id)), t => t.name);
+  public static leaderOptions(node: OrganizationNode, teammates: readonly Teammate[]): readonly SelectOption[] {
+    const people = NameOrder.sort(Object.isNull(node.leader) ? node.members : [node.leader, ...node.members], t => t.name);
+    const others = NameOrder.sort(teammates.filter(t => !people.some(u => u.id === t.id)), t => t.name);
+    return [new SelectOption(String.empty, Resources.organizationNoLeader), ...[...people, ...others].map(t => new SelectOption(t.id, t.name))];
+  }
+
+  public static async setLeaderAsync(organization: OrganizationStoreService, node: OrganizationNode, value: string): Promise<void> {
+    await organization.setLeader(node.id, value.length === 0 ? null : value);
   }
 
   public static deleteRequest(department: Department, type: NodeType | null, parents: readonly INamedParent[]): ConfirmRequest {
