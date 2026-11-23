@@ -56,7 +56,7 @@ describe("CardFlowLines", () => {
     expect([route("a", "d"), route("a", "nobody"), route("nobody", "a"), route("person", "nobody")]).toEqual([null, null, null, null]);
   });
 
-  it("starts your messages at the canvas's edge on the chat panel's side, level with the card, and ends a teammate's message to you there with no card to glow", () => {
+  it("starts your messages at the visible canvas's edge on the chat panel's side, past the container's own, level with the card, and ends a teammate's message to you there with no card to glow", () => {
     const b = new FlowBox(200, 100, 100, 40);
     const placed = (left: number, top: number, width: number, height: number): [[string, FlowBox | null] | null, [string, FlowBox | null] | null] => {
       chat.setAttribute("style", at(left, top, width, height));
@@ -64,7 +64,7 @@ describe("CardFlowLines", () => {
     };
 
     expect([placed(800, 200, 100, 300), placed(200, 600, 500, 50), placed(0, 200, 100, 300), placed(200, 0, 500, 100)]).toEqual([
-      [["M 400 120 L 300 120", b], ["M 300 120 L 400 120", null]], [["M 250 300 L 250 140", b], ["M 250 140 L 250 300", null]],
+      [["M 500 120 L 300 120", b], ["M 300 120 L 500 120", null]], [["M 250 300 L 250 140", b], ["M 250 140 L 250 300", null]],
       [["M 0 120 L 200 120", b], ["M 200 120 L 0 120", null]], [["M 250 0 L 250 100", b], ["M 250 100 L 250 0", null]]]);
   });
 

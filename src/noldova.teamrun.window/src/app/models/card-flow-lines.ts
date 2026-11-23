@@ -16,7 +16,7 @@ import { FlowRoute } from "./flow-route";
 
 export class CardFlowLines {
   private readonly cards: ReadonlyMap<string, FlowBox>;
-  private readonly plane: FlowBox;
+  private readonly edges: FlowBox;
   private readonly view: DOMRect;
   private readonly chat: DOMRect | null;
 
@@ -29,8 +29,8 @@ export class CardFlowLines {
         cards.set(key, frame.boxOf(element));
     }
     this.cards = cards;
-    this.plane = frame.boxOf(container);
     this.view = (container.closest(Resources.flowCanvasSelector) ?? container).getBoundingClientRect();
+    this.edges = frame.toBox(this.view);
     const panel = chat?.getBoundingClientRect() ?? null;
     this.chat = Object.isNull(panel) || panel.width === 0 && panel.height === 0 ? null : panel;
   }
@@ -58,12 +58,12 @@ export class CardFlowLines {
     const x = card.left + card.width / 2;
     const y = card.top + card.height / 2;
     if (chat.left >= this.view.right)
-      return [new FlowPoint(this.plane.width, y), new FlowPoint(card.left + card.width, y)];
+      return [new FlowPoint(this.edges.left + this.edges.width, y), new FlowPoint(card.left + card.width, y)];
     if (chat.top >= this.view.bottom)
-      return [new FlowPoint(x, this.plane.height), new FlowPoint(x, card.top + card.height)];
+      return [new FlowPoint(x, this.edges.top + this.edges.height), new FlowPoint(x, card.top + card.height)];
     if (chat.right <= this.view.left)
-      return [new FlowPoint(0, y), new FlowPoint(card.left, y)];
-    return chat.bottom <= this.view.top ? [new FlowPoint(x, 0), new FlowPoint(x, card.top)] : [];
+      return [new FlowPoint(this.edges.left, y), new FlowPoint(card.left, y)];
+    return chat.bottom <= this.view.top ? [new FlowPoint(x, this.edges.top), new FlowPoint(x, card.top)] : [];
   }
 
   private static across(from: FlowBox, to: FlowBox): readonly FlowPoint[] {

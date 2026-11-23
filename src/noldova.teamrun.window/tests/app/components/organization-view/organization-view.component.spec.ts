@@ -789,7 +789,7 @@ describe("OrganizationViewComponent", () => {
       await Wait.until(() => expect(ChatStoreService.of(context).conversation(chat.id)).not.toBeNull());
     };
 
-    it("draws your message on the Board from the canvas's edge beside the chat panel, level with its receiver's card, into the card's side, then a pulse and a glow over the card, and the answer back the same way, over the lanes and under the cards", async () => {
+    it("draws your message on the Board from the visible canvas's edge beside the chat panel, level with its receiver's card, into the card's side, then a pulse and a glow over the card, and the answer back the same way, over the lanes and under the cards", async () => {
       await create();
       await pickView("Board");
       const board = one("nol-teamrun-organization-board");
@@ -804,13 +804,14 @@ describe("OrganizationViewComponent", () => {
       await end(".pulse");
       const glow = box(one(".nol-teamrun-flow-overlay .glow", board));
 
-      expectRoute(yours, [new FlowPoint(box(board).right, level), new FlowPoint(bob.right, level)]);
-      expectRoute(answering, [new FlowPoint(bob.right, level), new FlowPoint(box(board).right, level)]);
+      const edge = box(one(".chart nol-canvas")).right;
+      expectRoute(yours, [new FlowPoint(edge, level), new FlowPoint(bob.right, level)]);
+      expectRoute(answering, [new FlowPoint(bob.right, level), new FlowPoint(edge, level)]);
       [glow.left, glow.top, glow.width, glow.height].forEach((t, i) => AppearanceFixture.expectPixels(t, [bob.left, bob.top, bob.width, bob.height].at(i) ?? Number.NaN));
       expect([layers, sent]).toEqual([["auto", true], [["route sent", "route writing"], 1]]);
     });
 
-    it("draws your message in Focus from the canvas's edge over the conversation below it, straight up into its receiver's card", async () => {
+    it("draws your message in Focus from the visible canvas's edge over the conversation below it, though its card ends at the plane's, straight up into its receiver's card", async () => {
       await create();
       await pickView("Focus");
       const plane = one(".focus-plane");
@@ -819,7 +820,7 @@ describe("OrganizationViewComponent", () => {
       const middle = alice.left + alice.width / 2;
 
       expect(box(one(".focus nol-teamrun-organization-chat")).top).toBeGreaterThanOrEqual(box(one(".focus nol-canvas")).bottom);
-      expectRoute(points("path.writing", plane), [new FlowPoint(middle, box(plane).bottom), new FlowPoint(middle, alice.bottom)]);
+      expectRoute(points("path.writing", plane), [new FlowPoint(middle, box(one(".focus nol-canvas")).bottom), new FlowPoint(middle, alice.bottom)]);
     });
 
     it.each(["Board", "Focus"])("draws a teammate's send on the %s at right angles from the middle of its card's edge to the middle of its receiver's, turning outside both cards", async view => {
