@@ -573,7 +573,7 @@ export declare enum MethodName {
   OrganizationUpdate = "OrganizationUpdate",
   /**
    * Deletes an organization with its departments, placements and layout, and publishes `OrganizationRemoved`; its teammates
-   * and their chats stay. Deleting the last organization fails with `Conflict`. Parameters: `OrganizationIdParams`.
+   * and their chats stay; the last one too, which leaves none. Parameters: `OrganizationIdParams`.
    * Result: `null`.
    */
   OrganizationDelete = "OrganizationDelete",

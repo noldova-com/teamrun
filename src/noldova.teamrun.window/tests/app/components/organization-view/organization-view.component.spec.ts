@@ -194,12 +194,25 @@ describe("OrganizationViewComponent", () => {
 
     expect([texts(".top .title"), texts(".top .headcount"), texts(".owner .name"), texts(".owner .role"), one(".chart > nol-canvas").getAttribute("aria-label"),
       all(".chart [nolCanvasItem]").filter(t => t.matches(".owner, .department, nol-teamrun-organization-card")).length])
-      .toEqual([["Organization"], ["4 teammates in 3 units"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
+      .toEqual([["My organization"], ["4 teammates in 3 units"], ["You"], ["Owner · 1 direct report"], "Organization structure", 8]);
     expect(tree()).toEqual([
       ["Design", "2", "2 idle", ["Alice"], ["Bob"], [["UI", "1", "1 idle", ["Code Reviewer"], [], [], []]], []],
       ["Build", "1", "1 stopped", [], ["Offline"], [], []]
     ]);
     expect(texts(".role", department("Design"))).toEqual(["Review"]);
+  });
+
+  it("names the organization its document instance names in its title, and follows a rename", async () => {
+    const second = new Organization("o2", "Second", null, 1, "c", "u", [SampleData.departmentType], [], []);
+    await create(context => context.answer(MethodName.OrganizationList, () => [organization.toJson(), second.toJson()]));
+    const mine = texts(".top .title");
+
+    fixture.componentRef.setInput("instance", "o2");
+    await Wait.until(() => expect(texts(".top .title")).toEqual(["Second"]));
+    context.emit(EventName.OrganizationChanged, new Organization("o2", "Studio", null, 1, "c", "u2", [SampleData.departmentType], [], []).toJson());
+    await settle();
+
+    expect([mine, texts(".top .title")]).toEqual([["My organization"], ["Studio"]]);
   });
 
   it("shows the organization its document instance names, with its own layout, and only that organization's changes", async () => {
@@ -1174,7 +1187,7 @@ describe("OrganizationViewComponent", () => {
         [new RecordedRequest(MethodName.DepartmentDelete, { organizationId: "my-organization", departmentId: "build" })]]);
     });
 
-    it("removes a member from its card once you confirm, moves it under any place in the tree, and shows neither once editing is done", async () => {
+    it("moves a member out of its unit from its card once you confirm, moves it under any place in the tree, and shows neither once editing is done", async () => {
       await editAsync();
 
       one(".remove", card("Bob")).click();
@@ -1193,7 +1206,7 @@ describe("OrganizationViewComponent", () => {
 
       expect(all(".remove, .move", card("Alice"))).toEqual([]);
       expect([cancelled, asking, label, departments, all(".remove, .move", card("Bob")).length]).toEqual([0,
-        ["Remove member", "Remove Bob from Design? Bob will report to you.", "Remove"], "Remove Bob",
+        ["Move out of unit", "Move Bob out of Design? Bob will report to you.", "Move out"], "Move Bob out of Design",
         ["You", "Design (Department)", "Alice", "UI (Department)", "Code Reviewer", "Build (Department)", "Offline"], 0]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null }),
         new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
@@ -1213,8 +1226,84 @@ describe("OrganizationViewComponent", () => {
       one(".top .edit").click();
       await settle();
 
-      expect([before, asking[1], reports()]).toEqual([[], "Remove Bob from Design? Bob will report to you.", ["Bob"]]);
+      expect([before, asking[1], reports()]).toEqual([[], "Move Bob out of Design? Bob will report to you.", ["Bob"]]);
       expect(asked).toEqual([new RecordedRequest(MethodName.DepartmentMemberSet, { organizationId: "my-organization", teammateId: "bob", departmentId: null })]);
+    });
+
+    it("takes a unit member, a unit leader, a teammate with reports and a direct report out of the organization from their cards once you confirm, saying where the reports go", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf([...sample.departments,
+        new Department("lab", "Lab", "department", OrganizationParent.teammate("offline"), null, 0, "c", "u"),
+        new Department("kit", "Kit", "department", OrganizationParent.teammate("reviewer"), null, 0, "c", "u")], [new TeammatePlacement("alice", OrganizationParent.department("design"), 0),
+        new TeammatePlacement("bob", OrganizationParent.department("design"), 1), new TeammatePlacement("offline", OrganizationParent.person, 0),
+        new TeammatePlacement("reviewer", OrganizationParent.teammate("alice"), 0)]).toJson());
+      await settle();
+      const removeAsync = async (name: string, answer: string): Promise<string[]> => {
+        one(".remove-from-organization", card(name)).click();
+        const asking = await dialogAsync();
+        await answerAsync(answer);
+        return asking;
+      };
+
+      const label = one(".remove-from-organization", card("Bob")).getAttribute("aria-label");
+      const cancelled = await removeAsync("Bob", ".nol-teamrun-cancel");
+      const asked0 = asked.length;
+      const member = await removeAsync("Bob", ".nol-teamrun-confirm");
+      const leader = await removeAsync("Alice", ".nol-teamrun-confirm");
+      const direct = await removeAsync("Offline", ".nol-teamrun-confirm");
+      const report = await removeAsync("Code Reviewer", ".nol-teamrun-confirm");
+      const placed = (id: string): RecordedRequest => new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id, parent: null, order: Resources.organizationLastOrder });
+
+      expect([label, cancelled, asked0]).toEqual(["Remove Bob from the organization",
+        ["Remove teammate", "Remove Bob from My organization? Bob keeps its chats and can be added back.", "Remove"], 0]);
+      expect([member[1], leader[1], direct[1], report[1]]).toEqual(["Remove Bob from My organization? Bob keeps its chats and can be added back.",
+        "Remove Alice from My organization? Alice keeps its chats and can be added back. The teammates and units under Alice will report to Design.",
+        "Remove Offline from My organization? Offline keeps its chats and can be added back. The teammates and units under Offline will report to you.",
+        "Remove Code Reviewer from My organization? Code Reviewer keeps its chats and can be added back. The teammates and units under Code Reviewer will report to Alice."]);
+      expect(asked).toEqual([placed("bob"), placed("alice"), placed("offline"), placed("reviewer")]);
+    });
+
+    it("leaves a teammate taken out of the organization off the Tree, the Board, Focus and the To choices, and adds it back from Add teammate", async () => {
+      await editAsync();
+      context.emit(EventName.OrganizationChanged, SampleData.organizationOf(sample.departments,
+        sample.placements.filter(t => t.teammateId !== "bob")).toJson());
+      await settle();
+      const names = (): string[] => texts("nol-teamrun-organization-card .name");
+      const tree = names();
+      one(".top .edit").click();
+      await settle();
+      await userEvent.click(one("aside.messages .to-choice .nol-select-button"));
+      await Wait.until(() => expect(document.querySelectorAll(".nol-select-option").length).toBeGreaterThan(0));
+      const offered = [...document.querySelectorAll<HTMLElement>(".nol-select-option")].map(t => t.textContent?.trim() ?? "");
+      await userEvent.keyboard("{Escape}");
+      await settle();
+      await pickView("Board");
+      const board = names();
+      await pickView("Focus");
+      const focused = names();
+      await pickView("Tree");
+      one(".top .edit").click();
+      await settle();
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "bo");
+      await pickAsync("Bob");
+
+      expect([tree.includes("Bob"), offered.some(t => t.includes("Bob")), board.includes("Bob"), focused.includes("Bob"), tree.includes("Alice")])
+        .toEqual([false, false, false, false, true]);
+      expect(asked).toEqual([new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "bob", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]);
+    });
+
+    it.each(["Board", "Focus"])("offers Remove from the organization on every card on the %s while editing, and sends it once you confirm", async view => {
+      await editAsync();
+      await pickView(view);
+      const cards = all("nol-teamrun-organization-card");
+      const offered = cards.map(t => all(".remove-from-organization", t).length);
+
+      one(".remove-from-organization", Required.of(cards[0])).click();
+      await dialogAsync();
+      await answerAsync(".nol-teamrun-confirm");
+
+      expect([cards.length > 0, offered.every(t => t === 1)]).toEqual([true, true]);
+      expect(asked).toEqual([expect.objectContaining({ method: MethodName.TeammatePlace, parameters: expect.objectContaining({ organizationId: "my-organization", parent: null }) })]);
     });
 
     it("shows each teammate's name on its card as text, in no field, where it shows outside editing, and renames no teammate", async () => {
@@ -1282,14 +1371,14 @@ describe("OrganizationViewComponent", () => {
     };
     const lastDialog = (): ParentNode => [...document.querySelectorAll("nol-dialog")].at(-1) ?? document;
 
-    it("adds a teammate under a department from a search of the team that lists no one until a name is typed, moving one already placed", async () => {
+    it("adds a teammate under a department from a search of the team that lists no one until a name is typed, then the matches and a new teammate, moving one already placed", async () => {
       await editAsync();
 
       const before = await searchAsync(one(":scope > .adds > .add-member", department("Build")), "");
       const hint = searchTexts(".nol-quick-input-empty");
       await userEvent.type(searchField(), "zz");
       await settle();
-      const none = searchTexts(".nol-quick-input-empty");
+      const none = [searchTexts(".nol-quick-input-option .nol-quick-input-title"), searchTexts(".nol-quick-input-option .nol-quick-input-detail")];
       await userEvent.clear(searchField());
       await userEvent.type(searchField(), "al");
       await settle();
@@ -1297,7 +1386,7 @@ describe("OrganizationViewComponent", () => {
       await pickAsync("Alice");
       await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search")).toBeNull());
 
-      expect([before, hint, none, found, asked]).toEqual([[], ["Type a teammate's name."], ["No teammate has that name."], ["Alice"],
+      expect([before, hint, none, found, asked]).toEqual([[], ["Type a teammate's name."], [["New teammate…"], ["zz"]], ["Alice", "New teammate…"],
         [new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "alice", parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder })]]);
     });
 
@@ -1317,6 +1406,62 @@ describe("OrganizationViewComponent", () => {
 
       expect([offered.includes("Bob"), refused, asked]).toEqual([false, ["A teammate or department can't be under itself."],
         [new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: "offline", parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })]]);
+    });
+
+    it("creates a teammate with the typed name from the search, in this organization only, under a department, under a teammate and under you", async () => {
+      await editAsync();
+      const store = ChatStoreService.of(context);
+      const ids = new Map<string, string>();
+      const createAsync = async (trigger: HTMLElement, name: string): Promise<string> => {
+        const placed = asked.length;
+        await searchAsync(trigger, name);
+        await pickAsync("New teammate…");
+        await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+        const shown = Required.of(document.querySelector<HTMLInputElement>("input.nol-teamrun-teammate-name")).value;
+        one("button[form='nol-teamrun-teammate-form']", document).click();
+        await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+        await fadedAsync();
+        await Wait.until(() => expect(asked).toHaveLength(placed + 1));
+        ids.set(name, Required.of(store.teammates().find(t => t.name === name)).id);
+        return shown;
+      };
+
+      const shown = [await createAsync(one(":scope > .adds > .add-member", department("Build")), "Dana"),
+        await createAsync(one(":scope > .adds > .add-member", nodeOf("Bob")), "Eve"),
+        await createAsync(one(".chart .tree > .adds > .add-member"), "Finn")];
+      const id = (name: string): string => Required.of(ids.get(name));
+
+      expect([shown, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([["Dana", "Eve", "Finn"], null, [
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Dana"), parent: { kind: "Department", id: "build" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Eve"), parent: { kind: "Teammate", id: "bob" }, order: Resources.organizationLastOrder }),
+        new RecordedRequest(MethodName.TeammatePlace, { organizationId: "my-organization", teammateId: id("Finn"), parent: { kind: "Person", id: null }, order: Resources.organizationLastOrder })]]);
+    });
+
+    it("creates and places no teammate when the new teammate's dialog is closed", async () => {
+      await editAsync();
+      const before = ChatStoreService.of(context).teammates().length;
+
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "Dana");
+      await pickAsync("New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      one(".nol-teamrun-cancel", lastDialog()).click();
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).toBeNull());
+      await fadedAsync();
+      await settle();
+
+      expect([ChatStoreService.of(context).teammates().length, document.querySelector("nol-teamrun-organization-teammate-search"), asked]).toEqual([before, null, []]);
+    });
+
+    it("says why in the organization when a teammate made from the search can't be placed", async () => {
+      await editAsync(() => Promise.reject(new RuntimeRequestException(FailureCode.Unavailable, "The runtime is busy.")));
+
+      await searchAsync(one(":scope > .adds > .add-member", department("Build")), "Dana");
+      await pickAsync("New teammate…");
+      await Wait.until(() => expect(document.querySelector("input.nol-teamrun-teammate-name")).not.toBeNull());
+      one("button[form='nol-teamrun-teammate-form']", document).click();
+      await Wait.until(() => expect(texts(".action-error")).toEqual(["The runtime is busy."]));
+
+      expect(asked.map(t => t.method)).toEqual([MethodName.TeammatePlace]);
     });
 
     it("creates a department under a teammate from a dialog asking its name and a leader among the whole team, and nothing for a blank name", async () => {

@@ -100,7 +100,7 @@ export class OrganizationFocusComponent {
   protected readonly crumbs: Signal<readonly OrganizationCrumb[]> = computed(() => {
     const focus = this.focus();
     const here = this.key();
-    const trail = [new OrganizationCrumb(Resources.organizationTitle, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.name, OrganizationTarget.department(t.id), false)),
+    const trail = [new OrganizationCrumb(this.organization.organization().name, OrganizationTarget.leaders, false), ...focus.path.map(t => new OrganizationCrumb(t.name, OrganizationTarget.department(t.id), false)),
       ...Object.isNull(focus.teammate) ? [] : [new OrganizationCrumb(focus.teammate.name, OrganizationTarget.teammate(focus.teammate.id), false)]];
     return trail.map(t => new OrganizationCrumb(t.label, t.target, OrganizationTargetKey.of(t.target) === here));
   });
@@ -139,7 +139,7 @@ export class OrganizationFocusComponent {
 
   protected removeTeammate(teammate: Teammate, department: Department): void {
     this.confirm(new ConfirmRequest(Resources.organizationRemoveMemberTitle, Resources.formatOrganizationRemoveMember(teammate.name, department.name),
-      Resources.organizationRemoveLabel, null, true), () => {
+      Resources.organizationLeaveUnitLabel, null, true), () => {
       this.go(OrganizationTarget.department(department.id));
       void this.organization.setMember(teammate.id, null);
     });
