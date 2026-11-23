@@ -534,7 +534,7 @@ describe("SubAgentsViewComponent", () => {
       expect(rect(stop).width).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("icon"));
       const probe = running.appendChild(document.createElement("span"));
       probe.style.color = "GrayText";
-      expect(forcedColors === "none" ? getComputedStyle(stop).opacity : getComputedStyle(stop).color)
+      expect(forcedColors === "none" ? getComputedStyle(stop.querySelector(":scope > .nol-icon-button-face") ?? stop).opacity : getComputedStyle(stop).color)
         .toBe(forcedColors === "none" ? "0.5" : getComputedStyle(probe).color);
       probe.remove();
     });

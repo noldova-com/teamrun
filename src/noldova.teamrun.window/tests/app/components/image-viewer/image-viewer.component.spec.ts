@@ -49,6 +49,7 @@ describe("ImageViewerComponent", () => {
   const part = <T extends HTMLElement = HTMLElement>(selector: string): T | null => element().querySelector<T>(selector);
   const button = (selector: string): HTMLButtonElement => part<HTMLButtonElement>(selector)!;
   const box = (target: Element | null): DOMRect => target?.getBoundingClientRect() ?? new DOMRect();
+  const faceOf = (control: Element): Element => control.querySelector(":scope > .nol-button-face, :scope > .nol-icon-button-face") ?? control;
   const name = (): string | undefined => part(".nol-teamrun-image-viewer-name")?.textContent?.trim();
   const percent = (): string | undefined => part(".nol-teamrun-zoom-fit")?.textContent?.trim();
   const items = (): string[] => [...document.querySelectorAll("button[nol-menu-item] .nol-menu-item-label")].map(t => t.textContent!.trim());
@@ -767,7 +768,7 @@ describe("ImageViewerComponent", () => {
       const controls = [...element().querySelectorAll<HTMLElement>("[nol-icon-button]")];
       expect(controls).toHaveLength(7);
       for (const control of controls) {
-        const chip = getComputedStyle(control, "::before");
+        const chip = getComputedStyle(control.matches(":disabled, [aria-disabled=true]") ? faceOf(control) : control, "::before");
         const disc = [Number.parseFloat(chip.width), Number.parseFloat(chip.height)];
         AppearanceFixture.expectPixels(disc[0]!, height);
         AppearanceFixture.expectPixels(disc[1]!, height);
@@ -784,7 +785,7 @@ describe("ImageViewerComponent", () => {
       if (forcedColors === "none") {
         expect(fit.backgroundColor).toBe(colorOf("overlay-control"));
         expect(fit.color).toBe(colorOf("overlay-control-text"));
-        expect([getComputedStyle(button(".nol-teamrun-image-previous")).opacity, getComputedStyle(button(".nol-teamrun-image-next")).opacity]).toEqual(["0.35", "1"]);
+        expect([getComputedStyle(faceOf(button(".nol-teamrun-image-previous"))).opacity, getComputedStyle(faceOf(button(".nol-teamrun-image-next"))).opacity]).toEqual(["0.35", "1"]);
       }
     });
 
