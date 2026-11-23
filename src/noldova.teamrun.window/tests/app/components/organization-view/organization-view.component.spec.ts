@@ -176,6 +176,13 @@ describe("OrganizationViewComponent", () => {
     one(`.nol-teamrun-flow-overlay ${selector}`).dispatchEvent(new AnimationEvent("animationend"));
     await settle();
   };
+  const holdFlows = (): void => {
+    TestBed.overrideProvider(ClockService, { useValue: new FakeClock(Date.parse("2026-09-10T08:05:00.000Z")) });
+    const still = document.createElement("style");
+    still.textContent = ".nol-teamrun-flow-overlay path, .nol-teamrun-flow-overlay .pulse, .nol-teamrun-flow-overlay .glow { animation-play-state: paused; }";
+    document.head.append(still);
+    onTestFinished(() => still.remove());
+  };
 
   beforeEach(() => page.viewport(1600, 1300));
 
@@ -612,6 +619,7 @@ describe("OrganizationViewComponent", () => {
   });
 
   it("draws a message on the Tree while it is written, a pulse once sent, then a glow on its receiver, and fades an answer that stops", async () => {
+    holdFlows();
     await create();
     await flow(asked, answer("r0", asked, "nobody", MessageStatus.Pending), answer("r1", asked, "bob", MessageStatus.Pending));
     const writing = routes();
@@ -803,6 +811,7 @@ describe("OrganizationViewComponent", () => {
     };
 
     it("draws your message on the Board from the visible canvas's edge beside the chat panel, level with its receiver's card, into the card's side, then a pulse and a glow over the card, and the answer back the same way, over the lanes and under the cards", async () => {
+      holdFlows();
       await create();
       await pickView("Board");
       const board = one("nol-teamrun-organization-board");
