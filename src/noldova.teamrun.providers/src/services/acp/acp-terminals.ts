@@ -14,7 +14,6 @@ import { type ITimer, type ITurnListener, TaskEnd, TaskStart } from "@noldova/te
 import { BackgroundTaskStatus } from "@noldova/teamrun.protocol";
 
 import { AcpRequestException } from "../../exceptions/acp-request.exception.js";
-import { AgentLaunchException } from "../../exceptions/agent-launch.exception.js";
 import type { IAcpTerminal } from "../../interfaces/i-acp-terminal.js";
 import type { IAcpTerminalExit } from "../../interfaces/i-acp-terminal-exit.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
@@ -22,6 +21,7 @@ import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import type { ProcessOrigin } from "../../models/process-origin.js";
 import { Resources } from "../../resources.js";
+import { FailureDescriber } from "../failure-describer.js";
 import { SavedImageFile } from "../saved-image-file.js";
 import { AcpCommandLine } from "./acp-command-line.js";
 
@@ -165,9 +165,7 @@ export class AcpTerminals {
       return Object.isNull(this.origin) ? command : command.withOrigin(this.origin);
     }
     catch (error) {
-      if (error instanceof AgentLaunchException)
-        throw new AcpRequestException(error.message, Resources.acpInvalidParamsCode);
-      throw error;
+      throw new AcpRequestException(FailureDescriber.describe(error), Resources.acpInvalidParamsCode);
     }
   }
 

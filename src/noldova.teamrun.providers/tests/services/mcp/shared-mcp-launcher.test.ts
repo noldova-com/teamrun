@@ -698,6 +698,8 @@ export class SharedMcpLauncherTests {
 
     Assert.areEqual(JSON.stringify([null, null, located, located, located]),
       JSON.stringify([commandOf(""), commandOf(".;bin;"), commandOf("C:\\bin"), commandOf(".;C:\\bin"), commandOf("bin;C:\\bin")]));
+    Assert.areEqual(JSON.stringify([null, "C:\\tools\\gone.exe"]), JSON.stringify([launcher.commandOf("git", [], { PATHEXT: ".exe" }),
+      launcher.commandOf("C:\\tools\\gone.exe", [], { PATH: "C:\\bin", PATHEXT: ".exe" })?.command]));
   }
 
   @TestMethod
