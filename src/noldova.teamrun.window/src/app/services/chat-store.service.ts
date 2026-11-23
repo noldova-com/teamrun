@@ -2405,7 +2405,7 @@ export class ChatStoreService {
       conversations.forEach((listed, projectId) => conversations.set(projectId, [...listed, ...dropped.filter(t => t.projectId === projectId)]));
       this.conversationsByProjectSignal.set(conversations);
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
-      this.setWorking(ChatStoreService.keyed(open, t => t.id));
+      this.replaceWorking(open, ChatStoreService.messagesOf(events));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
       this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
@@ -2566,6 +2566,24 @@ export class ChatStoreService {
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
+  private replaceWorking(open: readonly Message[], live: readonly Message[]): void {
+    const heard = ChatStoreService.keyed(live, t => t.id);
+    const working = ChatStoreService.keyed(open.filter(t => ChatStoreService.ACTIVE_STATUSES.includes(heard.get(t.id)?.status ?? t.status)), t => t.id);
+    const left = [...this.workingSignal().keys()].filter(t => !working.has(t) && !heard.has(t));
+    this.setWorking(working);
+    for (const messageId of left)
+      void this.request(MethodName.MessageSummary, new MessageIdParams(messageId).toJson())
+        .then(value => this.endedOf(value), ChatStoreService.rethrowUnlessRead);
+  }
+
+  private endedOf(summary: JsonValue): void {
+    const ended = Object.isNull(summary) ? null : ReplySummary.fromJson(summary).preview;
+    if (Object.isNull(ended) || ChatStoreService.ACTIVE_STATUSES.includes(ended.status))
+      return;
+    for (const watcher of this.replyEndWatchers)
+      watcher(ended);
+  }
+
   private setWorking(working: ReadonlyMap<string, Message>): void {
     this.learnChats(ChatStoreService.mapped([...working.values()], t => t.id, t => t.conversationId));
     this.learnTeammates([...working.values()]);
@@ -2594,7 +2612,7 @@ export class ChatStoreService {
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       if (this.watchedMessages !== seen || this.watchSubscriptions.length === 0)
         return;
-      this.setWorking(ChatStoreService.keyed(open, t => t.id));
+      this.replaceWorking(open, [...seen.values()]);
       for (const message of seen.values())
         this.trackWorking(message);
     }, this.loadFailed(Resources.workingLoad, Resources.workingNotLoaded, null, () => this.readWorking())).then(t => {
@@ -3402,6 +3420,10 @@ export class ChatStoreService {
 
   private static keyed<K, V>(items: readonly V[], keyOf: (item: V) => K): ReadonlyMap<K, V> {
     return ChatStoreService.mapped(items, keyOf, t => t);
+  }
+
+  private static messagesOf(events: ReadonlyMap<string, Event>): readonly Message[] {
+    return [...events.values()].filter(t => t.name === EventName.MessageCreated || t.name === EventName.MessageUpdated).map(t => Message.fromJson(t.payload));
   }
 
   private static mapped<T, K, V>(items: readonly T[], keyOf: (item: T) => K, valueOf: (item: T) => V): ReadonlyMap<K, V> {
