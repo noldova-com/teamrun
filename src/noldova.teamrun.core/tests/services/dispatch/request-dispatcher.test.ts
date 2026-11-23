@@ -13,7 +13,7 @@ import { ArgumentException } from "@noldova/context.exceptions";
 import { JsonException, type JsonObject, JsonReader } from "@noldova/context.json";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AppLook, ApprovalAsk, ConversationEngine, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
+import { AppLook, ApprovalAsk, ConversationEngine, type IAcpAgentsService, type ITurnListener, PlanReading, ProfileSearch, ProviderKindVersions, RememberedAppGrant, RequestDispatcher, Resources, SharedMcpAccess, SignInCheck, TaskEnd, TaskStart, TurnDetail }
   from "@noldova/teamrun.core";
 import { AcpAgentIdParams, AcpAgentListing, AcpLocalCommandAddParams, ComputerUseGrant, ComputerUseGrantIdParams, ProviderContextWindows, ProviderSignInCommand,
   type ITeammateChanges, TeammateFallback } from "@noldova/teamrun.protocol";
@@ -657,6 +657,23 @@ export class RequestDispatcherTests {
     Assert.areEqual(ProviderKindInstallState.NotInstalled, ProviderKindInstallation.fromJson(await installing).state);
     Assert.isNotNull(installation.signal);
     Assert.isTrue(installation.signal.aborted);
+  }
+
+  @TestMethod
+  public async checksAProvidersInstallationForItsLatestVersion(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const adapter = new FakeProviderAdapter("agy");
+    const installation = new FakeProviderKindInstallation();
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    adapter.installation = installation;
+    host.registry.register(adapter);
+
+    const checked = RequestDispatcherTests.objects(await RequestDispatcherTests.succeed(host, MethodName.ProviderKindInstallationCheck, null));
+
+    const found = ProviderKindInstallation.fromJson(checked[0]?.toJson());
+    Assert.areEqual("1 Installed 2.1.211 2.1.212", `${checked.length} ${found.state} ${found.version} ${found.update}`);
+    Assert.areEqual("true", installation.checks.join(","));
   }
 
   @TestMethod

@@ -638,6 +638,55 @@ describe("ChatStoreService", () => {
     expect(kept).toEqual([first.id, second.id]);
   });
 
+  it("tells the reply watchers of a working reply that ended while its end was missed, once a resync no longer lists it, and of none still working, gone or unread", async () => {
+    const reply = (id: string, status: MessageStatus): Message => new Message(id, "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id, status, [],
+      SampleData.reply.provenance, SampleData.timestamp, SampleData.timestamp, status === MessageStatus.Running ? null : SampleData.timestamp);
+    context.answer(MethodName.MessageListOpen, () => ["ended", "gone", "running", "unread"].map(t => reply(t, MessageStatus.Running).toJson()))
+      .answer(MethodName.MessageSummary, t => {
+        const messageId = MessageIdParams.fromJson(t).messageId;
+        if (messageId === "unread")
+          throw new RuntimeRequestException(FailureCode.Internal, "Summary failed");
+        return messageId === "gone" ? null
+          : ReplySummary.fromMessage(reply(messageId, messageId === "ended" ? MessageStatus.Completed : MessageStatus.Running)).toJson();
+      });
+    await store.initialize();
+    const ended: string[] = [];
+    store.onReplyEnded(t => ended.push(`${t.id}:${t.status}`));
+    const asked = context.count(MethodName.MessageSummary);
+    expect(store.workingReplies().map(t => t.id)).toEqual(["ended", "gone", "running", "unread"]);
+
+    context.answer(MethodName.MessageListOpen, () => []);
+    await expect(store.resync()).resolves.toBe(true);
+
+    await Wait.until(() => expect(context.count(MethodName.MessageSummary)).toBe(asked + 4));
+    await Wait.until(() => expect(ended).toEqual([`ended:${MessageStatus.Completed}`]));
+    expect(store.workingReplies()).toEqual([]);
+  });
+
+  it("tells the reply watchers once of a reply that starts while a resync reads the open replies, and asks no summary of it", async () => {
+    const live = new Message("live", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id, MessageStatus.Running, [], SampleData.reply.provenance,
+      SampleData.timestamp, SampleData.timestamp, null);
+    await store.initialize();
+    const ended: string[] = [];
+    store.onReplyEnded(t => ended.push(t.id));
+    const asked = context.count(MethodName.MessageSummary);
+    const read = context.count(MethodName.MessageListOpen);
+    const listed = new DeferredResponse();
+    context.answer(MethodName.MessageListOpen, () => listed.promise)
+      .answer(MethodName.MessageSummary, () => ReplySummary.fromMessage(SampleData.withStatus(live, MessageStatus.Completed)).toJson());
+
+    const resynced = store.resync();
+    await Wait.until(() => expect(context.count(MethodName.MessageListOpen)).toBe(read + 1));
+    context.emit(EventName.MessageCreated, live.toJson());
+    listed.resolve([]);
+    await expect(resynced).resolves.toBe(true);
+    const working = store.workingReplies().map(t => t.id);
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(live, MessageStatus.Completed).toJson());
+
+    expect([working, ended, context.count(MethodName.MessageSummary) - asked]).toEqual([["live"], ["live"], 0]);
+    expect(store.workingReplies()).toEqual([]);
+  });
+
   it("keeps a conversation busy across queued replies and follows their terminal updates", async () => {
     const first = SampleData.withStatus(SampleData.reply, MessageStatus.Pending);
     const queued = new Message("second", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id,
@@ -731,6 +780,24 @@ describe("ChatStoreService", () => {
       listed.resolve([SampleData.reply.toJson(), elsewhere.toJson()]);
 
       await Wait.until(() => expect(context.workingMarks).toEqual(marks("c2")));
+    });
+
+    it("tells the reply watchers once of a reply that ends while it reads the open replies again, though the read still lists it", async () => {
+      const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running);
+      context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+      const store = ChatStoreService.watch(context);
+      await Wait.until(() => expect(context.workingMarks).toEqual(marks("c1")));
+      const ended: string[] = [];
+      store.onReplyEnded(t => ended.push(t.id));
+      const listed = new DeferredResponse();
+      context.answer(MethodName.MessageListOpen, () => listed.promise);
+
+      const reading = ChatStoreService.resync(context);
+      context.emit(EventName.MessageUpdated, SampleData.withStatus(running, MessageStatus.Completed).toJson());
+      listed.resolve([running.toJson()]);
+
+      await expect(reading).resolves.toBe(true);
+      expect([ended, context.workingMarks, context.count(MethodName.MessageSummary)]).toEqual([[running.id], [], 0]);
     });
 
     it("reads the open replies again when the runtime's state is invalidated or asks for a resync, or the window resyncs, answering whether that worked", async () => {
@@ -4342,6 +4409,22 @@ describe("ChatStoreService", () => {
     context.disconnect(MethodName.ProviderKindInstallationList, "The service stopped.");
     await store.refreshInstallations();
     expect(store.installations().get("antigravity")?.state).toBe(ProviderKindInstallState.Installed);
+  });
+
+  it("checks the installations for their latest versions on request, and reports a failed check while keeping the ones it has", async () => {
+    context.answer(MethodName.ProviderKindInstallationList, () =>
+      [new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", null).toJson()]);
+    context.answer(MethodName.ProviderKindInstallationCheck, () =>
+      [new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", "1.21.0").toJson()]);
+    const reports: string[] = [];
+    await store.initialize();
+
+    await store.checkInstallations(t => reports.push(t));
+
+    expect([context.count(MethodName.ProviderKindInstallationCheck), store.installations().get("antigravity")?.update, reports]).toEqual([1, "1.21.0", []]);
+    context.fail(MethodName.ProviderKindInstallationCheck, "The release channel didn't answer.");
+    await store.checkInstallations(t => reports.push(t));
+    expect([store.installations().get("antigravity")?.update, reports]).toEqual(["1.21.0", ["The release channel didn't answer."]]);
   });
 
   it("installs a provider once while it installs, cancels it, and shows a failed install in the error line", async () => {

@@ -63,6 +63,11 @@ LICENSE file in the root directory of this source tree.
               <nol-teamrun-provider-terminal class="nol-teamrun-install-terminal" [sessionId]="line.sessionId" [title]="line.title"
                 (closed)="hideTerminal(line.sessionId)" />
             }
+            <div class="nol-teamrun-update-checks" role="note">
+              <p class="nol-teamrun-muted nol-teamrun-update-checks-note">{{ resources.toolUpdateChecksNote }}</p>
+              <button type="button" nol-button class="nol-teamrun-check-updates" [variant]="outlined" [busy]="checkingUpdates()"
+                [disabled]="checkingUpdates() || store.isBusy()" (click)="checkUpdates()">{{ resources.checkUpdatesLabel }}</button>
+            </div>
           </nol-configuration-table>
           <nol-configuration-table class="nol-teamrun-found-providers" [heading]="resources.foundProvidersTitle" [level]="4">
             @if (searching()) {

@@ -787,6 +787,11 @@ export declare enum MethodName {
    */
   ProviderKindInstallationList = "ProviderKindInstallationList",
   /**
+   * Reads each provider's versions now, the latest ones off the network included, as the person asked for it, whatever the app's Check for updates
+   * setting says. Parameters: none, `null` on the wire. Result: an array of `ProviderKindInstallation`, once the reads end.
+   */
+  ProviderKindInstallationCheck = "ProviderKindInstallationCheck",
+  /**
    * Finds each provider's command-line tool afresh, by where its provider installs it and the tool's own version command. Parameters: none,
    * `null` on the wire. Result: an array of `ProviderTool`, one per kind that has a command-line tool.
    */

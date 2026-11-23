@@ -55,6 +55,7 @@ export enum MethodName {
   ProviderListModels = "ProviderListModels",
   ProviderModelCatalog = "ProviderModelCatalog",
   ProviderKindInstallationList = "ProviderKindInstallationList",
+  ProviderKindInstallationCheck = "ProviderKindInstallationCheck",
   ProviderToolList = "ProviderToolList",
   ProviderKindInstall = "ProviderKindInstall",
   ProviderKindInstallCancel = "ProviderKindInstallCancel",
