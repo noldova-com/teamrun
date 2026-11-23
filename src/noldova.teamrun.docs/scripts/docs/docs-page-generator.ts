@@ -25,6 +25,9 @@ export class DocsPageGenerator {
   private static readonly DOCUMENT_EXTENSION: string = ".md";
   private static readonly SITE_LINK: string = "https://teamrun.noldova.dev/";
   private static readonly HOME_FILE: string = "home";
+  private static readonly RELEASE_NOTES_FILE: string = "release-notes";
+  private static readonly CHANGELOG_FILE: string = "CHANGELOG.md";
+  private static readonly RELEASED_VERSION: RegExp = /^## (?!Unreleased$)/mu;
   private static readonly DOCUMENT_TITLE: RegExp = /^# ([^\n]*)\n+/u;
   private static readonly PAGE_LINK: RegExp = /\]\(([a-z0-9-]+)\.md(#[^)\s]*)?\)/gu;
   private static readonly TEXT_ENCODING: BufferEncoding = "utf8";
@@ -43,8 +46,9 @@ export class DocsPageGenerator {
       .sort();
     const pages: DocsPageFile[] = [];
     for (const file of files) {
+      const name = path.basename(file, DocsPageGenerator.DOCUMENT_EXTENSION);
       const text = await readFile(path.join(this.root, DocsPageGenerator.PAGES_FOLDER, file), DocsPageGenerator.TEXT_ENCODING);
-      pages.push(DocsPageGenerator.formatPage(path.basename(file, DocsPageGenerator.DOCUMENT_EXTENSION), text));
+      pages.push(DocsPageGenerator.formatPage(name, name === DocsPageGenerator.RELEASE_NOTES_FILE ? `${text.trimEnd()}\n\n${await this.readReleasesAsync()}` : text));
     }
     await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.PAGES_MODULE), DocsPageGenerator.PAGES_EXPORT, pages);
     return files.length;
@@ -53,6 +57,14 @@ export class DocsPageGenerator {
   public async writeIndexAsync(): Promise<void> {
     const index = await readFile(path.join(this.root, DocsPageGenerator.INDEX_FILE), DocsPageGenerator.TEXT_ENCODING);
     await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.INDEX_MODULE), DocsPageGenerator.INDEX_EXPORT, index);
+  }
+
+  private async readReleasesAsync(): Promise<string> {
+    const changelog = await readFile(path.join(this.root, DocsPageGenerator.CHANGELOG_FILE), DocsPageGenerator.TEXT_ENCODING);
+    const start = changelog.search(DocsPageGenerator.RELEASED_VERSION);
+    if (start < 0)
+      throw new ProcessException(`${DocsPageGenerator.CHANGELOG_FILE} names no released version, a "## <version>" line.`);
+    return changelog.slice(start);
   }
 
   private static locate(...parts: readonly string[]): string {
