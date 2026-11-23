@@ -824,6 +824,7 @@ describe("OrganizationViewComponent", () => {
     });
 
     it.each(["Board", "Focus"])("draws a teammate's send on the %s at right angles from the middle of its card's edge to the middle of its receiver's, turning outside both cards", async view => {
+      AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await createWithChat("alice");
       await pickView(view);
       if (view === "Focus") {
