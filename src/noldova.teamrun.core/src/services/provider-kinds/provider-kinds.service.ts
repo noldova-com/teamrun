@@ -119,8 +119,8 @@ export class ProviderKindsService implements IProviderKindsService {
     const current = this.describe(params.kind, installation);
     if (current.state === ProviderKindInstallState.Installed && Object.isNull(current.update))
       return Promise.resolve(current);
-    if (current.state === ProviderKindInstallState.Unavailable)
-      throw new ServiceException(ErrorCode.Unavailable, current.reason ?? Resources.installFailed, [params.kind]);
+    if (current.state === ProviderKindInstallState.Unavailable && !Object.isNull(current.reason))
+      throw new ServiceException(ErrorCode.Unavailable, current.reason, [params.kind]);
     const run = new ProviderKindInstallRun();
     this.installs.set(params.kind, run);
     this.reads.delete(params.kind);

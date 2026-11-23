@@ -21,6 +21,7 @@ import type { AcpInstallTools } from "../../models/acp-install-tools.js";
 import type { AcpRegistryAgent } from "../../models/acp-registry-agent.js";
 import type { AcpRegistryBinary } from "../../models/acp-registry-binary.js";
 import type { AcpRegistryPackage } from "../../models/acp-registry-package.js";
+import type { LocatedExecutable } from "../../models/located-executable.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import { ReleaseFile } from "../../models/release-file.js";
 import { Resources } from "../../resources.js";
@@ -89,15 +90,8 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
   }
 
   public static refusalOf(agent: AcpRegistryAgent, target: string | null, tools: AcpInstallTools): string | null {
-    const binary = agent.binaryFor(target);
-    if (!Object.isNull(binary))
-      return binary.isRaw || !Object.isNull(binary.isZip ? tools.unzip : tools.tar) ? null : Resources.formatAcpAgentNoExtractor(agent.name);
-    if (!Object.isNull(agent.npx)) {
-      if (!agent.npx.isExactNpmPackage)
-        return Resources.formatAcpAgentPackageRefused(agent.name, agent.npx.name);
-      return Object.isNull(tools.npm) ? Resources.formatAcpAgentNoNpm(agent.name) : null;
-    }
-    return Object.isNull(agent.uvx) ? Resources.formatAcpAgentNoBuild(agent.name) : Resources.formatAcpAgentUvx(agent.name);
+    const plan = AcpAgentInstaller.planOf(agent, target, tools);
+    return Object.isString(plan) ? plan : null;
   }
 
   public commandOf(): ProcessCommand | null {
@@ -125,9 +119,9 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string> {
     const next = await this.latest() ?? this.current;
-    const refusal = AcpAgentInstaller.refusalOf(next, this.target, this.tools);
-    if (!Object.isNull(refusal))
-      throw new InstallFailedException(refusal);
+    const plan = AcpAgentInstaller.planOf(next, this.target, this.tools);
+    if (Object.isString(plan))
+      throw new InstallFailedException(plan);
     const staging = InstallStaging.writing(Resources.formatAcpAgentFolderNotWritable(this.directory), () => {
       mkdirSync(this.directory, { recursive: true });
       return InstallStaging.open(this.directory);
@@ -138,11 +132,7 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
     try {
       const unpacked = join(staging, Resources.acpAgentUnpackedName);
       mkdirSync(unpacked);
-      const binary = next.binaryFor(this.target);
-      if (Object.isNull(binary))
-        await this.installPackage(next, AcpAgentInstaller.packageOf(next), unpacked, signal);
-      else
-        await this.installBinary(next, binary, staging, unpacked, progress, signal);
+      await plan(this, staging, unpacked, progress, signal);
       signal.throwIfAborted();
       committed = true;
       commit();
@@ -163,22 +153,24 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
     }
   }
 
-  private async installBinary(agent: AcpRegistryAgent, binary: AcpRegistryBinary, staging: string, unpacked: string, progress: (received: number, total: number) => void,
-    signal: AbortSignal): Promise<void> {
+  private async installBinary(agent: AcpRegistryAgent, binary: AcpRegistryBinary, extractor: LocatedExecutable | null, staging: string, unpacked: string,
+    progress: (received: number, total: number) => void, signal: AbortSignal): Promise<void> {
     if (!DownloadAddress.isSafe(binary.archive))
       throw new InstallFailedException(Resources.formatAcpAgentArchiveInsecure(agent.name));
     const download = join(staging, Resources.acpAgentDownloadName);
     await ReleaseDownload.save(new ReleaseFile(binary.archive, binary.sha256, null), download, agent.name, progress, signal);
     signal.throwIfAborted();
     const program = binary.commandIn(unpacked).executable;
-    if (binary.isRaw) {
+    if (Object.isNull(extractor)) {
       mkdirSync(dirname(program), { recursive: true });
       this.rename(download, program);
     }
     else {
       if (binary.isZip && !ZipDirectory.isSafe(download))
         throw new InstallFailedException(Resources.formatAcpAgentArchiveUnsafe(agent.name));
-      const result = await this.runner.run(this.unpackCommand(agent, binary, download, unpacked), {}, Resources.acpAgentUnpackTimeout, signal);
+      const command = binary.isZip ? ArchiveUnpacker.command(extractor, download, unpacked)
+        : extractor.toCommand().withArguments(...Resources.tarExtractArguments, download, Resources.tarDirectoryArgument, unpacked);
+      const result = await this.runner.run(command, {}, Resources.acpAgentUnpackTimeout, signal);
       if (!result.succeeded)
         throw new InstallFailedException(Resources.formatAcpAgentUnpackFailed(agent.name, result.timedOut ? null : result.exitCode));
     }
@@ -187,18 +179,7 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
       chmodSync(program, Resources.executableMode);
   }
 
-  private unpackCommand(agent: AcpRegistryAgent, binary: AcpRegistryBinary, download: string, unpacked: string): ProcessCommand {
-    const extractor = binary.isZip ? this.tools.unzip : this.tools.tar;
-    if (Object.isNull(extractor))
-      throw new InstallFailedException(Resources.formatAcpAgentNoExtractor(agent.name));
-    return binary.isZip ? ArchiveUnpacker.command(extractor, download, unpacked)
-      : extractor.toCommand().withArguments(...Resources.tarExtractArguments, download, Resources.tarDirectoryArgument, unpacked);
-  }
-
-  private async installPackage(agent: AcpRegistryAgent, npx: AcpRegistryPackage, unpacked: string, signal: AbortSignal): Promise<void> {
-    const npm = this.tools.npm;
-    if (Object.isNull(npm))
-      throw new InstallFailedException(Resources.formatAcpAgentNoNpm(agent.name));
+  private async installPackage(agent: AcpRegistryAgent, npx: AcpRegistryPackage, npm: LocatedExecutable, unpacked: string, signal: AbortSignal): Promise<void> {
     const args = [...Resources.acpNpmInstallArguments, Resources.acpNpmPrefixArgument, unpacked, npx.name];
     const result = await this.runner.run(AcpCommandLine.of(this.platform, this.environment, {}, npm.path, args), this.environment, Resources.acpAgentNpmTimeout, signal);
     if (!result.succeeded)
@@ -241,10 +222,26 @@ export class AcpAgentInstaller implements IProviderKindInstallation {
     return Object.isNull(tools.tar) ? Resources.tarCommandName : null;
   }
 
-  private static packageOf(agent: AcpRegistryAgent): AcpRegistryPackage {
-    if (Object.isNull(agent.npx))
-      throw new InstallFailedException(Resources.formatAcpAgentNoBuild(agent.name));
-    return agent.npx;
+  private static planOf(agent: AcpRegistryAgent, target: string | null, tools: AcpInstallTools): string | ((installer: AcpAgentInstaller, staging: string, unpacked: string,
+    progress: (received: number, total: number) => void, signal: AbortSignal) => Promise<void>) {
+    const binary = agent.binaryFor(target);
+    if (!Object.isNull(binary)) {
+      const extractor = binary.isZip ? tools.unzip : tools.tar;
+      if (!binary.isRaw && Object.isNull(extractor))
+        return Resources.formatAcpAgentNoExtractor(agent.name);
+      const unpacker = binary.isRaw ? null : extractor;
+      return (installer, staging, unpacked, progress, signal) => installer.installBinary(agent, binary, unpacker, staging, unpacked, progress, signal);
+    }
+    const npx = agent.npx;
+    if (!Object.isNull(npx)) {
+      const npm = tools.npm;
+      if (!npx.isExactNpmPackage)
+        return Resources.formatAcpAgentPackageRefused(agent.name, npx.name);
+      if (Object.isNull(npm))
+        return Resources.formatAcpAgentNoNpm(agent.name);
+      return (installer, _staging, unpacked, _progress, signal) => installer.installPackage(agent, npx, npm, unpacked, signal);
+    }
+    return Object.isNull(agent.uvx) ? Resources.formatAcpAgentNoBuild(agent.name) : Resources.formatAcpAgentUvx(agent.name);
   }
 
   private static manifestOf(agent: AcpRegistryAgent, folder: string, npx: AcpRegistryPackage): JsonReader {

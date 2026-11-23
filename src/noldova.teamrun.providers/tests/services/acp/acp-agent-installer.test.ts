@@ -596,6 +596,8 @@ export class AcpAgentInstallerTests {
     mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
 
     Assert.areEqual("{}", JSON.stringify(install.installer.variables));
+    Assert.isNull(install.installer.program);
+    Assert.isNull(install.installer.commandOf());
     Assert.isNull(install.installer.unavailable);
     const zipped = new Install(AcpAgentInstallerTests.binaryOnly("agent.zip"), directory.resolve("zipped"), new AcpInstallTools(null, null, null));
     Assert.areEqual("unzip", zipped.installer.missingTool);
