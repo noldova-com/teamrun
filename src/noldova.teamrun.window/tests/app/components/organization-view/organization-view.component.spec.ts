@@ -1969,6 +1969,7 @@ describe("OrganizationViewComponent", () => {
     });
 
     it("routes a message along the lines from you down the bar, a department's stem and its report grid's bus to a member, and from a nested leader to that member past one side of the grid, a space-2 gap from the cards, into the head over it, with the pulse drawn over the cards", async () => {
+      holdFlows();
       await create();
       await Wait.until(async () => {
         one(".chart .nol-canvas-actual").click();
