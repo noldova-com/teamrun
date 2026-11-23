@@ -263,7 +263,7 @@ describe("OrganizationBoardComponent", () => {
     await userEvent.click(one(".lane:nth-child(1) .add-member"));
     await Wait.until(() => expect(document.querySelector("nol-teamrun-organization-teammate-search .nol-quick-input-field")).not.toBeNull());
     await userEvent.type(one("nol-teamrun-organization-teammate-search .nol-quick-input-field", document), "car");
-    await Wait.until(() => expect(offered().map(t => t.querySelector(".nol-quick-input-title")?.textContent?.trim())).toEqual(["Carol"]));
+    await Wait.until(() => expect(offered().map(t => t.querySelector(".nol-quick-input-title")?.textContent?.trim())).toEqual(["Carol", "New teammate…"]));
     await userEvent.click(at(offered(), 0));
     one(".add-department").click();
     await Wait.until(() => expect(document.querySelector("nol-dialog .nol-teamrun-department-name")).not.toBeNull());
