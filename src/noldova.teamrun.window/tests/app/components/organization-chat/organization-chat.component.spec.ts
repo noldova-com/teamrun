@@ -229,6 +229,30 @@ describe("OrganizationChatComponent", () => {
       release();
     });
 
+  it("shows a teammate's new chat's messages, then its reply, once the window has read its chats, though the chat opened before the window listed it", async () => {
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    openAnswer = id => {
+      kept = [chatOf(id)];
+      listing = held;
+      context.emit(EventName.StateInvalidated, null);
+      return chatOf(id).toJson();
+    };
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(box()).not.toBeNull());
+    const whileListing = element().querySelectorAll("nol-teamrun-history-message").length;
+
+    release();
+
+    await Wait.until(() => expect(element().querySelectorAll("nol-teamrun-history-message").length).toBeGreaterThan(0));
+    context.emit(EventName.MessageCreated, reply("org-alice", MessageStatus.Completed).toJson());
+    await Wait.until(() => expect(texts("nol-teamrun-history-message").some(t => t.includes("Working"))).toBe(true));
+
+    expect([whileListing, ChatStoreService.of(context).selectedConversationId()]).toEqual([0, "org-alice"]);
+  });
+
   it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
     const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>
       new Conversation(`${organizationId}-${teammateId}`, null, `Organization · ${teammateId}`, SampleData.timestamp, SampleData.timestamp, false, null, null, false, null,
