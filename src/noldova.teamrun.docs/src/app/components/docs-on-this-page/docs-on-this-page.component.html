@@ -1,0 +1,21 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+@if (entries().length > 0) {
+  <nav class="nol-docs-outline" aria-labelledby="nol-docs-outline-title">
+    <p id="nol-docs-outline-title" class="nol-docs-outline-title">{{ resources.onThisPageLabel }}</p>
+    <ul class="nol-docs-outline-list">
+      @for (entry of entries(); track entry.id) {
+        <li>
+          <a class="nol-docs-outline-link" [class.nol-docs-outline-nested]="entry.depth === 1" [class.nol-docs-outline-nested-twice]="entry.depth === 2" [class.nol-docs-outline-current]="entry === current()"
+            [attr.aria-current]="entry === current() ? resources.currentLocation : null" [routerLink]="pageLink()" [fragment]="entry.id" (click)="follow(entry)">{{ entry.title }}</a>
+        </li>
+      }
+    </ul>
+  </nav>
+}

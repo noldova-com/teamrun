@@ -1,0 +1,220 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: block;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.nol-docs-header {
+  position: sticky;
+  z-index: 2;
+  inset-block-start: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nol-space-3) var(--nol-space-4);
+  padding: var(--nol-space-3) var(--nol-space-4);
+  border-block-end: var(--nol-border-width) solid var(--nol-border);
+  background-color: var(--nol-panel);
+}
+
+.nol-docs-menu-button {
+  flex: none;
+}
+
+.nol-docs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-title);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-title);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nol-docs-wordmark {
+  flex: none;
+  height: 0.75em;
+  aspect-ratio: 1333.817 / 201.396;
+  background-color: currentColor;
+  mask: url("/assets/noldova-wordmark.svg") center / contain no-repeat;
+}
+
+.nol-docs-header-search {
+  flex: 1 1 12rem;
+  max-width: 24rem;
+}
+
+.nol-docs-header-end {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nol-space-3);
+  margin-inline-end: calc((var(--nol-icon) - var(--nol-icon-button-target)) / 2);
+}
+
+.nol-docs-header-link {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--nol-icon-button-target);
+  min-height: var(--nol-icon-button-target);
+  font-size: var(--nol-icon);
+  outline: none;
+}
+
+.nol-docs-header-link::before {
+  content: "";
+  grid-area: 1 / 1;
+  width: var(--nol-icon-button);
+  height: var(--nol-icon-button);
+  border-radius: var(--nol-radius-small);
+}
+
+.nol-docs-header-link nol-docs-brand-mark {
+  grid-area: 1 / 1;
+}
+
+.nol-docs-header-link:hover::before {
+  background-color: var(--nol-toolbar-hover);
+}
+
+.nol-docs-header-link:focus-visible::before {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+@media (forced-colors: active) {
+  .nol-docs-wordmark {
+    forced-color-adjust: none;
+    background-color: LinkText;
+  }
+}
+
+.nol-docs-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  box-sizing: border-box;
+  max-inline-size: 108rem;
+  margin-inline: auto;
+}
+
+.nol-docs-menu {
+  position: sticky;
+  z-index: 1;
+  inset-block-start: var(--nol-docs-header-height, 0px);
+  display: none;
+  align-content: start;
+  gap: var(--nol-space-1);
+  box-sizing: border-box;
+  min-width: 0;
+  max-block-size: calc(100dvh - var(--nol-docs-header-height, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--nol-space-4);
+  border-block-end: var(--nol-border-width) solid var(--nol-border);
+  background-color: var(--nol-window);
+}
+
+.nol-docs-menu-open {
+  display: grid;
+}
+
+.nol-docs-menu-list {
+  display: grid;
+  gap: var(--nol-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nol-docs-menu-link {
+  display: block;
+  padding: var(--nol-space-1) var(--nol-space-2);
+  border-radius: var(--nol-radius-small);
+  color: var(--nol-text);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.nol-docs-menu-link:hover {
+  background-color: var(--nol-hover);
+}
+
+.nol-docs-menu-link:focus-visible {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+.nol-docs-menu-current {
+  background-color: var(--nol-selected);
+}
+
+@media (forced-colors: active) {
+  .nol-docs-menu-current,
+  .nol-docs-menu-current:hover {
+    color: HighlightText;
+    forced-color-adjust: none;
+    background-color: Highlight;
+  }
+
+  .nol-docs-menu-current:focus-visible {
+    outline-color: HighlightText;
+  }
+}
+
+.nol-docs-main {
+  min-width: 0;
+  padding: var(--nol-space-4);
+}
+
+@media (min-width: 48rem) {
+  .nol-docs-body {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+
+  .nol-docs-menu-button {
+    display: none;
+  }
+
+  .nol-docs-header {
+    padding-inline-end: var(--nol-space-6);
+  }
+
+  .nol-docs-brand {
+    padding-inline-start: var(--nol-space-2);
+  }
+
+  .nol-docs-menu {
+    z-index: auto;
+    display: grid;
+    align-self: start;
+    block-size: calc(100dvh - var(--nol-docs-header-height, 0px));
+    border-block-end: none;
+    border-inline-end: var(--nol-border-width) solid var(--nol-border);
+  }
+
+  .nol-docs-main {
+    padding: var(--nol-space-6);
+  }
+}
+
+@media (min-width: 75rem) {
+  .nol-docs-body {
+    grid-template-columns: 14rem minmax(0, 1fr) 14rem;
+    padding-inline: 3.5rem;
+  }
+
+  .nol-docs-header {
+    padding-inline: calc(max(0px, (100% - 108rem) / 2) + 3.5rem + var(--nol-space-4));
+  }
+}

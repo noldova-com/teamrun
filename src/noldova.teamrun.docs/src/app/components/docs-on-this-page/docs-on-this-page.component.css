@@ -1,0 +1,90 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  display: none;
+}
+
+.nol-docs-outline {
+  display: grid;
+  gap: var(--nol-space-2);
+}
+
+.nol-docs-outline-title {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-weight: var(--nol-weight-emphasis);
+}
+
+.nol-docs-outline-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nol-docs-outline-link {
+  display: block;
+  padding: var(--nol-space-1) var(--nol-space-2);
+  border-inline-start: calc(var(--nol-border-width) * 2) solid var(--nol-border);
+  color: var(--nol-text-muted);
+  overflow-wrap: break-word;
+  text-decoration: none;
+}
+
+.nol-docs-outline-nested {
+  padding-inline-start: calc(var(--nol-space-2) + var(--nol-space-3));
+}
+
+.nol-docs-outline-nested-twice {
+  padding-inline-start: calc(var(--nol-space-2) + var(--nol-space-3) * 2);
+}
+
+.nol-docs-outline-link:hover {
+  color: var(--nol-text);
+}
+
+.nol-docs-outline-link:focus-visible {
+  outline: var(--nol-border-width) solid var(--nol-accent);
+  outline-offset: calc(var(--nol-border-width) * -1);
+}
+
+.nol-docs-outline-current {
+  border-inline-start-color: var(--nol-accent);
+  color: var(--nol-text-strong);
+}
+
+@media (min-width: 75rem) {
+  :host {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    inset-block-start: var(--nol-docs-header-height, 0px);
+    align-self: start;
+    box-sizing: border-box;
+    max-height: calc(100dvh - var(--nol-docs-header-height, 0px));
+    padding: var(--nol-space-6) var(--nol-space-4);
+  }
+
+  .nol-docs-outline {
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .nol-docs-outline-list {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (forced-colors: active) {
+  .nol-docs-outline-current {
+    border-inline-start-color: Highlight;
+  }
+}

@@ -18,7 +18,7 @@ export class PackageCatalog {
   private static readonly SOURCE_FOLDER: string = "src";
   private static readonly MANIFEST_NAME: string = "package.json";
   private static readonly DEPENDENCY_FOLDER: string = "node_modules";
-  private static readonly PROJECT_MANIFEST: string = "src/package.json";
+  private static readonly WORKSPACE_MANIFESTS: readonly string[] = ["src/package.json", "src/noldova.teamrun.docs/package.json"];
 
   private readonly root: string;
 
@@ -53,7 +53,7 @@ export class PackageCatalog {
     const entries = await readdir(source, { recursive: true });
     return entries
       .map(t => `${PackageCatalog.SOURCE_FOLDER}/${t.split(path.sep).join("/")}`)
-      .filter(t => path.posix.basename(t) === PackageCatalog.MANIFEST_NAME && t !== PackageCatalog.PROJECT_MANIFEST)
+      .filter(t => path.posix.basename(t) === PackageCatalog.MANIFEST_NAME && !PackageCatalog.WORKSPACE_MANIFESTS.includes(t))
       .filter(t => !t.split("/").includes(PackageCatalog.DEPENDENCY_FOLDER))
       .map(t => path.posix.dirname(t))
       .sort();

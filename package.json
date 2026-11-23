@@ -13,11 +13,13 @@
     "npm": "11.20.0"
   },
   "workspaces": [
-    "src"
+    "src",
+    "src/noldova.teamrun.docs"
   ],
   "scripts": {
     "build": "node scripts/installs/root-install.ts && node scripts/build.ts",
     "build:app": "node scripts/app.ts build",
+    "build:docs": "npm run docs:build --workspace src/noldova.teamrun.docs",
     "format:documents": "node scripts/format-documents.ts",
     "install:app": "node scripts/app.ts install",
     "install:root": "node scripts/installs/root-install.ts --with-scripts",
@@ -32,6 +34,7 @@
     "start": "node scripts/app.ts start",
     "test": "node scripts/test.ts",
     "test:angular": "node scripts/test.ts angular",
+    "test:docs": "npm run docs:test --workspace src/noldova.teamrun.docs",
     "test:e2e": "node node_modules/playwright/cli.js test --config src/noldova.teamrun/tests/e2e/playwright.config.ts"
   },
   "dependencies": {

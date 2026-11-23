@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@docs-generated/*": [
+        "../../_build/docs-generated/*"
+      ]
+    }
+  },
+  "files": []
+}
