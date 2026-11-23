@@ -80,7 +80,8 @@ Commands you type in the composer starting with `/`.
 
 - It can't stop one sub-agent: nothing ends what a sub-agent runs in Codex's sandbox.
 - It can't run TeamRun's explorer sub-agent: by Codex's documents, a command a rule allows runs outside its sandbox.
-- It runs neither commands it lists for the chat nor your custom prompts: Codex's `/` commands belong to its own terminal app. TeamRun runs four of them itself: `/review`, `/fork`, `/rename` and `/archive`.
+- It runs neither commands it lists for the chat nor your custom prompts: Codex's `/` commands belong to its own terminal app.
+  TeamRun runs four of them itself: `/review`, `/fork`, `/rename` and `/archive`.
 
 **GitHub Copilot**
 

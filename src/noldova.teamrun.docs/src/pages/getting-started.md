@@ -11,7 +11,8 @@ The first time you open TeamRun, it opens the **Providers** tab with a welcome l
 The tab has three parts:
 
 - **Your providers:** the providers you have added, grouped by kind.
-- **Found on this computer:** folders of providers you already use outside TeamRun, such as a Claude Code or Codex you signed in to before. Choose **Add** on one to add it as it is.
+- **Found on this computer:** folders of providers you already use outside TeamRun, such as a Claude Code or Codex you signed in to before.
+  Choose **Add** on one to add it as it is.
 - **Add provider:** a card for each kind, with whether it is installed.
 
 To add a new one, choose **Add provider** and pick a kind.

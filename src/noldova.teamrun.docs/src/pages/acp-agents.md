@@ -19,7 +19,8 @@ An agent you add becomes the chosen provider type in Add provider once the list 
 
 **Add** installs the agent's latest version:
 
-- An agent that comes as a download is fetched over HTTPS and checked against the checksum the registry lists. When the registry lists none, the agent installs only from an HTTPS address and its row shows **Not checked**.
+- An agent that comes as a download is fetched over HTTPS and checked against the checksum the registry lists.
+  When the registry lists none, the agent installs only from an HTTPS address and its row shows **Not checked**.
 - An agent that runs through `npx` installs through your own `npm`, at the exact version the registry names.
 
 A kind of agent that can't install on this computer says why; when it lacks a program, such as unzip, tar or npm, it names that program so you can install it first.
@@ -37,7 +38,8 @@ If a saved value is gone or can't be read, the agent doesn't start, and says why
 An agent signs in the way it names:
 
 - **Its own sign-in:** TeamRun asks the agent to sign in.
-- **A terminal sign-in:** **Sign in** runs the agent's sign-in command in a terminal. A local command signs in with its own command alone, without its saved values.
+- **A terminal sign-in:** **Sign in** runs the agent's sign-in command in a terminal.
+  A local command signs in with its own command alone, without its saved values.
 - **No sign-in:** an agent that names no sign-in needs none, and shows signed in once its session opens.
 
 Each agent runs in your home folder with the one sign-in it keeps there, so TeamRun takes one provider of each agent.

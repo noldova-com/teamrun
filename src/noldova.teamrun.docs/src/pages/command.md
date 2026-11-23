@@ -1,8 +1,10 @@
 # The teamrun command
 
-TeamRun has a command line. You can use it to list and open projects and chats, send messages, and check providers, and your teammates use it to message teammates in other chats.
+TeamRun has a command line.
+You can use it to list and open projects and chats, send messages, and check providers, and your teammates use it to message teammates in other chats.
 
-Each command runs as the app's command followed by `teamrun` and the command's name. On this page, `<app command>` stands for the app's command:
+Each command runs as the app's command followed by `teamrun` and the command's name.
+On this page, `<app command>` stands for the app's command:
 
 ```
 <app command> teamrun list-chats
@@ -40,11 +42,15 @@ The command works on the same data as the TeamRun window, in the [data folder](s
 <app command> teamrun send <chatId> <text…>
 ```
 
-`send` sends a message as the window does: `@` mentions name teammates. It prints the ids of the message and of the replies it started, without waiting for the replies.
+`send` sends a message as the window does: `@` mentions name teammates.
+It prints the ids of the message and of the replies it started, without waiting for the replies.
 
 - `--teammate <name>` chooses the teammate who answers.
-- With no teammate named, the default teammate set in [Settings](settings.md#default-teammate) answers, not the one chosen in the chat's composer. With no default teammate set, `send` refuses.
-- `--provider <id>`, `--model <id>` and `--effort <level>` change who answers and how. `--model` without `--effort` answers at the model's own default effort. An effort for a provider that can't choose one is refused, with the reason, before anything is sent.
+- With no teammate named, the default teammate set in [Settings](settings.md#default-teammate) answers, not the one chosen in the chat's composer.
+  With no default teammate set, `send` refuses.
+- `--provider <id>`, `--model <id>` and `--effort <level>` change who answers and how.
+  `--model` without `--effort` answers at the model's own default effort.
+  An effort for a provider that can't choose one is refused, with the reason, before anything is sent.
 - `--kind <kind>` needs a `--provider` of that kind.
 - With `-` alone as the text, `send` reads the message from standard input, such as a file piped into it.
 
@@ -54,7 +60,8 @@ The command works on the same data as the TeamRun window, in the [data folder](s
 
 `cancel` stops the chat's working replies, hand-offs among them, and names the ones it stopped.
 
-No command answers an approval: only you answer one, in the window. See [Approving](approving.md).
+No command answers an approval: only you answer one, in the window.
+See [Approving](approving.md).
 
 ## Providers and teammates
 
@@ -68,14 +75,19 @@ No command answers an approval: only you answer one, in the window. See [Approvi
 | `list-teammates` | Lists the teammates, each with its provider, signed-in account, model and effort, chats, whether it is answering now, and its usage. |
 | `live-check --provider <id> [--prompt <text>]` | Runs one reply of a provider from start to end, at its default model, and prints it. By default the prompt asks for the word PONG. |
 
-`live-check` runs in a chat of its own that it deletes after. It fails when the reply doesn't complete, and stops a reply that asks for an approval. If you end it early, with Ctrl+C or `--timeout`, the reply keeps running in the chat `Live check`: find it with `list-chats`, stop it with `cancel <chatId>`, and remove it with `delete-chat <chatId>`. A chat it can't delete is named, for you to remove with `delete-chat`.
+`live-check` runs in a chat of its own that it deletes after.
+It fails when the reply doesn't complete, and stops a reply that asks for an approval.
+If you end it early, with Ctrl+C or `--timeout`, the reply keeps running in the chat `Live check`: find it with `list-chats`, stop it with `cancel <chatId>`, and remove it with `delete-chat <chatId>`.
+A chat it can't delete is named, for you to remove with `delete-chat`.
 
 ## How teammates use it
 
-Each teammate's instructions tell it how to reach teammates in other chats with this command, whichever provider it runs on, on Windows, macOS and Linux. It isn't set up in WSL's shells.
+Each teammate's instructions tell it how to reach teammates in other chats with this command, whichever provider it runs on, on Windows, macOS and Linux.
+It isn't set up in WSL's shells.
 
 - A message a teammate sends with `send` during its turn is sent as that teammate, never as you, and the other chat shows who sent it and from which chat.
-- In the other chat, the teammate named in the message answers, or the one given with `--teammate`, or else the one chosen in that chat's composer. When that is the sender itself, or none is chosen, the message is posted and no one starts.
+- In the other chat, the teammate named in the message answers, or the one given with `--teammate`, or else the one chosen in that chat's composer.
+  When that is the sender itself, or none is chosen, the message is posted and no one starts.
 - The answer comes back the same way.
 - A chain of such messages stops at **Teammate hand-offs** in [Settings](settings.md#replies), 4 by default.
 

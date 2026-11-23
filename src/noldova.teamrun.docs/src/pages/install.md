@@ -1,6 +1,7 @@
 # Install
 
-TeamRun runs on Windows, macOS and Linux. Download it from [teamrun.noldova.com/download](https://teamrun.noldova.com/download), which shows the files for each system.
+TeamRun runs on Windows, macOS and Linux.
+Download it from [teamrun.noldova.com/download](https://teamrun.noldova.com/download), which shows the files for each system.
 
 ## What your computer needs
 
@@ -15,7 +16,8 @@ Windows 10 on ARM64 isn't supported.
 ## Windows
 
 1. Download the `.exe` for your processor, x64 or ARM64.
-2. Open it and follow its steps. The installer is signed.
+2. Open it and follow its steps.
+   The installer is signed.
 
 ## macOS
 
@@ -27,14 +29,18 @@ Windows 10 on ARM64 isn't supported.
 
 Two kinds of package are offered, each for x64 and ARM64:
 
-- **AppImage:** a single file. Make it executable, then open it.
-- **.deb:** for Debian, Ubuntu and the distributions based on them. Install it with your package manager, such as `sudo apt install ./TeamRun-<version>-linux-x64.deb`.
+- **AppImage:** a single file.
+  Make it executable, then open it.
+- **.deb:** for Debian, Ubuntu and the distributions based on them.
+  Install it with your package manager, such as `sudo apt install ./TeamRun-<version>-linux-x64.deb`.
 
-The Linux packages aren't signed. To check a download, compare it with its `.sha256` file, which sits beside it on the release.
+The Linux packages aren't signed.
+To check a download, compare it with its `.sha256` file, which sits beside it on the release.
 
 ## Checking a download
 
-Every file on a release has a `.sha256` file beside it with the file's SHA-256 hash. To compute your download's hash:
+Every file on a release has a `.sha256` file beside it with the file's SHA-256 hash.
+To compute your download's hash:
 
 - Windows, in PowerShell: `Get-FileHash <file> -Algorithm SHA256`
 - macOS: `shasum -a 256 <file>`
@@ -50,6 +56,7 @@ Settings' **Check for updates** chooses when it looks:
 - **Only at start**: once, 30 seconds after TeamRun starts.
 - **Only when I ask**: only when you choose Check for updates.
 
-Before installing an update, TeamRun checks the file's size and hash, and on Windows its signature. A copy installed from the `.deb` asks for an administrator's password to install each update.
+Before installing an update, TeamRun checks the file's size and hash, and on Windows its signature.
+A copy installed from the `.deb` asks for an administrator's password to install each update.
 
 What an update check sends is on [Privacy and network](privacy.md).
