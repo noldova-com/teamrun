@@ -663,6 +663,30 @@ describe("ChatStoreService", () => {
     expect(store.workingReplies()).toEqual([]);
   });
 
+  it("tells the reply watchers once of a reply that starts while a resync reads the open replies, and asks no summary of it", async () => {
+    const live = new Message("live", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id, MessageStatus.Running, [], SampleData.reply.provenance,
+      SampleData.timestamp, SampleData.timestamp, null);
+    await store.initialize();
+    const ended: string[] = [];
+    store.onReplyEnded(t => ended.push(t.id));
+    const asked = context.count(MethodName.MessageSummary);
+    const read = context.count(MethodName.MessageListOpen);
+    const listed = new DeferredResponse();
+    context.answer(MethodName.MessageListOpen, () => listed.promise)
+      .answer(MethodName.MessageSummary, () => ReplySummary.fromMessage(SampleData.withStatus(live, MessageStatus.Completed)).toJson());
+
+    const resynced = store.resync();
+    await Wait.until(() => expect(context.count(MethodName.MessageListOpen)).toBe(read + 1));
+    context.emit(EventName.MessageCreated, live.toJson());
+    listed.resolve([]);
+    await expect(resynced).resolves.toBe(true);
+    const working = store.workingReplies().map(t => t.id);
+    context.emit(EventName.MessageUpdated, SampleData.withStatus(live, MessageStatus.Completed).toJson());
+
+    expect([working, ended, context.count(MethodName.MessageSummary) - asked]).toEqual([["live"], ["live"], 0]);
+    expect(store.workingReplies()).toEqual([]);
+  });
+
   it("keeps a conversation busy across queued replies and follows their terminal updates", async () => {
     const first = SampleData.withStatus(SampleData.reply, MessageStatus.Pending);
     const queued = new Message("second", "c1", 3, MessageAuthor.Provider, SampleData.userMessage.id,
@@ -756,6 +780,24 @@ describe("ChatStoreService", () => {
       listed.resolve([SampleData.reply.toJson(), elsewhere.toJson()]);
 
       await Wait.until(() => expect(context.workingMarks).toEqual(marks("c2")));
+    });
+
+    it("tells the reply watchers once of a reply that ends while it reads the open replies again, though the read still lists it", async () => {
+      const running = SampleData.withStatus(SampleData.reply, MessageStatus.Running);
+      context.answer(MethodName.MessageListOpen, () => [running.toJson()]);
+      const store = ChatStoreService.watch(context);
+      await Wait.until(() => expect(context.workingMarks).toEqual(marks("c1")));
+      const ended: string[] = [];
+      store.onReplyEnded(t => ended.push(t.id));
+      const listed = new DeferredResponse();
+      context.answer(MethodName.MessageListOpen, () => listed.promise);
+
+      const reading = ChatStoreService.resync(context);
+      context.emit(EventName.MessageUpdated, SampleData.withStatus(running, MessageStatus.Completed).toJson());
+      listed.resolve([running.toJson()]);
+
+      await expect(reading).resolves.toBe(true);
+      expect([ended, context.workingMarks, context.count(MethodName.MessageSummary)]).toEqual([[running.id], [], 0]);
     });
 
     it("reads the open replies again when the runtime's state is invalidated or asks for a resync, or the window resyncs, answering whether that worked", async () => {
