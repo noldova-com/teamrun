@@ -309,6 +309,7 @@ export class ComposerComponent {
   public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
   public readonly fanOut: InputSignal<ComposerFanOut | null> = input<ComposerFanOut | null>(null);
   public readonly whileReplying: InputSignal<MessageDelivery | null> = input<MessageDelivery | null>(null);
+  public readonly inPanel: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
   protected readonly replyingDelivery: Signal<MessageDelivery> = computed(() => this.whileReplying() ?? this.store.whileReplying());

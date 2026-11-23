@@ -53,10 +53,6 @@
   flex: none;
 }
 
-.composer ::ng-deep .nol-teamrun-composer {
-  padding: var(--nol-space-1) var(--nol-space-3) var(--nol-space-3);
-}
-
 .nol-teamrun-organization-chat-error {
   margin: 0;
   padding: var(--nol-space-3) var(--nol-content-padding-inline);

@@ -18,7 +18,7 @@ LICENSE file in the root directory of this source tree.
     <div class="history">
       <ng-container *ngComponentOutlet="history; inputs: historyInputs(); environmentInjector: environment" />
     </div>
-    <nol-teamrun-composer class="composer" [conversationId]="chat" [teammateId]="teammate" [whileReplying]="queue" />
+    <nol-teamrun-composer class="composer" [conversationId]="chat" [teammateId]="teammate" [whileReplying]="queue" [inPanel]="true" />
   } @else if (error(); as shown) {
     <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
   }
@@ -36,5 +36,5 @@ LICENSE file in the root directory of this source tree.
   @if (error(); as shown) {
     <p class="nol-teamrun-organization-chat-error" role="alert">{{ shown }}</p>
   }
-  <nol-teamrun-composer class="composer" [conversationId]="fanOutKey()" [fanOut]="fanOut" />
+  <nol-teamrun-composer class="composer" [conversationId]="fanOutKey()" [fanOut]="fanOut" [inPanel]="true" />
 }

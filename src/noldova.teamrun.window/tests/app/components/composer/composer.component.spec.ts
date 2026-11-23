@@ -6021,6 +6021,30 @@ describe("ComposerComponent", () => {
       expect(getComputedStyle(field()).borderTopStyle).toBe("none");
     });
 
+    it("insets the card in a panel a space-3 from the sides and bottom and a space-1 from the top, wide and folded tight alike", async () => {
+      await prepare();
+      await render();
+      fixture.componentRef.setInput("inPanel", true);
+      await fixture.whenStable();
+      await ready();
+      const tight = (): boolean => part("form").classList.contains("nol-teamrun-composer-tight");
+      const expectInsets = (): void => {
+        const form = box(part("form"));
+        const frame = box(card());
+        AppearanceFixture.expectPixels(frame.left - form.left, space(3));
+        AppearanceFixture.expectPixels(form.right - frame.right, space(3));
+        AppearanceFixture.expectPixels(frame.top - form.top, space(1));
+        AppearanceFixture.expectPixels(form.bottom - frame.bottom, space(3));
+      };
+
+      root().style.width = "40rem";
+      await Wait.until(() => expect(tight()).toBe(false));
+      expectInsets();
+      root().style.width = "13.75rem";
+      await Wait.until(() => expect(tight()).toBe(true));
+      expectInsets();
+    });
+
     it("grows the field with its text from two lines to ten, then scrolls", async () => {
       await show();
       const lineCount = (): number => (box(field()).height - space(3)) / lineHeight();

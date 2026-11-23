@@ -6,7 +6,7 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<form #form class="nol-teamrun-composer" [class.nol-teamrun-composer-tight]="fold() >= folds.tight" [attr.aria-label]="resources.composerLabel"
+<form #form class="nol-teamrun-composer" [class.nol-teamrun-composer-tight]="fold() >= folds.tight" [class.nol-teamrun-composer-panel]="inPanel()" [attr.aria-label]="resources.composerLabel"
   (submit)="submit($event)" (paste)="paste($event)" (dragover)="dragOver($event)" (dragleave)="dragLeave()" (drop)="drop($event)">
   <nol-teamrun-waiting-messages [chatId]="conversationId()" [editable]="text().length === 0 && attachments().length === 0" (edit)="editWaiting($event)" />
   <div #card class="nol-teamrun-composer-card" [class.nol-teamrun-composer-dropping]="dropping()" [class.nol-teamrun-composer-idle]="!canCompose()">
