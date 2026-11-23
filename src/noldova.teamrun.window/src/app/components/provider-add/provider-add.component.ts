@@ -37,6 +37,7 @@ import {
 
 import { Resources } from "../../../resources";
 import { ProviderKindCard } from "../../models/provider-kind-card";
+import { ProviderKindChoices } from "../../models/provider-kind-choices";
 import { ProviderWizardRow } from "../../models/provider-wizard-row";
 import { TakenKind } from "../../models/taken-kind";
 import { AcpAgentsBrowser } from "../../services/acp-agents-browser";
@@ -69,7 +70,7 @@ export class ProviderAddComponent {
   protected readonly acpCard: ProviderKindCard = new ProviderKindCard(Resources.acpRowKind, Resources.acpCardName, Resources.acpCardNote, false, null);
   protected readonly cards: Signal<readonly ProviderKindCard[]> = computed(() => [...this.typeCards(), this.acpCard]);
   protected readonly kind: WritableSignal<string> = linkedSignal({
-    source: () => ({ kinds: this.store().kinds().map(t => t.id), taken: this.takenKinds() }),
+    source: () => new ProviderKindChoices(this.store().kinds().map(t => t.id), this.takenKinds()),
     computation: (source, previous) => TakenKind.firstFree(source.taken, [source.kinds.find(t => t === previous?.value),
       source.kinds.find(t => this.store().terminalSessions().has(t)), ...source.kinds], Resources.acpRowKind)
   });
@@ -180,8 +181,8 @@ export class ProviderAddComponent {
     }));
   }
 
-  protected editLabel(event: globalThis.Event): void {
-    this.edited.set((event.target as HTMLInputElement).value);
+  protected editLabel(value: string): void {
+    this.edited.set(value);
   }
 
   protected async pickFolder(): Promise<void> {
@@ -237,6 +238,8 @@ export class ProviderAddComponent {
   }
 
   private async install(kind: string): Promise<void> {
+    if (!Object.isNull(this.installingKind()))
+      return;
     const store = this.store();
     this.installingKind.set(kind);
     await store.installKind(kind, this.showError);
@@ -248,6 +251,8 @@ export class ProviderAddComponent {
       await this.save(kind);
     else if (installation?.state === ProviderKindInstallState.NotInstalled && !Object.isNull(installation.reason))
       this.error.set(installation.reason);
+    else if (installation?.state === ProviderKindInstallState.Unavailable)
+      this.error.set(null);
   }
 
   private installTool(card: ProviderKindCard): void {

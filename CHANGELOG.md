@@ -39,6 +39,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Providers:** Cancel in the add panel during a type's install no longer adds the provider once the install ends; pressing Add or Try again twice installs and adds the type once; and an install that ends without finishing shows its reason in the panel (#76).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).

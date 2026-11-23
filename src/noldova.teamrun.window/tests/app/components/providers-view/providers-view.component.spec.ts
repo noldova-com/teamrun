@@ -9,7 +9,8 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
 
 import "@noldova/context.core";
-import { WindowPartTokens } from "@noldova/desktop.window";
+import { FailureCode } from "@noldova/desktop.protocol";
+import { RuntimeRequestException, WindowPartTokens } from "@noldova/desktop.window";
 import {
   AbilityCell,
   AcpAgentEntry,
@@ -1069,6 +1070,24 @@ describe("ProvidersViewComponent", () => {
       expect(created()).toEqual([["antigravity", "Personal", null]]);
     });
 
+    it("installs and adds a type once when Try again is pressed twice before its install shows progress", async () => {
+      const ended = new DeferredResponse();
+      await withKinds(t => t.answer(MethodName.ProviderKindInstall, () => ended.promise));
+      await openPanel();
+      card("antigravity").click();
+      await settle();
+
+      button(".nol-teamrun-add-try-again").click();
+      button(".nol-teamrun-add-try-again").click();
+      await settle();
+      const installed = new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed).toJson();
+      context.emit(EventName.ProviderKindInstallationChanged, installed);
+      ended.resolve(installed);
+      await settle();
+
+      expect([context.count(MethodName.ProviderKindInstall), created()]).toEqual([1, [["antigravity", "Personal", null]]]);
+    });
+
     it("says what to run for a type TeamRun doesn't install itself, opens no terminal until Add, and looks for it again on Try again", async () => {
       let installed = false;
       await withKinds(t => t.answer(MethodName.ProviderToolList, () => [new ProviderTool("codex", true, "0.166.0").toJson(),
@@ -1321,12 +1340,16 @@ describe("ProvidersViewComponent", () => {
       await settle();
 
       expect([created(), texts(".nol-teamrun-add-error")]).toEqual([[], ["The installer can't be reached."]]);
-      context.answer(MethodName.ProviderKindInstall, () => new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, 0, 1000).toJson());
+      const ended = new DeferredResponse();
+      context.answer(MethodName.ProviderKindInstall, () => ended.promise);
       card("claude").click();
       await settle();
       button(".nol-teamrun-add-save").click();
       await settle();
+      context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.Installing, null, 0, 1000).toJson());
+      await settle();
       context.emit(EventName.ProviderKindInstallationChanged, new ProviderKindInstallation("claude", ProviderKindInstallState.Unavailable, unzip).toJson());
+      ended.reject(new RuntimeRequestException(FailureCode.Unavailable, unzip));
       await settle();
 
       expect([created(), texts(".nol-teamrun-add-error"), texts(".nol-teamrun-add-step[role=alert] .nol-teamrun-add-step-text")])
