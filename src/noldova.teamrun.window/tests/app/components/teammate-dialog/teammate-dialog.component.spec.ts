@@ -2051,7 +2051,7 @@ describe("TeammateDialogComponent", () => {
       const [heading, add] = [field(".nol-teamrun-usage-hand-offs-heading"), field(".nol-teamrun-add-usage-hand-off")];
       const dimmed = forcedColors === "active" ? 1 : 0.5;
 
-      expect([shown(heading), shown(add), forcedColors !== "active" || getComputedStyle(heading).color === getComputedStyle(add).color]).toEqual([dimmed, dimmed, true]);
+      expect([shown(heading), shown(add.querySelector(":scope > .nol-button-face, :scope > .nol-icon-button-face") ?? add), forcedColors !== "active" || getComputedStyle(heading).color === getComputedStyle(add).color]).toEqual([dimmed, dimmed, true]);
     });
 
     it("splits Hand off to's table like Sustain's: the model column 7.5rem wide with its lines wrapping, the position column narrow and the teammate column the rest", async () => {
@@ -2128,7 +2128,7 @@ describe("TeammateDialogComponent", () => {
         AppearanceFixture.expectPixels(box(field(selector)).right, form.right);
       }
       const label = document.createRange();
-      label.selectNodeContents(refresh);
+      label.selectNodeContents(refresh.querySelector(":scope > .nol-button-face") ?? refresh);
 
       const text = label.getBoundingClientRect();
       const model = labelOf(3);

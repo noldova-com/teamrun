@@ -788,8 +788,8 @@ describe("PageDocumentComponent", () => {
       AppearanceFixture.expectPixels(bar.right - dismiss.right, token("space-3"));
       AppearanceFixture.expectPixels(dismiss.height, token("button-height"));
       AppearanceFixture.expectPixels(dismiss.top + dismiss.height / 2, bar.top + (bar.height - Number.parseFloat(style.borderBottomWidth)) / 2);
-      expect([style.borderTopWidth, style.borderRadius, style.marginBottom, style.fontSize, quiet.fontSize, quiet.borderTopStyle])
-        .toEqual(["0px", "0px", "0px", `${0.75 * rem()}px`, `${0.75 * rem()}px`, "none"]);
+      expect([style.borderTopWidth, style.borderRadius, style.marginBottom, style.fontSize, quiet.fontSize, quiet.borderTopWidth])
+        .toEqual(["0px", "0px", "0px", `${0.75 * rem()}px`, `${0.75 * rem()}px`, "0px"]);
       if (forcedColors === "active")
         expect([style.borderBottomStyle, style.borderBottomColor, style.borderBottomWidth])
           .toEqual(["solid", systemColor("CanvasText"), getComputedStyle(element()).getPropertyValue("--nol-border-width").trim()]);
