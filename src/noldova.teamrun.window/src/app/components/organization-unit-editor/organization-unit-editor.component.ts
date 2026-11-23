@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, ElementRef, inject, input, type InputSignal, output, type OutputEmitterRef, type Signal, viewChild } from "@angular/core";
+import { Component, computed, inject, input, type InputSignal, output, type OutputEmitterRef, type Signal } from "@angular/core";
 
 import type { Department } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, DialogService, IconButtonComponent, SelectComponent, SelectOption, TextFieldComponent } from "@noldova/ui.components.angular";
@@ -33,7 +33,6 @@ export class OrganizationUnitEditorComponent {
   private readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   private readonly store: ChatStoreService = inject(ChatStoreService);
   private readonly dialogs: DialogService = inject(DialogService);
-  private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("name", { read: ElementRef });
 
   public readonly node: InputSignal<OrganizationNode> = input.required<OrganizationNode>();
 
@@ -50,14 +49,8 @@ export class OrganizationUnitEditorComponent {
     return OrganizationPlaceChoice.keyOf(department.parent);
   }
 
-  protected rename(department: Department): void {
-    const field = this.nameField().nativeElement;
-    const name = field.value.trim();
-    if (name.length === 0 || name === department.name) {
-      field.value = department.name;
-      return;
-    }
-    void this.organization.renameDepartment(department.id, name);
+  protected rename(event: Event, department: Department): void {
+    void OrganizationEdits.renameAsync(event, department.name, name => this.organization.renameDepartment(department.id, name));
   }
 
   protected setLeader(value: string): void {

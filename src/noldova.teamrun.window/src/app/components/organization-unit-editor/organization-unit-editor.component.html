@@ -15,7 +15,7 @@ LICENSE file in the root directory of this source tree.
   <div class="nol-teamrun-form">
     <label class="nol-teamrun-field">
       <span class="nol-teamrun-field-label">{{ resources.organizationUnitNameField }}</span>
-      <input #name nol-text-field class="name-field" [attr.aria-label]="resources.organizationUnitNameField" [value]="node().name" (change)="rename(department)">
+      <input nol-text-field class="name-field" [attr.aria-label]="resources.organizationUnitNameField" [value]="node().name" (change)="rename($event, department)">
     </label>
     <div class="nol-teamrun-field">
       <span class="nol-teamrun-field-label">{{ resources.organizationTypeLabel }}</span>

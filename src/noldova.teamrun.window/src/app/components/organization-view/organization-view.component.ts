@@ -7,7 +7,7 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, DestroyRef, effect, inject, input, type InputSignal, linkedSignal, signal, type Signal, untracked, type WritableSignal } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, input, type InputSignal, signal, type Signal, untracked, type WritableSignal } from "@angular/core";
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 
 import { OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
@@ -19,7 +19,6 @@ import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, Canva
 import { Resources } from "../../../resources";
 import { FlowLineShape } from "../../enums/flow-line-shape";
 import { OrganizationTargetKey } from "../../models/organization-target-key";
-import { OrganizationFocus } from "../../models/organization-focus";
 import { OrganizationTargetChoice } from "../../models/organization-target-choice";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -68,8 +67,7 @@ export class OrganizationViewComponent {
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly editing: WritableSignal<boolean> = signal(false);
   protected readonly selection: OrganizationUnitSelection = inject(OrganizationUnitSelection);
-  protected readonly focusKey: Signal<string | null> = computed(() => this.layout.layout().focus);
-  protected readonly chosen: WritableSignal<OrganizationTarget | null> = linkedSignal<string | null, OrganizationTarget | null>({ source: this.focusKey, computation: () => null });
+  protected readonly chosen: WritableSignal<OrganizationTarget | null> = signal(null);
   protected readonly root: Signal<OrganizationNode> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
   protected readonly editedUnit: Signal<OrganizationNode | null> = computed(() => {
     const id = this.selection.unitId();
@@ -91,9 +89,7 @@ export class OrganizationViewComponent {
       OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
     const first = OrganizationNode.walk(this.root()).flatMap(t => t.department ?? [])[0];
-    const key = this.focusKey();
-    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.root().subDepartments, this.reports(), key).target)
-      ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
+    return this.chosen() ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
   protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments,
     [...this.root().directReports, ...this.reports().filter(t => this.root().managers.has(t.id))]));
