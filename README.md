@@ -14,7 +14,7 @@ Product names and trademarks belong to their owners.
 ## Organization
 
 The Organization view shows the person's teammates as an organization: units of the types the person names, such as Department or Team, each with an optional leader and its members, nested to any depth, with the person at the root.
-It has three layouts: the tree, the board and Focus, on one unit or teammate.
+It draws them as one tree, each unit and teammate a card under the unit it reports to.
 Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped) and what it is doing now, and can also show the last thing it said and its Git branch, pull requests, documents and artifacts.
 The Messages panel sends one message to a teammate, a unit (its leader first, then its members), all leaders and the person's direct reports, or everyone; it shows how many teammates the message goes to before sending, and Stop halts the ones not yet started.
 ARCHITECTURE.md describes the organization's storage, the statuses and the messages.
