@@ -40,6 +40,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 ### Fixed
 
 - **Chats:** a reply that ends while the window has lost touch with TeamRun shows as ended once the window reads its state again: the composer reloads its models, and the Organization view and the teammate dialog see the reply end (#66).
+- **Chats:** a reply that ends while the window reads its state again is counted once: an Organization chat no longer shows two unread for one reply, and the composer reloads its models once (#182).
 - **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
