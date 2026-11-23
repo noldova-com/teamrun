@@ -799,7 +799,7 @@ describe("OrganizationViewComponent", () => {
       const yours = points("path.writing", board);
       const layers = [getComputedStyle(one(".nol-teamrun-flow-overlay .lines", board)).zIndex, box(one("aside.messages")).left >= box(one(".chart nol-canvas")).right];
       await flow(answer("r1", asked, "bob", MessageStatus.Running));
-      const sent = [routes(), all(".nol-teamrun-flow-overlay .pulse", board).length];
+      const sent = [routes(), all(".nol-teamrun-flow-overlay .pulse", board).length, getComputedStyle(one(".nol-teamrun-flow-overlay .pulse", board)).zIndex];
       const answering = points("path.writing", board);
       await end(".pulse");
       const glow = box(one(".nol-teamrun-flow-overlay .glow", board));
@@ -808,7 +808,7 @@ describe("OrganizationViewComponent", () => {
       expectRoute(yours, [new FlowPoint(edge, level), new FlowPoint(bob.right, level)]);
       expectRoute(answering, [new FlowPoint(bob.right, level), new FlowPoint(edge, level)]);
       [glow.left, glow.top, glow.width, glow.height].forEach((t, i) => AppearanceFixture.expectPixels(t, [bob.left, bob.top, bob.width, bob.height].at(i) ?? Number.NaN));
-      expect([layers, sent]).toEqual([["auto", true], [["route sent", "route writing"], 1]]);
+      expect([layers, sent]).toEqual([["auto", true], [["route sent", "route writing"], 1, "auto"]]);
     });
 
     it("draws your message in Focus from the visible canvas's edge over the conversation below it, though its card ends at the plane's, straight up into its receiver's card", async () => {

@@ -55,6 +55,7 @@
   animation: nol-teamrun-flow-glow ease-out forwards;
 }
 :host(.cards) .lines,
+:host(.cards) .pulse,
 :host(.cards) .glow {
   z-index: auto;
 }
