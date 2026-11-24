@@ -29,7 +29,6 @@ export class DocsCatalog {
     DocsCatalog.page(Resources.sustainTitle, "sustain", DocsGroup.Using),
     DocsCatalog.page(Resources.settingsTitle, "settings", DocsGroup.Using),
     DocsCatalog.page(Resources.privacyTitle, "privacy", DocsGroup.Reference),
-    DocsCatalog.page(Resources.commandTitle, "command", DocsGroup.Reference),
     DocsCatalog.page(Resources.troubleshootingTitle, "troubleshooting", DocsGroup.Reference),
     DocsCatalog.page(Resources.faqTitle, "faq", DocsGroup.Reference),
     DocsCatalog.page(Resources.releaseNotesTitle, "release-notes", DocsGroup.Reference)

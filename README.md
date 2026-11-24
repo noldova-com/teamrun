@@ -289,6 +289,21 @@ The composer keeps a chat's choice when it opens the chat, so a chat from an ear
 The teammate reads such a message as from the sender in that chat, named by the chat's current title and its id, and its instructions say to name a chat to the person by its title and keep the id for the command.
 The answer comes back the same way, and a chain of such messages, with the hand-offs between them, stops at the Teammate hand-offs limit in Settings › TeamRun, from 0 to 100 and 4 by default.
 
+## Documentation site
+
+TeamRun's documentation site, for people who use the app, is the private workspace `src/noldova.teamrun.docs`, served at teamrun.noldova.dev, with its staging at teamrun.staging.noldova.dev and its sandbox at teamrun.sandbox.noldova.dev.
+Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes add the released versions of [CHANGELOG.md](CHANGELOG.md) when the site is built.
+A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/drafts/`, outside the menu, the search and the build.
+`npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` runs its tests with coverage, then opens every page the menu links.
+
+The site documents the released app, so it is built from a release's commit, never from the tip of `main`.
+The "Docs" workflow, `.github/workflows/docs.yml`, started by hand with the released version and the full hash of the `main` commit the release built, checks both, runs `npm run set-version -- <version>` on that commit, as the release's builds do, so Release notes name the version, and builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.43.0, into the image `ghcr.io/noldova-com/teamrun-docs`, tagged with the commit.
+It then moves the image's `latest` label to it, which the sandbox follows:
+
+```sh
+gh workflow run docs.yml -f version=<version> -f commit=<released commit>
+```
+
 ## Releases
 
 Noldova builds, signs and publishes the official installers from this repository's source at one commit: it builds TeamRun's packages there, installs `app/` from those archives and packages the app, and publishes no package to a registry.

@@ -10,7 +10,7 @@ For example: `<app command> teamrun list-chats`
 
 Add `--json` to any command to get its result as JSON.
 
-The command works on the same data as the TeamRun window, in the [data folder](settings.md#data).
+The command works on the same data as the TeamRun window, in the [data folder](../src/pages/settings.md#data).
 
 ## Projects
 
@@ -42,7 +42,7 @@ To send a message: `<app command> teamrun send <chatId> <text…>`
 It prints the ids of the message and of the replies it started, without waiting for the replies.
 
 - `--teammate <name>` chooses the teammate who answers.
-- With no teammate named, the default teammate set in [Settings](settings.md#default-teammate) answers, not the one chosen in the chat's composer.
+- With no teammate named, the default teammate set in [Settings](../src/pages/settings.md#default-teammate) answers, not the one chosen in the chat's composer.
   With no default teammate set, `send` refuses.
 - `--provider <id>`, `--model <id>` and `--effort <level>` change who answers and how.
   `--model` without `--effort` answers at the model's own default effort.
@@ -55,7 +55,7 @@ To stop a chat's replies: `<app command> teamrun cancel <chatId>`
 `cancel` stops the chat's working replies, hand-offs among them, and names the ones it stopped.
 
 No command answers an approval: only you answer one, in the window.
-See [Approving](approving.md).
+See [Approving](../src/pages/approving.md).
 
 ## Providers and teammates
 
@@ -83,6 +83,6 @@ It isn't set up in WSL's shells.
 - In the other chat, the teammate named in the message answers, or the one given with `--teammate`, or else the one chosen in that chat's composer.
   When that is the sender itself, or none is chosen, the message is posted and no one starts.
 - The answer comes back the same way.
-- A chain of such messages stops at **Teammate hand-offs** in [Settings](settings.md#replies), 4 by default.
+- A chain of such messages stops at **Teammate hand-offs** in [Settings](../src/pages/settings.md#replies), 4 by default.
 
 When you run `send` yourself, outside a teammate's turn, it sends as you.

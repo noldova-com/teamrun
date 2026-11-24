@@ -39,7 +39,6 @@ export class Resources {
   public static readonly sustainTitle: string = "When usage runs out";
   public static readonly settingsTitle: string = "Settings";
   public static readonly privacyTitle: string = "Privacy and network";
-  public static readonly commandTitle: string = "The teamrun command";
   public static readonly troubleshootingTitle: string = "Troubleshooting";
   public static readonly faqTitle: string = "FAQ";
   public static readonly releaseNotesTitle: string = "Release notes";

@@ -49,7 +49,7 @@ describe("DocsSearchComponent", () => {
     const host = await renderAsync();
 
     await userEvent.type(field(host), "REFERENCE");
-    await DocsFixture.untilAsync(() => expect(results(host)).toEqual(["Privacy and network", "The teamrun command", "Troubleshooting", "FAQ", "Release notes"]));
+    await DocsFixture.untilAsync(() => expect(results(host)).toEqual(["Privacy and network", "Troubleshooting", "FAQ", "Release notes"]));
   });
 
   it("says when nothing matches", async () => {

@@ -1,7 +1,7 @@
 # Install
 
 TeamRun runs on Windows, macOS and Linux.
-Download it from [teamrun.noldova.com/download](https://teamrun.noldova.com/download), which shows the files for each system.
+Download it from [teamrun.noldova.com/download](https://teamrun.noldova.com/download/), which shows the files for each system.
 
 ## What your computer needs
 

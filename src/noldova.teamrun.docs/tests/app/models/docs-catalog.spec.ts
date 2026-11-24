@@ -38,7 +38,7 @@ describe("DocsCatalog", () => {
 
     expect(new Set(links).size).toBe(links.length);
     expect(links).toEqual(["/", "/getting-started", "/install", "/providers", "/provider-features", "/acp-agents", "/chats", "/approving", "/organization", "/projects", "/tools", "/sustain",
-      "/settings", "/privacy", "/command", "/troubleshooting", "/faq", "/release-notes"]);
+      "/settings", "/privacy", "/troubleshooting", "/faq", "/release-notes"]);
   });
 
   it("menus every page once, in the catalog's order, in groups that each hold a page", () => {

@@ -61,7 +61,7 @@ A change applies from the next Run.
 **Choose default teammate** sets the provider, model and effort a new chat starts with.
 Until you choose one, a new chat starts from the last message you sent.
 
-The default teammate also answers a message sent from [the teamrun command](command.md) that names no teammate.
+The default teammate also answers a message sent from the teamrun command that names no teammate.
 
 ## Teammates and providers
 
@@ -94,7 +94,7 @@ Choose another when this one is in use.
 
 **Data folder** is where TeamRun keeps its database.
 **Show in folder** shows the database file in your system's file manager.
-[The teamrun command](command.md) uses the same folder.
+The teamrun command uses the same folder.
 What TeamRun keeps there is on [Privacy and network](privacy.md).
 
 ## What each provider can do

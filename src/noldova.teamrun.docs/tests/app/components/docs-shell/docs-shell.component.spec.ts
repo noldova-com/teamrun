@@ -246,7 +246,7 @@ describe("DocsShellComponent", () => {
         ["TeamRun", "Getting started", "Install"],
         ["Providers and sign-in", "What each provider can do", "ACP agents", "Chats and teammates", "Following and approving the work", "Organization", "Projects and folders",
           "Tools teammates use", "When usage runs out", "Settings"],
-        ["Privacy and network", "The teamrun command", "Troubleshooting", "FAQ", "Release notes"]
+        ["Privacy and network", "Troubleshooting", "FAQ", "Release notes"]
       ]);
       expect(DocsFixture.all(nav, "a").map(t => t.getAttribute("href"))).toEqual(DocsCatalog.pages.map(t => t.link));
       expect(DocsFixture.all(nav, ":scope > a")).toEqual([]);
