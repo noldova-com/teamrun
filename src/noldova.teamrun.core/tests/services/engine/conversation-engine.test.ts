@@ -61,6 +61,7 @@ import {
   OrganizationParent,
   SubAgent,
   SubAgentStatus,
+  type Teammate,
   TeammateCreateParams,
   TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
@@ -529,7 +530,7 @@ export class ConversationEngineTests {
     await host.engine.waitForIdle();
     const saved = (await host.messages.findAsync(result.sent.id))?.attachments[0];
     const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
-    const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson);
+    const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, []);
 
     Assert.areEqual(2, host.adapter.requests.length);
     Assert.isTrue(promptOf(grokProvider.id).includes(Resources.formatOrganizationRolePrompt(role, "@Grok @Ben look")));
@@ -562,8 +563,41 @@ export class ConversationEngineTests {
 
     Assert.areEqual(memberChat.id, reopened.id);
     Assert.isTrue(promptOf(leadProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
-      Resources.organizationReportsToPerson)));
-    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead")));
+      Resources.organizationReportsToPerson, ["Member"])));
+    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead", [])));
+  }
+
+  @TestMethod
+  public async tellsATeammateTheDepartmentsUnderItWithTheirLeadersAndTheTeammatesPlacedUnderIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
+    const opusProvider = await host.createProviderAsync("fake", "Opus");
+    const otherProvider = await host.createProviderAsync("fake", "Other");
+    const make = (name: string, providerId: string): Promise<Teammate> =>
+      host.teammates.createAsync(new TeammateCreateParams(name, null, providerId, Harness.Provider, null, null));
+    const opus = await make("Opus", opusProvider.id);
+    const ann = await make("Ann", otherProvider.id);
+    const bob = await make("Bob", otherProvider.id);
+    const cat = await make("Cat", otherProvider.id);
+    const dan = await make("Dan", otherProvider.id);
+    const eve = await make("Eve", otherProvider.id);
+    const organizationId = Resources.defaultOrganizationId;
+    await host.organization.placeAsync(new TeammatePlaceParams(organizationId, opus.id, OrganizationParent.person, 0));
+    const devs = await host.organization.createAsync(new DepartmentCreateParams(organizationId, "Devs", type, OrganizationParent.teammate(opus.id), ann.id));
+    const design = await host.organization.createAsync(new DepartmentCreateParams(organizationId, "DESIGN", type, OrganizationParent.teammate(opus.id), cat.id));
+    await host.organization.createAsync(new DepartmentCreateParams(organizationId, "Research", type, OrganizationParent.teammate(opus.id)));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(organizationId, bob.id, devs.id));
+    await host.organization.setMemberAsync(new DepartmentMemberSetParams(organizationId, dan.id, design.id));
+    await host.organization.placeAsync(new TeammatePlaceParams(organizationId, eve.id, OrganizationParent.teammate(opus.id), 0));
+    const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(organizationId, opus.id));
+
+    await host.engine.sendAsync(new MessageSendParams(chat.id, "@Opus ask your agents", null, null, [], [opus.id]));
+    await host.engine.waitForIdle();
+
+    Assert.isTrue((host.adapter.requests.find(t => t.provider?.id === opusProvider.id)?.prompt ?? String.empty).includes(
+      Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, [
+        Resources.formatOrganizationDepartmentReport("Devs", "Ann"), Resources.formatOrganizationDepartmentReport("DESIGN", "Cat"),
+        Resources.formatOrganizationUnledReport("Research"), "Eve"])));
   }
 
   @TestMethod
@@ -577,7 +611,7 @@ export class ConversationEngineTests {
     await host.engine.waitForIdle();
 
     Assert.isFalse((host.adapter.requests[0]?.prompt ?? "missing").includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment,
-      Resources.organizationReportsToPerson)));
+      Resources.organizationReportsToPerson, [])));
     Assert.isTrue((host.adapter.requests[0]?.prompt ?? String.empty).includes("look"));
     Assert.isNull((await host.messages.findAsync(result.sent.id))?.details[0]?.payload ?? null);
   }

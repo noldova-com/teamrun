@@ -201,7 +201,7 @@ export class ResourcesTests {
     Assert.areEqual(14, note.split("\n").length);
     Assert.isTrue(note.includes("\nA read-only mode refuses `teamrun_send_message`, so in one, answer such a message in your reply instead.\n"));
     Assert.isTrue(note.includes("\nTeamRun's tools read the app: `teamrun_list_chats` lists each chat with its teammates and whether a reply is running, "
-      + "and `teamrun_list_teammates` lists every teammate with its provider, model, chats and usage.\n`teamrun_list_messages` lists a chat's latest messages: "));
+      + "and `teamrun_list_teammates` lists every teammate with its provider, model, chats, usage, and its department and manager in each organization.\n`teamrun_list_messages` lists a chat's latest messages: "));
     Assert.isTrue(note.includes("\n`teamrun_list_projects`, `teamrun_list_approvals`, `teamrun_list_providers` and `teamrun_check_provider` list the projects, "
       + "a chat's approvals and the providers with how much of their plans is used, and check a provider's sign-in.\n"));
     Assert.isTrue(note.includes("\n`teamrun_send_message` sends a message to another chat, marked as from you and this chat, and doesn't wait for the answer, "
@@ -253,7 +253,7 @@ export class ResourcesTests {
     Assert.isTrue(note.includes("\nTo hand this chat's work to a teammate, start your reply or a line with `@<name>`, as in `@<name>, please check this`; "
       + "a name inside a sentence, or that of a teammate you sent a message to, only mentions it and starts no one.\nTeamRun's command line"));
     Assert.isTrue(note.includes("`acme teamrun list-chats` lists each chat with its teammates and whether a reply is running, "
-      + "and `acme teamrun list-teammates` lists every teammate with its provider, model, chats and usage."));
+      + "and `acme teamrun list-teammates` lists every teammate with its provider, model, chats, usage, and its department and manager in each organization."));
     Assert.isFalse(note.includes("teamrun_"));
     Assert.isTrue(note.includes("`acme teamrun list-messages <chatId>` lists a chat's latest messages: `User` is the person, and a message a teammate sent from "
       + "another chat names it and that chat, such as `@<name> in chat \"<title>\" (<chatId>)`, or `the default teammate (<provider>) in chat \"<title>\" (<chatId>)`."));

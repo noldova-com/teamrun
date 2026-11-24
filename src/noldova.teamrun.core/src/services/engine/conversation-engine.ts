@@ -45,6 +45,7 @@ import {
   MessageSender,
   MessageStatus,
   ObservedSettings,
+  type Organization,
   type OrganizationChat,
   OrganizationParent,
   Provenance,
@@ -497,9 +498,21 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const managerId = organization.managerOf(chat.teammateId);
     const manager = teammates.find(t => t.id === managerId)?.name ?? Resources.organizationReportsToPerson;
     return {
-      [Resources.organizationRoleField]: Resources.formatOrganizationRole(place, manager),
+      [Resources.organizationRoleField]: Resources.formatOrganizationRole(place, manager, ConversationEngine.reportsOf(organization, chat.teammateId, teammates)),
       [Resources.organizationRoleTeammateIdField]: chat.teammateId
     };
+  }
+
+  private static reportsOf(organization: Organization, teammateId: string, teammates: readonly Teammate[]): readonly string[] {
+    const nameOf = (id: string | null): string | null => teammates.find(t => t.id === id)?.name ?? null;
+    const led = organization.departments.filter(t => t.leaderId === teammateId).map(t => OrganizationParent.department(t.id));
+    return [OrganizationParent.teammate(teammateId), ...led].flatMap(parent => [
+      ...organization.departmentsUnder(parent).filter(t => t.leaderId !== teammateId).map(t => {
+        const leader = nameOf(t.leaderId);
+        return Object.isNull(leader) ? Resources.formatOrganizationUnledReport(t.name) : Resources.formatOrganizationDepartmentReport(t.name, leader);
+      }),
+      ...organization.placementsUnder(parent).filter(t => t.teammateId !== teammateId).flatMap(t => nameOf(t.teammateId) ?? [])
+    ]);
   }
 
   private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null,

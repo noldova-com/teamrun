@@ -44,7 +44,7 @@ export class OrganizationChatOpeningTests {
     Assert.areNotEqual(before, after);
     Assert.isNull(left.organizationChat);
     Assert.areEqual(noldova.id, opened.organizationChat?.organizationId);
-    Assert.isTrue(asked.prompt.includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson)));
+    Assert.isTrue(asked.prompt.includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, [])));
     Assert.isTrue(first.prompt.includes("DEVS"));
     Assert.isFalse(sent.includes("DEVS") || sent.includes("Copilot"));
     Assert.isNull(asked.resumeNativeSessionId);
