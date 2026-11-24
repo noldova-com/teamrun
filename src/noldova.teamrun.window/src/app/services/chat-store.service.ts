@@ -147,6 +147,7 @@ import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../exceptions/model-catalog-unavailable.exception";
+import { TeammateProviderMissingException } from "../exceptions/teammate-provider-missing.exception";
 import type { IIdentified } from "../interfaces/i-identified";
 import type { ITerminalLauncher } from "../interfaces/i-terminal-launcher";
 import type { AcpLocalVariable } from "../models/acp-local-variable";
@@ -166,6 +167,7 @@ import type { ModelCatalog } from "../models/model-catalog";
 import type { ProviderChoice } from "../models/provider-choice";
 import { ReadingPosition } from "../models/reading-position";
 import { RewoundDraft } from "../models/rewound-draft";
+import { TeammateColor } from "../models/teammate-color";
 import { TeammateModelSettings } from "../models/teammate-model-settings";
 import { UnsentMessage } from "../models/unsent-message";
 import type { ProviderAction } from "../types/provider-action";
@@ -231,6 +233,9 @@ export class ChatStoreService {
   private readonly missingFoldersSignal: WritableSignal<ReadonlySet<string>> = signal(new Set());
   private readonly setAsideConversationIdSignal: WritableSignal<string | null> = signal(null);
   private readonly openingConversationIdSignal: WritableSignal<string | null> = signal(null);
+  private readonly organizationInViewSignal: WritableSignal<string | null> = signal(null);
+  private readonly teammateColors: Signal<ReadonlyMap<string, number>> = computed(() => TeammateColor.byCreation(this.teammatesSignal()),
+    { equal: (t, u) => t.size === u.size && [...t.keys()].every(id => u.get(id) === t.get(id)) });
   private readonly conversationsByProjectSignal: WritableSignal<ReadonlyMap<string | null, readonly Conversation[]>> = signal(new Map());
   private readonly windowsSignal: WritableSignal<ReadonlyMap<string, ConversationWindow>> = signal(new Map());
   private readonly messageIndexes: Map<string, MessageIndex> = new Map();
@@ -344,8 +349,9 @@ export class ChatStoreService {
   });
   public readonly markedConversationId: Signal<string | null> = computed(() => {
     const shown = this.shownConversationId();
-    return this.openingConversationIdSignal() ?? (shown === this.setAsideConversationIdSignal() ? null : shown);
+    return this.openingConversationIdSignal() ?? (!Object.isNull(this.organizationInViewSignal()) || shown === this.setAsideConversationIdSignal() ? null : shown);
   });
+  public readonly organizationInView: Signal<string | null> = this.organizationInViewSignal.asReadonly();
   public readonly screenConversationId: Signal<string | null> = computed(() => {
     const shown = this.shownConversationId();
     return !Object.isNull(shown) && shown === this.setAsideConversationIdSignal() ? shown : this.selectedConversationId();
@@ -627,6 +633,21 @@ export class ChatStoreService {
 
   public organizationChats(organizationId: string): readonly Conversation[] {
     return [...this.conversationsByProjectSignal().values()].flatMap(t => t.filter(u => u.organizationChat?.organizationId === organizationId));
+  }
+
+  public showOrganization(organizationId: string, active: boolean): void {
+    if (active)
+      this.organizationInViewSignal.set(organizationId);
+    else if (this.organizationInViewSignal() === organizationId)
+      this.organizationInViewSignal.set(null);
+  }
+
+  public leaveOrganization(): void {
+    this.organizationInViewSignal.set(null);
+  }
+
+  public teammateColor(teammateId: string | null): number | null {
+    return TeammateColor.of(teammateId, this.teammateColors());
   }
 
   public organizationChatsByTeammate(organizationId: string): ReadonlyMap<string, Conversation> {
@@ -1013,6 +1034,13 @@ export class ChatStoreService {
     return this.hasKind(provider.kind) ? null : TeammateStopReason.KindMissing;
   }
 
+  public providerOf(teammate: Teammate): Provider {
+    const provider = this.providers().find(t => t.id === teammate.providerId);
+    if (Object.isUndefined(provider))
+      throw new TeammateProviderMissingException(teammate.id, teammate.providerId);
+    return provider;
+  }
+
   public isTeammateProviderDisabled(id: string): boolean {
     const teammate = this.teammate(id);
     return this.providers().find(t => t.id === teammate?.providerId)?.enabled === false;
@@ -1221,7 +1249,7 @@ export class ChatStoreService {
     this.settleOpening(conversationId);
     const inView = this.conversationsInViewSignal().filter(t => t !== conversationId);
     this.conversationsInViewSignal.set(inView);
-    [...this.arrivedMessages].filter(t => t[1] === conversationId).forEach(t => this.arrivedMessages.delete(t[0]));
+    [...this.arrivedMessages.keys()].filter(t => this.arrivedMessages.get(t) === conversationId).forEach(t => this.arrivedMessages.delete(t));
     this.announceShown();
     const next = inView.at(-1);
     if (!Object.isUndefined(next) && this.requestedConversationId === conversationId && Object.isNull(this.openingConversationIdSignal()))
@@ -1930,6 +1958,13 @@ export class ChatStoreService {
     }, (_, error) => ChatStoreService.rethrowUnlessRead(error));
   }
 
+  public async checkInstallations(report: (message: string) => void): Promise<void> {
+    await this.attempt(async () => {
+      const installations = ChatStoreService.readArray(await this.request(MethodName.ProviderKindInstallationCheck, null), ProviderKindInstallation.fromJson);
+      this.installationsSignal.set(ChatStoreService.keyed(installations, t => t.kind));
+    }, report);
+  }
+
   public async cancelInstall(kind: string, report: (message: string) => void = this.actionFailed(ChatAction.CancelInstall, kind)): Promise<void> {
     await this.attempt(async () => {
       await this.request(MethodName.ProviderKindInstallCancel, new ProviderKindParams(kind).toJson());
@@ -2405,7 +2440,7 @@ export class ChatStoreService {
       conversations.forEach((listed, projectId) => conversations.set(projectId, [...listed, ...dropped.filter(t => t.projectId === projectId)]));
       this.conversationsByProjectSignal.set(conversations);
       const checks = await Promise.all(dropped.map(t => this.confirmDropped(t.id).catch((u: unknown) => u)));
-      this.setWorking(ChatStoreService.keyed(open, t => t.id));
+      this.replaceWorking(open, ChatStoreService.messagesOf(events));
       this.thinkingSignal.update(t => new Set([...t].filter(u => this.workingSignal().has(u))));
       this.savingCheckpointSignal.update(t => resyncing ? new Set() : new Set([...t].filter(u => this.workingSignal().has(u))));
       this.approvalsSignal.update(t => t.filter(u => u.status !== ApprovalStatus.Pending));
@@ -2566,6 +2601,24 @@ export class ChatStoreService {
       .finally(() => this.resolvingChats.delete(messageId));
   }
 
+  private replaceWorking(open: readonly Message[], live: readonly Message[]): void {
+    const heard = ChatStoreService.keyed(live, t => t.id);
+    const working = ChatStoreService.keyed(open.filter(t => ChatStoreService.ACTIVE_STATUSES.includes(heard.get(t.id)?.status ?? t.status)), t => t.id);
+    const left = [...this.workingSignal().keys()].filter(t => !working.has(t) && !heard.has(t));
+    this.setWorking(working);
+    for (const messageId of left)
+      void this.request(MethodName.MessageSummary, new MessageIdParams(messageId).toJson())
+        .then(value => this.endedOf(value), ChatStoreService.rethrowUnlessRead);
+  }
+
+  private endedOf(summary: JsonValue): void {
+    const ended = Object.isNull(summary) ? null : ReplySummary.fromJson(summary).preview;
+    if (Object.isNull(ended) || ChatStoreService.ACTIVE_STATUSES.includes(ended.status))
+      return;
+    for (const watcher of this.replyEndWatchers)
+      watcher(ended);
+  }
+
   private setWorking(working: ReadonlyMap<string, Message>): void {
     this.learnChats(ChatStoreService.mapped([...working.values()], t => t.id, t => t.conversationId));
     this.learnTeammates([...working.values()]);
@@ -2594,7 +2647,7 @@ export class ChatStoreService {
       const open = ChatStoreService.readArray(await this.request(MethodName.MessageListOpen, null), Message.fromJson);
       if (this.watchedMessages !== seen || this.watchSubscriptions.length === 0)
         return;
-      this.setWorking(ChatStoreService.keyed(open, t => t.id));
+      this.replaceWorking(open, [...seen.values()]);
       for (const message of seen.values())
         this.trackWorking(message);
     }, this.loadFailed(Resources.workingLoad, Resources.workingNotLoaded, null, () => this.readWorking())).then(t => {
@@ -3402,6 +3455,10 @@ export class ChatStoreService {
 
   private static keyed<K, V>(items: readonly V[], keyOf: (item: V) => K): ReadonlyMap<K, V> {
     return ChatStoreService.mapped(items, keyOf, t => t);
+  }
+
+  private static messagesOf(events: ReadonlyMap<string, Event>): readonly Message[] {
+    return [...events.values()].filter(t => t.name === EventName.MessageCreated || t.name === EventName.MessageUpdated).map(t => Message.fromJson(t.payload));
   }
 
   private static mapped<T, K, V>(items: readonly T[], keyOf: (item: T) => K, valueOf: (item: T) => V): ReadonlyMap<K, V> {

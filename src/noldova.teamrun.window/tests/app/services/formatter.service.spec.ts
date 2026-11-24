@@ -35,6 +35,7 @@ import {
 } from "@noldova/teamrun.protocol";
 import { ToolCall, ToolCallKind, ToolCallOutputState, ToolCallStatus } from "@noldova/ui.components.angular";
 
+import { Required } from "../../fixtures/required.fixture";
 import { SampleData } from "../../fixtures/sample-data.fixture";
 import { SamplePages } from "../../fixtures/sample-pages.fixture";
 import { ReplyActivity } from "../../../src/app/enums/reply-activity";
@@ -160,7 +161,8 @@ describe("FormatterService", () => {
 
     expect([label(on("a1")), label(on("a3")), label(on("a4"))]).toEqual(["Codex · Work", "Codex · Personal", "Codex"]);
     expect([label(on("gone")), label(on(null)), label(on("a3"), [SampleData.provider])]).toEqual(["Codex", "Codex", "Codex"]);
-    expect(formatter().replyAuthor(on("a3"), kinds, providers, false).name).toBe("Codex · Personal");
+    expect([formatter().replyAuthor(on("a3"), kinds, providers, false, 5), formatter().replyAuthor(on("a3"), kinds, providers, true, null)].map(t => [t.name, t.accent, t.unavailable]))
+      .toEqual([["Codex · Personal", 5, false], ["Codex · Personal", null, true]]);
   });
 
   it("splits a reply into answer and activity, joining tool results to their steps", () => {
@@ -181,7 +183,7 @@ describe("FormatterService", () => {
     expect(answers.map(t => t.sequence)).toEqual([6, 7]);
     expect(activity.map(t => t.detail.sequence)).toEqual([0, 1, 3, 5]);
     expect(activity.map(t => t.result?.sequence ?? null)).toEqual([null, 2, 4, null]);
-    expect(activity.map(t => t.result).filter(t => t !== null).map(t => formatter().isErrorResult(t))).toEqual([false, true]);
+    expect(activity.flatMap(t => Object.isNull(t.result) ? [] : [formatter().isErrorResult(t.result)])).toEqual([false, true]);
     expect(activity.map(t => formatter().toolName(t.detail))).toEqual([null, "Read", "Bash", null]);
     expect(activity.map(t => formatter().title(t.detail, "D:\\repo"))).toEqual(["Session tools: Read", "Read: .\\README.md", "> ls", "unrelated"]);
     expect(activity.map(t => formatter().body(t.detail))).toEqual([null, null, "file.txt", null]);
@@ -255,7 +257,7 @@ describe("FormatterService", () => {
     ]);
     const viewed = (rootPath: string | null): (readonly unknown[] | null)[] => message.details.map(t => {
       const image = formatter().generatedImageOf(message, t, rootPath);
-      return image === null ? null : [image.key, image.conversationId, image.name, image.mediaType, image.path, image.data, image.messageId];
+      return Object.isNull(image) ? null : [image.key, image.conversationId, image.name, image.mediaType, image.path, image.data, image.messageId];
     });
 
     expect(viewed("D:\\repo")).toEqual([
@@ -286,7 +288,7 @@ describe("FormatterService", () => {
       generated(8, { itemType: "imageGeneration", savedPath: null, imageData: null, mediaType: null })
     ]);
 
-    expect(message.details.map(t => formatter().missingImageOf(message, t, "D:\\repo")).map(t => t === null ? null : [t.text, t.reason])).toEqual([
+    expect(message.details.map(t => formatter().missingImageOf(message, t, "D:\\repo")).map(t => Object.isNull(t) ? null : [t.text, t.reason])).toEqual([
       [Resources.imageGenerationFailed, Resources.imageLimitReached],
       [Resources.imageGenerationFailed, null],
       [Resources.imageGenerationFailed, null],
@@ -297,7 +299,7 @@ describe("FormatterService", () => {
       null,
       null
     ]);
-    expect(formatter().generatedImageOf(message, message.details[4]!, "D:\\repo")).toBeNull();
+    expect(formatter().generatedImageOf(message, Required.of(message.details[4]), "D:\\repo")).toBeNull();
   });
 
   it("gives a failed image the message its failure carries as the reason, as Grok's raw output does, and none for a blank or non-text message", () => {
@@ -323,7 +325,7 @@ describe("FormatterService", () => {
       { itemType: "imageGeneration", savedPath: "D:\\repo\\out\\moon.png", imageData: "iVBORw==", mediaType: "image/png" });
     const keys = (status: MessageStatus): string[] => {
       const message = reply([generated(0), detail(1, DetailKind.Command, "> magick out/moon.png -resize 50% out/moon.png"), generated(2)], status);
-      return [0, 2].map(t => formatter().generatedImageOf(message, message.details[t]!, "D:\\repo")!.key);
+      return [0, 2].map(t => Required.of(formatter().generatedImageOf(message, Required.of(message.details[t]), "D:\\repo")).key);
     };
     const id = reply([]).id;
 
@@ -1121,7 +1123,7 @@ describe("FormatterService", () => {
     const nested = (sequence: number, kind: DetailKind, text: string, payload: JsonValue, parent: number = 0): MessageDetail =>
       new MessageDetail(sequence, kind, text, payload, SampleData.timestamp, parent);
     const callOf = (shown: Message, askers: ReadonlySet<string | null> | null = null): ToolCall =>
-      formatter().callsOf(shown, formatter().activity(shown), null, false, false, askers)[0]!;
+      Required.of(formatter().callsOf(shown, formatter().activity(shown), null, false, false, askers)[0]);
 
     it("is one step whose children are its own steps with their results, its plan apart and its usage and summary as its output, none of them the reply's", () => {
       const plan = new ReplyPlan([new PlanStep("Read the parser", PlanStepStatus.InProgress, "Reading the parser")], null, "# Its plan");
@@ -1145,7 +1147,7 @@ describe("FormatterService", () => {
       expect(formatter().subAgentPlanOf(shown, 0)?.steps.map(t => t.text)).toEqual(["Read the parser"]);
       expect(formatter().planOf(shown)).toBeNull();
       expect(formatter().activitySummary(formatter().activity(shown))).toBe(Resources.formatActivitySummary([Resources.formatCommandCount(1), Resources.formatOtherStepCount(1, false)]));
-      expect(formatter().stepOf(formatter().activity(shown)[0]!, null).title).toBe("Explore the parser");
+      expect(formatter().stepOf(Required.of(formatter().activity(shown)[0]), null).title).toBe("Explore the parser");
     });
 
     it("names its model in its usage by the display name of its reply's provider's model list", () => {
@@ -1187,7 +1189,7 @@ describe("FormatterService", () => {
         .toEqual([ToolCallStatus.Succeeded, 3000, "claude-haiku-5\nFound it in parser.ts", [ToolCallStatus.Cancelled]]);
       expect([SubAgentStatus.Failed, SubAgentStatus.Stopped].map(t => ended(t).status)).toEqual([ToolCallStatus.Failed, ToolCallStatus.Cancelled]);
       expect(ended(SubAgentStatus.Completed, true).output).toBe("claude-haiku-5\nFinished the scan");
-      expect(formatter().stepOf(formatter().activity(reply([detail(0, DetailKind.SubAgent, "Explore the parser", agent(SubAgentStatus.Failed))]))[0]!, null).isFailed).toBe(true);
+      expect(formatter().stepOf(Required.of(formatter().activity(reply([detail(0, DetailKind.SubAgent, "Explore the parser", agent(SubAgentStatus.Failed))]))[0]), null).isFailed).toBe(true);
     });
 
     it("shows no output when it has no model, usage or text, and reads as a plain step when its payload doesn't read", () => {

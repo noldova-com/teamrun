@@ -50,7 +50,7 @@ export class TreeFlowLines {
         return [new FlowPoint(x, box.top), ...this.overGrid(holder, x)];
       return this.pastGrid(holder, box, this.sideOf(holder, box.left));
     }
-    if (shape === FlowLineShape.Bus && !Object.isNull(kid) && !Object.isNull(kids)) {
+    if ((shape === FlowLineShape.Bus || shape === FlowLineShape.Grid) && !Object.isNull(kid) && !Object.isNull(kids)) {
       const one = this.boxOf(kid);
       const all = this.boxOf(kids);
       const middle = all.left + all.width / 2;

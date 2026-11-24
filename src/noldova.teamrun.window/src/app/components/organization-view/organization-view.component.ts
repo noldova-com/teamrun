@@ -7,20 +7,18 @@
  */
 
 import { NgTemplateOutlet } from "@angular/common";
-import { Component, computed, ElementRef, inject, input, type InputSignal, linkedSignal, signal, type Signal, viewChild, type WritableSignal } from "@angular/core";
+import { Component, computed, DestroyRef, effect, inject, input, type InputSignal, signal, type Signal, untracked, type WritableSignal } from "@angular/core";
+import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 
-import { OrganizationParent, OrganizationTarget, OrganizationTargetKind, type Teammate } from "@noldova/teamrun.protocol";
+import { OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 
-import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ChoicePillsComponent, DialogService, MenuComponent,
-  MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, OverlayAlignment, OverlaySide, PopoverOpening, PopoverTriggerDirective, SelectComponent,
+import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasControlsPlacement, CanvasFitAlignment, CanvasItemDirective, ColorChoices, DialogService, MenuComponent,
+  MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, SelectComponent,
   SelectOption } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import { FlowLineShape } from "../../enums/flow-line-shape";
-import { OrganizationViewMode } from "../../enums/organization-view-mode";
 import { OrganizationTargetKey } from "../../models/organization-target-key";
-import { OrganizationFocus } from "../../models/organization-focus";
-import { OrganizationLayout } from "../../models/organization-layout";
 import { OrganizationTargetChoice } from "../../models/organization-target-choice";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -28,27 +26,25 @@ import { OrganizationFlowService } from "../../services/organization-flow.servic
 import { OrganizationLayoutService } from "../../services/organization-layout.service";
 import { OrganizationScope } from "../../services/organization-scope";
 import { OrganizationStoreService } from "../../services/organization-store.service";
+import { OrganizationUnitSelection } from "../../services/organization-unit-selection";
 import { FlowOverlayComponent } from "../flow-overlay/flow-overlay.component";
-import { OrganizationBoardComponent } from "../organization-board/organization-board.component";
 import { OrganizationDepartmentComponent } from "../organization-department/organization-department.component";
 import { OrganizationDepartmentDialogComponent } from "../organization-department-dialog/organization-department-dialog.component";
 import { OrganizationDropDirective } from "../organization-drop.directive";
-import { OrganizationFocusComponent } from "../organization-focus/organization-focus.component";
 import { OrganizationChatComponent } from "../organization-chat/organization-chat.component";
-import { OrganizationChatsComponent } from "../organization-chats/organization-chats.component";
-import { OrganizationTeammateSearchComponent } from "../organization-teammate-search/organization-teammate-search.component";
+import { OrganizationAddTeammateDirective } from "../organization-add-teammate.directive";
 import { OrganizationTypesDialogComponent } from "../organization-types-dialog/organization-types-dialog.component";
+import { OrganizationUnitEditorComponent } from "../organization-unit-editor/organization-unit-editor.component";
 import { TeammateStatusComponent } from "../teammate-status/teammate-status.component";
 
 @Component({
   selector: "nol-teamrun-organization-view",
-  imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, ChoicePillsComponent, FlowOverlayComponent, MenuComponent, MenuGroupComponent,
-    MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationBoardComponent, OrganizationChatComponent,
-    OrganizationChatsComponent, OrganizationDepartmentComponent, OrganizationDropDirective, OrganizationFocusComponent, OrganizationTeammateSearchComponent,
-    PopoverTriggerDirective, SelectComponent, TeammateStatusComponent],
+  imports: [AvatarComponent, ButtonComponent, CanvasComponent, CanvasItemDirective, FlowOverlayComponent, MenuComponent, MenuGroupComponent,
+    MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, NgTemplateOutlet, OrganizationChatComponent, OrganizationDepartmentComponent,
+    OrganizationDropDirective, OrganizationAddTeammateDirective, OrganizationUnitEditorComponent, SelectComponent, TeammateStatusComponent],
   providers: [ChatStoreService.provider, OrganizationScope.provider, OrganizationStoreService.provider, OrganizationLayoutService.provider,
-    OrganizationFlowService.provider],
-  host: { class: "nol-teamrun-organization-view" },
+    OrganizationFlowService.provider, OrganizationUnitSelection.provider],
+  host: { class: "nol-teamrun-organization-view", "(pointerdown)": "markInView()", "(focusin)": "markInView()" },
   templateUrl: "./organization-view.component.html",
   styleUrls: ["../organization-tree.css", "./organization-view.component.css"]
 })
@@ -61,34 +57,40 @@ export class OrganizationViewComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly lines: typeof FlowLineShape = FlowLineShape;
   protected readonly flows: OrganizationFlowService = inject(OrganizationFlowService);
-  protected readonly messagesPanel: Signal<ElementRef<HTMLElement> | undefined> = viewChild("messages", { read: ElementRef });
   protected readonly person: OrganizationParent = OrganizationParent.person;
-  protected readonly clickOpening: PopoverOpening = PopoverOpening.Click;
-  protected readonly below: OverlaySide = OverlaySide.below;
-  protected readonly start: OverlayAlignment = OverlayAlignment.Start;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly outlined: ButtonVariant = ButtonVariant.Outlined;
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly floating: CanvasControlsPlacement = CanvasControlsPlacement.Floating;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly editing: WritableSignal<boolean> = signal(false);
-  protected readonly modes: typeof OrganizationViewMode = OrganizationViewMode;
-  protected readonly mode: Signal<OrganizationViewMode> = computed(() => this.layout.layout().view);
-  protected readonly viewOptions: readonly SelectOption[] = Object.values(OrganizationViewMode).map(t => new SelectOption(t, Resources.organizationViewLabels[t]));
-  protected readonly focusKey: Signal<string | null> = computed(() => this.layout.layout().focus);
-  protected readonly chosen: WritableSignal<OrganizationTarget | null> = linkedSignal<string | null, OrganizationTarget | null>({ source: this.focusKey, computation: () => null });
+  protected readonly selection: OrganizationUnitSelection = inject(OrganizationUnitSelection);
+  protected readonly chosen: WritableSignal<OrganizationTarget | null> = signal(null);
   protected readonly root: Signal<OrganizationNode> = computed(() => OrganizationNode.treeOf(this.organization.organization(), this.store.teammates()));
+  protected readonly editedUnit: Signal<OrganizationNode | null> = computed(() => {
+    const id = this.selection.unitId();
+    return Object.isNull(id) ? null : OrganizationNode.walk(this.root()).find(t => t.department?.id === id) ?? null;
+  });
+  protected readonly flowColors: Signal<ReadonlyMap<string, string>> = computed(() => {
+    const colors = new Map<string, string>();
+    for (const node of OrganizationNode.walk(this.root()).filter(t => !Object.isNull(t.department))) {
+      const color = ColorChoices.toCss(node.type?.color ?? null);
+      if (!Object.isNull(color))
+        for (const key of [Resources.formatOrganizationFlowDepartmentKey(node.id), ...Object.isNull(node.leader) ? [] : [node.leader.id], ...node.members.map(t => t.id)])
+          colors.set(key, color);
+    }
+    return colors;
+  });
   protected readonly reports: Signal<readonly Teammate[]> = computed(() => this.root().members);
   protected readonly headcount: Signal<string> = computed(() =>
     Resources.formatOrganizationHeadcount(this.store.teammates().length - this.organization.organization().unplaced(this.store.teammates().map(t => t.id)).length,
       OrganizationNode.departmentsOf(this.organization.organization()).length));
   protected readonly target: Signal<OrganizationTarget | null> = computed(() => {
     const first = OrganizationNode.walk(this.root()).flatMap(t => t.department ?? [])[0];
-    const key = this.focusKey();
-    return this.chosen() ?? (Object.isNull(key) ? null : OrganizationFocus.resolve(this.root().subDepartments, this.reports(), key).target)
-      ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
+    return this.chosen() ?? (Object.isUndefined(first) ? null : OrganizationTarget.department(first.id));
   });
   protected readonly choices: Signal<readonly OrganizationTargetChoice[]> = computed(() => OrganizationTargetChoice.of(this.root().subDepartments,
     [...this.root().directReports, ...this.reports().filter(t => this.root().managers.has(t.id))]));
@@ -97,24 +99,35 @@ export class OrganizationViewComponent {
     const target = this.target();
     return Object.isNull(target) ? String.empty : OrganizationTargetKey.of(target);
   });
-  protected readonly selectedTeammateId: Signal<string | null> = computed(() => {
-    const target = this.target();
-    return target?.kind === OrganizationTargetKind.Teammate ? target.id : null;
-  });
 
   protected readonly ownerRole: Signal<string> = computed(() => Resources.formatOrganizationOwnerRole(this.root().departments.filter(t => !Object.isNull(t.leader)).length
     + this.root().reports.length));
 
   public constructor() {
     inject(OrganizationScope).follow(this.instance);
+    const context: IWindowPartContext = inject(WindowPartTokens.context);
+    const active: Signal<boolean> = inject(WindowPartTokens.activeDocument);
+    const chats: ChatStoreService = inject(ChatStoreService);
+    effect(() => {
+      const instance = this.instance();
+      const isActive = active();
+      untracked(() => chats.showOrganization(instance, isActive));
+    });
+    inject(DestroyRef).onDestroy(() => chats.showOrganization(this.instance(), false));
+    effect(() => {
+      const organization = this.organization.organization();
+      if (organization.id === this.instance() && organization.updatedAt !== Resources.organizationUnloadedTime)
+        untracked(() => context.updateDocument(Resources.organizationDocumentName, organization.id, { title: organization.name }));
+    });
   }
 
-  protected showView(value: string): void {
-    this.layout.showView(OrganizationLayout.viewOf(value));
+  protected markInView(): void {
+    this.store.showOrganization(this.instance(), true);
   }
 
   protected toggleEditing(): void {
     this.editing.update(t => !t);
+    this.selection.select(null);
   }
 
   protected openTypes(): void {
@@ -123,10 +136,6 @@ export class OrganizationViewComponent {
 
   protected addDepartment(): void {
     OrganizationDepartmentDialogComponent.open(this.dialogs, this.store, this.organization, OrganizationParent.person);
-  }
-
-  protected chooseTeammate(teammateId: string): void {
-    this.chosen.set(OrganizationTarget.teammate(teammateId));
   }
 
   protected pick(key: string): void {

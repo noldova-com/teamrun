@@ -133,7 +133,7 @@ describe("Resources", () => {
 
   it("counts the organization's teammates and departments, one in the singular", () => {
     expect([Resources.formatOrganizationHeadcount(0, 0), Resources.formatOrganizationHeadcount(1, 1), Resources.formatOrganizationHeadcount(2, 3)])
-      .toEqual(["0 teammates in 0 units", "1 teammate in 1 unit", "2 teammates in 3 units"]);
+      .toEqual(["0 teammates · 0 units", "1 teammate · 1 unit", "2 teammates · 3 units"]);
   });
 
   it("sums up a department by its people's statuses in the status key's order, and says nothing when it has no one", () => {
@@ -246,13 +246,6 @@ describe("Resources", () => {
 
   it("words a reply's running tasks for one and for many", () => {
     expect([Resources.formatRunningTasks(1), Resources.formatRunningTasks(3)]).toEqual(["1 task running", "3 tasks running"]);
-  });
-
-  it("counts Focus's direct reports, and those under them, and a department's teammates in the singular for one and the plural for more", () => {
-    expect([Resources.formatOrganizationFocusLeaders(1, new Map()), Resources.formatOrganizationFocusLeaders(2, new Map()),
-      Resources.formatOrganizationFocusLeaders(3, new Map(), 1),
-      Resources.formatOrganizationFocusDepartment(1, new Map()), Resources.formatOrganizationFocusDepartment(2, new Map())])
-      .toEqual(["Your 1 direct report", "Your 2 direct reports", "Your 3 direct reports and 1 under them", "1 teammate", "2 teammates"]);
   });
 
   it("words the questions before deleting or moving a chat without a project, by how many files its folder holds", () => {

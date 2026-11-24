@@ -18,7 +18,9 @@ import { InstallHeldException } from "../../exceptions/install-held.exception.js
 import { ReleaseSourceException } from "../../exceptions/release-source.exception.js";
 import type { LocatedExecutable } from "../../models/located-executable.js";
 import { ProcessCommand } from "../../models/process-command.js";
+import { GitHubRelease } from "../../models/github-release.js";
 import { ReleaseFile } from "../../models/release-file.js";
+import { ToolRelease } from "../../models/tool-release.js";
 import { Resources } from "../../resources.js";
 import type { ExecutableVersionReader } from "../executables/executable-version.reader.js";
 import { InstallRename } from "../installs/install-rename.js";
@@ -89,33 +91,36 @@ export class CopilotInstaller implements IProviderKindInstallation {
     return this.isWindows ? Resources.copilotWindowsExecutableName : Resources.copilotExecutableName;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || Object.isNull(located) || !this.isOwn(located) ? null
+      !checksLatest || Object.isNull(this.target) || Object.isNull(located) || !this.isOwn(located) ? null
         : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null)
     ]);
     return new ProviderKindVersions(installed, latest);
   }
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void = () => undefined): Promise<string> {
-    const unavailable = this.unavailable;
-    if (!Object.isNull(unavailable))
-      throw new InstallFailedException(unavailable);
+    const target = this.target;
+    const extractor = this.extractor;
+    if (Object.isNull(target))
+      throw new InstallFailedException(Resources.copilotNoBuild);
+    if (Object.isNull(extractor))
+      throw new InstallFailedException(Resources.copilotNoExtractor);
     InstallStaging.sweepKeeping(this.directory, Resources.copilotPreviousName);
     const staging = InstallStaging.writing(Resources.formatCopilotFolderNotWritable(this.directory), () => InstallStaging.create(this.directory));
     const aside = join(staging, Resources.copilotPreviousName);
     let replaced: string | null = null;
     let committed = false;
     try {
-      const release = await this.readRelease(this.target!, signal);
+      const release = await this.readRelease(target, signal);
       const archive = join(staging, release.name);
       await ReleaseDownload.save(release.archive, archive, Resources.copilotDisplayName, progress, signal);
       signal.throwIfAborted();
       const unpacked = join(staging, Resources.copilotUnpackedName);
       mkdirSync(unpacked);
-      const result = await this.runner.run(this.extractor!.toCommand().withArguments(...Resources.tarExtractArguments, archive, Resources.tarDirectoryArgument, unpacked),
+      const result = await this.runner.run(extractor.toCommand().withArguments(...Resources.tarExtractArguments, archive, Resources.tarDirectoryArgument, unpacked),
         {}, this.unpackTimeout, signal);
       if (!result.succeeded)
         throw new InstallFailedException(Resources.formatCopilotUnpackFailed(result.timedOut ? null : result.exitCode));
@@ -201,31 +206,22 @@ export class CopilotInstaller implements IProviderKindInstallation {
     return located.source === (this.isWindows ? ExecutableSource.Managed : ExecutableSource.LocalBin);
   }
 
-  private async readRelease(target: string, signal: AbortSignal): Promise<{ readonly version: string; readonly name: string; readonly archive: ReleaseFile }> {
+  private async readRelease(target: string, signal: AbortSignal): Promise<ToolRelease> {
     const text = await ReleaseDownload.reachable(Resources.copilotDisplayName, signal, async () => {
       const response = await fetch(this.channel, { headers: { [Resources.acceptHeader]: Resources.jsonContentType }, signal });
       if (!response.ok)
         throw new ReleaseSourceException(Resources.formatReleaseChannelFailed(Resources.copilotDisplayName, response.status));
       return response.text();
     });
-    let release: { tag_name?: unknown; assets?: unknown } | null = null;
-    try {
-      release = JSON.parse(text) as { tag_name?: unknown; assets?: unknown } | null;
-    }
-    catch {
-      release = null;
-    }
-    const tag = release?.tag_name;
-    const version = typeof tag === "string" && tag.startsWith(Resources.copilotTagPrefix) ? tag.slice(Resources.copilotTagPrefix.length) : String.empty;
+    const release = GitHubRelease.parse(text);
+    const version = release.versionAfter(Resources.copilotTagPrefix);
     if (!Resources.releaseVersionPattern.test(version))
       throw new ReleaseSourceException(Resources.formatReleaseChannelUnreadable(Resources.copilotDisplayName));
     const name = `${Resources.copilotArchivePrefix}${target}${this.isWindows ? Resources.copilotWindowsArchiveSuffix : Resources.copilotPosixArchiveSuffix}`;
-    const assets = Array.isArray(release!.assets) ? release!.assets as ({ name?: unknown; digest?: unknown; size?: unknown; browser_download_url?: unknown } | null)[] : [];
-    const asset = assets.find(t => t?.name === name);
-    const digest = typeof asset?.digest === "string" && asset.digest.startsWith(Resources.sha256DigestPrefix) ? asset.digest.slice(Resources.sha256DigestPrefix.length) : String.empty;
-    if (!Resources.sha256Pattern.test(digest) || typeof asset?.browser_download_url !== "string")
+    const asset = release.assetNamed(name);
+    const url = asset?.url ?? null;
+    if (Object.isNull(asset) || !Resources.sha256Pattern.test(asset.sha256) || Object.isNull(url))
       throw new InstallFailedException(Resources.formatCopilotArchiveMissing(version));
-    const size = asset.size;
-    return { version, name, archive: new ReleaseFile(asset.browser_download_url, digest, typeof size === "number" && Number.isSafeInteger(size) && size > 0 ? size : null) };
+    return new ToolRelease(version, name, new ReleaseFile(url, asset.sha256, asset.knownSize));
   }
 }

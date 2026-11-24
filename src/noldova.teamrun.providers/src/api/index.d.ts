@@ -2227,6 +2227,7 @@ export declare class DownloadAddress {
 export declare class AcpCommandLine {
   /**
    * @throws Error with `Resources.formatAcpArgumentLineBreak` when the program is a Windows batch file and an argument has a line break, which `cmd.exe` can't carry.
+   * @throws Error with `Resources.formatCommandNotOnPath` on Windows when a program named without a folder isn't on `PATH`.
    */
   public static of(platform: string, environment: NodeJS.ProcessEnv, variables: Readonly<Record<string, string>>, command: string, args: readonly string[]): ProcessCommand;
 }
@@ -2272,7 +2273,11 @@ export declare class AcpAgentInstaller implements IProviderKindInstallation {
    * The command that starts the installed entry, or `null` when it isn't installed.
    */
   public commandOf(): ProcessCommand | null;
-  public readVersions(): Promise<ProviderKindVersions>;
+  /**
+   * Reads the installed entry's version and, with `checksLatest`, the registry's latest one, which is the installed one when the registry can't
+   * be read; without it, the latest is `null` and the registry isn't read.
+   */
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
   public install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string>;
 }
 
@@ -4046,6 +4051,40 @@ export declare class Resources {
   public static readonly codexStandaloneSegments: readonly string[];
   public static readonly codexReleasesDirectoryName: string;
   public static readonly codexArchiveName: string;
+  /**
+   * Where `CodexAppServerDownload` reads a Codex release by its tag, `https://api.github.com/repos/openai/codex/releases/tags/`, followed by `rust-v<version>`.
+   */
+  public static readonly codexAppServerReleaseAddress: string;
+  /**
+   * The start of a release's app server package name, `codex-app-server-package-`, followed by the target and `.tar.gz`.
+   */
+  public static readonly codexAppServerPackagePrefix: string;
+  public static readonly codexAppServerDisplayName: string;
+  /**
+   * The program in an app server package, `bin/codex-app-server`, with `.exe` on Windows.
+   */
+  public static readonly codexAppServerProgram: string;
+  /**
+   * The folder an app server package is unpacked into while it is staged, `package`.
+   */
+  public static readonly codexAppServerUnpackedName: string;
+  /**
+   * The files of an app server package made executable outside Windows: its programs, `rg` and `bwrap`.
+   */
+  public static readonly codexAppServerExecutableMembers: readonly string[];
+  /**
+   * The app-server's option that sets the source it records for the threads it creates, `--session-source`.
+   */
+  public static readonly codexSessionSourceArgument: string;
+  /**
+   * The source TeamRun's Codex threads are recorded with, `app-server`, which Codex stores as `mcp`: the Codex app lists only interactive sources,
+   * so it doesn't list these threads, and a later resume keeps the source the thread was created with.
+   */
+  public static readonly codexHiddenSessionSource: string;
+  /** The Codex kind's notice while the Codex chats TeamRun starts would show in the Codex app, and when TeamRun downloads what keeps them out. */
+  public static readonly codexThreadsListedNotice: string;
+  public static readonly helpArgument: string;
+  public static readonly windowsExecutableExtension: string;
   /**
    * The program in a Codex package, `bin/codex`, or `bin/codex.exe` on Windows.
    */
@@ -6423,6 +6462,7 @@ export declare class Resources {
    */
   public static formatAcpAgentArchiveInsecure(name: string): string;
   public static formatDownloadInsecure(name: string): string;
+  public static formatCommandNotOnPath(command: string): string;
   public static formatAcpArgumentLineBreak(command: string): string;
   public static formatAcpAgentNoExtractor(name: string): string;
   public static formatAcpAgentPackageRefused(name: string, packageName: string): string;
@@ -6512,6 +6552,41 @@ export declare class Resources {
    * Explains that a downloaded Claude Code build's own setup failed with its exit code, or was stopped from outside before it ended (`null`).
    */
   public static formatClaudeSetupFailed(version: string, exitCode: number | null): string;
+
+  /**
+   * Explains that a Codex release lists no app server package for this computer with a SHA-256.
+   */
+  public static formatCodexAppServerPackageMissing(version: string): string;
+
+  /**
+   * Explains that reading a Codex release by its tag failed with an HTTP status.
+   */
+  public static formatCodexAppServerReleaseFailed(version: string, status: number): string;
+
+  /**
+   * Explains that unpacking the app server package failed with tar's exit code, or was stopped (`null`).
+   */
+  public static formatCodexAppServerUnpackFailed(exitCode: number | null): string;
+
+  /**
+   * Explains that an app server package held no `Resources.codexAppServerProgram`.
+   */
+  public static formatCodexAppServerIncomplete(version: string): string;
+
+  /**
+   * The log line when the app server of a Codex version wasn't downloaded, so the threads TeamRun starts still show in the Codex app.
+   */
+  public static formatCodexAppServerNotDownloaded(version: string, reason: string): string;
+
+  /**
+   * The log line when an older app server download couldn't be removed.
+   */
+  public static formatCodexAppServerNotRemoved(path: string, reason: string): string;
+
+  /**
+   * The log line when a downloaded app server didn't start, so `codex app-server` runs in its place.
+   */
+  public static formatCodexAppServerRefused(program: string, reason: string): string;
 
   /**
    * Explains that a Codex release lists no package for this computer with a SHA-256.
@@ -9121,9 +9196,12 @@ export declare class CodexAdapter implements IProviderAdapter {
    * `CommandRunner` on the starter, with `Resources.processListTimeout` for each listing and the timings' `stopGrace` as its grace.
    * @param idleTimer Tells the time a thread held by its background work has been silent, for `timings.silenceLimit`, and an app-server has had no
    * thread or request, for `timings.idleLimit`; a `NodeTimer` by default.
+   * @param serverProgram Picks the app-server each start runs, so the threads it creates stay out of the Codex app; when the picked program is a
+   * download that fails to start, it is stopped and refused for the rest of the run, and `codex app-server` starts instead, unless the adapter
+   * is shutting down. `null` by default, which runs `codex app-server`.
    */
   public constructor(command: ProcessCommand | null, baseEnvironment: NodeJS.ProcessEnv, clientInfo: AppServerClientInfo, starter: IProcessStarter, timings: ProviderTimings, versionReader: ExecutableVersionReader, timer?: ITimer, locate?: () => ProcessCommand | null,
-    installation?: IProviderKindInstallation | null, log?: ILog | null, platform?: string, sweep?: IOrphanSweep, idleTimer?: ITimer);
+    installation?: IProviderKindInstallation | null, log?: ILog | null, platform?: string, sweep?: IOrphanSweep, idleTimer?: ITimer, serverProgram?: CodexAppServerProgram | null);
 
   /**
    * How TeamRun installs and updates Codex, when it was given one.
@@ -10814,7 +10892,7 @@ export declare class NodeProcessStarter implements IProcessStarter {
   /**
    * Starts the program without a shell, with its window hidden on Windows.
    * @param command How to run the program.
-   * @param environment The program's environment.
+   * @param environment The program's environment, as `SharedMcpLauncher.environmentToStart` gives it for this platform.
    * @param directory The program's working directory, or `null` for this process's.
    * @returns The process.
    */
@@ -11023,7 +11101,9 @@ export declare class SharedMcpLaunch {
  * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one with the
  * rest of `windowsEndMilliseconds`, which is ended too if it hasn't ended by then. The watch on Windows gets the launcher's errors and writes there a
  * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end, can't start or exits with an error, a line when a launcher
- * ended before its server left nothing of the server to end, and nothing otherwise.
+ * ended before its server left nothing of the server to end, and nothing otherwise. On Windows the watch and its PowerShell run in the Windows
+ * system folder, the PowerShell is the one under it, `WindowsPowerShell\v1.0\powershell.exe`, and a server named without a folder that `PATH`
+ * doesn't hold is refused as Node refuses a missing command, before anything starts.
  */
 export declare class SharedMcpLauncher {
   /**
@@ -11122,6 +11202,15 @@ export declare class SharedMcpLauncher {
   public static withholds(name: string): boolean;
 
   /**
+   * The environment a program starts with: on Windows the environment with `NoDefaultCurrentDirectoryInExePath` set, so `cmd.exe`, Node and the
+   * programs they start look for a command named without a folder only on `PATH`, never in the working folder; elsewhere the environment itself.
+   * @param platform The platform, as `process.platform`.
+   * @param environment The environment.
+   * @returns The environment to start with.
+   */
+  public static environmentToStart<T extends Readonly<Record<string, string | undefined>>>(platform: string, environment: T): T;
+
+  /**
    * The server's environment: each variable of the launcher's own whose name is a basic or one of `names`, matched in any case on Windows, and
    * each set `certificateVariables` made absolute, but none of `withheldVariables`.
    * @param names The server's own variables.
@@ -11131,13 +11220,14 @@ export declare class SharedMcpLauncher {
 
   /**
    * What starts a command: itself outside Windows; on Windows the file found through the environment's `PATH` and `PATHEXT`, or, for a `.cmd` or
-   * `.bat` file, `COMSPEC` (`cmd.exe` when unset) with `/d /s /c` and the quoted, escaped line, started with verbatim arguments.
+   * `.bat` file, `COMSPEC` (`cmd.exe` in the Windows system folder when unset or not an absolute path) with `/d /s /c` and the quoted, escaped line, started with verbatim
+   * arguments. A command named without a folder is looked for only in the absolute folders `PATH` lists, never the working folder.
    * @param command The command.
    * @param args Its arguments.
    * @param environment The environment it is found in.
-   * @returns The program, its arguments and whether they go to it verbatim.
+   * @returns The program, its arguments and whether they go to it verbatim, or `null` on Windows when a command named without a folder isn't on `PATH`.
    */
-  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean };
+  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean } | null;
 }
 
 /**
@@ -14702,9 +14792,9 @@ export declare class AntigravityInstallation implements IProviderKindInstallatio
     readVersion: () => Promise<string | null>);
 
   /**
-   * TeamRun's own versions, with the server on `PATH` as the installed one while it is compatible.
+   * TeamRun's own versions, read with `checksLatest`, with the server on `PATH` as the installed one while it is compatible.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
   public install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void): Promise<string>;
 }
 
@@ -15013,9 +15103,9 @@ export declare class ClaudeInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Claude Code's version and the channel's latest one, which is `null` when the channel can't be read in time, and for an
-   * installed Claude Code that isn't a native one (`ExecutableSource.LocalBin`), without reading the channel.
+   * installed Claude Code that isn't a native one (`ExecutableSource.LocalBin`) or without `checksLatest`, without reading the channel.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the channel's latest version, or updates an installed Claude Code to it.
@@ -15038,6 +15128,96 @@ export declare class ClaudeInstaller implements IProviderKindInstallation {
    * @returns The build's name, or `null` when Claude Code publishes none for it.
    */
   public static targetOf(platform: string, architecture: string, isMusl: boolean): string | null;
+}
+
+/**
+ * What `CodexAppServerProgram` read from a Codex command: whether its `app-server` accepts `--session-source`, and otherwise its version.
+ */
+export declare class CodexServerReading {
+  public readonly acceptsSource: boolean;
+  /** The installed Codex's version, or `null` when its `app-server` accepts the option or the version couldn't be read. */
+  public readonly version: string | null;
+  public constructor(acceptsSource: boolean, version: string | null);
+  /** Whether the reading can be kept: the option was found or the version was read. */
+  public get isKnown(): boolean;
+}
+
+/**
+ * The app-server command `CodexAppServerProgram` picked for a start.
+ */
+export declare class CodexServerChoice {
+  /** The command, without the `-c` settings a start adds. */
+  public readonly command: ProcessCommand;
+  /** The downloaded program the command runs, refused when it fails to start, or `null` when it runs the installed Codex. */
+  public readonly download: string | null;
+  public constructor(command: ProcessCommand, download: string | null);
+}
+
+/**
+ * Picks the app-server a Codex start runs so the threads it creates are recorded with `Resources.codexHiddenSessionSource` and stay out of the
+ * Codex app's lists: `codex app-server --session-source app-server` when the installed Codex's `app-server --help` names the option; otherwise
+ * the downloaded app server of the installed Codex's version, when `CodexAppServerDownload` holds it and it wasn't refused; otherwise
+ * `codex app-server`. It starts a version's download only from `readNotice`, which `CodexInstaller` calls when it reads Codex's latest version, as
+ * Noldova Desktop's Check for updates setting allows and whenever the person chooses Check for updates, and after it installs or updates Codex. What it
+ * read is kept per stamp of the Codex executable, and read again when the stamp changes or the last read found neither the option nor the version.
+ */
+export declare class CodexAppServerProgram {
+  /**
+   * @param runner Runs `codex app-server --help`.
+   * @param versionReader Stamps the Codex executable and reads its version.
+   * @param download Holds and downloads the app server of a Codex version.
+   * @param helpTimeout How long `--help` may take, in milliseconds.
+   * @param log Where a refused download is noted; nowhere by default.
+   */
+  public constructor(runner: CommandRunner, versionReader: ExecutableVersionReader, download: CodexAppServerDownload, helpTimeout: number, log?: ILog | null);
+  /** The shared app-server command, `codex app-server`. */
+  public static sharedOf(command: ProcessCommand): ProcessCommand;
+  /**
+   * Picks the app-server command for a start, as the class says, without starting a download.
+   * @param signal Stops the reads.
+   */
+  public choose(command: ProcessCommand, environment: NodeJS.ProcessEnv, signal: AbortSignal): Promise<CodexServerChoice>;
+  /**
+   * `Resources.codexThreadsListedNotice` while the threads a start creates would show in the Codex app: the installed Codex's `app-server --help`
+   * doesn't name the option, and its version's download isn't in place or was refused, or its version can't be read; `null` otherwise.
+   * @param downloads Whether to start the version's download when it isn't in place, as when the installer checks Codex's latest version.
+   */
+  public readNotice(command: ProcessCommand, environment: NodeJS.ProcessEnv, downloads: boolean): Promise<string | null>;
+  /** Stops the reads and downloads `readNotice` started; the adapter calls it at shutdown. */
+  public stop(): void;
+  /** Stops using a downloaded program that failed to start, for the rest of the run, and logs why. */
+  public refuse(program: string, reason: string): void;
+}
+
+/**
+ * Downloads the app server Codex publishes beside each release, the program that takes `--session-source`: it reads the release of a version from
+ * `Resources.codexAppServerReleaseAddress`, downloads this computer's `codex-app-server-package-<target>.tar.gz`, checks it against the SHA-256
+ * the release lists, and unpacks it with tar into `<root>/<version>-<target>`, in place of an incomplete folder there, then removes the other
+ * versions. The download is staged in
+ * `root` and removed whether it succeeds or not; the run's first download also removes the staging folders of downloads cut off before. One download runs per version at a time; a failed one is logged and tried again on the next run.
+ */
+export declare class CodexAppServerDownload {
+  /**
+   * @param root The folder downloads are kept in, `<data>/providers/codex-app-server`.
+   * @param releaseAddress Where a release is read by its tag, `Resources.codexAppServerReleaseAddress`.
+   * @param target This computer's package target, `CodexInstaller.targetOf`, or `null` when there is none.
+   * @param platform The platform, which decides the program's name and whether files are made executable.
+   * @param extractor The program `ExecutableLocator.locateTar` found, or `null`, which downloads nothing.
+   * @param runner Runs tar.
+   * @param unpackTimeout How long tar may take, in milliseconds.
+   * @param log Where a failed download, and an older version that couldn't be removed, is noted; nowhere by default.
+   * @param remove Removes a version's folder: the incomplete one a download replaces, and the other versions once it is in place; by default
+   * `rmSync`, recursive and forced, with `Resources.removeRetries`.
+   */
+  public constructor(root: string, releaseAddress: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
+    unpackTimeout: number, log?: ILog | null, remove?: (path: string) => void);
+  /** The downloaded program of a version, or `null` when it isn't there. */
+  public programOf(version: string): string | null;
+  /**
+   * Downloads the app server of a version unless it is there, one download per version at a time.
+   * @returns The program, or `null` when the download failed, after logging why.
+   */
+  public fetch(version: string, signal: AbortSignal): Promise<string | null>;
 }
 
 /**
@@ -15069,11 +15249,13 @@ export declare class CodexInstaller implements IProviderKindInstallation {
    * `InstallRename.moveAsync`; a move back that still fails is thrown as `Resources.formatCodexReleaseSetAside`.
    * @param unpackTimeout How long tar may take, in milliseconds.
    * @param channelTimeout How long `readVersions` may wait for the release, in milliseconds.
+   * @param serverProgram Reads the versions' `notice` through `CodexAppServerProgram.readNotice`, starting the app server's download when
+   * `readVersions` checks the latest version and after an install; `null`, the default, gives no notice and downloads nothing.
    */
   public constructor(locate: () => LocatedExecutable | null, versionReader: ExecutableVersionReader, environment: NodeJS.ProcessEnv, channels: readonly string[],
     home: string, binDirectory: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
     program: (path: string) => ProcessCommand, symlink: (target: string, path: string) => void, rename: (from: string, to: string) => void,
-    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number);
+    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number, serverProgram?: CodexAppServerProgram | null);
 
   /**
    * `Resources.codexNoBuild` when this computer has no package, `Resources.codexNoTar` when it has no tar, otherwise `null`.
@@ -15098,12 +15280,13 @@ export declare class CodexInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Codex's version and the latest release's, which is `null` when no release can be read in time, and without reading
-   * a release when no Codex is installed or the one installed isn't a standalone install.
+   * a release when no Codex is installed, the one installed isn't a standalone install, or without `checksLatest`. With a `serverProgram` and an
+   * installed Codex, its `notice` is `CodexAppServerProgram.readNotice`'s, which starts the app server's download with `checksLatest`.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
-   * Installs the latest release, or updates an installed Codex to it.
+   * Installs the latest release, or updates an installed Codex to it, then starts the `serverProgram`'s app server download for it, if needed.
    * @param progress Called with the bytes received so far and the size the server sends, if any.
    * @param commit Called once, just before the release is moved into place, when the install can no longer be stopped.
    * @returns The installed Codex's path.
@@ -15184,9 +15367,9 @@ export declare class CopilotInstaller implements IProviderKindInstallation {
 
   /**
    * Reads the installed Copilot's version and the latest release's, which is `null` when no release can be read in time, and without reading
-   * a release when no Copilot is installed or the one installed isn't one it installs.
+   * a release when no Copilot is installed, the one installed isn't one it installs, or without `checksLatest`.
    */
-  public readVersions(): Promise<ProviderKindVersions>;
+  public readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the latest release, or updates an installed Copilot to it.
@@ -15958,9 +16141,11 @@ export declare class AcpTerminals {
    * @param environment The turn's environment, read at each start.
    * @param origin The commands' origin, for the log.
    * @param tree Ends a command's process tree; once its first process has exited, the processes it left, and then the command's own stop is used.
+   * @param platform The platform, which decides how a command is found: on Windows by `AcpCommandLine`, through the turn's `PATH` and never the
+   * chat's folder, and refused when it isn't there.
    */
   public constructor(listener: ITurnListener, providerName: string, starter: IProcessStarter, timer: ITimer, directory: string,
-    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree);
+    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree, platform: string);
 
   /**
    * Whether no command runs and every task start, output and end has reached the listener.

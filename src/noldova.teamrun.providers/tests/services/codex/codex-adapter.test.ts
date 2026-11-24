@@ -16,12 +16,15 @@ import { ForkRequest, NodeTimer, SessionCarry, SessionTokens, SharedMcpFailureKi
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import { ApprovalKind, AuthStatus, DetailKind, MessageAttachment, type Provider, ProviderAbility, RequestedSettings, RoleApplication, SenderEnvironment, SharedMcpHeader,
   SharedMcpServerDefinition, SharedMcpTransport } from "@noldova/teamrun.protocol";
-import { AppServerException, AppServerUnavailableException, CodexAdapter, ExecutableNotFoundException, type IOrphanSweep, ProcessCommand, ProviderAbilityTable, ProviderTimings, Resources, SharedMcpLaunch } from "@noldova/teamrun.providers";
+import { AppServerException, AppServerUnavailableException, CodexAdapter, CodexAppServerProgram, CommandRunner, ExecutableNotFoundException, type IOrphanSweep, ProcessCommand,
+  ProviderAbilityTable, ProviderTimings, Resources, SharedMcpLaunch } from "@noldova/teamrun.providers";
 
 import { AbilityChecks } from "../../fixtures/ability-checks/ability-checks.fixture.js";
 import { TurnAbilityProbes } from "../../fixtures/ability-checks/turn-ability-probes.fixture.js";
+import { ChosenAppServerProgram } from "../../fixtures/chosen-app-server-program.fixture.js";
 import { CodexModelListRecording } from "../../fixtures/codex-model-list.recording.js";
 import { CodexTestHost } from "../../fixtures/codex-test-host.fixture.js";
+import { HeldAppServerDownload } from "../../fixtures/held-app-server-download.fixture.js";
 import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingMcpEndpoint } from "../../fixtures/recording-mcp-endpoint.fixture.js";
@@ -2782,6 +2785,104 @@ export class CodexAdapterTests {
       Assert.areEqual("The Codex app-server exited (code 3, signal null)", exited.error);
     }
     finally { await Promise.all([updated.shutdown(), exiting.shutdown()]); }
+  }
+
+  @TestMethod
+  public async startsTheInstalledCodexsAppServerWithTheSourceThatKeepsItsThreadsOutOfTheCodexAppOnceItsHelpNamesTheOption(): Promise<void> {
+    using host = new CodexTestHost();
+    const environment = { ...host.environment, TEAMRUN_FAKE_CODEX_SESSION_SOURCE: "true" };
+    const runner = new CommandRunner(host.starter);
+    const adapter = host.createAdapter(environment, undefined, undefined, undefined, null, undefined, undefined,
+      new CodexAppServerProgram(runner, host.versionReader, new HeldAppServerDownload(), 5000));
+    const listener = new RecordingTurnListener();
+    try {
+      await adapter.runTurn(host.createRequest("echo"), listener, new AbortController().signal);
+
+      Assert.areEqual("app-server --session-source app-server -c features.apps=false",
+        (JSON.parse(String(listener.texts[0])) as { argv: readonly string[] }).argv.join(" "));
+    }
+    finally {
+      await adapter.shutdown();
+    }
+  }
+
+  @TestMethod
+  public async startsTheChosenDownloadWithTheSettingsATurnNeeds(): Promise<void> {
+    using host = new CodexTestHost();
+    const program = new ChosenAppServerProgram(new ProcessCommand(process.execPath, [CodexTestHost.FAKE_SERVER_PATH, "app-server", "--session-source", "app-server"]),
+      "/downloads/codex-app-server");
+    const adapter = host.createAdapter(host.environment, undefined, undefined, undefined, null, undefined, undefined, program);
+    const listener = new RecordingTurnListener();
+    try {
+      const result = await adapter.runTurn(host.createRequest("echo"), listener, new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual("app-server --session-source app-server -c features.apps=false",
+        (JSON.parse(String(listener.texts[0])) as { argv: readonly string[] }).argv.join(" "));
+      Assert.areEqual(0, program.refusals.length);
+    }
+    finally {
+      await adapter.shutdown();
+    }
+  }
+
+  @TestMethod
+  public async stopsADownloadThatFailsToStartRefusesItWithCodexsErrorAndRunsTheTurnOnCodexAppServer(): Promise<void> {
+    using host = new CodexTestHost();
+    const exiting = host.directory.resolve("exiting-app-server.cjs");
+    writeFileSync(exiting, "process.stderr.write(\"error: unknown configuration key\", () => process.exit(3));");
+    const program = new ChosenAppServerProgram(new ProcessCommand(process.execPath, [exiting]), "/downloads/codex-app-server");
+    const adapter = host.createAdapter(host.environment, undefined, undefined, undefined, null, undefined, undefined, program);
+    const listener = new RecordingTurnListener();
+    try {
+      const result = await adapter.runTurn(host.createRequest("echo"), listener, new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual("app-server -c features.apps=false", (JSON.parse(String(listener.texts[0])) as { argv: readonly string[] }).argv.join(" "));
+      Assert.areEqual("/downloads/codex-app-server: The Codex app-server exited (code 3, signal null): error: unknown configuration key", program.refusals.join("\n"));
+      Assert.areEqual(`${exiting} -c features.apps=false|app-server -c features.apps=false`,
+        host.programs.started.map(t => t.arguments.filter(a => a !== CodexTestHost.FAKE_SERVER_PATH).join(" ")).join("|"));
+    }
+    finally {
+      await adapter.shutdown();
+    }
+  }
+
+  @TestMethod
+  public async startsNothingElseAndStopsTheAppServerDownloadsWhenTheAdapterShutsDownWhileADownloadStarts(): Promise<void> {
+    using host = new CodexTestHost();
+    const silent = host.directory.resolve("silent-app-server.cjs");
+    writeFileSync(silent, "process.stdin.resume();");
+    const program = new ChosenAppServerProgram(new ProcessCommand(process.execPath, [silent]), "/downloads/codex-app-server");
+    const adapter = host.createAdapter(host.environment, undefined, undefined, undefined, null, undefined, undefined, program);
+
+    const turn = adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal);
+    await Wait.untilOrSettled(() => host.programs.started.length === 1, turn);
+    await adapter.shutdown();
+    const result = await turn;
+
+    Assert.areEqual(TurnOutcome.Failed, result.outcome);
+    Assert.areEqual(`${silent} -c features.apps=false`, host.programs.started.map(t => t.arguments.join(" ")).join("|"));
+    Assert.areEqual(0, program.refusals.length);
+    Assert.areEqual(1, program.stops);
+  }
+
+  @TestMethod
+  public async failsATurnWhoseInstalledCodexAppServerFailsToStartWithTheSourceWithoutStartingAnother(): Promise<void> {
+    using host = new CodexTestHost();
+    const environment = { ...host.environment, TEAMRUN_FAKE_CODEX_SESSION_SOURCE: "true", TEAMRUN_FAKE_CODEX_INIT: "exit" };
+    const adapter = host.createAdapter(environment, undefined, undefined, undefined, null, undefined, undefined,
+      new CodexAppServerProgram(new CommandRunner(host.starter), host.versionReader, new HeldAppServerDownload(), 5000));
+    try {
+      const result = await adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Failed, result.outcome);
+      Assert.areEqual("The Codex app-server exited (code 3, signal null)", result.error);
+      Assert.areEqual("app-server --session-source app-server -c features.apps=false", host.programs.started.map(t => t.arguments.slice(1).join(" ")).join("|"));
+    }
+    finally {
+      await adapter.shutdown();
+    }
   }
 
   @TestMethod

@@ -15,7 +15,6 @@ import { EventName, MethodName, OrganizationIdParams, OrganizationLayoutSavePara
 
 import { Resources } from "../../resources";
 import type { OrganizationCardField } from "../enums/organization-card-field";
-import type { OrganizationViewMode } from "../enums/organization-view-mode";
 import { OrganizationLayout } from "../models/organization-layout";
 import { EngineResync } from "./engine-resync";
 
@@ -91,14 +90,6 @@ export class OrganizationLayoutState {
 
   public clearEveryCard(): void {
     this.update(t => t.withoutAnyCardFields());
-  }
-
-  public showView(view: OrganizationViewMode): void {
-    this.update(t => t.withView(view));
-  }
-
-  public focusOn(id: string | null): void {
-    this.update(t => t.withFocus(id));
   }
 
   private update(change: (layout: OrganizationLayout) => OrganizationLayout): void {

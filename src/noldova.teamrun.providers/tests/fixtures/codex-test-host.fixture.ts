@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 import { type ILog, type ITimer, NodeTimer, TurnRequest } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import { AuthStatus, Provider, RequestedSettings } from "@noldova/teamrun.protocol";
-import { AppServerClient, AppServerClientInfo, CodexAdapter, type IOrphanSweep, NodeProcessStarter, ProcessCommand, ProcessTerminator, ProviderTimings }
-  from "@noldova/teamrun.providers";
+import { AppServerClient, AppServerClientInfo, CodexAdapter, type CodexAppServerProgram, type IOrphanSweep, NodeProcessStarter, ProcessCommand, ProcessTerminator,
+  ProviderTimings } from "@noldova/teamrun.providers";
 
 import { ProgramRecorder } from "./program-recorder.fixture.js";
 import { IsolatedPath } from "./isolated-path.fixture.js";
@@ -37,9 +37,10 @@ export class CodexTestHost implements Disposable {
   public readonly idleTimer: ManualTimer = new ManualTimer();
 
   public createAdapter(environment: NodeJS.ProcessEnv = this.environment, command: ProcessCommand | null = this.command,
-    timings: ProviderTimings = this.timings, timer: ITimer = new NodeTimer(), log: ILog | null = null, platform?: string, sweep?: IOrphanSweep): CodexAdapter {
+    timings: ProviderTimings = this.timings, timer: ITimer = new NodeTimer(), log: ILog | null = null, platform?: string, sweep?: IOrphanSweep,
+    serverProgram: CodexAppServerProgram | null = null): CodexAdapter {
     return new CodexAdapter(command, environment, this.clientInfo, this.programs.wrap(this.starter), timings, this.versionReader, timer, undefined, null, log, platform, sweep,
-      this.idleTimer);
+      this.idleTimer, serverProgram);
   }
 
   public installCodex(versionFile: string, version: string): void {

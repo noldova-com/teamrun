@@ -18,10 +18,12 @@ import type { IAcpTerminal } from "../../interfaces/i-acp-terminal.js";
 import type { IAcpTerminalExit } from "../../interfaces/i-acp-terminal-exit.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
-import { ProcessCommand } from "../../models/process-command.js";
+import type { ProcessCommand } from "../../models/process-command.js";
 import type { ProcessOrigin } from "../../models/process-origin.js";
 import { Resources } from "../../resources.js";
+import { FailureDescriber } from "../failure-describer.js";
 import { SavedImageFile } from "../saved-image-file.js";
+import { AcpCommandLine } from "./acp-command-line.js";
 
 export class AcpTerminals {
   private readonly listener: ITurnListener;
@@ -32,6 +34,7 @@ export class AcpTerminals {
   private readonly environment: () => NodeJS.ProcessEnv;
   private readonly origin: ProcessOrigin | null;
   private readonly tree: IProcessTree;
+  private readonly platform: string;
   private readonly terminals: Map<string, IAcpTerminal> = new Map();
   private sessionId: string | null = null;
   private settle: (() => void) | null = null;
@@ -40,7 +43,7 @@ export class AcpTerminals {
   private queued: number = 0;
 
   public constructor(listener: ITurnListener, providerName: string, starter: IProcessStarter, timer: ITimer, directory: string,
-    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree) {
+    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree, platform: string) {
     this.listener = listener;
     this.providerName = providerName;
     this.starter = starter;
@@ -49,6 +52,7 @@ export class AcpTerminals {
     this.environment = environment;
     this.origin = origin;
     this.tree = tree;
+    this.platform = platform;
   }
 
   public get isIdle(): boolean {
@@ -130,9 +134,10 @@ export class AcpTerminals {
     const asked = fields[Resources.acpOutputByteLimitField];
     const limit = Object.isNumber(asked) && Number.isSafeInteger(asked) && asked >= 0 ? Math.min(asked, Resources.acpTerminalOutputLimit)
       : Resources.acpTerminalOutputLimit;
-    const command = new ProcessCommand(executable, args, this.origin).inOwnGroup();
+    const environment = this.environment();
+    const command = this.commandOf(environment, executable, args);
     const launched = this.timer.now();
-    const started = this.starter.start(command, { ...this.environment(), ...variables }, directory);
+    const started = this.starter.start(command, { ...environment, ...variables }, directory);
     const exited = Promise.withResolvers<IAcpTerminalExit>();
     const terminalId = `${Resources.acpTerminalIdPrefix}${randomUUID()}`;
     const terminal: IAcpTerminal = {
@@ -152,6 +157,16 @@ export class AcpTerminals {
       this.ended(terminalId, terminal, exit.exitCode);
     });
     return { [Resources.acpTerminalIdField]: terminalId };
+  }
+
+  private commandOf(environment: NodeJS.ProcessEnv, executable: string, args: readonly string[]): ProcessCommand {
+    try {
+      const command = AcpCommandLine.of(this.platform, environment, {}, executable, args).inOwnGroup();
+      return Object.isNull(this.origin) ? command : command.withOrigin(this.origin);
+    }
+    catch (error) {
+      throw new AcpRequestException(FailureDescriber.describe(error), Resources.acpInvalidParamsCode);
+    }
   }
 
   private followAsync(terminalId: string): Promise<void> {

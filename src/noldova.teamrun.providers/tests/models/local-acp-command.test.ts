@@ -23,7 +23,7 @@ export class LocalAcpCommandTests {
   public runsAsAKindOfItsOwnThatStartsItsCommandWithItsSavedValues(): void {
     const command = new LocalAcpCommand("my-agent", " My agent ", " node ", ["agent.js", "--acp"], [new SharedMcpSecret("MY_AGENT_KEY", REFERENCE)]);
 
-    const agent = command.toAgent({ MY_AGENT_KEY: "value" }, { HOME: "home" }, "home");
+    const agent = command.toAgent({ MY_AGENT_KEY: "value" }, { HOME: "home" }, "home", "linux");
     const launch = agent.launch(null, null, "chat");
 
     Assert.areEqual("local-my-agent|My agent|node", [command.kindId, command.name, command.command].join("|"));
@@ -62,7 +62,7 @@ export class LocalAcpCommandTests {
 
     const agent = command.toAgent(() => {
       throw new Error("The value is no longer saved.");
-    }, {}, "home");
+    }, {}, "home", "linux");
 
     Assert.areEqual("The value is no longer saved.", Assert.throws(() => agent.launch(null, null), Error).message);
   }

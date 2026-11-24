@@ -787,6 +787,11 @@ export declare enum MethodName {
    */
   ProviderKindInstallationList = "ProviderKindInstallationList",
   /**
+   * Reads each provider's versions now, the latest ones off the network included, as the person asked for it, whatever the app's Check for updates
+   * setting says. Parameters: none, `null` on the wire. Result: an array of `ProviderKindInstallation`, once the reads end.
+   */
+  ProviderKindInstallationCheck = "ProviderKindInstallationCheck",
+  /**
    * Finds each provider's command-line tool afresh, by where its provider installs it and the tool's own version command. Parameters: none,
    * `null` on the wire. Result: an array of `ProviderTool`, one per kind that has a command-line tool.
    */
@@ -2342,6 +2347,10 @@ export declare class Resources {
    * Name of a kind installation's path of a program found outside TeamRun's own install: `foundPath`.
    */
   public static readonly foundPathField: string;
+  /**
+   * Name of a kind installation's notice about how TeamRun runs it: `notice`.
+   */
+  public static readonly noticeField: string;
   /**
    * Name of a provider's label field: `label`.
    */
@@ -10573,17 +10582,22 @@ export declare class ProviderKindInstallation {
    * `PATH` or a path the person chose; `null` otherwise. Such a copy updates on its own, not through TeamRun.
    */
   public readonly foundPath: string | null;
+  /**
+   * What the person should know about how TeamRun runs the kind while `Installed`, such as Codex's chats still showing in the Codex app; `null`
+   * otherwise.
+   */
+  public readonly notice: string | null;
 
   /**
    * Initializes the installation.
    * @throws ArgumentException when `kind` is blank.
    */
   public constructor(kind: string, state: ProviderKindInstallState, reason?: string | null, received?: number, total?: number, version?: string | null,
-    update?: string | null, cancellable?: boolean, missingTool?: string | null, foundPath?: string | null);
+    update?: string | null, cancellable?: boolean, missingTool?: string | null, foundPath?: string | null, notice?: string | null);
 
   /**
    * Reads the installation from untrusted JSON carrying `kind`, `state`, the nullable `reason`, `received`, `total`, the nullable `version` and
-   * `update`, `cancellable`, and the nullable `missingTool` and `foundPath`; a missing one, as from a sender before it, reads as `null`.
+   * `update`, `cancellable`, and the nullable `missingTool`, `foundPath` and `notice`; a missing one, as from a sender before it, reads as `null`.
    * @throws JsonException when a field is missing or invalid; the exception names the field's path.
    */
   public static fromJson(value: unknown, path?: string): ProviderKindInstallation;

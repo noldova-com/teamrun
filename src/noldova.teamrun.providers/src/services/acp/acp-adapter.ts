@@ -353,7 +353,7 @@ export class AcpAdapter implements IProviderAdapter {
     const sender = SenderEnvironment.read(request.environment);
     const commands = new AcpCommands();
     const terminals = this.agent.runsTerminals === true ? new AcpTerminals(listener, this.descriptor.displayName, this.starter, this.timer, request.workingDirectory,
-      () => ({ ...launchEnvironment, ...request.environment }), this.originOf(request.provider), this.processTree) : null;
+      () => ({ ...launchEnvironment, ...request.environment }), this.originOf(request.provider), this.processTree, process.platform) : null;
     const channel = new AcpChannel(turn, this.agent.followsTasks ? listener : null, this.timer, this.timings.wakeGrace, async (t, u) => {
       await t.onToolsAsync(v => {
         adopt(v);

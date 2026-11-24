@@ -32,12 +32,16 @@ export class Resources {
   public static readonly copilotInstallSegments: readonly string[] = ["providers", "copilot"];
   public static readonly releaseChannelTimeout: number = 10_000;
   public static readonly codexUnpackTimeout: number = 600_000;
+  public static readonly codexAppServerSegments: readonly string[] = ["providers", "codex-app-server"];
   public static readonly copilotUnpackTimeout: number = 600_000;
   public static readonly cursorInstallSegments: readonly string[] = ["providers", "cursor"];
   public static readonly cursorUnpackTimeout: number = 600_000;
   public static readonly antigravityTempSegments: readonly string[] = ["antigravity-tmp"];
   public static readonly piExtensionSegments: readonly string[] = ["providers", "pi"];
   public static readonly chainHopLimitSetting: string = "teamrun.chainHopLimit";
+  public static readonly updateChecksSetting: string = "desktop.updateChecks";
+  public static readonly automaticUpdateChecks: string = "Automatic";
+  public static readonly atStartUpdateChecks: string = "AtStart";
   public static readonly titleModelSetting: string = "teamrun.titleModel";
   public static readonly idleCompactionSetting: string = "teamrun.idleCompaction";
   public static readonly outsideSessionsSetting: string = "teamrun.outsideSessions";

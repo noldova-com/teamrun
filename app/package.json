@@ -73,7 +73,8 @@
     ],
     "signedPlatforms": [
       "windows",
-      "macos"
+      "macos",
+      "linux"
     ],
     "packaging": {
       "acceptedLicenses": {

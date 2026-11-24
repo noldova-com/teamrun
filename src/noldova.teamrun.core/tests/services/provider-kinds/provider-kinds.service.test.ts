@@ -20,6 +20,7 @@ import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { FakeProviderAdapter } from "../../fixtures/fake-provider-adapter.fixture.js";
 import { FakeProviderKindInstallation } from "../../fixtures/fake-provider-kind-installation.fixture.js";
+import { FakeToolUpdateChecks } from "../../fixtures/fake-tool-update-checks.fixture.js";
 
 const params = new ProviderKindParams("agy");
 
@@ -220,7 +221,7 @@ export class ProviderKindsServiceTests {
 
     const failed = await host.kinds.readPlanUsageAsync(new PlanUsageParams("fake", provider.id));
     const usage = await host.kinds.readPlanUsageAsync(new PlanUsageParams("fake", provider.id));
-    const unowned = await new ProviderKindsService(host.registry, host.providers, host.events).readPlanUsageAsync(new PlanUsageParams("fake", null));
+    const unowned = await new ProviderKindsService(host.registry, host.providers, host.events, new FakeToolUpdateChecks(true)).readPlanUsageAsync(new PlanUsageParams("fake", null));
 
     Assert.isNull(none);
     Assert.isNull(failed);
@@ -420,6 +421,105 @@ export class ProviderKindsServiceTests {
     Assert.areEqual("Installed 2.1.211 null", await versions("2.1.211", null));
     Assert.areEqual("Installed null 2.1.212", await versions(null, "2.1.212"));
     Assert.areEqual(10, installation.reads);
+  }
+
+  @TestMethod
+  public async readsNoLatestVersionWhileUpdateChecksDontAllowItAndKeepsTheLatestItKnows(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    const checks = new FakeToolUpdateChecks(false);
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, checks);
+    const versions = async (): Promise<string> => {
+      await kinds.listInstallations();
+      await installation.read;
+      const listed = ProviderKindsServiceTests.versionsOf(await kinds.listInstallations());
+      await installation.read;
+      return listed;
+    };
+
+    Assert.areEqual("Installed 2.1.211 null", await versions());
+    checks.allows = true;
+    Assert.areEqual("Installed 2.1.211 2.1.212", await versions());
+    checks.allows = false;
+    Assert.areEqual("Installed 2.1.211 2.1.212", await versions());
+    Assert.areEqual("false,false,true,true,false,false", installation.checks.join(","));
+  }
+
+  @TestMethod
+  public async listsTheNoticeTheInstallationReadsWhileInstalledWhetherOrNotUpdateChecksAllowALatestRead(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("0.171.0", "0.171.0", "Codex chats show in the Codex app.");
+    const checks = new FakeToolUpdateChecks(false);
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, checks);
+    const notices = async (): Promise<string> => {
+      await kinds.listInstallations();
+      await installation.read;
+      const listed = (await kinds.listInstallations()).map(t => `${t.state} ${t.notice}`).join(",");
+      await installation.read;
+      return listed;
+    };
+
+    const unchecked = await notices();
+    checks.allows = true;
+    const checked = await notices();
+    installation.isInstalled = false;
+    const removed = await notices();
+
+    Assert.areEqual("Installed Codex chats show in the Codex app.|Installed Codex chats show in the Codex app.|NotInstalled null", [unchecked, checked, removed].join("|"));
+    Assert.areEqual("false,false,true,true", installation.checks.slice(0, 4).join(","));
+  }
+
+  @TestMethod
+  public async readsTheListedInstallationsLatestVersionsOnceUpdateChecksAllowItAndNothingBeforeAnyListing(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    const checks = new FakeToolUpdateChecks(false);
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, checks);
+    checks.allow();
+    const before = installation.checks.join(",");
+    checks.allows = false;
+    await kinds.listInstallations();
+    await installation.read;
+
+    checks.allow();
+    await installation.read;
+
+    Assert.areEqual(String.empty, before);
+    Assert.areEqual("false,true", installation.checks.join(","));
+    Assert.areEqual("Installed 2.1.211 2.1.212", ProviderKindsServiceTests.versionsOf(await kinds.listInstallations()));
+  }
+
+  @TestMethod
+  public async checksTheLatestVersionWhenAskedOvertakingARunningReadThatDoesntAndWaitsForIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const installation = ProviderKindsServiceTests.register(host);
+    installation.isInstalled = true;
+    installation.holdReads = true;
+    installation.versions = new ProviderKindVersions("2.1.211", "2.1.212");
+    const kinds = new ProviderKindsService(host.registry, host.providers, host.events, new FakeToolUpdateChecks(false));
+    await kinds.listInstallations();
+    let ended = false;
+
+    const checked = kinds.checkInstallationsAsync().then(t => {
+      ended = true;
+      return t;
+    });
+    const again = kinds.checkInstallationsAsync();
+    await installation.answerRead();
+    await kinds.listInstallations();
+
+    Assert.isFalse(ended);
+    Assert.areEqual("false,true", installation.checks.join(","));
+    await installation.answerRead();
+    Assert.areEqual("Installed 2.1.211 2.1.212", ProviderKindsServiceTests.versionsOf(await checked));
+    Assert.areEqual("Installed 2.1.211 2.1.212", ProviderKindsServiceTests.versionsOf(await again));
+    Assert.areEqual("Installed 2.1.211", ProviderKindsServiceTests.versionsPublished(host));
   }
 
   @TestMethod

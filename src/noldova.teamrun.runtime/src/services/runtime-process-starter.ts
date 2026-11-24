@@ -11,7 +11,7 @@ import path from "node:path";
 import { type IRuntimePartContext, type OwnedProcess, ProcessRequest } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import { Resources as CoreResources } from "@noldova/teamrun.core";
-import { type IProcessStarter, type ProcessCommand, StartedProcess } from "@noldova/teamrun.providers";
+import { type IProcessStarter, type ProcessCommand, SharedMcpLauncher, StartedProcess } from "@noldova/teamrun.providers";
 
 import { ProcessNotStartedException } from "../exceptions/process-not-started.exception.js";
 import { Resources } from "../resources.js";
@@ -19,14 +19,17 @@ import { Resources } from "../resources.js";
 export class RuntimeProcessStarter implements IProcessStarter {
   private readonly context: IRuntimePartContext;
   private readonly workFolder: string;
+  private readonly platform: string;
 
-  public constructor(context: IRuntimePartContext, workFolder: string) {
+  public constructor(context: IRuntimePartContext, workFolder: string, platform: string) {
     this.context = context;
     this.workFolder = workFolder;
+    this.platform = platform;
   }
 
   public start(command: ProcessCommand, environment: NodeJS.ProcessEnv, directory: string | null): StartedProcess {
-    const request = new ProcessRequest(command.executable, command.arguments, directory ?? this.workFolder, RuntimeProcessStarter.toVariables(environment), [], undefined, command.isVerbatim);
+    const variables = RuntimeProcessStarter.toVariables(SharedMcpLauncher.environmentToStart(this.platform, environment));
+    const request = new ProcessRequest(command.executable, command.arguments, directory ?? this.workFolder, variables, [], undefined, command.isVerbatim);
     const started = new StartedProcess();
     this.context.startProcessAsync(request).then(
       owned => RuntimeProcessStarter.attach(started, owned),

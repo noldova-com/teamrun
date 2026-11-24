@@ -57,19 +57,58 @@ class LinkingCommandRunner extends CommandRunner {
   }
 }
 
+class InstallOptions {
+  public platform: string = "linux";
+  public runner: CommandRunner = REAL_RUNNER;
+  public settle: (from: string, to: string) => Promise<void> = async (from, to) => renameSync(from, to);
+  public latest: AcpRegistryAgent | null = null;
+  public environment: NodeJS.ProcessEnv = process.env;
+  public target: string | null = TARGET;
+
+  public withPlatform(platform: string): InstallOptions {
+    this.platform = platform;
+    return this;
+  }
+
+  public withRunner(runner: CommandRunner): InstallOptions {
+    this.runner = runner;
+    return this;
+  }
+
+  public withSettle(settle: (from: string, to: string) => Promise<void>): InstallOptions {
+    this.settle = settle;
+    return this;
+  }
+
+  public withLatest(latest: AcpRegistryAgent | null): InstallOptions {
+    this.latest = latest;
+    return this;
+  }
+
+  public withEnvironment(environment: NodeJS.ProcessEnv): InstallOptions {
+    this.environment = environment;
+    return this;
+  }
+
+  public withTarget(target: string | null): InstallOptions {
+    this.target = target;
+    return this;
+  }
+}
+
 class Install {
   public readonly directory: string;
   public readonly saved: AcpRegistryAgent[] = [];
   public readonly installer: AcpAgentInstaller;
+  public latestReads: number = 0;
 
-  public constructor(agent: AcpRegistryAgent, directory: string, tools: AcpInstallTools, options: { readonly platform?: string; readonly runner?: CommandRunner;
-    readonly rename?: (from: string, to: string) => void; readonly settle?: (from: string, to: string) => Promise<void>; readonly latest?: AcpRegistryAgent | null;
-    readonly environment?: NodeJS.ProcessEnv; readonly target?: string | null } = {}) {
+  public constructor(agent: AcpRegistryAgent, directory: string, tools: AcpInstallTools, options: InstallOptions = new InstallOptions()) {
     this.directory = directory;
-    const rename = options.rename ?? renameSync;
-    this.installer = new AcpAgentInstaller(agent, directory, options.target === undefined ? TARGET : options.target, options.platform ?? "linux", options.environment ?? process.env,
-      tools, options.runner ?? REAL_RUNNER, rename, options.settle ?? (async (from, to) => rename(from, to)), () => Promise.resolve(options.latest === undefined ? null : options.latest),
-      async t => { this.saved.push(t); });
+    this.installer = new AcpAgentInstaller(agent, directory, options.target, options.platform, options.environment, tools, options.runner, renameSync, options.settle, () => {
+      this.latestReads++;
+      return Promise.resolve(options.latest);
+    },
+    async t => { this.saved.push(t); });
   }
 
   public run(signal: AbortSignal = new AbortController().signal, commit: () => void = () => undefined): Promise<string> {
@@ -111,7 +150,7 @@ export class AcpAgentInstallerTests {
     Assert.isFalse(install.installer.isInstalled);
     Assert.isNull(install.installer.program);
     Assert.isNull(install.installer.commandOf());
-    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     const folder = await install.installer.install(t => progress.push(t), new AbortController().signal, () => commits.push(existsSync(directory.resolve("installs", "1.0.0"))));
 
     Assert.areEqual(directory.resolve("installs", "1.0.0"), folder);
@@ -123,9 +162,11 @@ export class AcpAgentInstallerTests {
     Assert.isTrue(install.installer.isInstalled);
     Assert.isNull(install.installer.unavailable);
     Assert.areEqual(join(folder, "bin", "agent"), install.installer.program);
-    Assert.areEqual(`${join(folder, "bin", "agent")}|acp`, [install.installer.commandOf()!.executable, install.installer.commandOf()!.arguments.join(",")].join("|"));
+    const command = install.installer.commandOf();
+    Assert.isNotNull(command);
+    Assert.areEqual(`${join(folder, "bin", "agent")}|acp`, [command.executable, command.arguments.join(",")].join("|"));
     Assert.areEqual(JSON.stringify({ AGENT_MODE: "acp" }), JSON.stringify(install.installer.variables));
-    Assert.areEqual("1.0.0 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("1.0.0 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     if (process.platform !== "win32")
       Assert.areEqual(0o755, statSync(join(folder, "bin", "agent")).mode & 0o777);
   }
@@ -178,7 +219,7 @@ export class AcpAgentInstallerTests {
     using directory = new TemporaryDirectory();
     await using server = (await LocalHttpServer.start()).serve("/agent.exe", Buffer.from("program"));
     const install = new Install(AcpAgentInstallerTests.agent(server.url("/agent.exe"), null, "1.0.0", ["tools", "agent.exe"]), directory.resolve("installs"),
-      new AcpInstallTools(null, null, null), { platform: "win32" });
+      new AcpInstallTools(null, null, null), new InstallOptions().withPlatform("win32"));
 
     Assert.isNull(install.installer.unavailable);
     const folder = await install.run();
@@ -219,7 +260,7 @@ export class AcpAgentInstallerTests {
         Resources.formatAcpAgentProgramMissing("Agent", join("bin", "agent"))],
       ["folder", new Install(AcpAgentInstallerTests.agent(server.url("/folder.tar.gz"), null), directory.resolve("folder"), tar),
         Resources.formatAcpAgentProgramMissing("Agent", join("bin", "agent"))],
-      ["stopped", new Install(AcpAgentInstallerTests.agent(server.url("/stopped.tar.gz"), null), directory.resolve("stopped"), tar, { runner }), Resources.formatAcpAgentUnpackFailed("Agent", null)]
+      ["stopped", new Install(AcpAgentInstallerTests.agent(server.url("/stopped.tar.gz"), null), directory.resolve("stopped"), tar, new InstallOptions().withRunner(runner)), Resources.formatAcpAgentUnpackFailed("Agent", null)]
     ];
 
     for (const [name, install, message] of cases) {
@@ -240,7 +281,7 @@ export class AcpAgentInstallerTests {
     writeFileSync(join(outside, "agent"), "elsewhere");
     await using server = (await LocalHttpServer.start()).serve("/agent.tar.gz", FakeTar.archive({}));
     const install = new Install(AcpAgentInstallerTests.agent(server.url("/agent.tar.gz"), null), directory.resolve("installs"), new AcpInstallTools(TOOL, null, null),
-      { runner: new LinkingCommandRunner(outside) });
+      new InstallOptions().withRunner(new LinkingCommandRunner(outside)));
 
     const failure = await Assert.throwsAsync(() => install.run(), InstallFailedException);
 
@@ -256,18 +297,18 @@ export class AcpAgentInstallerTests {
     await using server = (await LocalHttpServer.start()).serve("/agent.tar.gz", archive);
     const next = AcpAgentInstallerTests.agent(server.url("/agent.tar.gz"), hashOf(archive), "2.0.0");
     const install = new Install(AcpAgentInstallerTests.agent(server.url("/old.tar.gz"), null), directory.resolve("installs"), new AcpInstallTools(FakeTar.create(tools.path), null, null),
-      { latest: next });
+      new InstallOptions().withLatest(next));
     mkdirSync(directory.resolve("installs", "0.9.0"), { recursive: true });
     mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
 
-    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     const folder = await install.run();
 
     Assert.areEqual(directory.resolve("installs", "2.0.0"), folder);
     Assert.areEqual("1.0.0,2.0.0", readdirSync(directory.resolve("installs")).sort().join(","));
     Assert.areEqual("2.0.0", install.saved.map(t => t.version).join(","));
     Assert.areEqual(join(folder, "bin", "agent"), install.installer.program);
-    Assert.areEqual("2.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("2.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
   }
 
   @TestMethod
@@ -335,7 +376,7 @@ export class AcpAgentInstallerTests {
     ];
 
     for (const [name, settle, message] of cases) {
-      const install = new Install(agent, directory.resolve(name), new AcpInstallTools(FakeTar.create(tools.path), null, null), { settle });
+      const install = new Install(agent, directory.resolve(name), new AcpInstallTools(FakeTar.create(tools.path), null, null), new InstallOptions().withSettle(settle));
 
       const failure = await Assert.throwsAsync(() => install.run(), Error);
 
@@ -356,7 +397,7 @@ export class AcpAgentInstallerTests {
     stopped.abort();
     const before = new Install(agent, directory.resolve("before"), new AcpInstallTools(FakeTar.create(tools.path), null, null));
     const late = new AbortController();
-    const after = new Install(agent, directory.resolve("after"), new AcpInstallTools(FakeTar.create(tools.path), null, null), { settle: () => Promise.reject(new Error("gone")) });
+    const after = new Install(agent, directory.resolve("after"), new AcpInstallTools(FakeTar.create(tools.path), null, null), new InstallOptions().withSettle(() => Promise.reject(new Error("gone"))));
 
     const cancelled = await Assert.throwsAsync(() => before.run(stopped.signal), InstallCancelledException);
     const placed = await Assert.throwsAsync(() => after.run(late.signal, () => late.abort()), Error);
@@ -412,7 +453,7 @@ export class AcpAgentInstallerTests {
     using tools = new TemporaryDirectory();
     const npm = new FakeNpm(tools.path, FakeNpm.package("agent-cli", "1.0.0", { "agent-cli": "cli.js" }, ["agent-cli"]));
     const install = new Install(AcpAgentInstallerTests.npx(), directory.resolve("installs"), new AcpInstallTools(null, null, npm.executable),
-      { platform: process.platform, environment: { ...process.env, PERSON_SETTING: "kept" } });
+      new InstallOptions().withPlatform(process.platform).withEnvironment({ ...process.env, PERSON_SETTING: "kept" }));
 
     const folder = await install.run();
 
@@ -434,7 +475,7 @@ export class AcpAgentInstallerTests {
     writeFileSync(shim, "");
     const answering = new AnsweringCommandRunner(new CommandResult(0, null, "", "", false));
     const windows = new Install(AcpAgentInstallerTests.npx(), directory.resolve("windows"), new AcpInstallTools(null, null, new LocatedExecutable(shim, ExecutableSource.Path)),
-      { platform: "win32", runner: answering, environment: { COMSPEC: "C:\\Windows\\System32\\cmd.exe", PATH: directory.path } });
+      new InstallOptions().withPlatform("win32").withRunner(answering).withEnvironment({ COMSPEC: "C:\\Windows\\System32\\cmd.exe", PATH: directory.path }));
 
     await Assert.throwsAsync(() => windows.run(), Error);
     mkdirSync(directory.resolve("windows", "1.0.0"), { recursive: true });
@@ -446,7 +487,7 @@ export class AcpAgentInstallerTests {
     Assert.areEqual("C:\\Windows\\System32\\cmd.exe|true", `${answering.commands[0]!.executable}|${answering.commands[0]!.isVerbatim}`);
     Assert.areEqual(directory.resolve("windows", "1.0.0", "node_modules", ".bin", "agent-cli.cmd"), windows.installer.program);
     Assert.areEqual("C:\\Windows\\System32\\cmd.exe|true", `${windows.installer.commandOf()!.executable}|${windows.installer.commandOf()!.isVerbatim}`);
-    const linux = new Install(AcpAgentInstallerTests.npx(), directory.resolve("windows"), new AcpInstallTools(null, null, TOOL), { environment: {} });
+    const linux = new Install(AcpAgentInstallerTests.npx(), directory.resolve("windows"), new AcpInstallTools(null, null, TOOL), new InstallOptions().withEnvironment({}));
     Assert.areEqual(directory.resolve("windows", "1.0.0", "node_modules", ".bin", "agent-cli"), linux.installer.program);
   }
 
@@ -465,14 +506,14 @@ export class AcpAgentInstallerTests {
     for (const [name, files, exitCode, stderr, message] of cases) {
       mkdirSync(directory.resolve(`${name}-npm`));
       const npm = new FakeNpm(directory.resolve(`${name}-npm`), files, exitCode, stderr);
-      const install = new Install(AcpAgentInstallerTests.npx(), directory.resolve(name), new AcpInstallTools(null, null, npm.executable), { platform: process.platform });
+      const install = new Install(AcpAgentInstallerTests.npx(), directory.resolve(name), new AcpInstallTools(null, null, npm.executable), new InstallOptions().withPlatform(process.platform));
 
       const failure = await Assert.throwsAsync(() => install.run(), Error);
 
       Assert.areEqual(message, failure.message, name);
       Assert.areEqual(String.empty, readdirSync(directory.resolve(name)).join(","), name);
     }
-    const timedOut = new Install(AcpAgentInstallerTests.npx(), directory.resolve("timed"), new AcpInstallTools(null, null, TOOL), { runner: new AnsweringCommandRunner(new CommandResult(null, null, "", "", true)) });
+    const timedOut = new Install(AcpAgentInstallerTests.npx(), directory.resolve("timed"), new AcpInstallTools(null, null, TOOL), new InstallOptions().withRunner(new AnsweringCommandRunner(new CommandResult(null, null, "", "", true))));
     Assert.areEqual(Resources.formatAcpAgentNpmFailed("Agent", null, ""), (await Assert.throwsAsync(() => timedOut.run(), InstallFailedException)).message);
     Assert.areEqual("npm took too long to install Agent.", Resources.formatAcpAgentNpmFailed("Agent", null, ""));
     Assert.areEqual("npm couldn't install Agent: exit code 7. no such version", Resources.formatAcpAgentNpmFailed("Agent", 7, "no such version"));
@@ -498,7 +539,7 @@ export class AcpAgentInstallerTests {
       using tools = new TemporaryDirectory();
       const programs = Object.isNull(expected) ? [] : [expected];
       const npm = new FakeNpm(tools.path, FakeNpm.package(name, "1.0.0", bin, programs));
-      const install = new Install(AcpAgentInstallerTests.npx(`${name}@1.0.0`), directory.resolve("installs"), new AcpInstallTools(null, null, npm.executable), { platform: process.platform });
+      const install = new Install(AcpAgentInstallerTests.npx(`${name}@1.0.0`), directory.resolve("installs"), new AcpInstallTools(null, null, npm.executable), new InstallOptions().withPlatform(process.platform));
 
       if (Object.isNull(expected)) {
         Assert.areEqual(Resources.formatAcpAgentNoProgram(`${name}@1.0.0`), (await Assert.throwsAsync(() => install.run(), InstallFailedException)).message, label);
@@ -537,7 +578,7 @@ export class AcpAgentInstallerTests {
     const missing: ReadonlyMap<string, string> = new Map([["no tar", "tar"], ["no unzip", "unzip"], ["no npm", "npm"]]);
 
     for (const [label, agent, tools, target, reason] of cases) {
-      const install = new Install(agent, directory.resolve(label), tools, { target });
+      const install = new Install(agent, directory.resolve(label), tools, new InstallOptions().withTarget(target));
 
       Assert.areEqual(String(missing.get(label) ?? null), String(install.installer.missingTool), label);
 
@@ -555,6 +596,8 @@ export class AcpAgentInstallerTests {
     mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
 
     Assert.areEqual("{}", JSON.stringify(install.installer.variables));
+    Assert.isNull(install.installer.program);
+    Assert.isNull(install.installer.commandOf());
     Assert.isNull(install.installer.unavailable);
     const zipped = new Install(AcpAgentInstallerTests.binaryOnly("agent.zip"), directory.resolve("zipped"), new AcpInstallTools(null, null, null));
     Assert.areEqual("unzip", zipped.installer.missingTool);
@@ -569,10 +612,23 @@ export class AcpAgentInstallerTests {
     const archive = FakeTar.archive({ "bin/agent": "new" });
     await using server = (await LocalHttpServer.start()).serve("/agent.tar.gz", archive);
     const install = new Install(AcpAgentInstallerTests.agent(server.url("/agent.tar.gz"), hashOf(archive)), directory.resolve("installs"), new AcpInstallTools(FakeTar.create(tools.path), null, null),
-      { latest: null });
+      new InstallOptions().withLatest(null));
 
-    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions()));
+    Assert.areEqual("null 1.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
     Assert.areEqual(directory.resolve("installs", "1.0.0"), await install.run());
+  }
+
+  @TestMethod
+  public async readsNoListWhenTheLatestIsntChecked(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const install = new Install(AcpAgentInstallerTests.agent("https://example.invalid/agent.tar.gz", null), directory.resolve("installs"), new AcpInstallTools(null, null, null),
+      new InstallOptions().withLatest(AcpAgentInstallerTests.agent("https://example.invalid/agent.tar.gz", null, "2.0.0")));
+    mkdirSync(directory.resolve("installs", "1.0.0"), { recursive: true });
+
+    Assert.areEqual("1.0.0 null", AcpAgentInstallerTests.versions(await install.installer.readVersions(false)));
+    Assert.areEqual(0, install.latestReads);
+    Assert.areEqual("1.0.0 2.0.0", AcpAgentInstallerTests.versions(await install.installer.readVersions(true)));
+    Assert.areEqual(1, install.latestReads);
   }
 
   private static versions(versions: { readonly installed: string | null; readonly latest: string | null }): string {

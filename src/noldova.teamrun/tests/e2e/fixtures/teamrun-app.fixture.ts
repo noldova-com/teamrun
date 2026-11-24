@@ -23,6 +23,7 @@ import { HolderListing } from "./holder-listing.ts";
 import { PollTiming } from "./poll-timing.ts";
 import { ProcessStatus } from "./process-status.ts";
 import { StartedProcess } from "./started-process.ts";
+import { WindowSize } from "./window-size.ts";
 
 declare global {
   interface Window {
@@ -425,17 +426,33 @@ export class TeamRunApp {
     window.on("pageerror", t => this.failures.push(`renderer: ${t.message}`));
     window.on("console", t => this.console.push(`${t.type()}: ${t.text()}`));
     this.window = window;
+    const wanted = new WindowSize(TeamRunApp.DESKTOP_DEFAULT_WIDTH, TeamRunApp.DESKTOP_DEFAULT_HEIGHT);
     const area = await application.evaluate(({ BrowserWindow, screen }, { width, height }) => {
       for (const shown of BrowserWindow.getAllWindows()) {
         shown.setContentSize(width, height);
         shown.center();
       }
       return screen.getPrimaryDisplay().workArea;
-    }, { width: TeamRunApp.DESKTOP_DEFAULT_WIDTH, height: TeamRunApp.DESKTOP_DEFAULT_HEIGHT });
-    await expect.poll(() => window.evaluate(() => [innerWidth, innerHeight]), {
-      message: `the window at Desktop's default size, which the specs were written against, on a screen whose work area is ${area.width}×${area.height}`,
-      ...TeamRunApp.pollOf(30_000) }).toEqual([TeamRunApp.DESKTOP_DEFAULT_WIDTH, TeamRunApp.DESKTOP_DEFAULT_HEIGHT]);
+    }, wanted);
+    let previous = String.empty;
+    const unsettled = async (): Promise<string> => {
+      const sizes = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map(t => ({ content: t.getContentSize(), bounds: t.getBounds() })));
+      const inner = await window.evaluate(() => [innerWidth, innerHeight]);
+      const shown = JSON.stringify([sizes, inner]);
+      const isSettled = shown === previous;
+      previous = shown;
+      const misfits = sizes.filter(t => !TeamRunApp.fits(t.content[0] ?? 0, wanted.width, t.bounds.width, area.width)
+        || !TeamRunApp.fits(t.content[1] ?? 0, wanted.height, t.bounds.height, area.height));
+      return isSettled && misfits.length === 0 && sizes.some(t => t.content[0] === inner[0] && t.content[1] === inner[1]) ? String.empty : shown;
+    };
+    await expect.poll(unsettled, {
+      message: `the window at Desktop's default size, which the specs were written against, or as near it as a screen whose work area is ${area.width}×${area.height} allows`,
+      ...TeamRunApp.pollOf(30_000) }).toBe(String.empty);
     return window;
+  }
+
+  private static fits(content: number, wanted: number, bound: number, room: number): boolean {
+    return content === wanted || (content < wanted && bound >= room);
   }
 
   public async openChatAsync(variables: Readonly<Record<string, string>> = {}, preloads: readonly string[] = []): Promise<Page> {

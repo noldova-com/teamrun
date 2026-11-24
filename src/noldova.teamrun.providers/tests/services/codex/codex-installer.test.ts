@@ -14,6 +14,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { ProviderKindVersions } from "@noldova/teamrun.core";
 import {
+  type CodexAppServerProgram,
   CodexInstaller,
   CommandRunner,
   ExecutableSource,
@@ -28,6 +29,7 @@ import {
 
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
+import { NoticingAppServerProgram } from "../../fixtures/noticing-app-server-program.fixture.js";
 import { RecordedDelayTimer } from "../../fixtures/recorded-delay-timer.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
@@ -40,6 +42,28 @@ export class CodexInstallerTests {
   };
 
   @TestMethod
+  public startsTheAppServerDownloadAfterAnInstallAndWhenItChecksTheLatestVersionAndReadsItsNoticeEachTime(): Promise<void> {
+    return CodexInstallerTests.withReleases(async (server, directory) => {
+      CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
+      const program = new NoticingAppServerProgram();
+      const installer = CodexInstallerTests.installer([server.url("/c")], directory, "linux", undefined, 60_000, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, program);
+      const before = await installer.readVersions(true);
+
+      await installer.install(() => undefined, new AbortController().signal);
+      const installed = program.reads.length;
+      const listed = await installer.readVersions(false);
+      const checked = await installer.readVersions(true);
+
+      Assert.isNull(before.notice);
+      Assert.areEqual(1, installed);
+      Assert.areEqual(`${NoticingAppServerProgram.NOTICE}|${NoticingAppServerProgram.NOTICE}`, `${listed.notice}|${checked.notice}`);
+      Assert.areEqual([`${process.execPath} downloads`, `${process.execPath} reads`, `${process.execPath} downloads`].join(","), program.reads.join(","));
+      Assert.isTrue(program.environments.every(t => t === process.env));
+    });
+  }
+
+  @TestMethod
   public installsTheLatestPackageOnceItPassesItsCheckAndLinksItWhereCodexsInstallerDoes(): Promise<void> {
     return CodexInstallerTests.withReleases(async (server, directory) => {
       const archive = CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
@@ -49,7 +73,7 @@ export class CodexInstallerTests {
       Assert.isNull(installer.missingTool);
       Assert.isFalse(installer.isInstalled);
       Assert.isNull(installer.foundPath);
-      Assert.areEqual("null null", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("null null", CodexInstallerTests.versions(await installer.readVersions(true)));
 
       const path = await installer.install((received, total) => progress.push([received, total]), new AbortController().signal);
 
@@ -57,7 +81,7 @@ export class CodexInstallerTests {
       const release = join(root, "releases", "0.164.0-x86_64-unknown-linux-musl");
       Assert.areEqual(process.execPath, path);
       Assert.isTrue(installer.isInstalled);
-      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(JSON.stringify([archive.length, archive.length]), JSON.stringify(progress.at(-1)));
       Assert.areEqual("0.164.0-x86_64-unknown-linux-musl", readdirSync(join(root, "releases")).join(","));
       Assert.isTrue(Resources.codexPosixMembers.concat(Resources.codexLinuxMembers).every(t => existsSync(join(release, t))));
@@ -94,14 +118,14 @@ export class CodexInstallerTests {
       CodexInstallerTests.publish(server, "/new", "0.164.0", "linux");
       await CodexInstallerTests.installer([server.url("/old")], directory).install(() => undefined, new AbortController().signal);
       const installer = CodexInstallerTests.installer([server.url("/new")], directory);
-      Assert.areEqual("0.163.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.163.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
 
       await installer.install(() => undefined, new AbortController().signal);
 
       const root = directory.resolve("home", "packages", "standalone");
       Assert.areEqual("0.163.0-x86_64-unknown-linux-musl,0.164.0-x86_64-unknown-linux-musl", readdirSync(join(root, "releases")).sort().join(","));
       Assert.areEqual(realpathSync(join(root, "releases", "0.164.0-x86_64-unknown-linux-musl")), realpathSync(join(root, "current")));
-      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -123,7 +147,7 @@ export class CodexInstallerTests {
       Assert.areEqual(realpathSync(release), realpathSync(join(root, "current")));
       Assert.areEqual(realpathSync(join(release, "bin")), realpathSync(directory.resolve("bin")));
       Assert.areEqual("0.164.0-x86_64-pc-windows-msvc", readFileSync(join(root, "auto-update-version"), "utf8"));
-      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -164,7 +188,7 @@ export class CodexInstallerTests {
 
       Assert.areEqual("0.164.0-x86_64-unknown-linux-musl", readdirSync(releases).join(","));
       Assert.isTrue(Resources.codexPosixMembers.concat(Resources.codexLinuxMembers).every(t => existsSync(join(release, t))));
-      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -433,7 +457,7 @@ export class CodexInstallerTests {
 
       Assert.isTrue(installer.isInstalled);
       Assert.areEqual("/down,/github,/packages/0.164.0/codex-package-x86_64-pc-windows-msvc.tar.gz", CodexInstallerTests.paths(server));
-      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -589,7 +613,7 @@ export class CodexInstallerTests {
       Assert.areEqual("tar", noTar.missingTool);
       Assert.areEqual(Resources.codexNoBuild, (await Assert.throwsAsync(() => noPackage.install(() => undefined, new AbortController().signal), InstallFailedException)).message);
       Assert.areEqual(Resources.codexNoTar, (await Assert.throwsAsync(() => noTar.install(() => undefined, new AbortController().signal), Error)).message);
-      Assert.areEqual("null null", CodexInstallerTests.versions(await noPackage.readVersions()));
+      Assert.areEqual("null null", CodexInstallerTests.versions(await noPackage.readVersions(true)));
       Assert.areEqual(0, server.requests.length);
     });
   }
@@ -601,8 +625,8 @@ export class CodexInstallerTests {
       CodexInstallerTests.installedElsewhere(directory, "0.163.0");
       mkdirSync(directory.resolve("home", "packages", "standalone", "current"), { recursive: true });
 
-      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await CodexInstallerTests.installer([server.url("/down")], directory).readVersions()));
-      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await CodexInstallerTests.installer(["http://localhost:1/c"], directory).readVersions()));
+      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await CodexInstallerTests.installer([server.url("/down")], directory).readVersions(true)));
+      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await CodexInstallerTests.installer(["http://localhost:1/c"], directory).readVersions(true)));
       Assert.areEqual("/down", CodexInstallerTests.paths(server));
     });
   }
@@ -615,7 +639,7 @@ export class CodexInstallerTests {
       writeFileSync(directory.resolve("bin", "codex"), "process.exit(1);\n");
       mkdirSync(directory.resolve("home", "packages", "standalone", "current"), { recursive: true });
 
-      const versions = await CodexInstallerTests.installer([server.url("/c")], directory).readVersions();
+      const versions = await CodexInstallerTests.installer([server.url("/c")], directory).readVersions(true);
 
       Assert.areEqual("null 0.164.0", CodexInstallerTests.versions(versions));
       Assert.areEqual("0.164.0", versions.update);
@@ -631,11 +655,25 @@ export class CodexInstallerTests {
 
       Assert.isTrue(installer.isInstalled);
       Assert.areEqual(process.execPath, installer.foundPath);
-      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await installer.readVersions(true)));
       Assert.areEqual(0, server.requests.length);
       mkdirSync(directory.resolve("home", "packages", "standalone", "current"), { recursive: true });
       Assert.isNull(installer.foundPath);
-      Assert.areEqual("0.163.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions()));
+      Assert.areEqual("0.163.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
+    });
+  }
+
+  @TestMethod
+  public readsNoReleaseWhenTheLatestIsntChecked(): Promise<void> {
+    return CodexInstallerTests.withReleases(async (server, directory) => {
+      CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
+      CodexInstallerTests.installedElsewhere(directory, "0.163.0");
+      mkdirSync(directory.resolve("home", "packages", "standalone", "current"), { recursive: true });
+      const installer = CodexInstallerTests.installer([server.url("/c")], directory);
+
+      Assert.areEqual("0.163.0 null", CodexInstallerTests.versions(await installer.readVersions(false)));
+      Assert.areEqual(0, server.requests.length);
+      Assert.areEqual("0.163.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
     });
   }
 
@@ -688,7 +726,7 @@ export class CodexInstallerTests {
     program: (path: string) => ProcessCommand = path => new ProcessCommand(process.execPath, [path]), bin: string | undefined = undefined,
     locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CodexInstallerTests.TARGETS[platform]!,
     symlink: (target: string, path: string) => void = CodexInstallerTests.link, rename: (from: string, to: string) => void = renameSync,
-    settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to)): CodexInstaller {
+    settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to), serverProgram: CodexAppServerProgram | null = null): CodexInstaller {
     const root = typeof directory === "string" ? directory : directory.path;
     mkdirSync(root, { recursive: true });
     const runner = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
@@ -697,7 +735,7 @@ export class CodexInstallerTests {
     const found = (): LocatedExecutable | null => existsSync(visible) ? new LocatedExecutable(process.execPath, ExecutableSource.Path, [visible]) : null;
     return new CodexInstaller(locate ?? found, new ExecutableVersionReader(runner, 60_000), process.env, channels, join(root, "home"), binDirectory, target, platform,
       Object.isUndefined(extractor) ? FakeTar.create(root) : extractor, runner, program,
-      symlink, rename, settle, unpackTimeout, 60_000);
+      symlink, rename, settle, unpackTimeout, 60_000, serverProgram);
   }
 
   private static broken(releases: string): string {

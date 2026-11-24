@@ -71,6 +71,12 @@ export class FakeCodexAppServer {
         FakeCodexAppServer.holdVersionRead(release, answer);
       return;
     }
+    if (process.argv.slice(2).join(" ") === "app-server --help") {
+      const source = process.env["TEAMRUN_FAKE_CODEX_SESSION_SOURCE"] === "true" ? "      --session-source <SOURCE>  Session source\n" : String.empty;
+      process.stdout.write(`Usage: codex app-server [OPTIONS]\n\nOptions:\n      --listen <URL>  Transport endpoint URL\n${source}`);
+      process.exitCode = process.env["TEAMRUN_FAKE_CODEX_HELP"] === "fails" ? 2 : 0;
+      return;
+    }
     if (process.argv.slice(2).join(" ") === "login status") {
       const account = process.env["TEAMRUN_FAKE_CODEX_ACCOUNT"];
       process.stderr.write(account === "none" ? "Not logged in\n" : account === "error" ? "Error: unreadable auth.json\n" : "Logged in using ChatGPT\n");
