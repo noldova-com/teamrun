@@ -10,11 +10,12 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 
-import { ToolFailureCode } from "@noldova/desktop.runtime";
+import { type IModuleLog, ToolFailureCode } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import type { DataRecord } from "@noldova/context.data";
 import { type SqlConnection, SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
+import { Resources as CoreResources } from "@noldova/teamrun.core";
 import { CanvasManifest, Page, PageAuthor, PageKind, PageVersion } from "@noldova/teamrun.protocol";
 
 import { PageException } from "../../exceptions/pages/page.exception.js";
@@ -28,10 +29,12 @@ import type { PageFiles } from "./page-files.js";
 export class PagesStore {
   private readonly connection: SqlConnection;
   private readonly files: PageFiles;
+  private readonly log: IModuleLog;
 
-  public constructor(connection: SqlConnection, files: PageFiles) {
+  public constructor(connection: SqlConnection, files: PageFiles, log: IModuleLog) {
     this.connection = connection;
     this.files = files;
+    this.log = log;
   }
 
   public async showAsync(chatId: string, folder: string, author: PageAuthor, path: string, title: string, id: string | null, baseVersion: number | null,
@@ -179,7 +182,12 @@ export class PagesStore {
     const copies: PageWrite[] = [];
     const result = await this.connection.runInTransactionAsync(transaction => work(new PageTransaction(transaction, copies)));
     for (const write of copies)
-      this.files.write(write.page.chatId, write.page.id, write.html);
+      try {
+        this.files.write(write.page.chatId, write.page.id, write.html);
+      }
+      catch (error) {
+        this.log.write(PagesResources.formatCopyNotSaved(CoreResources.formatFailureKind(error)));
+      }
     return result;
   }
 

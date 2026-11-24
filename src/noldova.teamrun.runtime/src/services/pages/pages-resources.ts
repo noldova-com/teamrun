@@ -269,9 +269,12 @@ export class PagesResources {
     return Object.isNull(version) ? address : `${address}&${PagesResources.versionParameter}=${String(version)}`;
   }
 
-
   public static formatServerFailed(kind: string): string {
     return `The page server failed while serving pages (${kind}).`;
+  }
+
+  public static formatCopyNotSaved(kind: string): string {
+    return `A page's version was saved, but its copy for showing could not be written (${kind}).`;
   }
 
   public static formatServerNotListening(kind: string): string {

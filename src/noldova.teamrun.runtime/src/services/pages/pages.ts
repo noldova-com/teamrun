@@ -42,7 +42,7 @@ export class Pages {
   private ping: PagePing | null = null;
 
   public constructor(connection: SqlConnection, dataDirectory: string, host: IPagesHost, log: IModuleLog, server: Server = createServer()) {
-    this.store = new PagesStore(connection, new PageFiles(dataDirectory));
+    this.store = new PagesStore(connection, new PageFiles(dataDirectory), log);
     this.canvases = new CanvasStore(this.store);
     this.host = host;
     this.log = log;

@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { DataDirectory, MethodFailureException, ModuleDatabase } from "@noldova/desktop.runtime";
@@ -97,6 +97,22 @@ export class PagesStoreTests {
     pages.database.failsCommit = false;
 
     Assert.areEqual("one one 1", `${copy} ${await PagesStoreTests.currentAsync(pages, id)}`);
+  }
+
+  @TestMethod
+  public async keepsAShowsSavedVersionAndLogsWhyWhenItsCopyCantBeWrittenAfterTheCommit(): Promise<void> {
+    using pages = new PagesHarness();
+    pages.file("a.html", "one");
+    const id = await pages.showAsync();
+    pages.file("a.html", "two");
+    rmSync(pages.copyOf("c1", id));
+    mkdirSync(pages.copyOf("c1", id));
+
+    const shown = await pages.callAsync(PagesHarness.show, { path: "a.html", title: "A", page_id: id, base_version: 1 });
+    rmSync(pages.copyOf("c1", id), { recursive: true });
+
+    Assert.areEqual(JSON.stringify([2, 1]), JSON.stringify([shown.readInteger("version"),
+      pages.lines.filter(t => t.startsWith("A page's version was saved, but its copy for showing could not be written (")).length]));
   }
 
   @TestMethod
