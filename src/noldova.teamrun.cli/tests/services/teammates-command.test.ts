@@ -72,7 +72,7 @@ export class TeammatesCommandTests {
       planWindows: [{ name: "FiveHour", usedPercent: 40, unlimited: false }, { name: "Weekly", used: 2, allowance: 10, unlimited: false }],
       organizations: [{ id: "o1", name: "Acme", department: "Devs", manager: null }]
     }), JSON.stringify(rows[0]));
-    Assert.areEqual(JSON.stringify([{ id: "o1", name: "Acme", department: "Devs", manager: { id: "t1", name: "Alice" } }]), JSON.stringify(rows[3]!["organizations"]));
+    Assert.areEqual(JSON.stringify([{ id: "o1", name: "Acme", department: "Devs", manager: { id: "t1", name: "Alice" } }]), JSON.stringify(rows[3]?.["organizations"]));
     Assert.areEqual(JSON.stringify([{ chatId: "c1" }]), JSON.stringify(rows[1]!["usage"]));
     Assert.areEqual(JSON.stringify({
       id: "t3", name: "Bob", role: null, harness: "Provider", provider: null, model: null, effort: null, chats: [], answering: false, usage: [], planWindows: [],
