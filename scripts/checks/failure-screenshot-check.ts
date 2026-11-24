@@ -29,15 +29,22 @@ export class FailureScreenshotCheck implements ICheck {
   private static readonly SHORT_NAME: RegExp = /^fails-with-a-title-past-what-a-file-name-may-hold[\w -]*-[\da-f]{16}\.png$/u;
   private static readonly LOGGED: RegExp = /^Screenshot of "(?<name>[^"]+)": (?<path>.+)$/mu;
   private static readonly NO_TEST: RegExp = /^\s*Tests\s+no tests\s*$/mu;
+  private static readonly WINDOWS_PLATFORM: string = "win32";
+  private static readonly NETSTAT: string = "netstat";
+  private static readonly NETSTAT_ARGUMENTS: readonly string[] = ["-an"];
+  private static readonly NETSTAT_TIMEOUT: number = 30_000;
+  private static readonly TCP_STATE: RegExp = /^\s*TCP\s+\S+\s+\S+\s+(?<state>[A-Z][A-Z_\d]*)\s*$/gmu;
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
+  private readonly platform: string;
 
   public readonly title: string = "Failure screenshots";
 
-  public constructor(root: string, runner: ProcessRunner) {
+  public constructor(root: string, runner: ProcessRunner, platform: string = process.platform) {
     this.root = root;
     this.runner = runner;
+    this.platform = platform;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
@@ -45,8 +52,20 @@ export class FailureScreenshotCheck implements ICheck {
     const findings = FailureScreenshotCheck.findingsOf(run.result, run.files);
     for (const finding of findings)
       output.write(`${finding}\n`);
+    if (this.platform === FailureScreenshotCheck.WINDOWS_PLATFORM && FailureScreenshotCheck.ranNoTest(run.result))
+      output.write(`${await this.describeSocketsAsync()}\n`);
     output.write(`Ran ${FailureScreenshotCheck.FIXTURE} in Vitest's browser mode and found ${run.files.length} failure screenshot files.\n`);
     return findings.length === 0;
+  }
+
+  public static socketStatesOf(text: string): string {
+    const counts = new Map<string, number>();
+    for (const match of text.matchAll(FailureScreenshotCheck.TCP_STATE)) {
+      const state = match.groups?.["state"] ?? "";
+      counts.set(state, (counts.get(state) ?? 0) + 1);
+    }
+    const states = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(t => `${t[0]} ${t[1]}`);
+    return states.length === 0 ? "none" : states.join(", ");
   }
 
   public static findingsOf(result: ProcessResult, files: readonly string[]): readonly string[] {
@@ -69,7 +88,19 @@ export class FailureScreenshotCheck implements ICheck {
     return FailureScreenshotCheck.NO_TEST.test(stripVTControlCharacters(result.text));
   }
 
-  private async runFixtureAsync(): Promise<{ readonly result: ProcessResult; readonly files: readonly string[] }> {
+  private async describeSocketsAsync(): Promise<string> {
+    try {
+      const result = await this.runner.captureAsync(FailureScreenshotCheck.NETSTAT, FailureScreenshotCheck.NETSTAT_ARGUMENTS, this.root, FailureScreenshotCheck.NETSTAT_TIMEOUT);
+      if (!result.isSuccessful)
+        return `netstat couldn't list Windows' TCP connections after that run, and exited with ${result.exitCode}:\n${result.text}`;
+      return `Windows' TCP connections by state after that run, from netstat: ${FailureScreenshotCheck.socketStatesOf(result.output)}.`;
+    }
+    catch (error) {
+      return `netstat couldn't list Windows' TCP connections after that run: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  private async runFixtureAsync():Promise<{ readonly result: ProcessResult; readonly files: readonly string[] }> {
     const attachments = path.join(this.root, ...FailureScreenshotCheck.ATTACHMENTS_SEGMENTS);
     await rm(attachments, { recursive: true, force: true });
     await mkdir(attachments, { recursive: true });

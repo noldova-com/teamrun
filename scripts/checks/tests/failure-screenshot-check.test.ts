@@ -24,18 +24,32 @@ const folder = path.join(path.sep, "work", "failure-screenshots", "long-title.fi
 const logLine = `Screenshot of "${longName}": ${path.join(folder, shortName)}`;
 const failed = (output: string): ProcessResult => new ProcessResult(1, `FAIL long-title.fixture.ts\n${output}\n`, "");
 const noTest = new ProcessResult(1, " Test Files  (1)\n\u001b[2m      Tests \u001b[22m \u001b[2mno tests\u001b[22m\n Errors  1 error\npage.goto: net::ERR_NO_BUFFER_SPACE\n", "");
+const netstatText = ["", "Active Connections", "", "  Proto  Local Address          Foreign Address        State",
+  "  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING", "  TCP    127.0.0.1:24315        127.0.0.1:50001        TIME_WAIT",
+  "  TCP    127.0.0.1:50002        127.0.0.1:24315        TIME_WAIT", "  TCP    127.0.0.1:50003        127.0.0.1:24315        ESTABLISHED",
+  "  TCP    [::1]:24315            [::1]:50004            TIME_WAIT", "  UDP    0.0.0.0:5353           *:*                    ", ""].join("\r\n");
+const sockets = new ProcessResult(0, netstatText, "");
 
 class ScriptedRunner extends ProcessRunner {
   public runs: number = 0;
+  public netstatRuns: number = 0;
   private readonly results: readonly ProcessResult[];
+  private readonly netstat: ProcessResult | Error;
 
-  public constructor(results: readonly ProcessResult[]) {
+  public constructor(results: readonly ProcessResult[], netstat: ProcessResult | Error) {
     super();
     this.results = results;
+    this.netstat = netstat;
   }
 
-  public override async captureAsync(_command: string, _commandArguments: readonly string[], _directory: string, _timeout: number,
+  public override async captureAsync(command: string, _commandArguments: readonly string[], _directory: string, _timeout: number,
     environment?: NodeJS.ProcessEnv): Promise<ProcessResult> {
+    if (command === "netstat") {
+      this.netstatRuns++;
+      if (this.netstat instanceof Error)
+        throw this.netstat;
+      return this.netstat;
+    }
     const result = this.results[this.runs] ?? noTest;
     this.runs++;
     const attachments = environment?.["NOLDOVA_FAILURE_SCREENSHOT_ATTACHMENTS"] ?? "";
@@ -47,10 +61,11 @@ class ScriptedRunner extends ProcessRunner {
   }
 }
 
-const runAsync = async (results: readonly ProcessResult[]): Promise<readonly [boolean, number, string]> => {
+const runAsync = async (results: readonly ProcessResult[], platform: string = "linux", netstat: ProcessResult | Error = sockets):
+  Promise<readonly [boolean, number, string, number]> => {
   const root = await mkdtemp(path.join(tmpdir(), "failure-screenshot-check-"));
   try {
-    const runner = new ScriptedRunner(results);
+    const runner = new ScriptedRunner(results, netstat);
     let written = "";
     const output = new Writable({
       write: (chunk: Buffer, _encoding, done): void => {
@@ -58,8 +73,8 @@ const runAsync = async (results: readonly ProcessResult[]): Promise<readonly [bo
         done();
       }
     });
-    const passed = await new FailureScreenshotCheck(root, runner).runAsync(output);
-    return [passed, runner.runs, written];
+    const passed = await new FailureScreenshotCheck(root, runner, platform).runAsync(output);
+    return [passed, runner.runs, written, runner.netstatRuns];
   }
   finally {
     await rm(root, { recursive: true, force: true });
@@ -99,6 +114,31 @@ describe("FailureScreenshotCheck", () => {
 
     assert.deepEqual([none[0], none[1], ran[0], ran[1]], [false, 1, true, 1]);
     assert.match(none[2], /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/u);
+  });
+
+  it("counts netstat's TCP connections by state, most first, over IPv4 and IPv6, and says none when it lists none", () => {
+    assert.deepEqual([FailureScreenshotCheck.socketStatesOf(netstatText), FailureScreenshotCheck.socketStatesOf("Active Connections\r\n")],
+      ["TIME_WAIT 3, ESTABLISHED 1, LISTENING 1", "none"]);
+  });
+
+  it("prints Windows' TCP connections by state after a run that ran no test, and asks netstat only then and only on Windows", async () => {
+    const windows = await runAsync([noTest], "win32");
+    const ran = await runAsync([failed(logLine)], "win32");
+    const linux = await runAsync([noTest], "linux");
+
+    assert.deepEqual([windows[0], windows[3], ran[0], ran[3], linux[0], linux[3]], [false, 1, true, 0, false, 0]);
+    assert.match(windows[2], /^Windows' TCP connections by state after that run, from netstat: TIME_WAIT 3, ESTABLISHED 1, LISTENING 1\.$/mu);
+    assert.doesNotMatch(`${ran[2]}${linux[2]}`, /netstat/u);
+  });
+
+  it("still fails a run that ran no test for that reason when netstat exits with an error or can't start, and says which", async () => {
+    const exited = await runAsync([noTest], "win32", new ProcessResult(1, "", "The requested operation requires elevation."));
+    const failedToStart = await runAsync([noTest], "win32", new Error(`"netstat" could not start.`));
+
+    assert.deepEqual([exited[0], failedToStart[0]], [false, false]);
+    assert.match(exited[2], /^netstat couldn't list Windows' TCP connections after that run, and exited with 1:\nThe requested operation requires elevation\.$/mu);
+    assert.match(failedToStart[2], /^netstat couldn't list Windows' TCP connections after that run: "netstat" could not start\.$/mu);
+    assert.match(failedToStart[2], /^The fixture's run should fail its one test, but ran no test/u);
   });
 
   it("fails a run that didn't log the long name, logged a name that fits, or logged another file's path", () => {
