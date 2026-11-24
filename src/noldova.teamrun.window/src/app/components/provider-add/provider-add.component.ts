@@ -8,7 +8,9 @@
 import {
   Component,
   computed,
+  DestroyRef,
   effect,
+  ElementRef,
   inject,
   input,
   type InputSignal,
@@ -18,6 +20,7 @@ import {
   type Signal,
   signal,
   untracked,
+  viewChild,
   type WritableSignal
 } from "@angular/core";
 
@@ -36,6 +39,7 @@ import {
 
 import { Resources } from "../../../resources";
 import { ProviderKindCard } from "../../models/provider-kind-card";
+import { ProviderKindChoices } from "../../models/provider-kind-choices";
 import { ProviderWizardRow } from "../../models/provider-wizard-row";
 import { TakenKind } from "../../models/taken-kind";
 import { AcpAgentsBrowser } from "../../services/acp-agents-browser";
@@ -68,7 +72,7 @@ export class ProviderAddComponent {
   protected readonly acpCard: ProviderKindCard = new ProviderKindCard(Resources.acpRowKind, Resources.acpCardName, Resources.acpCardNote, false, null);
   protected readonly cards: Signal<readonly ProviderKindCard[]> = computed(() => [...this.typeCards(), this.acpCard]);
   protected readonly kind: WritableSignal<string> = linkedSignal({
-    source: () => ({ kinds: this.store().kinds().map(t => t.id), taken: this.takenKinds() }),
+    source: () => new ProviderKindChoices(this.store().kinds().map(t => t.id), this.takenKinds()),
     computation: (source, previous) => TakenKind.firstFree(source.taken, [source.kinds.find(t => t === previous?.value),
       source.kinds.find(t => this.store().terminalSessions().has(t)), ...source.kinds], Resources.acpRowKind)
   });
@@ -78,7 +82,7 @@ export class ProviderAddComponent {
     ?? Resources.nextProviderName(this.store().providers().filter(t => t.kind === this.kind()).map(t => t.label)));
   protected readonly folder: WritableSignal<string | null> = signal(null);
   protected readonly saving: WritableSignal<boolean> = signal(false);
-  protected readonly waitingKind: WritableSignal<string | null> = signal(null);
+  protected readonly installingKind: WritableSignal<string | null> = signal(null);
   protected readonly waitingTool: WritableSignal<ProviderKindCard | null> = signal(null);
   protected readonly error: WritableSignal<string | null> = signal(null);
   protected readonly shownAs: Signal<string | null> = computed(() => {
@@ -118,39 +122,30 @@ export class ProviderAddComponent {
   });
   protected readonly addLabel: Signal<string> = computed(() => Object.isNull(this.folder()) && this.chosen().row?.kind.supportsSignIn === true
     ? Resources.addAndSignInLabel : Resources.addOnlyLabel);
-  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.waitingKind()) || !Object.isNull(this.waitingTool()));
+  protected readonly busy: Signal<boolean> = computed(() => this.saving() || !Object.isNull(this.installingKind()) || !Object.isNull(this.waitingTool()));
   protected readonly canAdd: Signal<boolean> = computed(() => {
     const label = this.label().trim();
-    return !this.saving() && Object.isNull(this.waitingKind()) && Object.isNull(this.waitingTool()) && !Object.isNull(this.chosen().row) && Object.isNull(this.unavailable())
-      && Object.isNull(this.progress()) && !this.store().isBusy() && (Object.isNull(this.folder()) ? !Object.isNull(ProfileFolderName.of(label)) : label.length > 0);
+    return !this.saving() && Object.isNull(this.installingKind()) && Object.isNull(this.waitingTool())
+      && !Object.isNull(this.chosen().row) && Object.isNull(this.unavailable()) && Object.isNull(this.progress()) && !this.store().isBusy()
+      && (Object.isNull(this.folder()) ? !Object.isNull(ProfileFolderName.of(label)) : label.length > 0);
   });
 
   private readonly dialogs: DialogService = inject(DialogService);
   private readonly showError: (message: string) => void = message => this.error.set(message);
   private readonly hiddenSessions: WritableSignal<ReadonlySet<string>> = signal(new Set());
+  private readonly labelField: Signal<ElementRef<HTMLInputElement>> = viewChild.required("labelField", { read: ElementRef });
+  private dropped: boolean = false;
   private readonly toolTerminal: Signal<string | undefined> = computed(() => {
     return this.store().terminalSessions().get(this.kind());
   });
 
   public constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.dropped = true;
+    });
     effect(() => {
       const kind = this.kind();
       untracked(() => this.chosenKind.emit(kind));
-    });
-    effect(() => {
-      const kind = this.waitingKind();
-      if (Object.isNull(kind))
-        return;
-      const state = this.store().installations().get(kind);
-      if (Object.isUndefined(state) || state.state === ProviderKindInstallState.Installing)
-        return;
-      untracked(() => {
-        this.waitingKind.set(null);
-        if (state.state === ProviderKindInstallState.Installed)
-          void this.save(kind);
-        else if (state.state === ProviderKindInstallState.NotInstalled)
-          this.error.set(state.reason);
-      });
     });
     effect(() => {
       const card = this.waitingTool();
@@ -189,8 +184,8 @@ export class ProviderAddComponent {
     }));
   }
 
-  protected editLabel(event: globalThis.Event): void {
-    this.edited.set((event.target as HTMLInputElement).value);
+  protected editLabel(): void {
+    this.edited.set(this.labelField().nativeElement.value);
   }
 
   protected async pickFolder(): Promise<void> {
@@ -219,7 +214,6 @@ export class ProviderAddComponent {
   }
 
   protected cancelInstall(kind: string): void {
-    this.waitingKind.set(null);
     this.error.set(null);
     void this.store().cancelInstall(kind, this.showError);
   }
@@ -240,18 +234,28 @@ export class ProviderAddComponent {
   }
 
   protected close(): void {
-    if (!this.saving())
-      this.closed.emit();
+    if (this.saving())
+      return;
+    this.dropped = true;
+    this.closed.emit();
   }
 
   private async install(kind: string): Promise<void> {
+    if (!Object.isNull(this.installingKind()))
+      return;
     const store = this.store();
+    this.installingKind.set(kind);
     await store.installKind(kind, this.showError);
-    const state = store.installations().get(kind)?.state;
-    if (state === ProviderKindInstallState.Installing)
-      this.waitingKind.set(kind);
-    else if (state === ProviderKindInstallState.Installed)
+    this.installingKind.set(null);
+    if (this.dropped)
+      return;
+    const installation = store.installations().get(kind);
+    if (installation?.state === ProviderKindInstallState.Installed)
       await this.save(kind);
+    else if (installation?.state === ProviderKindInstallState.NotInstalled && !Object.isNull(installation.reason))
+      this.error.set(installation.reason);
+    else if (installation?.state === ProviderKindInstallState.Unavailable && this.error() === installation.reason)
+      this.error.set(null);
   }
 
   private installTool(card: ProviderKindCard): void {

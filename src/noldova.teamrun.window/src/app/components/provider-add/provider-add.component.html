@@ -21,7 +21,7 @@ LICENSE file in the root directory of this source tree.
     <span class="nol-teamrun-field-label">{{ resources.providerNameLabel }}</span>
     <span class="nol-teamrun-name-row">
       <input nol-text-field class="nol-teamrun-add-name" name="label" [attr.aria-label]="resources.providerNameLabel" [value]="label()" [disabled]="busy()"
-        [attr.aria-describedby]="shownAsId" (input)="editLabel($event)" (keydown.enter)="add()">
+        [attr.aria-describedby]="shownAsId" #labelField (input)="editLabel()" (keydown.enter)="add()">
       <span class="nol-teamrun-muted nol-teamrun-shown-as" [id]="shownAsId">{{ shownAs() }}</span>
     </span>
   </label>
@@ -40,7 +40,7 @@ LICENSE file in the root directory of this source tree.
   } @else if (unavailable(); as unavailableInstall) {
     <div class="nol-teamrun-add-step" role="alert">
       <span class="nol-teamrun-add-step-text nol-teamrun-add-unavailable">{{ resources.formatUnavailableStep(unavailableInstall.reason) }}</span>
-      <button type="button" nol-button class="nol-teamrun-add-try-again" [variant]="outlined" [disabled]="store().isBusy()"
+      <button type="button" nol-button class="nol-teamrun-add-try-again" [variant]="outlined" [disabled]="busy() || store().isBusy()"
         (click)="tryAgain(unavailableInstall.kind)">{{ resources.tryAgainLabel }}</button>
     </div>
   } @else if (toolCommand(); as command) {
