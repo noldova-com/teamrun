@@ -68,6 +68,7 @@ import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
 import { CodexAccount } from "../../models/codex-account.js";
+import { CodexServerChoice } from "../../models/codex-server-choice.js";
 import { CommandSource } from "../../models/command-source.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
@@ -88,6 +89,7 @@ import { PowershellSession } from "../process/powershell-session.js";
 import { ProcessTree } from "../process/process-tree.js";
 import { AppServerClient } from "./app-server-client.js";
 import { CodexActivity } from "./codex-activity.js";
+import { CodexAppServerProgram } from "./codex-app-server-program.js";
 import { CodexCommand } from "./codex-command.js";
 import { CodexCompactionReader } from "./codex-compaction.reader.js";
 import { CodexEnvironment } from "./codex-environment.js";
@@ -134,6 +136,7 @@ export class CodexAdapter implements IProviderAdapter {
   private readonly starter: IProcessStarter;
   private readonly timings: ProviderTimings;
   private readonly versionReader: ExecutableVersionReader;
+  private readonly serverProgram: CodexAppServerProgram | null;
   private readonly log: ILog | null;
   private readonly platform: string;
   private readonly sweep: IOrphanSweep;
@@ -180,8 +183,10 @@ export class CodexAdapter implements IProviderAdapter {
     platform: string = process.platform,
     sweep: IOrphanSweep = new ProcessTree(platform, new CommandRunner(starter), process.env, Resources.processListTimeout, timer, timings.stopGrace, undefined,
       PowershellSession.shared, undefined, log),
-    idleTimer: ITimer = new NodeTimer()) {
+    idleTimer: ITimer = new NodeTimer(),
+    serverProgram: CodexAppServerProgram | null = null) {
     this.log = log;
+    this.serverProgram = serverProgram;
     this.idleTimer = idleTimer;
     this.platform = platform;
     this.sweep = sweep;
@@ -609,6 +614,7 @@ export class CodexAdapter implements IProviderAdapter {
   public async shutdown(): Promise<void> {
     this.stopped = true;
     this.stopping.abort();
+    this.serverProgram?.stop();
     for (const idle of [...this.idle.values(), ...this.kept.keys()])
       idle.stop();
     this.idle.clear();
@@ -1140,9 +1146,25 @@ export class CodexAdapter implements IProviderAdapter {
       mkdirSync(profileDir, { recursive: true });
 
     const environment = CodexEnvironment.build(await this.starter.readEnvironmentAsync(this.baseEnvironment), profileDir);
+    const shared = new CodexServerChoice(CodexAppServerProgram.sharedOf(command), null);
+    const program = this.serverProgram;
+    const choice = Object.isNull(program) ? shared : await program.choose(command, environment, this.stopping.signal);
+    try {
+      return await this.startOn(choice, command, environment, origin, keepsOwnServers);
+    }
+    catch (error) {
+      if (Object.isNull(program) || Object.isNull(choice.download) || this.stopped)
+        throw error;
+      program.refuse(choice.download, FailureDescriber.describe(error));
+      return this.startOn(shared, command, environment, origin, keepsOwnServers);
+    }
+  }
+
+  private async startOn(choice: CodexServerChoice, command: ProcessCommand, environment: NodeJS.ProcessEnv, origin: ProcessOrigin, keepsOwnServers: boolean): Promise<AppServerClient> {
+    const server = choice.command;
     const client = new AppServerClient(
-      (keepsOwnServers ? command.withArguments(Resources.appServerArgument)
-        : command.withArguments(Resources.appServerArgument, Resources.codexConfigArgument, Resources.codexAppsOffArgument)).withOrigin(origin), environment, this.clientInfo, this.starter, this.timings, this.log);
+      (keepsOwnServers ? server : server.withArguments(Resources.codexConfigArgument, Resources.codexAppsOffArgument)).withOrigin(origin), environment, this.clientInfo,
+      this.starter, this.timings, this.log);
     this.checks.set(client, { stamp: this.versionReader.readStamp(command), done: Promise.resolve(), retryAt: Number.POSITIVE_INFINITY });
     client.setServerRequestHandler(this.router);
     const started = client.start();
@@ -1151,6 +1173,10 @@ export class CodexAdapter implements IProviderAdapter {
       await started;
     }
     catch (error) {
+      if (!Object.isNull(choice.download)) {
+        await client.stop();
+        throw error;
+      }
       if (FailureDescriber.describe(error).includes(Resources.codexPackageMismatch))
         throw new ProviderStoppedException(Resources.codexUpdatedWhileInUse);
       throw error;

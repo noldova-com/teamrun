@@ -31,6 +31,7 @@ export { GrantedAttachmentMethod } from "../services/granted-attachment-method.j
 export { HopLimitSetting } from "../services/hop-limit-setting.js";
 export { IdleCompactionSetting } from "../services/idle-compaction-setting.js";
 export { TitleModelSetting } from "../services/title-model-setting.js";
+export { ToolUpdateChecks } from "../services/tool-update-checks.js";
 export { HostedMigrations } from "../services/hosted-migrations.js";
 export { InProcessCliContext } from "../services/in-process-cli-context.js";
 export { MainProcessMethod } from "../services/main-process-method.js";

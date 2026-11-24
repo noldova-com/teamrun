@@ -39,6 +39,23 @@
   margin-block-end: var(--nol-space-3);
 }
 
+.nol-teamrun-update-checks {
+  display: flex;
+  align-items: center;
+  gap: var(--nol-space-3);
+  margin-block-start: var(--nol-space-3);
+}
+
+.nol-teamrun-update-checks-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.nol-teamrun-check-updates {
+  flex: none;
+}
+
 .nol-teamrun-sign-in-terminal,
 .nol-teamrun-install-terminal {
   margin-block-start: var(--nol-space-3);

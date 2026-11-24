@@ -1392,6 +1392,14 @@ export class Resources {
   public static readonly foundProvidersTitle: string = "Found on this computer";
   public static readonly providerKindOrder: readonly string[] = ["codex", "claude", "copilot", "cursor", "grok", "opencode", "antigravity"];
   public static readonly checkAllLabel: string = "Check every provider again";
+  public static readonly checkUpdatesLabel: string = "Check for updates";
+  public static readonly toolUpdateChecksNote: string = "TeamRun looks for newer versions of Claude Code at downloads.claude.ai, of Codex at releases.openai.com "
+    + "and api.github.com, of GitHub Copilot at api.github.com, and of agents added from the ACP registry at cdn.agentclientprotocol.com, when "
+    + "Noldova Desktop's Check for updates setting allows it, once after TeamRun starts with Only at start, and whenever you choose Check for "
+    + "updates. At those times, and when you install or update Codex here, it also downloads the app server Codex publishes for your Codex version "
+    + "from api.github.com and github.com, so TeamRun's Codex chats stay out of the Codex app's recent chats. Until Noldova Desktop tells it this "
+    + "device's choice, it counts the choice as Automatic, so with Only at start or Only when I ask it may still look before your choice arrives: "
+    + "github.com/noldova-com/desktop/issues/96.";
   public static readonly searchAgainLabel: string = "Search this computer again";
   public static readonly searchingLabel: string = "Searching…";
   public static readonly checkingLabel: string = "Checking…";

@@ -39,9 +39,12 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Chats:** a reply that ends while the window has lost touch with TeamRun shows as ended once the window reads its state again: the composer reloads its models, and the Organization view and the teammate dialog see the reply end (#66).
+- **Chats:** a reply that ends while the window reads its state again is counted once: an Organization chat no longer shows two unread for one reply, and the composer reloads its models once (#182).
 - **Chats:** on a short window, such as 905×616, the members bar and the composer give way, so the history keeps the chat's largest share: the message box starts one line high and grows to four, and the paddings around them tighten; Desktop's default window keeps today's look (#31).
 - **Teammates:** Stop on a reply that a teammate out of usage is handing off ends it as Stopped, and the next teammate on its Hand off to list doesn't answer (#61).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
+- **Organization:** the chat beside the tree shows a teammate's new Organization chat, your message and its reply, once the window has read its chats again, rather than staying empty (#175).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
 - **Organization:** the view's title and, at the Focus view's root, its crumb, heading and outline row name the organization, and follow a rename, rather than reading Organization in every organization's view (#145, #166).
 - **Organization:** while you edit the structure, each person's Add teammate and Add unit sit right under that person's card, or a unit's leader, on the line to the people below, rather than after everyone below; Reports to stays on one line, and a single report's line runs straight down with no stub (#146).
@@ -91,6 +94,10 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
+- **Codex:** the Codex chats TeamRun starts no longer show in the Codex and ChatGPT apps' recent chats, and TeamRun still continues them after a restart; to do this, TeamRun downloads the app server Codex publishes for your installed version, checked against its SHA-256, until Codex's own `codex app-server` can do it.
+  It downloads it as Noldova Desktop's Check for updates setting allows, when you choose Check for updates, and when you install or update Codex in TeamRun.
+  Until that download is in place, the Codex row in the Providers tab says the chats show, and so do chats started before; they also no longer add to your Codex memories, though they still read them (#190).
+- **Providers:** TeamRun looks for newer versions of Claude Code, Codex, GitHub Copilot and ACP agents only as Noldova Desktop's Check for updates setting allows, and whenever you choose Check for updates in the Providers tab, which says what it checks and where; with Only at start it looks once after it starts; until Noldova Desktop tells it this device's choice, it counts the choice as the default, Automatic, so with Only at start or Only when I ask it may still look at start-up before your choice arrives (#96).
 - **Explorer:** Organizations come right after Pinned, before Projects and Chats, and the section headers stand as tall and as close to each other as New chat, Open folder and Open browser (#150, #43).
 - **The first launch's Skip for now and Continue:** they sit in a footer along the Providers tab's bottom edge, so they stay in view on a short window while the providers scroll above them (#350).
 - **A served call's approval card:** under its title, a card for a Git, GitHub or other module call that TeamRun serves names the module, the tool, the teammate and its chat, such as `Git · git_commit · Codex in "Gemini folder trust"`, as the approved design draws it (#19).

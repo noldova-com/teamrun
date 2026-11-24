@@ -714,6 +714,24 @@ export interface IProviderAdapter {
 }
 
 /**
+ * Whether TeamRun may look for newer versions of the providers' programs without the person asking, as the app's Check for updates setting
+ * chooses.
+ */
+export interface IToolUpdateChecks {
+  /**
+   * Whether a read of the installations' versions may ask the network for the latest ones now, before the person asks for it; a `true`
+   * counts as that check, so a choice that allows one check only gives `false` after it.
+   */
+  takeCheck(): boolean;
+
+  /**
+   * Calls `listener` each time the choice turns to allow a check that it didn't allow before.
+   * @param listener What to call.
+   */
+  onAllowed(listener: () => void): void;
+}
+
+/**
  * How TeamRun installs a provider's program on this computer.
  */
 export interface IProviderKindInstallation {
@@ -748,8 +766,10 @@ export interface IProviderKindInstallation {
   /**
    * Reads the installed program's version and the version an install would bring now, each `null` when it can't be read; it never throws, and
    * settles within its own time limits, as Core reads no other versions of the kind until it does.
+   * @param checksLatest Whether it may ask the network for the version an install would bring; without it, the latest version is `null`, or
+   * one read from this computer alone.
    */
-  readVersions(): Promise<ProviderKindVersions>;
+  readVersions(checksLatest: boolean): Promise<ProviderKindVersions>;
 
   /**
    * Installs the program, or replaces an installed one with the version an install brings now, leaving nothing behind, and an installed one as it
@@ -2083,9 +2103,17 @@ export interface IProviderKindsService {
   /**
    * Lists the providers TeamRun installs at once, each with where its installation stands and the versions last read, and reads each one's
    * versions again in the background unless it is installing or already reading them, publishing `EventName.ProviderKindInstallationChanged`
-   * when a read ends; a read that fails keeps the versions it had.
+   * when a read ends; a read that fails keeps the versions it had. The read asks the network for the latest versions only when
+   * `IToolUpdateChecks.takeCheck` allows it; otherwise it keeps the latest version an earlier check found. Once the installations have been
+   * listed, the service reads them again, with that check, each time `IToolUpdateChecks.onAllowed` says a check is allowed.
    */
   listInstallations(): Promise<readonly ProviderKindInstallation[]>;
+
+  /**
+   * Reads each installation's versions now, asking the network for the latest ones whatever `IToolUpdateChecks` says, as the person asked for
+   * it, and lists the installations once the reads end.
+   */
+  checkInstallationsAsync(): Promise<readonly ProviderKindInstallation[]>;
 
   /**
    * Finds each provider's command-line tool afresh, one entry per kind that has one, all checked at once.
@@ -6135,13 +6163,18 @@ export declare class ProviderKindVersions {
    * The version an install would bring now, or `null` when it can't be read.
    */
   public readonly latest: string | null;
+  /**
+   * What the person should know about how TeamRun runs the installed program, or `null`; the installation's `notice` while it's `Installed`.
+   */
+  public readonly notice: string | null;
 
   /**
    * Initializes the versions.
    * @param installed The installed version, or `null`.
    * @param latest The version an install would bring now, or `null`.
+   * @param notice What the person should know about how TeamRun runs the installed program, or `null`, the default.
    */
-  public constructor(installed: string | null, latest: string | null);
+  public constructor(installed: string | null, latest: string | null, notice?: string | null);
 
   /**
    * `latest` when both are known and it is newer than `installed`, comparing their dot-separated numbers in order, each missing one as 0 and each
@@ -8087,12 +8120,13 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @param registry The registered adapters.
    * @param providers The providers, for `listModelsAsync` through a provider.
    * @param events Where `ProviderKindInstallationChanged` is published.
+   * @param updateChecks Whether `listInstallations` and an install's end may ask the network for the latest versions.
    * @param planUsage Where `readPlanUsageAsync` keeps what it reads; a `PlanUsageService` on `events` by default.
    * @param teammates Whose speeds `modelCatalogAsync` clears when the catalog no longer lists them; none by default.
    * @param log Where `listAsync` writes a kind whose `refreshDescriptorAsync` failed, with the kind of failure; none by default.
    */
-  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, planUsage?: IPlanUsageService,
-    teammates?: ITeammatesService | null, log?: ILog | null);
+  public constructor(registry: ProviderKindRegistry, providers: IProvidersService, events: IEventSink, updateChecks: IToolUpdateChecks,
+    planUsage?: IPlanUsageService, teammates?: ITeammatesService | null, log?: ILog | null);
 
   /**
    * Lists the registered kinds, each saying whether it can name a chat: whether its adapter has `askIsolated`.
@@ -8120,6 +8154,11 @@ export declare class ProviderKindsService implements IProviderKindsService {
    * @inheritdoc
    */
   public listInstallations(): Promise<readonly ProviderKindInstallation[]>;
+
+  /**
+   * @inheritdoc
+   */
+  public checkInstallationsAsync(): Promise<readonly ProviderKindInstallation[]>;
 
   /**
    * @inheritdoc

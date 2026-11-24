@@ -9,6 +9,7 @@
 import { chmodSync } from "node:fs";
 import { join } from "node:path";
 import "@noldova/context.core";
+import { type JsonObject, JsonReader } from "@noldova/context.json";
 import { type IProviderKindInstallation, ProviderKindVersions } from "@noldova/teamrun.core";
 
 import { ExecutableSource } from "../../enums/executable-source.js";
@@ -65,21 +66,20 @@ export class ClaudeInstaller implements IProviderKindInstallation {
     return Object.isNull(located) || located.source === ExecutableSource.LocalBin ? null : located.path;
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const [installed, latest] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
-      Object.isNull(this.target) || located?.source !== ExecutableSource.LocalBin ? null
+      !checksLatest || Object.isNull(this.target) || located?.source !== ExecutableSource.LocalBin ? null
         : this.readLatest(AbortSignal.timeout(this.channelTimeout)).catch(() => null)
     ]);
     return new ProviderKindVersions(installed, latest);
   }
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void = () => undefined): Promise<string> {
-    const unavailable = this.unavailable;
-    if (!Object.isNull(unavailable))
-      throw new InstallFailedException(unavailable);
-    const target = this.target!;
+    const target = this.target;
+    if (Object.isNull(target))
+      throw new InstallFailedException(Resources.claudeNoBuild);
     const staging = InstallStaging.open(this.stagingDirectory);
     let committed = false;
     try {
@@ -142,17 +142,21 @@ export class ClaudeInstaller implements IProviderKindInstallation {
 
   private async readBuild(version: string, target: string, signal: AbortSignal): Promise<ReleaseFile> {
     const text = await this.read(`${this.channel}/${version}/${Resources.claudeManifestName}`, signal);
-    let build: unknown = null;
-    try {
-      build = (JSON.parse(text) as { platforms?: Record<string, unknown> } | null)?.platforms?.[target] ?? null;
-    }
-    catch {
-      build = null;
-    }
-    const { checksum, size } = (build ?? {}) as { checksum?: unknown; size?: unknown };
-    if (typeof checksum !== "string" || !Resources.sha256Pattern.test(checksum) || typeof size !== "number" || !Number.isSafeInteger(size) || size <= 0)
+    const build = ClaudeInstaller.buildOf(text, target);
+    const checksum = build?.[Resources.claudeChecksumField];
+    const size = build?.[Resources.claudeSizeField];
+    if (!Object.isString(checksum) || !Resources.sha256Pattern.test(checksum) || !Object.isNumber(size) || !Number.isSafeInteger(size) || size <= 0)
       throw new InstallFailedException(Resources.formatClaudeBuildMissing(version));
     return new ReleaseFile(`${this.channel}/${version}/${target}/${this.programName(target)}`, checksum, size);
+  }
+
+  private static buildOf(text: string, target: string): JsonObject | null {
+    try {
+      return JsonReader.parse(text).readObject(Resources.claudePlatformsField).readObject(target).toJson();
+    }
+    catch {
+      return null;
+    }
   }
 
   private read(url: string, signal: AbortSignal): Promise<string> {

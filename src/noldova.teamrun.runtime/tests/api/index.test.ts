@@ -19,7 +19,7 @@ export class RuntimeApiTests {
       "ModuleDatabaseProvider", "ModuleDatabaseSession", "PanelTool", "PermissionAnswerer", "ProviderCreateMethod", "ProviderKindRegistryFactory", "ProviderUpdateMethod", "ReplyFailureNotices", "ReplyWork", "RequestedModeMethod", "Resources", "RuntimeAppDescriptions",
       "RuntimeCommandStarter", "RuntimePart", "RuntimeException", "RuntimePartException", "ProcessNotStartedException", "RuntimeProcessStarter", "RuntimeRememberedAppGrants", "RuntimeToolSession", "RuntimeToolSessions", "SendTool", "ServedCalls", "SharedMcpAccounts", "SharedMcpOauth", "SubAgentTool",
       "SubAgentMethod", "SubAgentTools", "CommandTools", "TeammateCommandFolder",
-      "TeamRunChange", "TeamRunChanges", "TeamRunTool", "TeamRunTools", "WindowClients", "WorkingMethod",
+      "TeamRunChange", "TeamRunChanges", "TeamRunTool", "TeamRunTools", "ToolUpdateChecks", "WindowClients", "WorkingMethod",
       "Pages", "TeamRunPagesHost"
     ];
 
