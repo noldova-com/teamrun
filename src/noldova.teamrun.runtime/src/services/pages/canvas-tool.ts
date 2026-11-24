@@ -16,6 +16,7 @@ import { CanvasPage, type Page } from "@noldova/teamrun.protocol";
 
 import { PageException } from "../../exceptions/pages/page.exception.js";
 import type { IPagesHost } from "../../interfaces/pages/i-pages-host.js";
+import { ArtboardPlace } from "../../models/pages/artboard-place.js";
 import { CanvasArtboardChange } from "../../models/pages/canvas-artboard-change.js";
 import type { CanvasContent } from "../../models/pages/canvas-content.js";
 import type { CanvasRevision } from "../../models/pages/canvas-revision.js";
@@ -62,9 +63,9 @@ export class CanvasTool implements IToolHandler {
         return this.revisedTo(await this.store.addArtboardAsync(chatId, this.host.folderOf(call), this.host.authorOf(call),
           input.readNonBlankString(PagesResources.canvasIdArgument), input.readInteger(PagesResources.baseVersionArgument),
           input.readNonBlankString(PagesResources.pathArgument), input.readNonBlankString(PagesResources.titleArgument),
-          CanvasTool.optionalText(input, PagesResources.canvasPageArgument), [CanvasTool.optionalNumber(input, PagesResources.xArgument),
+          CanvasTool.optionalText(input, PagesResources.canvasPageArgument), new ArtboardPlace(CanvasTool.optionalNumber(input, PagesResources.xArgument),
             CanvasTool.optionalNumber(input, PagesResources.yArgument), CanvasTool.optionalNumber(input, PagesResources.widthArgument),
-            CanvasTool.optionalNumber(input, PagesResources.heightArgument)], writing));
+            CanvasTool.optionalNumber(input, PagesResources.heightArgument)), writing));
       case PagesResources.reviseArtboardTool: {
         const edits = input.hasField(PagesResources.editsArgument)
           ? input.readObjectArray(PagesResources.editsArgument)

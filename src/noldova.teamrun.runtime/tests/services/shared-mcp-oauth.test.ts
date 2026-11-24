@@ -6,10 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { createServer, type Server } from "node:http";
 import { connect } from "node:net";
 
 import "@noldova/context.core";
-import type { IModuleSecrets } from "@noldova/desktop.runtime";
+import type { IModuleLog, IModuleSecrets } from "@noldova/desktop.runtime";
 import type { SharedMcpAccess } from "@noldova/teamrun.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources, SharedMcpOauth } from "@noldova/teamrun.runtime";
@@ -21,12 +22,35 @@ export class SharedMcpOauthTests {
   private static readonly reference = "teamrun.mcpSignIn0123456789abcdef0123456789abcdef";
   private static readonly start = Date.parse("2026-11-02T10:00:00.000Z");
   private static readonly never = (): AbortSignal => new AbortController().signal;
+  private static readonly log: IModuleLog = { write: () => undefined };
+
+  @TestMethod
+  public async logsAFailureOfItsListenerByKindOnceItListensAndStillFinishesTheSignIn(): Promise<void> {
+    await using server = await OauthTestServer.startAsync();
+    const [secrets] = SharedMcpOauthTests.secrets();
+    const logged: string[] = [];
+    const listeners: Server[] = [];
+    const oauth = new SharedMcpOauth(secrets, { write: t => logged.push(t) }, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, undefined, () => {
+      const listener = createServer();
+      listeners.push(listener);
+      return listener;
+    });
+    const finished = Promise.withResolvers<SharedMcpAccess>();
+
+    const started = await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t));
+    listeners[0]?.emit("error", Object.assign(new Error("Too many open files."), { code: "EMFILE" }));
+    await server.signInInTheBrowserAsync(started);
+
+    Assert.areEqual("access-1", (await finished.promise).token);
+    Assert.areEqual(Resources.formatSharedMcpCallbackFailed("Error EMFILE"), logged.join("|"));
+    Assert.areEqual(1, listeners.length);
+  }
 
   @TestMethod
   public async signsInByDiscoveryFromTheServers401AndKeepsTheClientAndTokensOnlyInTheSecretStore(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const finished = Promise.withResolvers<SharedMcpAccess>();
 
     const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)) ?? String.empty);
@@ -58,8 +82,8 @@ export class SharedMcpOauthTests {
     bare.answersWithBare401 = true;
     const [secrets] = SharedMcpOauthTests.secrets();
 
-    const access = await SharedMcpOauthTests.signInAsync(new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start), server);
-    const named = await SharedMcpOauthTests.signInAsync(new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start), bare);
+    const access = await SharedMcpOauthTests.signInAsync(new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start), server);
+    const named = await SharedMcpOauthTests.signInAsync(new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start), bare);
 
     Assert.areEqual(JSON.stringify(["access-1", "access-1"]), JSON.stringify([access.token, named.token]));
     Assert.areEqual(JSON.stringify([`authorize client-1 null ${server.url}`, "authorization_code"]), JSON.stringify(server.grants));
@@ -71,7 +95,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
     let now = SharedMcpOauthTests.start;
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => now);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => now);
     await SharedMcpOauthTests.signInAsync(oauth, server);
 
     now = Date.parse("2026-11-02T10:58:59.000Z");
@@ -90,7 +114,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
     let now = SharedMcpOauthTests.start;
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => now);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => now);
 
     const missing = await oauth.accessAsync(server.url, SharedMcpOauthTests.reference);
     server.givesRefreshToken = false;
@@ -117,7 +141,7 @@ export class SharedMcpOauthTests {
   public async renewsATokenWithoutAnExpiryThatTheServerNoLongerTakesAndGrantsItWhenTheServerCantBeReached(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     server.expiresIn = null;
     await SharedMcpOauthTests.signInAsync(oauth, server);
 
@@ -137,7 +161,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
     let now = SharedMcpOauthTests.start;
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => now);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => now);
     await SharedMcpOauthTests.signInAsync(oauth, server);
     now = Date.parse("2026-11-02T12:00:00.000Z");
 
@@ -160,7 +184,7 @@ export class SharedMcpOauthTests {
   public async endsASignInWhoseAnswerIsntItsOwnIsDeniedCantBeExchangedOrIsntFinishedInTime(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const answerAsync = async (query: (state: string) => string, path: string = "/callback"): Promise<{ status: number; access: SharedMcpAccess | null }> => {
       const finished = Promise.withResolvers<SharedMcpAccess>();
       const started = new URL(await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t)) ?? String.empty);
@@ -176,10 +200,10 @@ export class SharedMcpOauthTests {
     const codeless = await answerAsync(t => `state=${t}`);
     const timedOut = Promise.withResolvers<SharedMcpAccess>();
     const expiry = new AbortController();
-    await new SharedMcpOauth(secrets, () => expiry.signal, () => SharedMcpOauthTests.start).startAsync(server.url, SharedMcpOauthTests.reference, t => timedOut.resolve(t));
+    await new SharedMcpOauth(secrets, SharedMcpOauthTests.log, () => expiry.signal, () => SharedMcpOauthTests.start).startAsync(server.url, SharedMcpOauthTests.reference, t => timedOut.resolve(t));
     expiry.abort();
     const expired = Promise.withResolvers<SharedMcpAccess>();
-    await new SharedMcpOauth(secrets, () => AbortSignal.abort(), () => SharedMcpOauthTests.start)
+    await new SharedMcpOauth(secrets, SharedMcpOauthTests.log, () => AbortSignal.abort(), () => SharedMcpOauthTests.start)
       .startAsync(server.url, SharedMcpOauthTests.reference, t => expired.resolve(t));
 
     Assert.areEqual(404, foreign.status);
@@ -199,7 +223,7 @@ export class SharedMcpOauthTests {
     await using silentRegistration = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
     const requests: AbortController[] = [];
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => {
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => {
       const request = new AbortController();
       requests.push(request);
       return request.signal;
@@ -231,7 +255,7 @@ export class SharedMcpOauthTests {
   public async endsWithNoAddressAStartSignedOutWhileItsCallbackListenerOpensAndSendsTheServerNothing(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const ends: SharedMcpAccess[] = [];
 
     const starting = oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => ends.push(t));
@@ -247,7 +271,7 @@ export class SharedMcpOauthTests {
   public async endsWithNoAddressAnEarlierStartWhenALaterOneStartsWhileTheEarlierRegisters(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const ends: string[] = [];
     const finished = Promise.withResolvers<SharedMcpAccess>();
     const registration = server.holdAt("/register");
@@ -270,7 +294,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
     const probe = new AbortController();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => probe.signal);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start, () => probe.signal);
     const asked = server.hangAt("/mcp");
 
     const starting = oauth.startAsync(server.url, SharedMcpOauthTests.reference, () => undefined);
@@ -286,7 +310,7 @@ export class SharedMcpOauthTests {
   public async answersARequestWhoseTargetIsNoAddressWithNotFoundAndKeepsWaitingForTheAnswer(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const finished = Promise.withResolvers<SharedMcpAccess>();
     const started = await oauth.startAsync(server.url, SharedMcpOauthTests.reference, t => finished.resolve(t));
     const callback = new URL(await server.callbackOfAsync(started));
@@ -304,7 +328,7 @@ export class SharedMcpOauthTests {
   public async endsAnEarlierSignInOfTheSameServerWithoutAnAnswerWhenALaterOneStarts(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const ends: string[] = [];
     const finished = Promise.withResolvers<SharedMcpAccess>();
 
@@ -324,7 +348,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
     const expiry = new AbortController();
-    const oauth = new SharedMcpOauth(secrets, () => expiry.signal, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, () => expiry.signal, () => SharedMcpOauthTests.start);
     const finished = Promise.withResolvers<SharedMcpAccess>();
     const held = server.holdTokens();
 
@@ -346,7 +370,7 @@ export class SharedMcpOauthTests {
   public async signOutEndsASignInWithoutAnAnswerAndRemovesItsTokensOnlyOnceItsExchangeIsSaved(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, undefined, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, undefined, () => SharedMcpOauthTests.start);
     const ends: SharedMcpAccess[] = [];
     const held = server.holdTokens();
 
@@ -368,7 +392,7 @@ export class SharedMcpOauthTests {
     await using server = await OauthTestServer.startAsync();
     const [secrets, saved] = SharedMcpOauthTests.secrets();
     let now = SharedMcpOauthTests.start;
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => now);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => now);
     await SharedMcpOauthTests.signInAsync(oauth, server);
     now = Date.parse("2026-11-02T12:00:00.000Z");
     const held = server.holdTokens();
@@ -397,7 +421,7 @@ export class SharedMcpOauthTests {
     const [secrets] = SharedMcpOauthTests.secrets();
     let now = SharedMcpOauthTests.start;
     const requests: AbortController[] = [];
-    const lasting = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => now, () => {
+    const lasting = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => now, () => {
       const request = new AbortController();
       requests.push(request);
       return request.signal;
@@ -429,7 +453,7 @@ export class SharedMcpOauthTests {
   public async keepsReadingASignInAfterTheStoreRefusedItsRemoval(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     await SharedMcpOauthTests.signInAsync(oauth, server);
     Object.assign(secrets, { removeAsync: () => Promise.reject(new Error("The store is locked.")) });
 
@@ -444,7 +468,7 @@ export class SharedMcpOauthTests {
   public async failsToStartWhenTheServerCantBeReachedOrRefusesTheRegistration(): Promise<void> {
     await using server = await OauthTestServer.startAsync();
     const [secrets] = SharedMcpOauthTests.secrets();
-    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
+    const oauth = new SharedMcpOauth(secrets, SharedMcpOauthTests.log, SharedMcpOauthTests.never, () => SharedMcpOauthTests.start);
     const closed = await OauthTestServer.startAsync();
     const unreachable = closed.url;
     await closed[Symbol.asyncDispose]();

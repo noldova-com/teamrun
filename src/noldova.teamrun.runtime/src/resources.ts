@@ -568,6 +568,14 @@ export class Resources {
     return code === "EADDRINUSE" ? `Port ${port} is in use; choose another in Settings.` : `The endpoint couldn't listen on port ${port}.`;
   }
 
+  public static formatSharedMcpCallbackFailed(kind: string): string {
+    return `The shared MCP sign-in's callback listener failed (${kind}).`;
+  }
+
+  public static formatAttachmentNotClosed(kind: string): string {
+    return `TeamRun couldn't close an attached file after copying it (${kind}).`;
+  }
+
   public static formatOutsideNotApplied(kind: string): string {
     return `TeamRun couldn't apply the outside sessions settings (${kind}).`;
   }

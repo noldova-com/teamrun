@@ -249,7 +249,7 @@ export class RuntimePart implements IRuntimePart {
     this.planUsage = planUsage;
     const kinds = new ProviderKindsService(registry, providers, events, new ToolUpdateChecks(context.settings), planUsage, teammates, context.log);
     const sharedServers = new SharedMcpServersService(database, providers, teammates, registry, () => context.readEnvironmentAsync(), context.secrets,
-      new SharedMcpOauth(context.secrets), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
+      new SharedMcpOauth(context.secrets, context.log), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
       events, context.log);
     const catalog = this.registries.createAcpCatalog?.(version, context.moduleFolder, starter, context.secrets, context.log) ?? null;
     const acpAgents = Object.isNull(catalog) ? null : new AcpAgentsService(database, registry, kinds, providers, catalog, context.secrets, events, context.log);

@@ -13,6 +13,7 @@ import type { ICliCommandHandler, ICliPartContext, ICliSecrets } from "@noldova/
 import type {
   ClientClosure,
   EventChannel,
+  IAppWindows,
   IMethodHandler,
   IModuleDatabase,
   IModuleLog,
@@ -41,6 +42,7 @@ import type { JsonObject, JsonValue } from "@noldova/context.json";
 import type {
   AppLook,
   ConversationEngine,
+  EventHub,
   IAcpAgentCatalog,
   IAppDescriptions,
   ICommandStarter,
@@ -313,6 +315,10 @@ export declare class Resources {
   public static formatOutsideNotApplied(kind: string): string;
   /** The log line for an outside endpoint that couldn't listen on a port, with the failure's kind. */
   public static formatOutsideNotListening(port: number, kind: string): string;
+  /** The log line for a shared MCP sign-in's callback listener that failed once listening, with the failure's kind. */
+  public static formatSharedMcpCallbackFailed(kind: string): string;
+  /** The log line for an attached file that couldn't be closed after its copy, with the failure's kind. */
+  public static formatAttachmentNotClosed(kind: string): string;
   /** The client a tool's request to the part's methods names, `teamrun.tools`. */
   public static readonly toolsClient: string;
   /** The connection a tool's request to the part's methods names, 0, for none. */
@@ -1569,13 +1575,15 @@ export declare class RuntimeToolSession implements ITurnToolSession {
 export declare class SharedMcpOauth implements ISharedMcpSignIn {
   /**
    * @param secrets Noldova Desktop's secret store of the module.
+   * @param log The module's log, where a failure of a sign-in's listener once it listens is written by its kind.
    * @param expiry Gives each started sign-in the signal whose abort ends it while the browser hasn't answered, with `sharedMcpSignInTimedOut`;
    * by default it aborts after five minutes. Once the answer arrives, the signal no longer ends the sign-in.
    * @param now The clock that expiry is read against.
    * @param deadline Gives each request to the server or its authorization server the signal whose abort ends it; by default it aborts after
    * five seconds.
+   * @param serverOf Makes each sign-in's listener; by default an HTTP server.
    */
-  public constructor(secrets: IModuleSecrets, expiry?: () => AbortSignal, now?: () => number, deadline?: () => AbortSignal);
+  public constructor(secrets: IModuleSecrets, log: IModuleLog, expiry?: () => AbortSignal, now?: () => number, deadline?: () => AbortSignal, serverOf?: () => Server);
   /**
    * Registers the sign-in under `reference` at once, ending an earlier one there without an answer, then asks the server for its 401, registers
    * TeamRun as a client and returns the address of the authorization server's sign-in page, or `null` when a Sign out or a later start of the same
@@ -1686,8 +1694,8 @@ export declare class OutsideSessions implements IMcpEndpointHost {
    * @param appWindows The app's windows, whose change, a window opening or closing or the main process connecting or going, applies a token read that waited again.
    */
   public constructor(settings: IModuleSettings, secrets: IModuleSecrets, outside: IOutsideMessages,
-    events: { subscribe(listener: IEventListener): Disposable }, timer: ITimer, endpointOf: () => McpHttpEndpoint, log: ILog,
-    appWindows: { onChanged(listener: () => void): () => void });
+    events: Pick<EventHub, "subscribe">, timer: ITimer, endpointOf: () => McpHttpEndpoint, log: ILog,
+    appWindows: Pick<IAppWindows, "onChanged">);
 
   /**
    * Follows both settings and the app's windows from now on and, without waiting, starts applying them: when the sessions are on,
@@ -2031,10 +2039,11 @@ export declare class GrantedAttachmentMethod implements IMethodHandler {
   /**
    * Initializes the method.
    * @param method The method that prepares an input by its bytes or saved path.
-   * @param context The runtime part's context, whose files redeem the grant; read at each request.
+   * @param context The runtime part's context, whose files redeem the grant, read at each request, and whose log takes a failure to close the
+   * granted file after the copy, by its kind, without failing the request.
    * @param engine The chat engine, which copies the granted file.
    */
-  public constructor(method: IMethodHandler, context: Pick<IRuntimePartContext, "files">, engine: Pick<IConversationEngine, "prepareOpenedAttachmentAsync">);
+  public constructor(method: IMethodHandler, context: Pick<IRuntimePartContext, "files" | "log">, engine: Pick<IConversationEngine, "prepareOpenedAttachmentAsync">);
 
   /**
    * Prepares the input the request carries.

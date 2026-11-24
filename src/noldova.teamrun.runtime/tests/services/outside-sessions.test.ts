@@ -515,6 +515,37 @@ export class OutsideSessionsTests {
   }
 
   @TestMethod
+  public async readsTheRepliesNoMoreOnceAWaitEnds(): Promise<void> {
+    await using rig = await Rig.onAsync();
+    rig.outside.replies.set("m1", new OutsideReply("m1", OutsideReplyState.Working));
+
+    const timed = rig.read(["m1"], 5);
+    await Rig.turnsUntilAsync(() => rig.timer.delays.length === 1);
+    rig.timer.delays[0]?.end();
+    await timed;
+    const timedReads = rig.outside.reads;
+    const off = rig.read(["m1"], 5);
+    await Rig.turnsUntilAsync(() => rig.timer.delays.length === 2);
+    rig.settings.write(Resources.outsideSessionsSetting, false);
+    await off;
+
+    Assert.areEqual("1 2", `${timedReads} ${rig.outside.reads}`);
+  }
+
+  @TestMethod
+  public async answersAWaitWhoseCallerWentBeforeItStartedWithWhatItHasAndKeepsNoListener(): Promise<void> {
+    await using rig = await Rig.onAsync();
+    rig.outside.replies.set("m1", new OutsideReply("m1", OutsideReplyState.Working));
+    const caller = new AbortController();
+    caller.abort();
+
+    const answer = await rig.read(["m1"], 5, caller.signal);
+
+    Assert.areEqual(OutsideSessionsTests.result([{ message_id: "m1", state: "working" }]), JSON.stringify(answer));
+    Assert.areEqual("1 0", `${rig.outside.reads} ${rig.events.listenerCount}`);
+  }
+
+  @TestMethod
   public async appliesASwitchMadeWhileATokenIsResetOnlyAfterTheResetSoTheShownTokenIsTheOneAccepted(): Promise<void> {
     const secrets = new MemorySecrets();
     secrets.saved.set(Resources.outsideTokenSecret, "old");
