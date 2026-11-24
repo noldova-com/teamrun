@@ -1035,6 +1035,8 @@ describe("OrganizationViewComponent", () => {
       await settle();
     };
 
+    beforeEach(() => AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light));
+
     it("asks for a unit while editing, opens the unit chosen by its Edit button or a click on it in the editor beside the tree, outlined, and closes it from Close or Done editing", async () => {
       AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
       await editAsync();
@@ -2004,7 +2006,7 @@ describe("OrganizationViewComponent", () => {
       expect(getComputedStyle(one("aside.messages")).borderLeftWidth).toBe(width < 48 ? "0px" : "1px");
     });
 
-    it("fills the space under the header with the canvas and the messages beside it, 22rem wide as the chart takes the rest, and fits the chart at 100% to its top, under the canvas's tools", async () => {
+    it("fills the space under the header with the canvas and the messages beside it, 22rem wide as the chart takes the rest, fits the chart at 100% a step below its top, and floats the canvas's tools a step inside its bottom right", async () => {
       await create();
       element().style.width = "100rem";
       element().style.height = "76rem";
@@ -2015,8 +2017,9 @@ describe("OrganizationViewComponent", () => {
       const top = box(".top");
       const canvas = box(".chart > nol-canvas");
       const messages = box("aside.messages");
-      const tools = box(".chart .nol-canvas-tools");
+      const bar = box(".chart .nol-canvas-bar");
       const tree = box(".chart .tree");
+      const space = AppearanceFixture.measureLook("space-3");
 
       AppearanceFixture.expectPixels(canvas.top, top.bottom);
       AppearanceFixture.expectPixels(canvas.left, host.left);
@@ -2026,7 +2029,10 @@ describe("OrganizationViewComponent", () => {
       AppearanceFixture.expectPixels(messages.top, canvas.top);
       AppearanceFixture.expectPixels(messages.bottom, canvas.bottom);
       AppearanceFixture.expectPixels(messages.width, 22 * rem + (host.width - 57 * rem) / 1000);
-      expect([texts(".chart .nol-canvas-zoom"), tree.top >= tools.bottom, tree.top - tools.bottom < box(".owner").height]).toEqual([["100%"], true, true]);
+      AppearanceFixture.expectPixels(bar.right, canvas.right - space);
+      AppearanceFixture.expectPixels(bar.bottom, canvas.bottom - space);
+      expect([texts(".chart .nol-canvas-zoom"), tree.top >= canvas.top + space - 0.5, tree.top - canvas.top < box(".owner").height, all(".chart .nol-canvas-hint").map(u => getComputedStyle(u).display)])
+        .toEqual([["100%"], true, true, ["none"]]);
     });
 
     it("keeps the cards at their widths while editing, with a unit's Edit button and a card's choices and buttons inside the cards' padding", async () => {
@@ -2295,11 +2301,17 @@ describe("OrganizationViewComponent", () => {
     });
 
     describe.each([new ViewSizeCase("the narrowest a document gets", 13.75, true), new ViewSizeCase("a wide window", 72, false)])("at $size", ({ width, wraps }) => {
-      it("heads the view with its title for screen readers only, the status key on the left, then the headcount, Cards show and Edit structure half a step apart, wrapping under it when narrow, and fits the tree on the canvas under its tools", async () => {
+      it("heads the view with its title for screen readers only, the status key on the left, then the headcount, Cards show and Edit structure half a step apart, wrapping under it when narrow, and fits the tree on the canvas clear of its tools", async () => {
         await create();
         element().style.width = `${width}rem`;
         element().style.height = "40rem";
-        await settle();
+        await Wait.until(() => {
+          const canvas = one(".chart > nol-canvas");
+          const zoom = new DOMMatrixReadOnly(getComputedStyle(one(".chart .nol-canvas-plane")).transform).a;
+          const view = one(".chart .nol-canvas-map-view");
+          AppearanceFixture.expectPixels(Number(view.getAttribute("width")) * zoom, canvas.clientWidth);
+          AppearanceFixture.expectPixels(Number(view.getAttribute("height")) * zoom, canvas.clientHeight);
+        });
         one(".chart .nol-canvas-fit").click();
         await settle();
         const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
@@ -2312,7 +2324,7 @@ describe("OrganizationViewComponent", () => {
         const cards = box(".top .cards-show");
         const edit = box(".top .edit");
         const canvas = box(".chart > nol-canvas");
-        const bar = box(".chart .nol-canvas-tools");
+        const bar = box(".chart .nol-canvas-bar");
         const owner = box(".owner");
         const heading = getComputedStyle(one(".top .title"));
 
@@ -2322,8 +2334,8 @@ describe("OrganizationViewComponent", () => {
         expect(tools.right).toBeLessThanOrEqual(top.right - space(4) + 0.5);
         AppearanceFixture.expectPixels(canvas.top, top.bottom);
         AppearanceFixture.expectPixels(canvas.left, top.left);
-        expect([owner.top >= bar.bottom, owner.left >= canvas.left, all(".top .status-key nol-teamrun-teammate-status").length, texts(".top .tools .headcount")])
-          .toEqual([true, true, 4, ["4 teammates · 3 units"]]);
+        expect([owner.bottom <= bar.top || owner.right <= bar.left, owner.top >= canvas.top, owner.left >= canvas.left, all(".top .status-key nol-teamrun-teammate-status").length, texts(".top .tools .headcount")])
+          .toEqual([true, true, true, 4, ["4 teammates · 3 units"]]);
         if (wraps) {
           AppearanceFixture.expectPixels(tools.left, key.left);
           AppearanceFixture.expectPixels(key.top - top.top, space(2));
@@ -2347,7 +2359,7 @@ describe("OrganizationViewComponent", () => {
 
     afterEach(() => AppearanceFixture.reset());
 
-    it("draws the view, its canvas and its messages on the panel's colour, the messages behind a 1px line in the border colour, in light and dark", async () => {
+    it("draws the view, its borderless canvas and its messages on the panel's colour, the canvas's half-pixel dots a rem apart, the messages behind a 1px line in the border colour, in light and dark", async () => {
       await create();
       const messages = one("aside.messages");
       const probe = document.createElement("span");
@@ -2357,11 +2369,16 @@ describe("OrganizationViewComponent", () => {
         return getComputedStyle(probe).color;
       };
       const expected = [colour("panel"), colour("border")];
+      const dot = colour("menu-border");
       probe.remove();
       const style = getComputedStyle(messages);
+      const canvas = getComputedStyle(one(".chart > nol-canvas"));
+      const rem = getComputedStyle(document.documentElement).fontSize;
 
       expect([getComputedStyle(element()).backgroundColor, getComputedStyle(one(".chart > nol-canvas")).backgroundColor, style.borderLeftColor, style.borderLeftStyle,
         style.borderLeftWidth, style.borderTopWidth, style.borderRightWidth, style.borderTopLeftRadius]).toEqual([...expected.slice(0, 1), ...expected, "solid", "1px", "0px", "0px", "0px"]);
+      expect([canvas.backgroundImage, canvas.backgroundSize, canvas.borderTopWidth, canvas.borderLeftWidth, canvas.borderTopLeftRadius])
+        .toEqual([`radial-gradient(${dot} 0.5px, rgba(0, 0, 0, 0) 0.5px)`, `${rem} ${rem}`, "0px", "0px", "0px"]);
     });
 
     it("draws the cards, departments and you on the panel's colour in light and the raised colour in dark, off the canvas's, a department's count on a filled badge, and a status's word in its colour", async () => {

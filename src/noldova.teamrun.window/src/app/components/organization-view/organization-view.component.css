@@ -130,35 +130,10 @@
   }
 }
 
-.canvas ::ng-deep .nol-canvas-tools {
-  position: static;
-}
-
-.canvas ::ng-deep .nol-canvas-bar {
-  position: absolute;
-  z-index: 1;
-  right: var(--nol-space-3);
-  bottom: var(--nol-space-3);
-}
-
-.canvas ::ng-deep .nol-canvas-hint {
-  display: none;
-}
-
-.canvas ::ng-deep .nol-canvas-map {
-  right: var(--nol-space-3);
-  bottom: calc(var(--nol-space-3) * 2 + 2.5rem);
-}
-
 .canvas {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  border: none;
-  border-radius: 0;
-  background-color: var(--nol-panel);
-  background-image: radial-gradient(var(--nol-menu-border) 0.5px, transparent 0.5px);
-  background-size: 1rem 1rem;
 }
 
 .to {

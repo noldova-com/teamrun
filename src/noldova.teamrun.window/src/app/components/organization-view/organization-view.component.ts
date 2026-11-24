@@ -12,7 +12,7 @@ import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.wind
 
 import { OrganizationParent, OrganizationTarget, type Teammate } from "@noldova/teamrun.protocol";
 
-import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasFitAlignment, CanvasItemDirective, ColorChoices, DialogService, MenuComponent,
+import { AvatarComponent, ButtonComponent, ButtonVariant, CanvasComponent, CanvasControlsPlacement, CanvasFitAlignment, CanvasItemDirective, ColorChoices, DialogService, MenuComponent,
   MenuGroupComponent, MenuItemComponent, MenuSeparatorComponent, MenuTriggerDirective, SelectComponent,
   SelectOption } from "@noldova/ui.components.angular";
 
@@ -63,6 +63,7 @@ export class OrganizationViewComponent {
   protected readonly primary: ButtonVariant = ButtonVariant.Primary;
   protected readonly secondary: ButtonVariant = ButtonVariant.Secondary;
   protected readonly top: CanvasFitAlignment = CanvasFitAlignment.Top;
+  protected readonly floating: CanvasControlsPlacement = CanvasControlsPlacement.Floating;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly organization: OrganizationStoreService = inject(OrganizationStoreService);
   protected readonly editing: WritableSignal<boolean> = signal(false);

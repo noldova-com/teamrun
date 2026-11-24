@@ -1231,6 +1231,8 @@ export class Resources {
   public static readonly teammatesTitle: string = "Teammates";
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
+  public static readonly organizationCanvasDotSize: string = "0.5px";
+  public static readonly organizationCanvasDotGap: string = "1rem";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationPersonId: string = "person";
   public static readonly organizationFlowPersonKey: string = "person";

@@ -128,7 +128,7 @@ describe("OrganizationTeammateSearchComponent", () => {
         order: Resources.organizationLastOrder })]]);
   });
 
-  it("leaves out the teammate it adds under, stays open saying why when the organization refuses one, below the field, and closes on Escape", async () => {
+  it("leaves out the teammate it adds under, in a popover 22rem wide whose field has no card of its own, stays open saying why when the organization refuses one, below the field, and closes on Escape", async () => {
     fixture.componentInstance.parent.set(OrganizationParent.teammate("bob"));
     await settle();
 
@@ -138,10 +138,15 @@ describe("OrganizationTeammateSearchComponent", () => {
     await settle();
     await pickAsync("Alice");
     await Wait.until(() => expect(texts(".error")).toEqual(["A teammate or department can't be under itself."]));
+    const popover = one("nol-teamrun-organization-teammate-search");
+    const frame = getComputedStyle(popover);
     const input = one("nol-teamrun-organization-teammate-search nol-quick-input").getBoundingClientRect();
     const error = one("nol-teamrun-organization-teammate-search .error").getBoundingClientRect();
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    AppearanceFixture.expectPixels(input.width, 22 * rem);
+    const look = getComputedStyle(one("nol-teamrun-organization-teammate-search nol-quick-input"));
+    AppearanceFixture.expectPixels(popover.getBoundingClientRect().width, 22 * rem);
+    AppearanceFixture.expectPixels(input.width, popover.clientWidth - Number.parseFloat(frame.paddingLeft) - Number.parseFloat(frame.paddingRight));
+    expect([look.borderTopWidth, look.borderTopLeftRadius, look.backgroundColor, look.boxShadow, look.marginTop]).toEqual(["0px", "0px", "rgba(0, 0, 0, 0)", "none", "0px"]);
     AppearanceFixture.expectPixels(error.left, input.left);
     expect(error.top - input.bottom).toBeGreaterThanOrEqual(AppearanceFixture.measureLook("space-2") - 0.5);
     await userEvent.keyboard("{Escape}");

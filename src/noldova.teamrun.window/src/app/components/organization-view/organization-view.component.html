@@ -54,7 +54,8 @@ LICENSE file in the root directory of this source tree.
 }
 <div class="body">
   <main class="chart">
-    <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top">
+    <nol-canvas class="canvas" [label]="resources.organizationStructureLabel" [fitAlignment]="top" [dotSize]="resources.organizationCanvasDotSize"
+      [dotGap]="resources.organizationCanvasDotGap" [controlsPlacement]="floating" [isFlush]="true">
       <div class="tree" #flowArea>
         <nol-teamrun-flow-overlay [container]="flowArea" [flows]="flows.flows()" [colors]="flowColors()" (arrived)="flows.arrive($event)" (finished)="flows.finish($event)" />
         <div class="owner" nolCanvasItem [attr.data-flow-node]="resources.organizationFlowPersonKey" [attr.data-flow-shape]="lines.Root"
