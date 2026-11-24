@@ -65,6 +65,7 @@ describe("DocsShellComponent", () => {
     ["Light", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT],
     ["Dark", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT]
   ])("in the %s mode at %ipx wide, the header", (mode, width, height) => {
+    const downloadMark = "M480-337q-8 0-15-2.5t-13-8.5L308-492q-12-12-11.5-28t11.5-28q12-12 28.5-12.5T365-549l75 75v-286q0-17 11.5-28.5T480-800q17 0 28.5 11.5T520-760v286l75-75q12-12 28.5-11.5T652-548q11 12 11.5 28T652-492L508-348q-6 6-13 8.5t-15 2.5ZM240-160q-33 0-56.5-23.5T160-240v-80q0-17 11.5-28.5T200-360q17 0 28.5 11.5T240-320v80h480v-80q0-17 11.5-28.5T760-360q17 0 28.5 11.5T800-320v80q0 33-23.5 56.5T720-160H240Z";
     const githubMark = "M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656";
     const xMark = "M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z";
 
@@ -118,15 +119,16 @@ describe("DocsShellComponent", () => {
       expect(background).toBe(getComputedStyle(brand).color);
     });
 
-    it("links to TeamRun's repository and to Noldova on X in this tab, each named by its brand and showing only that brand's mark", async () => {
+    it("links to TeamRun's download page, its repository and Noldova on X in this tab, each named by what it opens and showing only its mark", async () => {
       const header = await renderHeaderAsync();
       const links = DocsFixture.all(header, ".nol-docs-header-link");
 
       expect(links.map(t => [t.getAttribute("aria-label"), nameOf(t), t.getAttribute("href"), t.getAttribute("target")])).toEqual([
+        ["Download", String(), "https://teamrun.noldova.com/download/", null],
         ["GitHub", String(), "https://github.com/noldova-com/teamrun", null],
         ["X", String(), "https://x.com/noldova", null]
       ]);
-      expect(links.map(t => pathOf(t).getAttribute("d"))).toEqual([githubMark, xMark]);
+      expect(links.map(t => pathOf(t).getAttribute("d"))).toEqual([downloadMark, githubMark, xMark]);
     });
 
     it("draws each mark 1rem square in the middle of a pointer target, black in the Light look and white in the Dark one", async () => {
@@ -155,7 +157,7 @@ describe("DocsShellComponent", () => {
       const fills = DocsFixture.all(header, ".nol-docs-header-link").map(t => getComputedStyle(pathOf(t)).fill);
       root.style.removeProperty("--nol-docs-brand-mark");
 
-      expect(fills).toEqual(["rgb(1, 2, 3)", "rgb(1, 2, 3)"]);
+      expect(fills).toEqual(["rgb(1, 2, 3)", "rgb(1, 2, 3)", "rgb(1, 2, 3)"]);
     });
 
     it("shows each link's name as its tooltip under the pointer, inside the window", async () => {

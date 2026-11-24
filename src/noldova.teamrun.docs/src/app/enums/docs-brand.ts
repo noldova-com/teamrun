@@ -7,6 +7,7 @@
  */
 
 export enum DocsBrand {
+  Download = "Download",
   GitHub = "GitHub",
   X = "X"
 }

@@ -304,6 +304,12 @@ It then moves the image's `latest` label to it, which the sandbox follows:
 gh workflow run docs.yml -f version=<version> -f commit=<released commit>
 ```
 
+The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and the same commit, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
+
+```sh
+gh workflow run deploy.yml -f environment=staging -f commit=<released commit>
+```
+
 ## Releases
 
 Noldova builds, signs and publishes the official installers from this repository's source at one commit: it builds TeamRun's packages there, installs `app/` from those archives and packages the app, and publishes no package to a registry.

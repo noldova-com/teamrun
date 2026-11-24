@@ -1,0 +1,153 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment whose label moves to the docs image of the release's commit
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      commit:
+        description: The full hash of the main commit the release built, which the Docs form built the image from
+        required: true
+        type: string
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  find:
+    name: Find the commit's image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    outputs:
+      digest: ${{ steps.find.outputs.digest }}
+    env:
+      CRANE_VERSION: v0.22.1
+      CRANE_SHA256: 0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0
+    steps:
+      - name: Check the commit and the environment
+        env:
+          COMMIT: ${{ inputs.commit }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::A deploy starts on main, not \"$GITHUB_REF\"."
+            exit 1
+          fi
+          if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::A deploy needs a full commit hash, not \"$COMMIT\"."
+            exit 1
+          fi
+          if [ "$ENVIRONMENT" != staging ] && [ "$ENVIRONMENT" != production ]; then
+            echo "::error::A deploy moves staging or production, not \"$ENVIRONMENT\"."
+            exit 1
+          fi
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status)
+          if [ "$status" != ahead ] && [ "$status" != identical ]; then
+            echo "::error::main doesn't hold $COMMIT, so it isn't a release's commit."
+            exit 1
+          fi
+          if ! gh api "repos/$GITHUB_REPOSITORY/environments/deploy-$ENVIRONMENT" --silent; then
+            echo "::error::This repository has no deploy-$ENVIRONMENT environment, and a run would create it unprotected, so no label moves."
+            exit 1
+          fi
+
+      - name: Download crane
+        run: |
+          set -euo pipefail
+          folder="$RUNNER_TEMP/crane"
+          mkdir -p "$folder"
+          curl --fail --silent --show-error --location --retry 3 --proto '=https' --output "$folder/crane.tar.gz" \
+            "https://github.com/google/go-containerregistry/releases/download/$CRANE_VERSION/go-containerregistry_Linux_x86_64.tar.gz"
+          echo "$CRANE_SHA256  $folder/crane.tar.gz" | sha256sum --check --strict
+          tar --extract --gzip --file "$folder/crane.tar.gz" --directory "$folder" crane
+          echo "$folder" >> "$GITHUB_PATH"
+
+      - name: Find the image tagged with the commit
+        id: find
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          DOCS_IMAGE: teamrun-angular-docs
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${OWNER,,}/$DOCS_IMAGE"
+          echo "$REGISTRY_TOKEN" | crane auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if ! digest=$(crane digest "$image:$COMMIT"); then
+            echo "::error::$image has no image tagged $COMMIT; run the Docs form on it first."
+            exit 1
+          fi
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::The registry gave no digest for $image:$COMMIT, \"$digest\"."
+            exit 1
+          fi
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+  approve:
+    name: Approve the deploy
+    needs: find
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: deploy-${{ inputs.environment }}
+    permissions: {}
+    steps:
+      - name: Name what was approved
+        env:
+          COMMIT: ${{ inputs.commit }}
+          DIGEST: ${{ needs.find.outputs.digest }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: echo "Approved $COMMIT, $DIGEST, for $ENVIRONMENT."
+
+  move:
+    name: Move the environment's label
+    needs: [find, approve]
+    uses: noldova-com/.github/.github/workflows/move-image-label.yml@190702f4535ab017e5e436ce47e3562c686eb477 # v2.43.0
+    permissions:
+      packages: write
+    with:
+      image: teamrun-angular-docs
+      digest: ${{ needs.find.outputs.digest }}
+      label: ${{ inputs.environment }}
+
+  summary:
+    name: Record the deploy
+    needs: [find, move]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Write the summary
+        env:
+          COMMIT: ${{ inputs.commit }}
+          DIGEST: ${{ needs.find.outputs.digest }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          {
+            echo '| Commit | Digest | Environment | Approved in |'
+            echo '|---|---|---|---|'
+            echo "| \`$COMMIT\` | \`$DIGEST\` | $ENVIRONMENT | deploy-$ENVIRONMENT |"
+          } >> "$GITHUB_STEP_SUMMARY"

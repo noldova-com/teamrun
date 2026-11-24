@@ -13,6 +13,8 @@ export class Resources {
   public static readonly siteLink: string = "https://teamrun.noldova.dev/";
   public static readonly wordmarkLabel: string = "Noldova";
   public static readonly siteName: string = "TeamRun";
+  public static readonly downloadLink: string = "https://teamrun.noldova.com/download/";
+  public static readonly downloadLabel: string = "Download";
   public static readonly repositoryLink: string = "https://github.com/noldova-com/teamrun";
   public static readonly repositoryLabel: string = "GitHub";
   public static readonly xLink: string = "https://x.com/noldova";
