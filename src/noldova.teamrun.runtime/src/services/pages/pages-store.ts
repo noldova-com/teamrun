@@ -15,7 +15,6 @@ import "@noldova/context.core";
 import type { DataRecord } from "@noldova/context.data";
 import { type SqlConnection, SqlQuery, type SqlTransaction } from "@noldova/context.data.sql";
 import { JsonReader } from "@noldova/context.json";
-import { Resources as CoreResources } from "@noldova/teamrun.core";
 import { CanvasManifest, Page, PageAuthor, PageKind, PageVersion } from "@noldova/teamrun.protocol";
 
 import { PageException } from "../../exceptions/pages/page.exception.js";
@@ -186,7 +185,7 @@ export class PagesStore {
         this.files.write(write.page.chatId, write.page.id, write.html);
       }
       catch (error) {
-        this.log.write(PagesResources.formatCopyNotSaved(CoreResources.formatFailureKind(error)));
+        this.log.write(PagesResources.formatCopyNotSaved(PagesStore.kindOf(error)));
       }
     return result;
   }
@@ -290,5 +289,9 @@ export class PagesStore {
   private static requireSize(bytes: number): void {
     if (bytes > PagesResources.maximumBytes)
       throw new PageException(ToolFailureCode.TooLarge, PagesResources.tooLarge);
+  }
+
+  private static kindOf(error: unknown): string {
+    return error instanceof Error ? error.name : typeof error;
   }
 }
