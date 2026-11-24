@@ -205,7 +205,7 @@ export class AttachmentStoreTests {
     Assert.areEqual(`${first}|true,false`, [saved[0]?.path, saved.map(t => store.exists(t)).join()].join("|"));
     store.saveWaiting("c", "w2", [small]);
     store.removeWaitingFiles("c", "w2");
-    Assert.areEqual("w1|c,w1", [readdirSync(chat).join(), store.listWaitingFolders().flat().join()].join("|"));
+    Assert.areEqual("w1|c,w1", [readdirSync(chat).join(), store.listWaitingFolders().map(t => `${t.chatId},${t.waitingId}`).join()].join("|"));
     store.removeWaitingFiles("c");
     Assert.isFalse(existsSync(chat));
 

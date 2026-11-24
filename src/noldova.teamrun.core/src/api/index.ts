@@ -145,6 +145,7 @@ export { CommandExit } from "../models/command-exit.js";
 export { TaskStart } from "../models/task-start.js";
 export { WorkingTreeChange } from "../models/working-tree-change.js";
 export { WorkFolder } from "../models/work-folder.js";
+export { WaitingFolder } from "../models/waiting-folder.js";
 export { Resources } from "../resources.js";
 export { ApprovalsService } from "../services/approvals/approvals.service.js";
 export { BackgroundTasksService } from "../services/tasks/background-tasks.service.js";
