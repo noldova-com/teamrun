@@ -225,7 +225,7 @@ export class RuntimePart implements IRuntimePart {
   }
 
   private async composeAsync(context: IRuntimePartContext): Promise<void> {
-    const starter = new RuntimeProcessStarter(context, await context.getWorkFolderAsync());
+    const starter = new RuntimeProcessStarter(context, await context.getWorkFolderAsync(), process.platform);
     const version = this.productVersion ?? RuntimeBuild.identity.productVersion;
     const registry = this.registries.create(version, context.moduleFolder, starter,
       context.log);

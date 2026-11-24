@@ -2227,6 +2227,7 @@ export declare class DownloadAddress {
 export declare class AcpCommandLine {
   /**
    * @throws Error with `Resources.formatAcpArgumentLineBreak` when the program is a Windows batch file and an argument has a line break, which `cmd.exe` can't carry.
+   * @throws Error with `Resources.formatCommandNotOnPath` on Windows when a program named without a folder isn't on `PATH`.
    */
   public static of(platform: string, environment: NodeJS.ProcessEnv, variables: Readonly<Record<string, string>>, command: string, args: readonly string[]): ProcessCommand;
 }
@@ -6461,6 +6462,7 @@ export declare class Resources {
    */
   public static formatAcpAgentArchiveInsecure(name: string): string;
   public static formatDownloadInsecure(name: string): string;
+  public static formatCommandNotOnPath(command: string): string;
   public static formatAcpArgumentLineBreak(command: string): string;
   public static formatAcpAgentNoExtractor(name: string): string;
   public static formatAcpAgentPackageRefused(name: string, packageName: string): string;
@@ -10890,7 +10892,7 @@ export declare class NodeProcessStarter implements IProcessStarter {
   /**
    * Starts the program without a shell, with its window hidden on Windows.
    * @param command How to run the program.
-   * @param environment The program's environment.
+   * @param environment The program's environment, as `SharedMcpLauncher.environmentToStart` gives it for this platform.
    * @param directory The program's working directory, or `null` for this process's.
    * @returns The process.
    */
@@ -11099,7 +11101,9 @@ export declare class SharedMcpLaunch {
  * still runs. A PowerShell that hasn't ended within `powershellAnswerMilliseconds` is ended, and the same run starts once more in a new one with the
  * rest of `windowsEndMilliseconds`, which is ended too if it hasn't ended by then. The watch on Windows gets the launcher's errors and writes there a
  * line with a PowerShell's time and outcome when it takes over 2 seconds, doesn't end, can't start or exits with an error, a line when a launcher
- * ended before its server left nothing of the server to end, and nothing otherwise.
+ * ended before its server left nothing of the server to end, and nothing otherwise. On Windows the watch and its PowerShell run in the Windows
+ * system folder, the PowerShell is the one under it, `WindowsPowerShell\v1.0\powershell.exe`, and a server named without a folder that `PATH`
+ * doesn't hold is refused as Node refuses a missing command, before anything starts.
  */
 export declare class SharedMcpLauncher {
   /**
@@ -11198,6 +11202,15 @@ export declare class SharedMcpLauncher {
   public static withholds(name: string): boolean;
 
   /**
+   * The environment a program starts with: on Windows the environment with `NoDefaultCurrentDirectoryInExePath` set, so `cmd.exe`, Node and the
+   * programs they start look for a command named without a folder only on `PATH`, never in the working folder; elsewhere the environment itself.
+   * @param platform The platform, as `process.platform`.
+   * @param environment The environment.
+   * @returns The environment to start with.
+   */
+  public static environmentToStart<T extends Readonly<Record<string, string | undefined>>>(platform: string, environment: T): T;
+
+  /**
    * The server's environment: each variable of the launcher's own whose name is a basic or one of `names`, matched in any case on Windows, and
    * each set `certificateVariables` made absolute, but none of `withheldVariables`.
    * @param names The server's own variables.
@@ -11207,13 +11220,14 @@ export declare class SharedMcpLauncher {
 
   /**
    * What starts a command: itself outside Windows; on Windows the file found through the environment's `PATH` and `PATHEXT`, or, for a `.cmd` or
-   * `.bat` file, `COMSPEC` (`cmd.exe` when unset) with `/d /s /c` and the quoted, escaped line, started with verbatim arguments.
+   * `.bat` file, `COMSPEC` (`cmd.exe` in the Windows system folder when unset or not an absolute path) with `/d /s /c` and the quoted, escaped line, started with verbatim
+   * arguments. A command named without a folder is looked for only in the absolute folders `PATH` lists, never the working folder.
    * @param command The command.
    * @param args Its arguments.
    * @param environment The environment it is found in.
-   * @returns The program, its arguments and whether they go to it verbatim.
+   * @returns The program, its arguments and whether they go to it verbatim, or `null` on Windows when a command named without a folder isn't on `PATH`.
    */
-  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean };
+  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean } | null;
 }
 
 /**
@@ -16127,9 +16141,11 @@ export declare class AcpTerminals {
    * @param environment The turn's environment, read at each start.
    * @param origin The commands' origin, for the log.
    * @param tree Ends a command's process tree; once its first process has exited, the processes it left, and then the command's own stop is used.
+   * @param platform The platform, which decides how a command is found: on Windows by `AcpCommandLine`, through the turn's `PATH` and never the
+   * chat's folder, and refused when it isn't there.
    */
   public constructor(listener: ITurnListener, providerName: string, starter: IProcessStarter, timer: ITimer, directory: string,
-    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree);
+    environment: () => NodeJS.ProcessEnv, origin: ProcessOrigin | null, tree: IProcessTree, platform: string);
 
   /**
    * Whether no command runs and every task start, output and end has reached the listener.
