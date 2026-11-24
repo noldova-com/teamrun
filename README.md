@@ -310,6 +310,10 @@ The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main`
 gh workflow run deploy.yml -f environment=staging -f commit=<released commit>
 ```
 
+The site counts visits to its production, teamrun.noldova.dev, with Cloudflare Web Analytics, which sets no cookie and stores nothing in the browser.
+`VisitCounter`, started once as the app starts, adds Cloudflare's beacon, `https://static.cloudflareinsights.com/beacon.min.js`, to the page's head as a deferred script with the site's token, from the site's own script in the browser and on that host only: the prerendered pages hold no script of Cloudflare's, and staging, the sandbox and local runs load none.
+The host, the beacon's address and the token, which every page that loads the beacon publishes, are `VisitCounterResources`' values, and Cloudflare's automatic setup, which would add the beacon itself, stays off for the site.
+
 ## Releases
 
 Noldova builds, signs and publishes the official installers from this repository's source at one commit: it builds TeamRun's packages there, installs `app/` from those archives and packages the app, and publishes no package to a registry.

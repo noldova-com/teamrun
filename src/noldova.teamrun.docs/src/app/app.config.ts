@@ -7,7 +7,7 @@
  */
 
 import { LocationStrategy, TrailingSlashPathLocationStrategy } from "@angular/common";
-import { type ApplicationConfig, provideBrowserGlobalErrorListeners } from "@angular/core";
+import { type ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalErrorListeners } from "@angular/core";
 import { provideClientHydration } from "@angular/platform-browser";
 import { provideRouter, withComponentInputBinding } from "@angular/router";
 import { ClipboardWriter } from "@noldova/ui.components.angular";
@@ -16,6 +16,7 @@ import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 
 import { routes } from "./app.routes";
 import { BrowserClipboardWriter } from "./services/browser-clipboard-writer";
+import { VisitCounter } from "./services/visit-counter";
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -25,6 +26,7 @@ export const appConfig: ApplicationConfig = {
     provideMarkdown(),
     provideCodeHighlighting(),
     { provide: LocationStrategy, useClass: TrailingSlashPathLocationStrategy },
-    { provide: ClipboardWriter, useClass: BrowserClipboardWriter }
+    { provide: ClipboardWriter, useClass: BrowserClipboardWriter },
+    provideAppInitializer(() => inject(VisitCounter).start())
   ]
 };

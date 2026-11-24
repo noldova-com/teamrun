@@ -7,17 +7,32 @@
  */
 
 import { LocationStrategy, TrailingSlashPathLocationStrategy } from "@angular/common";
+import { ApplicationInitStatus } from "@angular/core";
 import { TestBed } from "@angular/core/testing";
 import { ClipboardWriter, CodeBlockComponent } from "@noldova/ui.components.angular";
 
 import { appConfig } from "../../src/app/app.config";
 import { BrowserClipboardWriter } from "../../src/app/services/browser-clipboard-writer";
+import { VisitCounter } from "../../src/app/services/visit-counter";
 import { DocsFixture } from "../fixtures/docs.fixture";
 
 describe("appConfig", () => {
   it("gives the kit the browser's clipboard, and the site its trailing-slash links", () => {
     expect(appConfig.providers).toContainEqual({ provide: ClipboardWriter, useClass: BrowserClipboardWriter });
     expect(appConfig.providers).toContainEqual({ provide: LocationStrategy, useClass: TrailingSlashPathLocationStrategy });
+  });
+
+  it("starts counting visits once as the app starts", async () => {
+    const start = vi.spyOn(VisitCounter.prototype, "start");
+    try {
+      TestBed.configureTestingModule({ providers: appConfig.providers });
+      await TestBed.inject(ApplicationInitStatus).donePromise;
+
+      expect(start).toHaveBeenCalledTimes(1);
+    }
+    finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("colors a code block with the kit's highlighter", async () => {
