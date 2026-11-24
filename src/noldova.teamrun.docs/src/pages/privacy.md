@@ -25,7 +25,7 @@ Only its update checks, to `updates.teamrun.noldova.com`:
 - Settings' **Check for updates** decides when: **Automatically**, **Only at start**, or **Only when I ask**, which sends a check only when you choose Check for updates.
 - An update itself downloads from GitHub's release file hosts, `release-assets.githubusercontent.com` and `objects.githubusercontent.com`.
 
-TeamRun sends no usage data and no crash reports.
+Beyond that daily count, TeamRun sends no usage data, and it sends no crash reports.
 When a window crashes, TeamRun offers to reload it or to open its log folder; nothing is sent.
 
 ## Checks TeamRun makes on its own
