@@ -9,6 +9,8 @@
 import { Component, DOCUMENT, DestroyRef, type WritableSignal, afterNextRender, inject, input, signal } from "@angular/core";
 import { NavigationEnd, Router, RouterLink } from "@angular/router";
 
+import "@noldova/context.core";
+
 import { Resources } from "../../../resources";
 import { DocsOutline } from "../../models/docs-outline";
 import type { DocsOutlineEntry } from "../../models/docs-outline-entry";
@@ -92,7 +94,7 @@ export class DocsOnThisPageComponent {
 
   private reachFragment(): void {
     const entry = this.entries().find(t => t.id === this.fragmentToReach);
-    if (entry === undefined)
+    if (Object.isUndefined(entry))
       return;
     this.fragmentToReach = null;
     this.heldHeading = entry.heading;

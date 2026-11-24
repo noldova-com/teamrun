@@ -29,6 +29,7 @@ body {
 
 .nol-docs-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--nol-space-6);
   min-width: 0;
 }
@@ -59,12 +60,6 @@ body {
 
 .nol-docs-page .nol-markdown-table code {
   white-space: nowrap;
-}
-
-@media (min-width: 48rem) {
-  .nol-docs-page .nol-markdown-table :is(th, td):not(:last-child) {
-    white-space: nowrap;
-  }
 }
 
 nol-markdown-view.nol-docs-markdown {

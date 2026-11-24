@@ -10,6 +10,8 @@ import { Component, DestroyRef, ElementRef, Injector, type Signal, type Writable
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 import { IconButtonComponent, SectionHeaderComponent, TooltipDirective } from "@noldova/ui.components.angular";
 
+import "@noldova/context.core";
+
 import { Resources } from "../../../resources";
 import { DocsBrand } from "../../enums/docs-brand";
 import { DocsCatalog } from "../../models/docs-catalog";
@@ -83,7 +85,7 @@ export class DocsShellComponent {
       return;
     this.isMenuOpen.set(false);
     queueMicrotask(() => {
-      if (this.router.currentNavigation() === null)
+      if (Object.isNull(this.router.currentNavigation()))
         this.focusHeadingAfterRender();
       else
         this.isHeadingToFocus = true;

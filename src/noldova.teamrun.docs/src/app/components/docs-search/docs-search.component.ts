@@ -90,7 +90,7 @@ export class DocsSearchComponent {
 
   private open(event: KeyboardEvent): void {
     const page = this.isOpen() ? this.results().at(this.active()) : undefined;
-    if (this.active() === DocsSearchComponent.NONE || page === undefined)
+    if (this.active() === DocsSearchComponent.NONE || Object.isUndefined(page))
       return;
     event.preventDefault();
     this.clear();

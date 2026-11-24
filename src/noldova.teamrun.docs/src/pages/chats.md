@@ -120,7 +120,7 @@ A message you send then goes one of three ways:
 - **Queue** waits and goes as the next turn when the replies end.
 - **Stop and send** stops the running replies and goes first.
 
-Enter uses the way a Chat setting in Settings names, Steer by default.
+Enter uses the way Settings' **While a reply runs, Enter**, in the Composer group, names: **Steer** by default, **Queue**, or **Stop and send**.
 Alt+Enter queues, and Ctrl+Enter (Cmd+Enter on macOS) stops and sends.
 The split button beside Stop offers each way with its key.
 

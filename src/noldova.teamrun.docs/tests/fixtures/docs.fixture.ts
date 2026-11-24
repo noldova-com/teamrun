@@ -10,14 +10,19 @@ import type { ComponentFixture } from "@angular/core/testing";
 import type { Router } from "@angular/router";
 import { page } from "vitest/browser";
 
+import "@noldova/context.core";
+
+import { DocsMode } from "./docs-mode";
+
 export class DocsFixture {
   public static readonly DESKTOP_WIDTH: number = 1280;
   public static readonly DESKTOP_HEIGHT: number = 800;
   public static readonly PHONE_WIDTH: number = 375;
+  public static readonly SHORT_HEIGHT: number = 320;
   public static readonly PHONE_HEIGHT: number = 812;
   public static readonly MODE_ATTRIBUTE: string = "data-nol-theme-mode";
   public static readonly STORAGE_KEY: string = "nol-docs-theme";
-  public static readonly MODES: readonly (readonly [mode: string, scheme: string])[] = [["Light", "light"], ["Dark", "dark"]];
+  public static readonly MODES: readonly DocsMode[] = [new DocsMode("Light", "light"), new DocsMode("Dark", "dark")];
 
   private static readonly POLL_INTERVAL: number = 1;
   private static readonly POLL_LIMIT: number = 15_000;
@@ -42,7 +47,7 @@ export class DocsFixture {
 
   public static byText(root: ParentNode, selector: string, text: string): HTMLElement {
     const element = DocsFixture.all(root, selector).find(t => t.textContent.trim() === text);
-    if (element === undefined)
+    if (Object.isUndefined(element))
       throw new TypeError(`No ${selector} reads ${text}.`);
     return element;
   }
@@ -52,7 +57,7 @@ export class DocsFixture {
   }
 
   public static setMode(mode: string | null): void {
-    if (mode === null)
+    if (Object.isNull(mode))
       document.documentElement.removeAttribute(DocsFixture.MODE_ATTRIBUTE);
     else
       document.documentElement.setAttribute(DocsFixture.MODE_ATTRIBUTE, mode);

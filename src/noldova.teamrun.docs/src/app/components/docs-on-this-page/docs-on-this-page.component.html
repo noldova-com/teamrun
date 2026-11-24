@@ -12,7 +12,7 @@ LICENSE file in the root directory of this source tree.
     <ul class="nol-docs-outline-list">
       @for (entry of entries(); track entry.id) {
         <li>
-          <a class="nol-docs-outline-link" [class.nol-docs-outline-nested]="entry.depth === 1" [class.nol-docs-outline-nested-twice]="entry.depth === 2" [class.nol-docs-outline-current]="entry === current()"
+          <a class="nol-docs-outline-link" [class.nol-docs-outline-nested]="entry.depth === 1" [class.nol-docs-outline-current]="entry === current()"
             [attr.aria-current]="entry === current() ? resources.currentLocation : null" [routerLink]="pageLink()" [fragment]="entry.id" (click)="follow(entry)">{{ entry.title }}</a>
         </li>
       }

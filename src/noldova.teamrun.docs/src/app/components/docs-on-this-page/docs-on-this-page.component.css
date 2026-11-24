@@ -41,10 +41,6 @@
   padding-inline-start: calc(var(--nol-space-2) + var(--nol-space-3));
 }
 
-.nol-docs-outline-nested-twice {
-  padding-inline-start: calc(var(--nol-space-2) + var(--nol-space-3) * 2);
-}
-
 .nol-docs-outline-link:hover {
   color: var(--nol-text);
 }

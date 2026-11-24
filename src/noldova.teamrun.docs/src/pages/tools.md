@@ -24,7 +24,7 @@ A reply's shell code blocks (bash, sh, shell, zsh, powershell, pwsh or cmd) offe
 Nothing runs until you press it.
 Your own messages offer none.
 
-The run opens where a setting says:
+The run opens where Settings' **Run opens in** says:
 
 - **Chat**, the default: in a terminal inside the chat, under the block.
 - **Terminals panel**: in a terminal tab.
@@ -58,10 +58,10 @@ Clicks and typing always ask, and a card can offer **I'll type it myself**, so y
 ## Computer use
 
 Computer use lets a teammate see the screen and use apps.
-It works on Windows and macOS only, while its preview setting is on.
+It works on Windows and macOS only, while Settings' **Computer use (preview)** is on; it is off by default.
 Linux has none.
 
-While a teammate controls the screen, a border in your accent colour goes around every display; computer use's own setting turns the border off.
+While a teammate controls the screen, a border in your accent colour goes around every display; Settings' **Show a border while an agent uses the computer**, on by default, turns it off.
 
 A teammate asks for the screen, or for one app, with **Allow in this chat**.
 The access then stays for that teammate in that chat; another chat asks again.

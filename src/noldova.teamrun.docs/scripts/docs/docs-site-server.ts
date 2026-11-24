@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 export class DocsSiteServer {
   private static readonly HOST: string = "127.0.0.1";
   private static readonly ANY_PORT: number = 0;
@@ -51,7 +53,7 @@ export class DocsSiteServer {
       this.server.listen(DocsSiteServer.ANY_PORT, DocsSiteServer.HOST, () => resolve());
     });
     const address = this.server.address();
-    const port = address === null || typeof address === "string" ? DocsSiteServer.ANY_PORT : address.port;
+    const port = Object.isNull(address) || Object.isString(address) ? DocsSiteServer.ANY_PORT : address.port;
     return `http://${DocsSiteServer.HOST}:${port}`;
   }
 
@@ -63,12 +65,12 @@ export class DocsSiteServer {
   private async serveAsync(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const file = this.fileOf(request.url ?? String());
     let status = DocsSiteServer.NOT_FOUND_STATUS;
-    const content = file === null ? null : await readFile(file).catch((error: unknown) => {
-      if (!(error instanceof Error && "code" in error && typeof error.code === "string" && DocsSiteServer.ABSENT_CODES.includes(error.code)))
+    const content = Object.isNull(file) ? null : await readFile(file).catch((error: unknown) => {
+      if (!(error instanceof Error && "code" in error && Object.isString(error.code) && DocsSiteServer.ABSENT_CODES.includes(error.code)))
         status = DocsSiteServer.FAILED_STATUS;
       return null;
     });
-    if (file === null || content === null) {
+    if (Object.isNull(file) || Object.isNull(content)) {
       response.writeHead(status);
       response.end();
       return;

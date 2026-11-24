@@ -9,6 +9,8 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { ProcessException } from "../../../../scripts/processes/process.exception.ts";
 import { DocsModuleWriter } from "./docs-module-writer.ts";
 import { DocsPageFile } from "./docs-page-file.ts";
@@ -73,7 +75,7 @@ export class DocsPageGenerator {
 
   private static formatPage(name: string, text: string): DocsPageFile {
     const title = DocsPageGenerator.DOCUMENT_TITLE.exec(text);
-    if (title === null)
+    if (Object.isNull(title))
       throw new ProcessException(`${DocsPageGenerator.PAGES_FOLDER}/${name}${DocsPageGenerator.DOCUMENT_EXTENSION} doesn't start with its title, a "# " line.`);
     const body = text.slice(title[0].length).replace(DocsPageGenerator.PAGE_LINK, (_link: string, target: string, anchor: string | undefined) =>
       `](${DocsPageGenerator.SITE_LINK}${target === DocsPageGenerator.HOME_FILE ? String() : target}${anchor ?? String()})`).trimEnd();

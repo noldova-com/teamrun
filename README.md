@@ -294,17 +294,12 @@ The answer comes back the same way, and a chain of such messages, with the hand-
 TeamRun's documentation site, for people who use the app, is the private workspace `src/noldova.teamrun.docs`, served at teamrun.noldova.dev, with its staging at teamrun.staging.noldova.dev and its sandbox at teamrun.sandbox.noldova.dev.
 Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes add the released versions of [CHANGELOG.md](CHANGELOG.md) when the site is built.
 A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/drafts/`, outside the menu, the search and the build.
-`npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` runs its tests with coverage, then opens every page the menu links.
+`npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` runs its tests with coverage, checks their JSON report, `_build/docs-tests.json`, so that every spec file reported and no two tests share a name, then opens every page the menu links; CI runs it in its "Docs site tests" job.
 
-The site documents the released app, so it is built from a release's commit, never from the tip of `main`.
-The "Docs" workflow, `.github/workflows/docs.yml`, started by hand with the released version and the full hash of the `main` commit the release built, checks both, runs `npm run set-version -- <version>` on that commit, as the release's builds do, so Release notes name the version, and builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.43.0, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit.
-It then moves the image's `latest` label to it, which the sandbox follows:
+The "Docs" workflow, `.github/workflows/docs.yml`, runs on each push to `main`, as the UI kit's does: it builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.44.0, running `npm ci --no-audit --no-fund && npm run build:docs`, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit, then moves the image's `latest` label to it, which the sandbox follows.
+Release notes show the versions [CHANGELOG.md](CHANGELOG.md) names as released at that commit.
 
-```sh
-gh workflow run docs.yml -f version=<version> -f commit=<released commit>
-```
-
-The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and the same commit, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
+The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and the full hash of a `main` commit, such as the one a release built, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
 
 ```sh
 gh workflow run deploy.yml -f environment=staging -f commit=<released commit>
@@ -342,11 +337,12 @@ Every pull request into `main` must pass both checks before it merges.
 | Check | What it verifies |
 |---|---|
 | Check / Linked issue | The organization's shared check, which `.github/workflows/require-linked-issue.yml` calls from its `check` job, named "Check": the PR description has a standalone `Issue: #N`, `Issue #N` or closing reference, such as `Closes #N`, that names an issue in this repository. |
-| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, and the unsigned package passed. |
+| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, the docs site's tests, and the unsigned package passed. |
 
 The "Build and test" job calls the organization's shared `build-and-test.yml` workflow at the `.github` repository's v2.40.0, the version its `uses:` lines pin and a pin PR moves here too, which runs each target in a job of its own, such as "Build and test / Windows x64": it builds and runs `npm test -- --skip-test-details --skip-coverage-details` with `NOLDOVA_SEPARATE_TEST=angular`, which leaves the Angular tests and coverage out.
 Its "Separate test" job runs `npm run test:angular`, the Angular tests and coverage alone, on Linux x64, and its "End-to-end test" job runs the [end-to-end test](#end-to-end-test).
 On every other target, "<target>, Angular tests and app" installs and builds, runs `npm run test:angular`, and then installs and builds the app; the end-to-end test and the unsigned package install and build the app on Linux x64.
+"Docs site tests" installs and builds on Linux x64, then runs `npm run test:docs`, which builds the [documentation site](#documentation-site) and runs its tests, their report check and the built-site check; the site is static and the same on every system, so it runs on Linux only, and when its tests fail it keeps their report, `_build/docs-tests.json`, and the failed specs' screenshots as its artifact `docs-tests-<attempt>` for 14 days.
 The jobs run side by side, so the run takes about the longest of them, not their sum.
 `NOLDOVA_SEPARATE_TEST` takes `angular` or nothing, and `npm test` refuses any other value before it runs a check.
 Each job runs on the GitHub-hosted runner its target's `runs-on-*` output names, from the organization's shared `versions.yml` workflow, which the `.github` repository's README explains under "Shared settings".

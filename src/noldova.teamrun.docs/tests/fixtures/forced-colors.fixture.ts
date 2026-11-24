@@ -6,19 +6,19 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type {} from "@vitest/browser-playwright";
-import { cdp } from "vitest/browser";
+import { EmulatedMediaFixture } from "./emulated-media.fixture";
 
 export class ForcedColorsFixture {
   private static readonly FEATURE: string = "forced-colors";
-  private static readonly ACTIVE: string = "active";
   private static readonly NONE: string = "none";
 
   public static activateAsync(): Promise<unknown> {
-    return ForcedColorsFixture.emulateAsync(ForcedColorsFixture.ACTIVE);
+    return ForcedColorsFixture.emulateAsync("active");
   }
 
-  public static resetAsync(): Promise<unknown> {
+  public static async resetAsync(): Promise<unknown> {
+    if (EmulatedMediaFixture.holds(ForcedColorsFixture.FEATURE, ForcedColorsFixture.NONE))
+      return undefined;
     return ForcedColorsFixture.emulateAsync(ForcedColorsFixture.NONE);
   }
 
@@ -31,6 +31,6 @@ export class ForcedColorsFixture {
   }
 
   private static emulateAsync(value: string): Promise<unknown> {
-    return cdp().send("Emulation.setEmulatedMedia", { features: [{ name: ForcedColorsFixture.FEATURE, value }] });
+    return EmulatedMediaFixture.emulateAsync(ForcedColorsFixture.FEATURE, value);
   }
 }

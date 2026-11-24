@@ -17,7 +17,7 @@ on:
           - staging
           - production
       commit:
-        description: The full hash of the main commit the release built, which the Docs form built the image from
+        description: The full hash of the main commit the release built, whose docs image the Docs workflow built when it reached main
         required: true
         type: string
 
@@ -98,7 +98,7 @@ jobs:
           image="ghcr.io/${OWNER,,}/$DOCS_IMAGE"
           echo "$REGISTRY_TOKEN" | crane auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
           if ! digest=$(crane digest "$image:$COMMIT"); then
-            echo "::error::$image has no image tagged $COMMIT; run the Docs form on it first."
+            echo "::error::$image has no image tagged $COMMIT; the Docs workflow builds one for each commit pushed to main."
             exit 1
           fi
           if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
@@ -125,7 +125,7 @@ jobs:
   move:
     name: Move the environment's label
     needs: [find, approve]
-    uses: noldova-com/.github/.github/workflows/move-image-label.yml@190702f4535ab017e5e436ce47e3562c686eb477 # v2.43.0
+    uses: noldova-com/.github/.github/workflows/move-image-label.yml@aded76d5bd26adfaace92fe98adf4890a969c4ca # v2.44.0
     permissions:
       packages: write
     with:

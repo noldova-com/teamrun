@@ -11,6 +11,8 @@ import { type Route, Router, provideRouter, withComponentInputBinding } from "@a
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 import { userEvent } from "vitest/browser";
 
+import "@noldova/context.core";
+
 import { routes } from "../../../../src/app/app.routes";
 import { DocsShellComponent } from "../../../../src/app/components/docs-shell/docs-shell.component";
 import { DocsCatalog } from "../../../../src/app/models/docs-catalog";
@@ -102,7 +104,7 @@ describe("DocsOnThisPageComponent", () => {
         expect(DocsFixture.all(main, ".nol-docs-page-body .nol-markdown-blocks > *").length).toBeGreaterThan(0);
         const own = DocsFixture.all(main, `${headings}[aria-level="2"], ${headings}[aria-level="3"]`);
         expect(titles(host)).toEqual(own.map(t => t.textContent.trim()));
-        expect(host.querySelector("nav[aria-labelledby=\"nol-docs-outline-title\"]") === null).toBe(own.length === 0);
+        expect(Object.isNull(host.querySelector("nav[aria-labelledby=\"nol-docs-outline-title\"]"))).toBe(own.length === 0);
       });
     }
   });
@@ -140,6 +142,7 @@ describe("DocsOnThisPageComponent", () => {
     const host = DocsFixture.host(await renderAsync(`${SamplePageFixture.LINK}#your-first-chat`));
     await settledAsync(host);
     const target = DocsFixture.one(host, "#your-first-chat");
+    expect(document.documentElement.scrollHeight - target.getBoundingClientRect().top - window.scrollY).toBeGreaterThanOrEqual(window.innerHeight);
 
     await DocsFixture.untilAsync(() => expect(Math.abs(target.getBoundingClientRect().top - headerBottom(host))).toBeLessThanOrEqual(1));
     expect(window.scrollY).toBeGreaterThan(0);
@@ -177,6 +180,7 @@ describe("DocsOnThisPageComponent", () => {
     const host = DocsFixture.host(await renderAsync(`${SamplePageFixture.LINK}#your-first-chat`));
     await settledAsync(host);
     const target = DocsFixture.one(host, "#your-first-chat");
+    expect(document.documentElement.scrollHeight - target.getBoundingClientRect().top - window.scrollY).toBeGreaterThanOrEqual(window.innerHeight);
     await DocsFixture.untilAsync(() => expect(Math.abs(target.getBoundingClientRect().top - headerBottom(host))).toBeLessThanOrEqual(1));
 
     document.dispatchEvent(new WheelEvent("wheel", { bubbles: true }));
@@ -187,7 +191,7 @@ describe("DocsOnThisPageComponent", () => {
     expect(window.scrollY).toBe(0);
   });
 
-  describe.each(DocsFixture.MODES)("in the %s mode, a %s color scheme", (mode, scheme) => {
+  describe.each(DocsFixture.MODES)("in the $mode mode, a $scheme color scheme", ({ mode, scheme }) => {
     it("stands 14rem wide to the right of the page at a desktop width, its title at its padding's edge inside the window, and is hidden at a phone width", async () => {
       DocsFixture.setMode(mode);
       await DocsFixture.viewAsync(1920, 1080);

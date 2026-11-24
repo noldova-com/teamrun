@@ -12,12 +12,15 @@ import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 import { TooltipFixture } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
+import "@noldova/context.core";
+
 import { routes } from "../../../../src/app/app.routes";
 import { DocsShellComponent } from "../../../../src/app/components/docs-shell/docs-shell.component";
 import { DocsCatalog } from "../../../../src/app/models/docs-catalog";
 import { DocsFixture } from "../../../fixtures/docs.fixture";
 import { ForcedColorsFixture } from "../../../fixtures/forced-colors.fixture";
 import { SamplePageFixture } from "../../../fixtures/sample-page.fixture";
+import { ScrolledPage } from "../../../fixtures/scrolled-page";
 
 describe("DocsShellComponent", () => {
   const renderAsync = async (url: string): Promise<ComponentFixture<DocsShellComponent>> => {
@@ -56,6 +59,32 @@ describe("DocsShellComponent", () => {
       expect(DocsFixture.overflowWidth()).toBe(0);
       expect(DocsFixture.one(host, ".nol-docs-header").getBoundingClientRect().right).toBeLessThanOrEqual(edge);
       expect(DocsFixture.one(host, "main").getBoundingClientRect().right).toBeLessThanOrEqual(edge);
+    });
+  });
+
+  describe.each([
+    [DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT],
+    [768, 1024],
+    [1024, 768],
+    [DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT],
+    [1920, 1080],
+    [2000, 1125]
+  ])("at %ipx wide", (width, height) => {
+    it.each(["/chats", "/install", "/privacy", "/provider-features", "/tools", "/troubleshooting"])("fits every table on %s inside the page's text, with no table scrolling sideways from a desktop's width but the 12-column ones on /provider-features below 1920px", async url => {
+      await DocsFixture.viewAsync(width, height);
+      const host = DocsFixture.host(await renderAsync(url));
+      await DocsFixture.untilAsync(() => expect(DocsFixture.all(host, "main .nol-markdown-table").length).toBeGreaterThan(0));
+      const text = DocsFixture.one(host, "main .nol-docs-page-body").getBoundingClientRect();
+      const tables = DocsFixture.all(host, "main .nol-markdown-table");
+
+      expect(DocsFixture.overflowWidth()).toBe(0);
+      expect(tables.flatMap((t, index) => {
+        const box = t.getBoundingClientRect();
+        return box.left < text.left - 0.5 || box.right > text.right + 0.5 ? [`table ${index + 1}: ${Math.round(box.width)} > ${Math.round(text.width)}`] : [];
+      })).toEqual([]);
+      if (width >= DocsFixture.DESKTOP_WIDTH)
+        expect(tables.flatMap((t, index) => t.scrollWidth > t.clientWidth ? [`table ${index + 1}`] : []))
+          .toEqual(url === "/provider-features" && width < 1920 ? ["table 1", "table 2"] : []);
     });
   });
 
@@ -147,6 +176,26 @@ describe("DocsShellComponent", () => {
         expect(Math.abs(mark.left + mark.width / 2 - (box.left + box.width / 2)) / rem).toBeLessThanOrEqual(0.05);
         expect(Math.abs(mark.top + mark.height / 2 - (box.top + box.height / 2)) / rem).toBeLessThanOrEqual(0.05);
         expect(getComputedStyle(pathOf(link)).fill).toBe(mode === "Light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
+      }
+    });
+
+    it("draws the GitHub mark's circle 1rem across, the X 0.8rem tall and the download arrow and tray two thirds of a rem, so none looks larger, each ink in the middle of its link", async () => {
+      const header = await renderHeaderAsync();
+      const rem = DocsFixture.rem();
+      const links = DocsFixture.all(header, ".nol-docs-header-link");
+      const ink = (label: string): DOMRect => pathOf(DocsFixture.one(header, `.nol-docs-header-link[aria-label="${label}"]`)).getBoundingClientRect();
+      const [download, github, x] = [ink("Download"), ink("GitHub"), ink("X")];
+
+      expect(github.width / rem).toBeCloseTo(1, 2);
+      expect(x.height / rem).toBeCloseTo(0.8, 2);
+      expect([download.width / rem, download.height / rem]).toEqual([expect.closeTo(2 / 3, 2), expect.closeTo(2 / 3, 2)]);
+      expect(x.width).toBeLessThan(github.width);
+      for (const [index, link] of links.entries()) {
+        const box = link.getBoundingClientRect();
+        const drawn = pathOf(link).getBoundingClientRect();
+
+        expect(Math.abs(drawn.left + drawn.width / 2 - (box.left + box.width / 2)) / rem, `link ${index}'s ink across`).toBeLessThanOrEqual(0.05);
+        expect(Math.abs(drawn.top + drawn.height / 2 - (box.top + box.height / 2)) / rem, `link ${index}'s ink down`).toBeLessThanOrEqual(0.05);
       }
     });
 
@@ -254,6 +303,17 @@ describe("DocsShellComponent", () => {
       expect(DocsFixture.all(nav, ":scope > a")).toEqual([]);
     });
 
+    it("puts the kit's 12px space above each of the menu's group headers after the first, beside the menu's 4px gap on a desktop", async () => {
+      await DocsFixture.viewAsync(DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT);
+      const headers = DocsFixture.all(DocsFixture.host(await renderAsync("/")), "#nol-docs-menu nol-section-header");
+      const margin = (element: HTMLElement): number => Number.parseFloat(getComputedStyle(element).marginTop);
+
+      expect(headers.map(t => margin(t))).toEqual([0, 12, 12]);
+      expect(headers.map(t => Object.isNull(t.previousElementSibling))).toEqual([true, false, false]);
+      expect(headers.slice(1).map(t => t.getBoundingClientRect().top - (t.previousElementSibling?.getBoundingClientRect().bottom ?? Number.NaN)))
+        .toEqual([expect.closeTo(16, 1), expect.closeTo(16, 1)]);
+    });
+
     it.each(DocsCatalog.pages.map(t => [t.link, t.title]))("marks only %s's link current on its page, and shows its title as the page's heading", async (link, title) => {
       const fixture = await renderAsync(link);
       const nav = DocsFixture.one(DocsFixture.host(fixture), "nav");
@@ -274,7 +334,7 @@ describe("DocsShellComponent", () => {
       expect(DocsFixture.byText(nav, "a", "TeamRun").getAttribute("aria-current")).toBeNull();
     });
 
-    describe.each(DocsFixture.MODES)("in the %s mode", mode => {
+    describe.each(DocsFixture.MODES)("in the $mode mode", ({ mode }) => {
       it("starts each link's text at the same edge, a rem-measured inset from the menu's, and fills the current one inside the menu", async () => {
         DocsFixture.setMode(mode);
         const nav = DocsFixture.one(DocsFixture.host(await renderAsync("/install")), "nav");
@@ -302,7 +362,7 @@ describe("DocsShellComponent", () => {
     ["Light", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT],
     ["Dark", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT]
   ])("in the %s mode at %ipx wide, while the page scrolls", (mode, width, height) => {
-    const scrolledAsync = async (): Promise<{ host: HTMLElement; header: HTMLElement; height: number }> => {
+    const scrolledAsync = async (): Promise<ScrolledPage> => {
       DocsFixture.setMode(mode);
       await DocsFixture.viewAsync(width, height);
       const host = DocsFixture.host(await renderAsync(SamplePageFixture.LINK));
@@ -311,11 +371,11 @@ describe("DocsShellComponent", () => {
       const before = header.getBoundingClientRect().height;
       window.scrollTo(0, document.documentElement.scrollHeight / 2);
       await DocsFixture.untilAsync(() => expect(window.scrollY).toBeGreaterThan(before));
-      return { host, header, height: before };
+      return new ScrolledPage(host, header, before);
     };
 
     it("keeps the header at the top of the window, at its height and in front of the page", async () => {
-      const { header, height: before } = await scrolledAsync();
+      const { header, headerHeight: before } = await scrolledAsync();
       const box = header.getBoundingClientRect();
 
       expect(box.top).toBe(0);
@@ -325,7 +385,7 @@ describe("DocsShellComponent", () => {
       expect(header.contains(document.elementFromPoint(box.left + 1, box.top + 1))).toBe(true);
     });
 
-    it("keeps the menu right below the header, in front of the page and in the window wherever the page is scrolled", async () => {
+    it("keeps the menu right below the header, in front of the page and in the window wherever the page is scrolled, scrolling on its own in a window too short for it", async () => {
       const { host, header } = await scrolledAsync();
       const menu = DocsFixture.one(host, "nav#nol-docs-menu");
       if (width === DocsFixture.PHONE_WIDTH) {
@@ -345,7 +405,12 @@ describe("DocsShellComponent", () => {
       window.scrollTo(0, scrolled + window.innerHeight / 2);
       await DocsFixture.untilAsync(() => expect(window.scrollY).toBeGreaterThan(scrolled));
       expectInView();
-      expect(getComputedStyle(menu).overflowY).toBe("auto");
+      await DocsFixture.viewAsync(width, DocsFixture.SHORT_HEIGHT);
+      await DocsFixture.untilAsync(() => expect(menu.scrollHeight).toBeGreaterThan(menu.clientHeight));
+      expectInView();
+      menu.scrollTop = menu.scrollHeight;
+
+      expect(menu.scrollTop).toBeGreaterThan(0);
     });
 
     it("lands a heading an address names fully below the header", async () => {
@@ -430,7 +495,7 @@ describe("DocsShellComponent", () => {
       expect(getComputedStyle(current).color).toBe(ForcedColorsFixture.resolve("HighlightText"));
     };
 
-    describe.each(DocsFixture.MODES)("in the %s mode", mode => {
+    describe.each(DocsFixture.MODES)("in the $mode mode", ({ mode }) => {
       it("marks the menu's current page with the highlight fill and its text on a desktop, through hover and focus", async () => {
         DocsFixture.setMode(mode);
         await ForcedColorsFixture.activateAsync();
@@ -457,7 +522,7 @@ describe("DocsShellComponent", () => {
     });
   });
 
-  describe.each(DocsFixture.MODES)("on a phone in the %s mode, a %s color scheme", (mode, scheme) => {
+  describe.each(DocsFixture.MODES)("on a phone in the $mode mode, a $scheme color scheme", ({ mode, scheme }) => {
     it("starts the page's content right under the header, and opens the menu above it from the menu button", async () => {
       DocsFixture.setMode(mode);
       await DocsFixture.viewAsync(DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT);

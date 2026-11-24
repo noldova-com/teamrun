@@ -14,61 +14,62 @@ Each answer is one of four:
 - **Not checked yet:** TeamRun offers it, but no one has seen it work or fail with that provider yet.
 
 The **Added ACP agent** column is any agent you add from the ACP Registry or as your own command; see [ACP agents](acp-agents.md).
+For OpenCode, fx and Pi, **Install only; updates are yours** means TeamRun's **Install** runs the tool's own installer, and you update the tool with its own command, as [Providers and sign-in](providers.md) says for each.
 
 ## Features
 
-| Ability | Codex | Claude Code | Grok | GitHub Copilot | OpenCode | Cursor | fx | Antigravity | Pi | Added ACP agent |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Run and stop a turn | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Resume a chat | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Rewind within the provider's session | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Works | Can't |
-| Compact the context | Works | Works | Works | Works | Works | Can't | Can't | Can't | Works | Works |
-| Images in a message | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Files in a message | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Steer a message into a running turn | Works | Can't | Works | Can't | Can't | Can't | Not checked yet | Can't | Works | Can't |
-| Chat title written by the model | Works | Works | Works | Works | Can't | Works | Works | Works | Works | Can't |
-| Choose a model | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Choose an effort | Works | Works | Works | Works | Works | Can't | Works | Works | Works | Works |
-| Choose a fast speed | Works | Works | Works | Works | Not built yet | Can't | Works | Can't | Can't | Can't |
-| Choose a context size | Works | Works | Can't | Not built yet | Not built yet | Can't | Can't | Can't | Can't | Can't |
-| Plan mode | Works | Works | Works | Works | Works | Works | Can't | Can't | Can't | Can't |
-| Read-only mode | Works | Works | Works | Works | Works | Works | Can't | Can't | Works | Can't |
-| Unrestricted mode | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Permission cards | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| TeamRun's approved tools run without asking | Works | Works | Works | Works | Works | Works | Can't | Works | Works | Works |
-| The provider asks the person questions | Works | Works | Works | Can't | Can't | Can't | Can't | Works | Works | Works |
-| Plan checklist in the reply | Works | Works | Works | Works | Can't | Works | Can't | Can't | Can't | Works |
-| Tokens and cost of a reply | Works | Works | Works | Works | Works | Can't | Works | Can't | Works | Works |
-| Plan-limit meters | Works | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't |
-| Rows for the provider's own sub-agents | Works | Works | Works | Works | Can't | Not built yet | Can't | Works | Can't | Can't |
-| A background sub-agent outlives its turn | Works | Works | Works | Can't | Can't | Not built yet | Can't | Can't | Can't | Can't |
-| Stop one sub-agent | Can't | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't | Can't |
-| Follow and stop background commands | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't | Works |
-| TeamRun's explorer sub-agent | Can't | Works | Not built yet | Not built yet | Not built yet | Not built yet | Not built yet | Can't | Works | Not built yet |
-| Generated images in the reply | Works | Can't | Works | Can't | Not checked yet | Works | Can't | Works | Can't | Works |
-| TeamRun's tools in a turn | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Shared MCP servers, stdio | Works | Works | Works | Can't | Works | Works | Not built yet | Can't | Works | Not built yet |
-| Shared MCP servers, HTTP | Works | Works | Works | Works | Works | Works | Not built yet | Can't | Works | Not built yet |
-| Switch the person's own servers on | Works | Works | Can't | Works | Works | Can't | Not built yet | Not built yet | Can't | Not built yet |
-| List the person's own servers | Works | Works | Works | Works | Can't | Works | Works | Can't | Works | Can't |
-| Sign in from TeamRun | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Sign out from TeamRun | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Several accounts | Works | Works | Works | Works | Works | Works | Can't | Works | Works | Can't |
-| Show the signed-in account | Works | Works | Works | Works | Not built yet | Works | Can't | Can't | Can't | Can't |
-| Install and update from TeamRun | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
+| Ability | Codex | Claude Code | Grok | GitHub Copilot | OpenCode | Cursor | fx | Antigravity | Pi | Muse Code | Added ACP agent |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Run and stop a turn | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Resume a chat | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Rewind within the provider's session | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Works | Can't | Can't |
+| Compact the context | Works | Works | Works | Works | Works | Can't | Can't | Can't | Works | Not checked yet | Works |
+| Images in a message | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Files in a message | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Steer a message into a running turn | Works | Can't | Works | Can't | Can't | Can't | Not checked yet | Can't | Works | Can't | Can't |
+| Chat title written by the model | Works | Works | Works | Works | Can't | Works | Works | Works | Works | Can't | Can't |
+| Choose a model | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
+| Choose an effort | Works | Works | Works | Works | Works | Can't | Works | Works | Works | Works | Works |
+| Choose a fast speed | Works | Works | Works | Works | Not built yet | Can't | Works | Can't | Can't | Can't | Can't |
+| Choose a context size | Works | Works | Can't | Not built yet | Not built yet | Can't | Can't | Can't | Can't | Can't | Can't |
+| Plan mode | Works | Works | Works | Works | Works | Works | Can't | Can't | Can't | Can't | Can't |
+| Read-only mode | Works | Works | Works | Works | Works | Works | Can't | Can't | Works | Can't | Can't |
+| Unrestricted mode | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
+| Permission cards | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| TeamRun's approved tools run without asking | Works | Works | Works | Works | Works | Works | Can't | Works | Works | Not checked yet | Works |
+| The provider asks the person questions | Works | Works | Works | Can't | Can't | Can't | Can't | Works | Works | Not checked yet | Works |
+| Plan checklist in the reply | Works | Works | Works | Works | Can't | Works | Can't | Can't | Can't | Not checked yet | Works |
+| Tokens and cost of a reply | Works | Works | Works | Works | Works | Can't | Works | Can't | Works | Can't | Works |
+| Plan-limit meters | Works | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't | Can't |
+| Rows for the provider's own sub-agents | Works | Works | Works | Works | Can't | Not built yet | Can't | Works | Can't | Can't | Can't |
+| A background sub-agent outlives its turn | Works | Works | Works | Can't | Can't | Not built yet | Can't | Can't | Can't | Can't | Can't |
+| Stop one sub-agent | Can't | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't | Can't | Can't |
+| Follow and stop background commands | Works | Works | Works | Can't | Can't | Can't | Can't | Can't | Can't | Can't | Works |
+| TeamRun's explorer sub-agent | Can't | Works | Not built yet | Not built yet | Not built yet | Not built yet | Not built yet | Can't | Works | Can't | Not built yet |
+| Generated images in the reply | Works | Can't | Works | Can't | Not checked yet | Works | Can't | Works | Can't | Not checked yet | Works |
+| TeamRun's tools in a turn | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Shared MCP servers, stdio | Works | Works | Works | Can't | Works | Works | Not built yet | Can't | Works | Not checked yet | Not built yet |
+| Shared MCP servers, HTTP | Works | Works | Works | Works | Works | Works | Not built yet | Can't | Works | Not checked yet | Not built yet |
+| Switch the person's own servers on | Works | Works | Can't | Works | Works | Can't | Not built yet | Not built yet | Can't | Not built yet | Not built yet |
+| List the person's own servers | Works | Works | Works | Works | Can't | Works | Works | Can't | Works | Works | Can't |
+| Sign in from TeamRun | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Sign out from TeamRun | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Several accounts | Works | Works | Works | Works | Works | Works | Can't | Works | Works | Not checked yet | Can't |
+| Show the signed-in account | Works | Works | Works | Works | Not built yet | Works | Can't | Can't | Can't | Can't | Can't |
+| Install and update from TeamRun | Works | Works | Works | Works | Install only; updates are yours | Works | Install only; updates are yours | Works | Install only; updates are yours | Not checked yet | Works |
 
 ## / commands
 
 Commands you type in the composer starting with `/`.
 **/compact** and **/logout** run TeamRun's own compaction and sign-out, so they follow "Compact the context" and "Sign out from TeamRun" above.
 
-| Command | Codex | Claude Code | Grok | GitHub Copilot | OpenCode | Cursor | fx | Antigravity | Pi | Added ACP agent |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| /compact | Works | Works | Works | Works | Works | Can't | Can't | Can't | Works | Works |
-| Commands the provider lists | Can't | Works | Works | Works | Works | Works | Works | Works | Works | Works |
-| Other built-in commands | Works | Works | Works | Works | Works | Not checked yet | Can't | Works | Can't | Works |
-| Custom commands, prompts and skills | Can't | Works | Works | Not checked yet | Works | Not checked yet | Can't | Can't | Works | Works |
-| /logout | Works | Works | Works | Works | Works | Works | Works | Works | Works | Works |
+| Command | Codex | Claude Code | Grok | GitHub Copilot | OpenCode | Cursor | fx | Antigravity | Pi | Muse Code | Added ACP agent |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| /compact | Works | Works | Works | Works | Works | Can't | Can't | Can't | Works | Not checked yet | Works |
+| Commands the provider lists | Can't | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
+| Other built-in commands | Works | Works | Works | Works | Works | Not checked yet | Can't | Works | Can't | Not checked yet | Works |
+| Custom commands, prompts and skills | Can't | Works | Works | Not checked yet | Works | Not checked yet | Can't | Can't | Works | Not checked yet | Works |
+| /logout | Works | Works | Works | Works | Works | Works | Works | Works | Works | Not checked yet | Works |
 
 ## Why some features are missing
 

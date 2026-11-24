@@ -63,7 +63,7 @@ They never touch your project's own Git.
 
 ### Rewind
 
-Rewinding a chat to one of your messages removes it and what came after, gives the message back in the message box, and can restore the files those replies changed from the checkpoint.
+**Rewind to here**, on one of your messages, opens **Rewind the chat**: its **Rewind** removes the message and what came after and gives the message back in the message box, and, while **Also put the project's files back to before this message** is ticked, as it is by default, restores the files those replies changed from the checkpoint.
 The restore covers only the paths the removed replies changed.
 A file changed by something else, such as a pull or your own edit, stays as it is.
 When TeamRun can't be sure a reply listed every file it changed, the whole folder is restored instead.

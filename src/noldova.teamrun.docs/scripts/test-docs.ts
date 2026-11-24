@@ -6,17 +6,25 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { glob, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import { AngularTestReport } from "../../../scripts/angular/angular-test-report.ts";
 import { ProcessRunner } from "../../../scripts/processes/process-runner.ts";
+import { JsonFields } from "../../../scripts/totals/json-fields.ts";
+import { TotalsException } from "../../../scripts/totals/totals.exception.ts";
 import { BuildDocs } from "./build-docs.ts";
 import { DocsSiteCheck } from "./docs-site-check.ts";
 
 export class TestDocs {
   private static readonly ANGULAR_CLI: string = "node_modules/@angular/cli/bin/ng.js";
-  private static readonly TEST_ARGUMENTS: readonly string[] = ["test", "docs", "--reporters=default"];
+  private static readonly TEST_ARGUMENTS: readonly string[] = ["test", "docs", "--reporters=default", "--reporters=json", "--output-file"];
+  private static readonly REPORT_FILE: string = "_build/docs-tests.json";
+  private static readonly SPEC_FILES: string = "tests/**/*.spec.ts";
+  private static readonly RUNNER: string = "docs";
+  private static readonly TITLE: string = "The docs site's tests";
   private static readonly COVERAGE_FOLDER: string = "_build/docs-coverage";
   private static readonly DEPENDENCY_CACHE: string = "node_modules/.vite";
   private static readonly SITE_FOLDER: string = "src/noldova.teamrun.docs";
@@ -36,11 +44,36 @@ export class TestDocs {
       return 1;
     await rm(path.join(this.root, TestDocs.COVERAGE_FOLDER), { recursive: true, force: true });
     await rm(path.join(this.root, TestDocs.DEPENDENCY_CACHE), { recursive: true, force: true });
-    const tested = await this.runner.runAsync(process.execPath, [path.join(this.root, TestDocs.ANGULAR_CLI), ...TestDocs.TEST_ARGUMENTS], path.join(this.root, TestDocs.SITE_FOLDER));
-    const site = new DocsSiteCheck(this.root);
-    this.output.write(`\n${site.title}\n`);
-    const isSiteSound = await site.runAsync(this.output);
-    return tested === 0 && isSiteSound ? 0 : 1;
+    const report = path.join(this.root, TestDocs.REPORT_FILE);
+    await rm(report, { force: true });
+    const site = path.join(this.root, TestDocs.SITE_FOLDER);
+    const tested = await this.runner.runAsync(process.execPath, [path.join(this.root, TestDocs.ANGULAR_CLI), ...TestDocs.TEST_ARGUMENTS, report], site);
+    const isReportSound = await this.checkReportAsync(report, site);
+    const check = new DocsSiteCheck(this.root);
+    this.output.write(`\n${check.title}\n`);
+    const isSiteSound = await check.runAsync(this.output);
+    return tested === 0 && isReportSound && isSiteSound ? 0 : 1;
+  }
+
+  private async checkReportAsync(report: string, site: string): Promise<boolean> {
+    if (!existsSync(report)) {
+      this.output.write(`${TestDocs.TITLE} wrote no report to ${TestDocs.REPORT_FILE}.\n`);
+      return false;
+    }
+    try {
+      const name = (file: string): string => path.relative(site, path.resolve(site, file)).split(path.sep).join(path.posix.sep);
+      const results = JsonFields.parse(await readFile(report, "utf8"), TestDocs.REPORT_FILE).list("testResults");
+      const expected: string[] = [];
+      for await (const file of glob(TestDocs.SPEC_FILES, { cwd: site }))
+        expected.push(name(file));
+      return new AngularTestReport(TestDocs.REPORT_FILE, name).read(results).toTotals(TestDocs.RUNNER, TestDocs.TITLE, null, expected.sort(), null).report(this.output);
+    }
+    catch (error) {
+      if (!(error instanceof TotalsException))
+        throw error;
+      this.output.write(`${error.message}\n`);
+      return false;
+    }
   }
 }
 

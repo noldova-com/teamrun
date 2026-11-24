@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 
 import type { ICheck } from "../../../scripts/checks/interfaces/i-check.ts";
 import { JsonFields } from "../../../scripts/totals/json-fields.ts";
+import { DocsMenuLink } from "./docs/docs-menu-link.ts";
 import { DocsSiteServer } from "./docs/docs-site-server.ts";
 import type { IPlaywrightModule } from "./docs/interfaces/i-playwright-module.ts";
 import type { ISiteBrowser } from "./docs/interfaces/i-site-browser.ts";
@@ -74,7 +75,7 @@ export class DocsSiteCheck implements ICheck {
     return import(pathToFileURL(require.resolve(DocsSiteCheck.PLAYWRIGHT)).href);
   }
 
-  private async readMenuAsync(browser: ISiteBrowser, address: string, findings: string[]): Promise<readonly { readonly link: string; readonly title: string }[]> {
+  private async readMenuAsync(browser: ISiteBrowser, address: string, findings: string[]): Promise<readonly DocsMenuLink[]> {
     const page = await browser.newPage();
     try {
       const response = await page.goto(new URL(DocsSiteCheck.HOME, address).href);
@@ -88,7 +89,7 @@ export class DocsSiteCheck implements ICheck {
       for (const icon of icons.filter(t => t.count("status") !== DocsSiteCheck.OK_STATUS || !t.text("type").startsWith(DocsSiteCheck.IMAGE_TYPE)))
         findings.push(DocsSiteCheck.iconNotServed(icon.text("link"), icon.count("status"), icon.text("type")));
       const menu = JsonFields.parse(String(await page.evaluate(DocsSiteCheck.MENU_LINKS)), DocsSiteCheck.HOME);
-      return menu.objects("links").map(t => ({ link: t.text("link"), title: t.text("title") }));
+      return menu.objects("links").map(t => new DocsMenuLink(t.text("link"), t.text("title")));
     }
     finally {
       await page.close();

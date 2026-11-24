@@ -12,6 +12,8 @@ import { Router } from "@angular/router";
 import { LinkGesture, type LinkOpenEvent } from "@noldova/ui.components.angular";
 import { MarkdownViewComponent } from "@noldova/ui.components.angular/markdown";
 
+import "@noldova/context.core";
+
 import { Resources } from "../../../resources";
 
 @Directive({
@@ -32,25 +34,25 @@ export class DocsLinksDirective {
 
   private open(link: LinkOpenEvent): void {
     const page = this.pageOf(link.url);
-    if (page !== null && link.gesture === LinkGesture.Plain) {
+    if (!Object.isNull(page) && link.gesture === LinkGesture.Plain) {
       void this.router.navigateByUrl(page).then(isDone => {
         if (isDone && !page.includes("#"))
           this.window?.scrollTo(0, 0);
       });
       return;
     }
-    this.window?.open(page === null ? link.url : this.location.prepareExternalUrl(page), DocsLinksDirective.NEW_TAB, DocsLinksDirective.NO_OPENER);
+    this.window?.open(Object.isNull(page) ? link.url : this.location.prepareExternalUrl(page), DocsLinksDirective.NEW_TAB, DocsLinksDirective.NO_OPENER);
   }
 
   private pageOf(url: string): string | null {
     if (!url.startsWith(Resources.siteLink))
       return null;
     const match = DocsLinksDirective.SITE_PAGE.exec(url.slice(Resources.siteLink.length));
-    if (match === null)
+    if (Object.isNull(match))
       return null;
     const [, path, anchor] = match;
     if (!this.router.config.some(t => t.path === path))
       return null;
-    return anchor === undefined ? `/${path}` : `/${path}#${anchor}`;
+    return Object.isUndefined(anchor) ? `/${path}` : `/${path}#${anchor}`;
   }
 }

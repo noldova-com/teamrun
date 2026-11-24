@@ -106,6 +106,6 @@ See [Provider features](provider-features.md).
 
 - **Check for updates** chooses when TeamRun looks for a newer version.
   Its choices are on [Install](install.md#updates).
-- Times follow the app's time format and its date-and-time format: a reply's time, a plan's reset today, and the date and time of a later reset, a computer use grant and a chat's tooltip in the Projects view.
+- Times follow the General page's **Time format** and **Date and time format**, in its Date and time group: a reply's time, a plan's reset today, and the date and time of a later reset, a computer use grant and a chat's tooltip in the Projects view.
   A change shows at once.
-  Without a format set, times use the 12-hour clock, such as 6:00 PM.
+  By default they are `h:mm a`, such as 6:00 PM, and `MMM d, yyyy, h:mm a`.

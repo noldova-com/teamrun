@@ -154,6 +154,15 @@ fx uses the model provider your fx is set up with, such as Vercel AI Gateway, an
 - **Update:** updates are yours.
   A version TeamRun doesn't support is refused, with the reason.
 
+## Muse Code
+
+- **Install:** TeamRun installs no copy of Muse Code and doesn't run its installer for you yet; install it with its maker's command, `curl -fsSL https://dev.meta.ai/install.sh | sh` on macOS and Linux, or `irm https://dev.meta.ai/install.ps1 | iex` on Windows.
+- **Your own Muse Code:** TeamRun runs your `muse`, from your PATH or `~/.local/bin`, and turns on its ACP connection for it.
+  On macOS, Muse Code keeps its sign-in in the keychain, so a Mac has one Muse Code provider.
+- **Sign in:** you sign in by running `muse login` in a terminal; TeamRun doesn't run it for you yet.
+- **Update:** updates are yours; Muse Code updates itself.
+- **Features:** most of what TeamRun offers hasn't been checked with Muse Code yet, as [What each provider can do](provider-features.md) shows.
+
 ## When a model isn't offered
 
 When GitHub Copilot, Grok, OpenCode, Cursor or Antigravity doesn't offer the chosen model, the reply fails and says to refresh the models and choose one; its **Choose a model** opens the teammate's dialog or the composer's model picker.

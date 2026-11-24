@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { DocsOutlineEntry } from "./docs-outline-entry";
 
 export class DocsOutline {
@@ -48,7 +50,7 @@ export class DocsOutline {
 
   private static freeId(base: string, document: Document, taken: Set<string>): string {
     let id = base;
-    for (let suffix = DocsOutline.FIRST_SUFFIX; taken.has(id) || document.getElementById(id) !== null; suffix++)
+    for (let suffix = DocsOutline.FIRST_SUFFIX; taken.has(id) || !Object.isNull(document.getElementById(id)); suffix++)
       id = `${base}${DocsOutline.ID_SEPARATOR}${suffix}`;
     taken.add(id);
     return id;
