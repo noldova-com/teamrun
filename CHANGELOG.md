@@ -97,6 +97,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
+- **Default layout:** a fresh install and Reset the layout show Pages second in the right dock, after Background tasks, so it shows at the default window size of 1280×800; Git, now third, waits behind Show all tabs there (#111).
 - **Updates:** TeamRun's Linux AppImage and Debian package are signed for the update feed.
   On Linux, TeamRun installs only an update signed with its own key (#196).
 - **Codex:** the Codex chats TeamRun starts no longer show in the Codex and ChatGPT apps' recent chats, and TeamRun still continues them after a restart; to do this, TeamRun downloads the app server Codex publishes for your installed version, checked against its SHA-256, until Codex's own `codex app-server` can do it.
