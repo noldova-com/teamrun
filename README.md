@@ -297,6 +297,26 @@ The composer keeps a chat's choice when it opens the chat, so a chat from an ear
 The teammate reads such a message as from the sender in that chat, named by the chat's current title and its id, and its instructions say to name a chat to the person by its title and keep the id for the command.
 The answer comes back the same way, and a chain of such messages, with the hand-offs between them, stops at the Teammate hand-offs limit in Settings › TeamRun, from 0 to 100 and 4 by default.
 
+## Documentation site
+
+TeamRun's documentation site, for people who use the app, is the private workspace `src/noldova.teamrun.docs`, served at teamrun.noldova.dev, with its staging at teamrun.staging.noldova.dev and its sandbox at teamrun.sandbox.noldova.dev.
+Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes add the released versions of [CHANGELOG.md](CHANGELOG.md) when the site is built.
+A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/drafts/`, outside the menu, the search and the build.
+`npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` installs Playwright's headless Chromium, as the Angular tests do, runs its tests with coverage, checks their JSON report, `_build/docs-tests.json`, so that every spec file reported and no two tests share a name, then opens every page the menu links; CI runs it in its "Docs site tests" job.
+
+The "Docs" workflow, `.github/workflows/docs.yml`, runs on each push to `main`, as the UI kit's does: it builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.45.0, whose image keeps no request log, running `npm ci --no-audit --no-fund && npm run build:docs`, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit, then moves the image's `latest` label to it, which the sandbox follows.
+Release notes show the versions [CHANGELOG.md](CHANGELOG.md) names as released at that commit.
+
+The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and a TeamRun release tag, such as `teamrun-0.0.10`, reads that release in noldova-com/downloads, takes the one teamrun commit its "Built from" line names, checks that `main` holds it, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
+
+```sh
+gh workflow run deploy.yml -f environment=staging -f tag=teamrun-<version>
+```
+
+The site counts visits to its production, teamrun.noldova.dev, with Cloudflare Web Analytics, which sets no cookie and stores nothing in the browser.
+`VisitCounter`, started once as the app starts, adds Cloudflare's beacon, `https://static.cloudflareinsights.com/beacon.min.js`, to the page's head as a deferred script with the site's token, from the site's own script in the browser and on that host only: the prerendered pages hold no script of Cloudflare's, and staging, the sandbox and local runs load none.
+The host, the beacon's address and the token, which every page that loads the beacon publishes, are `VisitCounterResources`' values, and Cloudflare's automatic setup, which would add the beacon itself, stays off for the site.
+
 ## Releases
 
 Noldova builds, signs and publishes the official installers from this repository's source at one commit: it builds TeamRun's packages there, installs `app/` from those archives and packages the app, and publishes no package to a registry.
@@ -325,11 +345,12 @@ Every pull request into `main` must pass both checks before it merges.
 | Check | What it verifies |
 |---|---|
 | Check / Linked issue | The organization's shared check, which `.github/workflows/require-linked-issue.yml` calls from its `check` job, named "Check": the PR description has a standalone `Issue: #N`, `Issue #N` or closing reference, such as `Closes #N`, that names an issue in this repository. |
-| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, and the unsigned package passed. |
+| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, the docs site's tests, and the unsigned package passed. |
 
 The "Build and test" job calls the organization's shared `build-and-test.yml` workflow at the `.github` repository's v2.40.0, the version its `uses:` lines pin and a pin PR moves here too, which runs each target in a job of its own, such as "Build and test / Windows x64": it builds and runs `npm test -- --skip-test-details --skip-coverage-details` with `NOLDOVA_SEPARATE_TEST=angular`, which leaves the Angular tests and coverage out.
 Its "Separate test" job runs `npm run test:angular`, the Angular tests and coverage alone, on Linux x64, and its "End-to-end test" job runs the [end-to-end test](#end-to-end-test).
 On every other target, "<target>, Angular tests and app" installs and builds, runs `npm run test:angular`, and then installs and builds the app; the end-to-end test and the unsigned package install and build the app on Linux x64.
+"Docs site tests" installs and builds on Linux x64, then runs `npm run test:docs`, which builds the [documentation site](#documentation-site) and runs its tests, their report check and the built-site check; the site is static and the same on every system, so it runs on Linux only, and when its tests fail it keeps their report, `_build/docs-tests.json`, and the failed specs' screenshots as its artifact `docs-tests-<attempt>` for 14 days.
 The jobs run side by side, so the run takes about the longest of them, not their sum.
 `NOLDOVA_SEPARATE_TEST` takes `angular` or nothing, and `npm test` refuses any other value before it runs a check.
 Each job runs on the GitHub-hosted runner its target's `runs-on-*` output names, from the organization's shared `versions.yml` workflow, which the `.github` repository's README explains under "Shared settings".

@@ -1,0 +1,40 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header #header class="nol-docs-header">
+  <button #menuButton type="button" nol-icon-button class="nol-docs-menu-button" [icon]="resources.menuGlyph" [label]="resources.menuButtonLabel"
+    [attr.aria-expanded]="isMenuOpen()" aria-controls="nol-docs-menu" (click)="toggleMenu()"></button>
+  <a class="nol-docs-brand" [routerLink]="resources.homeLink">
+    <span class="nol-docs-wordmark" role="img" [attr.aria-label]="resources.wordmarkLabel"></span>
+    <span>{{ resources.siteName }}</span>
+  </a>
+  <nol-docs-search class="nol-docs-header-search" />
+  <div class="nol-docs-header-end">
+    <nol-docs-theme-switch />
+    <a class="nol-docs-header-link" [href]="resources.downloadLink" [attr.aria-label]="resources.downloadLabel" [nolTooltip]="resources.downloadLabel"><nol-docs-brand-mark [brand]="brands.Download" /></a>
+    <a class="nol-docs-header-link" [href]="resources.repositoryLink" [attr.aria-label]="resources.repositoryLabel" [nolTooltip]="resources.repositoryLabel"><nol-docs-brand-mark [brand]="brands.GitHub" /></a>
+    <a class="nol-docs-header-link" [href]="resources.xLink" [attr.aria-label]="resources.xLabel" [nolTooltip]="resources.xLabel"><nol-docs-brand-mark [brand]="brands.X" /></a>
+  </div>
+</header>
+<div class="nol-docs-body">
+  <nav id="nol-docs-menu" class="nol-docs-menu" [class.nol-docs-menu-open]="isMenuOpen()" [attr.aria-label]="resources.menuLabel" (keydown.escape)="closeMenu()">
+    @for (group of groups; track group.label) {
+      <nol-section-header [label]="group.label" />
+      <ul class="nol-docs-menu-list">
+        @for (page of group.pages; track page.path) {
+          <li><a class="nol-docs-menu-link" [routerLink]="page.link" routerLinkActive="nol-docs-menu-current" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }"
+            (click)="choosePage()">{{ page.title }}</a></li>
+        }
+      </ul>
+    }
+  </nav>
+  <main #main class="nol-docs-main">
+    <router-outlet />
+  </main>
+  <nol-docs-on-this-page [content]="main" />
+</div>

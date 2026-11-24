@@ -1,0 +1,22 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<input #searchInput nol-text-field class="nol-docs-search-field" type="search" role="combobox" aria-autocomplete="list" autocomplete="off" [attr.aria-label]="resources.searchLabel"
+  [attr.aria-expanded]="isOpen()" [attr.aria-controls]="isOpen() ? listId : null" [attr.aria-activedescendant]="activeId()" [placeholder]="resources.searchLabel" [value]="query()"
+  (input)="type(field().nativeElement.value)" (keydown)="press($event)" />
+@if (isOpen()) {
+  <ul #resultsList class="nol-docs-search-results" role="listbox" [id]="listId" [attr.aria-label]="resources.searchResultsLabel">
+    @for (page of results(); track page.path; let index = $index) {
+      <li class="nol-docs-search-option" role="option" [id]="optionId(index)" [attr.aria-selected]="index === active()" (mouseenter)="active.set(index)">
+        <a class="nol-docs-search-result" tabindex="-1" [routerLink]="page.link" (click)="clear()">{{ page.title }}</a>
+      </li>
+    } @empty {
+      <li class="nol-docs-search-empty" role="option" aria-disabled="true">{{ resources.searchEmpty }}</li>
+    }
+  </ul>
+}

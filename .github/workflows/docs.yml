@@ -1,0 +1,40 @@
+# @license
+# Copyright (c) Noldova.
+#
+# This source code is licensed under the license found in the
+# LICENSE file in the root directory of this source tree.
+
+name: Docs
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  docs:
+    name: Docs
+    uses: noldova-com/.github/.github/workflows/docs-image.yml@10413f5b0f85b476830388e7c34e573393ea1daf # v2.45.0
+    permissions:
+      contents: read
+      packages: write
+    with:
+      build: npm ci --no-audit --no-fund && npm run build:docs
+      output: _build/docs/browser
+      image: teamrun-angular-docs
+
+  latest:
+    name: Move the latest label
+    needs: docs
+    uses: noldova-com/.github/.github/workflows/move-image-label.yml@10413f5b0f85b476830388e7c34e573393ea1daf # v2.45.0
+    permissions:
+      packages: write
+    with:
+      image: teamrun-angular-docs
+      digest: ${{ needs.docs.outputs.digest }}
+      label: latest

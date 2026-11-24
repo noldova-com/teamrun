@@ -1,0 +1,68 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:root {
+  --nol-docs-brand-mark: #000000;
+  scroll-padding-block-start: var(--nol-docs-header-height, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-nol-theme-mode="Light"]) {
+    --nol-docs-brand-mark: #FFFFFF;
+  }
+}
+
+:root[data-nol-theme-mode="Dark"] {
+  --nol-docs-brand-mark: #FFFFFF;
+}
+
+body {
+  font-family: var(--nol-font-sans);
+  font-size: var(--nol-text-panel);
+  line-height: var(--nol-line-panel);
+}
+
+.nol-docs-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nol-space-6);
+  min-width: 0;
+}
+
+.nol-docs-page-title {
+  margin: 0;
+  color: var(--nol-text-strong);
+  font-size: var(--nol-text-heading);
+  font-weight: var(--nol-weight-emphasis);
+  line-height: var(--nol-line-heading);
+}
+
+.nol-docs-page p {
+  line-height: 1.5;
+}
+
+.nol-docs-page code,
+.nol-docs-page kbd {
+  font-family: var(--nol-font-mono);
+  font-size: var(--nol-text-code);
+  overflow-wrap: anywhere;
+}
+
+.nol-docs-page .nol-markdown-table :is(th, td),
+.nol-docs-page .nol-markdown-table :is(th, td) * {
+  overflow-wrap: normal;
+}
+
+.nol-docs-page .nol-markdown-table code {
+  white-space: nowrap;
+}
+
+nol-markdown-view.nol-docs-markdown {
+  font-size: inherit;
+  line-height: inherit;
+}
