@@ -1080,6 +1080,8 @@ describe("ProvidersViewComponent", () => {
       button(".nol-teamrun-add-try-again").click();
       button(".nol-teamrun-add-try-again").click();
       await settle();
+
+      expect(button(".nol-teamrun-add-try-again").disabled).toBe(true);
       const installed = new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed).toJson();
       context.emit(EventName.ProviderKindInstallationChanged, installed);
       ended.resolve(installed);
