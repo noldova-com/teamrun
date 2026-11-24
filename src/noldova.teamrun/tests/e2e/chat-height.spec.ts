@@ -47,7 +47,7 @@ function readAsync(page: Page): Promise<IMeasuredChat> {
     const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     const one = (selector: string): Element => {
       const found = document.querySelector(selector);
-      if (found === null)
+      if (Object.isNull(found))
         throw new Error(`The chat has no ${selector} to measure.`);
       return found;
     };
