@@ -74,7 +74,7 @@ jobs:
       ref: ${{ needs.release.outputs.commit }}
       build: npm run set-version -- ${{ needs.release.outputs.version }} && npm ci --no-audit --no-fund && npm run build:docs
       output: _build/docs/browser
-      image: teamrun-docs
+      image: teamrun-angular-docs
 
   latest:
     name: Move the latest label
@@ -83,6 +83,6 @@ jobs:
     permissions:
       packages: write
     with:
-      image: teamrun-docs
+      image: teamrun-angular-docs
       digest: ${{ needs.docs.outputs.digest }}
       label: latest

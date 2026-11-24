@@ -297,7 +297,7 @@ A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/dr
 `npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` runs its tests with coverage, then opens every page the menu links.
 
 The site documents the released app, so it is built from a release's commit, never from the tip of `main`.
-The "Docs" workflow, `.github/workflows/docs.yml`, started by hand with the released version and the full hash of the `main` commit the release built, checks both, runs `npm run set-version -- <version>` on that commit, as the release's builds do, so Release notes name the version, and builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.43.0, into the image `ghcr.io/noldova-com/teamrun-docs`, tagged with the commit.
+The "Docs" workflow, `.github/workflows/docs.yml`, started by hand with the released version and the full hash of the `main` commit the release built, checks both, runs `npm run set-version -- <version>` on that commit, as the release's builds do, so Release notes name the version, and builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.43.0, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit.
 It then moves the image's `latest` label to it, which the sandbox follows:
 
 ```sh
