@@ -135,9 +135,9 @@ export class WaitingSends {
 
   public async resumeAsync(): Promise<void> {
     const held = new Set(await this.waiting.idsAsync());
-    for (const [chatId, waitingId] of this.attachments.listWaitingFolders())
-      if (!held.has(waitingId))
-        this.removeWaitingFiles(waitingId, () => this.attachments.removeWaitingFiles(chatId, waitingId));
+    for (const folder of this.attachments.listWaitingFolders())
+      if (!held.has(folder.waitingId))
+        this.removeWaitingFiles(folder.waitingId, () => this.attachments.removeWaitingFiles(folder.chatId, folder.waitingId));
     for (const chatId of await this.waiting.chatIdsAsync())
       await this.sendWaitingAsync(chatId);
   }

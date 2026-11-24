@@ -19,6 +19,7 @@ import { type AttachmentInput, ErrorCode, MessageAttachment, Resources as Protoc
 
 import type { IOpenedFile } from "../../interfaces/i-opened-file.js";
 import { Guid } from "../../models/guid.js";
+import { WaitingFolder } from "../../models/waiting-folder.js";
 import { Resources } from "../../resources.js";
 import { ImageSizeReader } from "./image-size.reader.js";
 
@@ -115,12 +116,12 @@ export class AttachmentStore {
     return readdirSync(directory, { withFileTypes: true }).filter(t => t.isDirectory()).map(t => t.name);
   }
 
-  public listWaitingFolders(): readonly (readonly [string, string])[] {
+  public listWaitingFolders(): readonly WaitingFolder[] {
     const directory = join(this.directory, Resources.attachmentWaitingFilesDirectoryName);
     if (this.leadsAway(directory) || !existsSync(directory))
       return [];
     return readdirSync(directory, { withFileTypes: true }).filter(t => t.isDirectory()).flatMap(t => readdirSync(join(directory, t.name), { withFileTypes: true })
-      .filter(u => u.isDirectory()).map((u): readonly [string, string] => [t.name, u.name]));
+      .filter(u => u.isDirectory()).map(u => new WaitingFolder(t.name, u.name)));
   }
 
   public exists(attachment: MessageAttachment): boolean {
