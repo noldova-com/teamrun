@@ -38,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Approvals:** an added ACP agent's command approval whose title is its own command shows it with control and direction characters replaced and cut at the usual length, like every other approval (#187).
 - **Chats:** a reply that ends while the window has lost touch with TeamRun shows as ended once the window reads its state again: the composer reloads its models, and the Organization view and the teammate dialog see the reply end (#66).
 - **Chats:** a reply that ends while the window reads its state again is counted once: an Organization chat no longer shows two unread for one reply, and the composer reloads its models once (#182).
 - **Chats:** on a short window, such as 905×616, the members bar and the composer give way, so the history keeps the chat's largest share: the message box starts one line high and grows to four, and the paddings around them tighten; Desktop's default window keeps today's look (#31).
