@@ -41,7 +41,7 @@ export class RuntimeProcessStarterTests {
         return Promise.resolve();
       }
     } as unknown as OwnedProcess);
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
 
     const child = starter.start(new ProcessCommand("tool", ["--flag"]), { KEPT: "1", "=C:": "C:\\", MISSING: undefined }, null);
     await once(child, "spawn");
@@ -68,7 +68,7 @@ export class RuntimeProcessStarterTests {
   public leavesTheCrashHandlerPipeOutOfAProgramsEnvironment(): void {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
 
     starter.start(new ProcessCommand("tool", []), { KEPT: "1", CHROME_CRASHPAD_PIPE_NAME: "pipe" }, null).on("error", () => {});
 
@@ -76,10 +76,21 @@ export class RuntimeProcessStarterTests {
   }
 
   @TestMethod
+  public startsAProgramOnWindowsWithCmdAndNodeLookingOnlyInPathNotItsWorkingFolder(): void {
+    using database = new MemoryModuleDatabase();
+    const context = new RecordingPartContext("/module", database, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "win32");
+
+    starter.start(new ProcessCommand("tool", []), { KEPT: "1" }, null).on("error", () => {});
+
+    Assert.areEqual("{\"KEPT\":\"1\",\"NoDefaultCurrentDirectoryInExePath\":\"1\"}", JSON.stringify(context.requests[0]?.environment));
+  }
+
+  @TestMethod
   public async asksDesktopCoreForVerbatimArgumentsWhenTheCommandIsVerbatim(): Promise<void> {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
 
     const child = starter.start(new ProcessCommand("cmd.exe", ["/d", "/s", "/c", "\"echo \"a b\"\""], null, true), {}, null);
     await once(child, "error");
@@ -92,7 +103,7 @@ export class RuntimeProcessStarterTests {
   public async readsTheCurrentEnvironmentFromDesktopCoreForEachStartInPlaceOfTheOneTeamRunStartedWith(): Promise<void> {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
     const before = { SET_SINCE: "before" };
     context.environment = before;
 
@@ -109,7 +120,7 @@ export class RuntimeProcessStarterTests {
   public async reportsARefusedStartAsAnErrorInItsOwnFolder(): Promise<void> {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
 
     const refused = starter.start(new ProcessCommand("tool", []), {}, "/project");
     const [error] = await once(refused, "error") as [Error];
@@ -128,7 +139,7 @@ export class RuntimeProcessStarterTests {
   public async logsARefusedStartByItsProgramProviderAndKindButNeverItsText(): Promise<void> {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
     const prompt = "Summarize the plan in secret.md";
     const provider = "0192f3a4-5b6c-7d8e-9f01-23456789abcd";
 
@@ -149,7 +160,7 @@ export class RuntimeProcessStarterTests {
   @TestMethod
   public async endsARefusedStartAfterItsErrorSoAStopAfterItReturns(): Promise<void> {
     using database = new MemoryModuleDatabase();
-    const starter = new RuntimeProcessStarter(new RecordingPartContext("/module", database, "/work"), "/work");
+    const starter = new RuntimeProcessStarter(new RecordingPartContext("/module", database, "/work"), "/work", "linux");
     const events: string[] = [];
     const closed = Promise.withResolvers<void>();
 
@@ -169,7 +180,7 @@ export class RuntimeProcessStarterTests {
   @TestMethod
   public async failsTheRequestsOfAnAcpClientWhoseStartDesktopCoreRefusesAndStopsIt(): Promise<void> {
     using database = new MemoryModuleDatabase();
-    const starter = new RuntimeProcessStarter(new RecordingPartContext("/module", database, "/work"), "/work");
+    const starter = new RuntimeProcessStarter(new RecordingPartContext("/module", database, "/work"), "/work", "linux");
     const client = new AcpClient(new ProcessCommand("agent", []), {}, "/work", starter, RuntimeProcessStarterTests.TIMINGS);
 
     client.start();
@@ -181,7 +192,7 @@ export class RuntimeProcessStarterTests {
   public async failsAClaudeQueryWhoseStartDesktopCoreRefuses(): Promise<void> {
     using database = new MemoryModuleDatabase();
     const context = new RecordingPartContext("/module", database, "/work");
-    const starter = new RuntimeProcessStarter(context, "/work");
+    const starter = new RuntimeProcessStarter(context, "/work", "linux");
     const query = new AgentSdkQueryFactory(starter).start("hello", {
       env: {},
       pathToClaudeCodeExecutable: process.execPath,

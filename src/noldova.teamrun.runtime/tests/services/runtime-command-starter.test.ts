@@ -66,7 +66,7 @@ export class RuntimeCommandStarterTests {
     context.startProcess = request => supervisor.startAsync("teamrun", request);
     const output: string[] = [];
     try {
-      const running = new RuntimeCommandStarter(new RuntimeProcessStarter(context, directory.path)).start(
+      const running = new RuntimeCommandStarter(new RuntimeProcessStarter(context, directory.path, process.platform)).start(
         `"${process.execPath}" -e "console.log(JSON.stringify(process.argv.slice(1)))" "a b" "x&y" plain`, directory.path, text => output.push(text));
       const exit = await running.exited;
 
@@ -91,7 +91,7 @@ export class RuntimeCommandStarterTests {
     context.startProcess = request => supervisor.startAsync("teamrun", request);
     const output: string[] = [];
     try {
-      const commands = new RuntimeCommandStarter(new RuntimeProcessStarter(context, directory.path));
+      const commands = new RuntimeCommandStarter(new RuntimeProcessStarter(context, directory.path, process.platform));
       const refusal = commands.refusalOf("echo one\necho two");
       const exit = await commands.start("echo one\necho two", directory.path, text => output.push(text)).exited;
 

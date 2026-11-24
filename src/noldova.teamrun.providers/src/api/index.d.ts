@@ -10816,7 +10816,7 @@ export declare class NodeProcessStarter implements IProcessStarter {
   /**
    * Starts the program without a shell, with its window hidden on Windows.
    * @param command How to run the program.
-   * @param environment The program's environment.
+   * @param environment The program's environment, as `SharedMcpLauncher.environmentToStart` gives it for this platform.
    * @param directory The program's working directory, or `null` for this process's.
    * @returns The process.
    */
@@ -11126,6 +11126,15 @@ export declare class SharedMcpLauncher {
   public static withholds(name: string): boolean;
 
   /**
+   * The environment a program starts with: on Windows the environment with `NoDefaultCurrentDirectoryInExePath` set, so `cmd.exe`, Node and the
+   * programs they start look for a command named without a folder only on `PATH`, never in the working folder; elsewhere the environment itself.
+   * @param platform The platform, as `process.platform`.
+   * @param environment The environment.
+   * @returns The environment to start with.
+   */
+  public static environmentToStart<T extends Readonly<Record<string, string | undefined>>>(platform: string, environment: T): T;
+
+  /**
    * The server's environment: each variable of the launcher's own whose name is a basic or one of `names`, matched in any case on Windows, and
    * each set `certificateVariables` made absolute, but none of `withheldVariables`.
    * @param names The server's own variables.
@@ -11135,7 +11144,7 @@ export declare class SharedMcpLauncher {
 
   /**
    * What starts a command: itself outside Windows; on Windows the file found through the environment's `PATH` and `PATHEXT`, or, for a `.cmd` or
-   * `.bat` file, `COMSPEC` (`cmd.exe` in the Windows system folder when unset) with `/d /s /c` and the quoted, escaped line, started with verbatim
+   * `.bat` file, `COMSPEC` (`cmd.exe` in the Windows system folder when unset or not an absolute path) with `/d /s /c` and the quoted, escaped line, started with verbatim
    * arguments. A command named without a folder is looked for only in the absolute folders `PATH` lists, never the working folder.
    * @param command The command.
    * @param args Its arguments.

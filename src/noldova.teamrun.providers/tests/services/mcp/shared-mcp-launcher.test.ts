@@ -382,7 +382,7 @@ export class SharedMcpLauncherTests {
     Assert.areEqual(JSON.stringify([0]), JSON.stringify(host.codes));
     Assert.areEqual(JSON.stringify([["pipe", "ignore", "inherit"], "C:\\Windows\\System32"]), JSON.stringify([recorder.starts[0]?.options.stdio, recorder.starts[0]?.options.cwd]));
     Assert.areEqual(JSON.stringify({ command: path.join("C:\\tools\\server.exe"), args: ["--stdio"], options: { env: { Path: "C:\\Windows", SystemRoot: "C:\\Windows",
-      search_key: "s1" }, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: false, detached: false } }), JSON.stringify(recorder.starts[1]));
+      search_key: "s1", NoDefaultCurrentDirectoryInExePath: "1" }, stdio: "inherit", windowsHide: true, windowsVerbatimArguments: false, detached: false } }), JSON.stringify(recorder.starts[1]));
     Assert.areEqual(JSON.stringify([[recorder.children[1]?.pid, "SIGTERM"]]), JSON.stringify(host.signals));
     Assert.areEqual(0, SharedMcpLauncher.forwardedSignals.reduce((total, t) => total + host.listenerCount(t), 0));
   }
@@ -733,6 +733,24 @@ export class SharedMcpLauncherTests {
 
     Assert.areEqual(JSON.stringify({ command: "C:\\Windows\\system32\\cmd.exe", args: ["/d", "/s", "/c", `"${located} ^^^"x^^^&y^^^""`], verbatim: true }),
       JSON.stringify(command));
+  }
+
+  @TestMethod
+  public runsABatchFileThroughComSpecOnlyWhenItIsAnAbsolutePathAndOtherwiseThroughTheSystemFoldersCmd(): void {
+    const located = path.join("C:\\bin", "tool.cmd");
+    const launcher = new SharedMcpLauncher("win32", {}, "node", "launch.js", new FakeLauncherHost(), undefined, t => t === located);
+    const shellOf = (comSpec: string): string | undefined => launcher.commandOf("tool.cmd", [], { PATHEXT: ".CMD", PATH: "C:\\bin", COMSPEC: comSpec })?.command;
+
+    Assert.areEqual(JSON.stringify(["D:\\Shells\\cmd.exe", "C:\\Windows\\System32\\cmd.exe", "C:\\Windows\\System32\\cmd.exe"]),
+      JSON.stringify([shellOf("D:\\Shells\\cmd.exe"), shellOf("cmd.exe"), shellOf("shells\\cmd.exe")]));
+  }
+
+  @TestMethod
+  public startsOnWindowsWithCmdAndNodeLookingOnlyInPathAndElsewhereWithTheEnvironmentAsItIs(): void {
+    const environment = { PATH: "C:\\bin" };
+
+    Assert.areEqual(JSON.stringify([{ PATH: "C:\\bin", NoDefaultCurrentDirectoryInExePath: "1" }, true, { PATH: "C:\\bin" }]),
+      JSON.stringify([SharedMcpLauncher.environmentToStart("win32", environment), SharedMcpLauncher.environmentToStart("linux", environment) === environment, environment]));
   }
 
   @TestMethod

@@ -2534,13 +2534,14 @@ export declare class RuntimeProcessStarter implements IProcessStarter {
    * Initializes the starter.
    * @param context The part's context.
    * @param workFolder The working folder of a program that names none.
+   * @param platform The platform the programs run on, as `process.platform`.
    */
-  public constructor(context: IRuntimePartContext, workFolder: string);
+  public constructor(context: IRuntimePartContext, workFolder: string, platform: string);
 
   /**
    * Starts the program with the environment's variables as the request's own.
    * @param command How to run the program.
-   * @param environment The program's environment; unset variables, names Noldova Desktop refuses and `Resources.crashPipeVariable` are left out, so a provider's Electron tools don't open the app's crash handler pipe.
+   * @param environment The program's environment, as `SharedMcpLauncher.environmentToStart` gives it for the platform; unset variables, names Noldova Desktop refuses and `Resources.crashPipeVariable` are left out, so a provider's Electron tools don't open the app's crash handler pipe.
    * @param directory The program's working folder, or `null` for the work folder.
    * @returns The process.
    */
