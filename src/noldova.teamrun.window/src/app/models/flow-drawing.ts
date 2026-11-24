@@ -26,8 +26,7 @@ export class FlowDrawing {
 
   public get key(): string {
     const box = this.route.target;
-    const at = Object.isNull(box) ? "" : ` ${box.left} ${box.top} ${box.width} ${box.height}`;
-    return `${this.flow.id} ${this.flow.stage} ${this.route.path}${at}`;
+    return `${this.flow.id} ${this.flow.stage} ${this.route.path} ${box.left} ${box.top} ${box.width} ${box.height}`;
   }
 
   public static sameAll(drawings: readonly FlowDrawing[], others: readonly FlowDrawing[]): boolean {

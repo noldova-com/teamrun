@@ -1,0 +1,22 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<nol-dialog [title]="title()" (dismissed)="closed.emit()">
+  <form id="nol-teamrun-add-teammate-form" class="nol-teamrun-form" novalidate (submit)="save($event)">
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationTeammateLabel }}</span>
+      <nol-select class="nol-teamrun-add-teammate-choice" [label]="resources.organizationTeammateLabel" [options]="teammateOptions()" [value]="teammateId()"
+        [disabled]="saving()" (valueChange)="chooseTeammate($event)" />
+    </div>
+    @if (error(); as message) {
+      <nol-field-message class="nol-teamrun-dialog-error">{{ message }}</nol-field-message>
+    }
+  </form>
+  <button type="button" nol-button nolDialogAction class="nol-teamrun-cancel" [variant]="text" [disabled]="saving()" (click)="closed.emit()">{{ resources.cancelLabel }}</button>
+  <button type="submit" form="nol-teamrun-add-teammate-form" nol-button nolDialogAction class="nol-teamrun-save" [disabled]="!canSave()">{{ resources.organizationAddLabel }}</button>
+</nol-dialog>

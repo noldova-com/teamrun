@@ -18,9 +18,7 @@ import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
 import { ImageOpenMode } from "./app/enums/image-open-mode";
-import { OrganizationBoardSort } from "./app/enums/organization-board-sort";
 import { OrganizationCardField } from "./app/enums/organization-card-field";
-import { OrganizationViewMode } from "./app/enums/organization-view-mode";
 import { StepCategory } from "./app/enums/step-category";
 import { TeammateStatus } from "./app/enums/teammate-status";
 import { BrowserStepWords } from "./app/models/browser-step-words";
@@ -56,7 +54,6 @@ export class Resources {
   public static readonly signOutKindsNotRead: string = "The provider types couldn't be read again, so the sign-out didn't start.";
   public static readonly nullKind: string = "null";
   public static readonly modelCatalogUnavailable: string = "Models could not be refreshed. Previously loaded choices are kept.";
-  public static readonly errorCodeField: string = "code";
   public static readonly errorArgumentsField: string = "arguments";
   public static readonly modelCatalogLifetime: number = 300_000;
   public static readonly draftSaveInterval: number = 500;
@@ -394,8 +391,6 @@ export class Resources {
     [CheckState.Succeeded]: new CiLabel("CI passed", "ci-passed"),
     [CheckState.Neutral]: new CiLabel("CI passed", "ci-passed")
   };
-  public static readonly organizationViewField: string = "view";
-  public static readonly organizationFocusField: string = "focus";
   public static readonly legacyPinnedChatsField: string = "pinnedConversations";
   public static readonly legacyChatOrderField: string = "conversationOrder";
   public static readonly conversationListIdPrefix: string = "teamrun-conversations-";
@@ -662,6 +657,7 @@ export class Resources {
   public static readonly programFocusOrigin: FocusOrigin = "program";
   public static readonly personAuthorId: string = "person";
   public static readonly teammateColorCount: number = 8;
+  public static readonly defaultTeammateColor: number = 1;
   public static readonly teammateColorHashOffset: number = 2166136261;
   public static readonly teammateColorHashPrime: number = 16777619;
   public static readonly historyEstimate: number = 160;
@@ -671,8 +667,6 @@ export class Resources {
   public static readonly historyWarmUpQuestion: string = "Warm up";
   public static readonly historyWarmUpReply: string = "Warm up with `code`, **bold** and a list:\n\n- one\n- two";
   public static readonly youLabel: string = "You";
-  public static readonly organizationInboxTitle: string = "Inbox";
-  public static readonly organizationChatsLabel: string = "Chats";
   public static readonly organizationRecipientsLabel: string = "Recipients";
   public static readonly organizationRecipientNoReply: string = "No reply yet";
   public static readonly organizationRecipientStatusLabels: Readonly<Record<MessageStatus, string>> = {
@@ -684,8 +678,6 @@ export class Resources {
     [MessageStatus.Cancelled]: "Stopped",
     [MessageStatus.Interrupted]: "Interrupted"
   };
-  public static readonly organizationAllRead: string = "All read";
-  public static readonly organizationNoMessages: string = "No messages yet";
   public static readonly organizationChooseTarget: string = "Choose whom to message.";
   public static readonly organizationLeadersTitle: string = "All leaders and your direct reports";
   public static readonly organizationLeadersChat: string = "Chat with all leaders and your direct reports";
@@ -765,7 +757,8 @@ export class Resources {
   public static readonly markdownEscapeBase: number = 0xe000;
   public static readonly markdownEscapedPattern: RegExp = /[\ue000-\ue07f]/g;
   public static readonly markdownEscapeMark: string = "\\";
-  public static readonly markdownCodeSpanPattern: RegExp = /(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g;
+  public static readonly markdownCodeSpanPattern: RegExp = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
+  public static readonly markdownCodeFencePattern: RegExp = /^`+|`+$/g;
   public static readonly markdownCodeSpacePattern: RegExp = /^ (?=[\s\S]*\S)([\s\S]*) $/;
   public static readonly markdownFencePattern: RegExp = /^ {0,3}(`{3,}|~{3,})/;
   public static readonly markdownIndentedCodePattern: RegExp = /^(?: {4}|\t)/;
@@ -1237,6 +1230,8 @@ export class Resources {
   public static readonly teammatesTitle: string = "Teammates";
   public static readonly organizationTitle: string = "Organization";
   public static readonly organizationStructureLabel: string = "Organization structure";
+  public static readonly organizationCanvasDotSize: string = "0.5px";
+  public static readonly organizationCanvasDotGap: string = "1rem";
   public static readonly organizationOwnerName: string = "You";
   public static readonly organizationPersonId: string = "person";
   public static readonly organizationFlowPersonKey: string = "person";
@@ -1249,7 +1244,6 @@ export class Resources {
   public static readonly flowKidSelector: string = ".kid";
   public static readonly flowKidsSelector: string = ".kids";
   public static readonly flowReportsSelector: string = ".reports";
-  public static readonly flowCanvasSelector: string = "nol-canvas";
   public static readonly flowNodeData: string = "flowNode";
   public static readonly flowParentData: string = "flowParent";
   public static readonly flowShapeData: string = "flowShape";
@@ -1271,6 +1265,13 @@ export class Resources {
     TeammateStatus.Stopped];
   public static readonly organizationDepartmentNameLabel: string = "Unit name";
   public static readonly organizationLeaderLabel: string = "Leader";
+  public static readonly organizationUnitNameField: string = "Name";
+  public static readonly organizationTeammateLabel: string = "Teammate";
+  public static readonly organizationChooseTeammate: string = "Choose a teammate";
+  public static readonly organizationAddLabel: string = "Add";
+  public static readonly organizationEditUnitIcon: string = "edit";
+  public static readonly organizationUnitEditorLabel: string = "Edit unit";
+  public static readonly organizationChooseUnit: string = "Select a unit to change its name, type, leader or who it reports to.";
   public static readonly organizationNoLeader: string = "No leader";
   public static readonly organizationAddMemberIcon: string = "person_add";
   public static readonly organizationAddDepartment: string = "Add unit";
@@ -1320,8 +1321,6 @@ export class Resources {
   public static readonly organizationOwnFolder: string = "Its own folder";
   public static readonly organizationOwnFolderInText: string = "its own folder";
   public static readonly organizationMessagesLabel: string = "Messages";
-  public static readonly organizationMessageButton: string = "Message";
-  public static readonly organizationMessageIcon: string = "chat";
   public static readonly organizationToLabel: string = "To";
   public static readonly organizationDeleteLabel: string = "Delete";
   public static readonly organizationRemoveMemberTitle: string = "Move out of unit";
@@ -1344,12 +1343,6 @@ export class Resources {
     [OrganizationCardField.PullRequests]: "Pull requests",
     [OrganizationCardField.Documents]: "Documents",
     [OrganizationCardField.Artifacts]: "Artifacts"
-  };
-  public static readonly organizationViewLabel: string = "View";
-  public static readonly organizationViewLabels: Readonly<Record<OrganizationViewMode, string>> = {
-    [OrganizationViewMode.Tree]: "Tree",
-    [OrganizationViewMode.Board]: "Board",
-    [OrganizationViewMode.Focus]: "Focus"
   };
   public static readonly teammateStatusLabels: Readonly<Record<TeammateStatus, string>> = {
     [TeammateStatus.Working]: "Working",
@@ -1830,34 +1823,6 @@ export class Resources {
   public static readonly fallbackUpSelector: string = ".nol-teamrun-fallback-up";
   public static readonly fallbackDownSelector: string = ".nol-teamrun-fallback-down";
   public static readonly moveDownLabel: string = "Move down";
-  public static readonly organizationBoardLeadersTitle: string = "Reports to you";
-  public static readonly organizationBoardLeadersNote: string = "They report to you; the leaders talk across units.";
-  public static readonly organizationBoardMessageLeaders: string = "Message all leaders and your direct reports";
-  public static readonly organizationBoardMessageLeadersIcon: string = "forum";
-  public static readonly organizationBoardDepartmentsTitle: string = "Units";
-  public static readonly organizationBoardDepartmentsNote: string = "Each column's members, sorted by who needs you first.";
-  public static readonly organizationBoardMessageIcon: string = "chat";
-  public static readonly organizationBoardNoMembers: string = "No members yet.";
-  public static readonly organizationBoardNeedsTitle: string = "Needs you";
-  public static readonly organizationBoardNeedsIcon: string = "pan_tool";
-  public static readonly organizationBoardNobodyWaiting: string = "Nobody is waiting for you.";
-  public static readonly organizationBoardAnswer: string = "Answer";
-  public static readonly organizationBoardOpen: string = "Open";
-  public static readonly organizationBoardMessage: string = "Message";
-  public static readonly organizationBoardSortLabels: Readonly<Record<OrganizationBoardSort, string>> = {
-    [OrganizationBoardSort.Status]: "Status",
-    [OrganizationBoardSort.Name]: "Name"
-  };
-  public static readonly organizationFocusOutlineLabel: string = "Organization outline";
-  public static readonly organizationFocusStructure: string = "Structure";
-  public static readonly organizationFocusRootIcon: string = "domain";
-  public static readonly organizationFocusDepartmentIcon: string = "groups";
-  public static readonly organizationFocusShowIcon: string = "chevron_right";
-  public static readonly organizationFocusHideIcon: string = "expand_more";
-  public static readonly organizationFocusCrumbIcon: string = "chevron_right";
-  public static readonly organizationFocusLeads: string = "leads";
-  public static readonly organizationFocusUnitLabel: string = "Focused unit";
-  public static readonly organizationFocusNobody: string = "Nobody here yet.";
 
   public static formatTeammateWorkSummary(pullRequests: number, documents: number, artifacts: number, branch: string | null): string {
     const counts = [Resources.formatCount(pullRequests, "pull request", "pull requests"), Resources.formatCount(documents, "document", "documents"),
@@ -1918,7 +1883,7 @@ export class Resources {
   }
 
   public static formatOrganizationHeadcount(teammates: number, departments: number): string {
-    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} in ${departments === 1 ? "1 unit" : `${departments} units`}`;
+    return `${teammates === 1 ? "1 teammate" : `${teammates} teammates`} · ${departments === 1 ? "1 unit" : `${departments} units`}`;
   }
 
   public static formatOrganizationOwnerRole(reports: number): string {
@@ -1952,6 +1917,10 @@ export class Resources {
 
   public static formatOrganizationRemoveUnit(type: NodeType | null): string {
     return Object.isNull(type) ? "Remove unit" : `Remove ${type.name}`;
+  }
+
+  public static formatOrganizationEditNamed(name: string): string {
+    return `Edit ${name}`;
   }
 
   public static formatOrganizationDeleteNamed(name: string): string {
@@ -1995,17 +1964,9 @@ export class Resources {
     return `Choose what ${name}'s card shows and where ${name} works`;
   }
 
-  public static formatOrganizationReportsTo(manager: string): string {
-    return `Reports to ${manager}`;
-  }
-
   public static formatOrganizationRoleIn(role: string | null, department: string | null): string | null {
     const parts = [role, department].filter(t => !Object.isNull(t) && t.length > 0);
     return parts.length === 0 ? null : parts.join(" · ");
-  }
-
-  public static formatOrganizationNowOf(name: string): string {
-    return `What ${name} is doing now`;
   }
 
   public static formatOrganizationNowFor(milliseconds: number, more: number): string {
@@ -2193,10 +2154,6 @@ export class Resources {
     return `${Resources.draftUnreadable} ${error}`;
   }
 
-  public static formatOrganizationUnread(count: number): string {
-    return `${count} unread`;
-  }
-
   public static formatOrganizationChat(name: string): string {
     return `Chat with ${name}`;
   }
@@ -2215,10 +2172,6 @@ export class Resources {
 
   public static formatOrganizationLeaderOption(name: string, department: string): string {
     return `${name} (leads ${department})`;
-  }
-
-  public static formatOrganizationLastLine(author: string, text: string): string {
-    return `${author}: ${text}`;
   }
 
   public static formatOrganizationReach(count: number): string {
@@ -2264,6 +2217,18 @@ export class Resources {
 
   public static formatListNotArray(kind: string): string {
     return `The runtime part answered a list with a value of kind ${kind}, which isn't a list.`;
+  }
+
+  public static formatTeammateProviderMissing(teammateId: string, providerId: string): string {
+    return `Teammate ${teammateId} answers through provider ${providerId}, which isn't listed.`;
+  }
+
+  public static formatViewedImageMissing(key: string): string {
+    return `Image ${key} isn't among the images to view.`;
+  }
+
+  public static formatSegmentDetailMissing(kind: string): string {
+    return `A reply's ${kind} segment has no detail of its own.`;
   }
 
   public static formatHistoryReadMismatch(start: number, end: number): string {
@@ -3307,55 +3272,6 @@ export class Resources {
 
   public static formatLowRiskLine(requester: string, steps: readonly string[]): string {
     return `${Resources.lowRiskLead}${requester} ${steps.join(Resources.browserStepSeparator)}`;
-  }
-
-  public static formatOrganizationBoardMessage(name: string): string {
-    return `Message ${name}`;
-  }
-
-  public static formatOrganizationBoardAnswer(action: string, name: string): string {
-    return `${action} ${name}`;
-  }
-
-  public static formatOrganizationBoardAskAgo(endedAt: number, now: number): string {
-    return `· ${Resources.formatAgo(Math.floor((now - endedAt) / Resources.minuteMilliseconds))}`;
-  }
-
-  public static formatOrganizationBoardSort(name: string): string {
-    return `Sort ${name} by`;
-  }
-
-  public static formatOrganizationBoardSummary(leader: string | null, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [...Object.isNull(leader) ? [] : [`Led by ${leader}`], ...Resources.statusCountParts(counts)].join(" · ");
-  }
-
-  public static formatOrganizationFocusLeaders(count: number, counts: ReadonlyMap<TeammateStatus, number>, under: number = 0): string {
-    const reports = `Your ${count} ${count === 1 ? "direct report" : "direct reports"}`;
-    return [under === 0 ? reports : `${reports} and ${under} under them`, ...Resources.statusCountParts(counts)].join(" · ");
-  }
-
-  public static formatOrganizationFocusDepartment(count: number, counts: ReadonlyMap<TeammateStatus, number>): string {
-    return [`${count} ${count === 1 ? "teammate" : "teammates"}`, ...Resources.statusCountParts(counts)].join(" · ");
-  }
-
-  public static formatOrganizationFocusTeammate(role: string | null, department: string, model: string | null): string {
-    return [Object.isNull(role) ? department : `${role} in ${department}`, ...Object.isNull(model) ? [] : [model]].join(" · ");
-  }
-
-  public static formatOrganizationFocusAddMember(name: string): string {
-    return `Add a member to ${name}`;
-  }
-
-  public static formatOrganizationFocusAsks(count: number): string {
-    return `${count} need you`;
-  }
-
-  public static formatOrganizationFocusToggle(isOpen: boolean, name: string): string {
-    return `${isOpen ? "Hide" : "Show"} ${name}'s teammates`;
-  }
-
-  private static statusCountParts(counts: ReadonlyMap<TeammateStatus, number>): readonly string[] {
-    return Object.values(TeammateStatus).flatMap(t => (counts.get(t) ?? 0) > 0 ? [`${counts.get(t)} ${Resources.teammateStatusLabels[t].toLowerCase()}`] : []);
   }
 
   private static browserStep(words: BrowserStepWords, phase: BrowserStepPhase, notes: readonly (string | null)[]): string {

@@ -85,7 +85,7 @@ import { CatalogReads } from "../../models/catalog-reads";
 import { CatalogSource } from "../../models/catalog-source";
 import type { ChatContext } from "../../models/chat-context";
 import { ChatThread } from "../../models/chat-thread";
-import { ComposerAttachment } from "../../models/composer-attachment";
+import type { ComposerAttachment } from "../../models/composer-attachment";
 import { ComposerBar } from "../../models/composer-bar";
 import { ComposerDraft } from "../../models/composer-draft";
 import type { ComposerFanOut } from "../../models/composer-fan-out";
@@ -94,11 +94,13 @@ import { ConfirmRequest } from "../../models/confirm-request";
 import { FoldWidths } from "../../models/fold-widths";
 import { ImageViewerData } from "../../models/image-viewer-data";
 import { ModelCatalog } from "../../models/model-catalog";
+import { PickedAttachment } from "../../models/picked-attachment";
 import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
 import type { RewoundDraft } from "../../models/rewound-draft";
+import { SavedAttachment } from "../../models/saved-attachment";
 import { TeammateModelSettings } from "../../models/teammate-model-settings";
-import { ViewedImage } from "../../models/viewed-image";
+import type { ViewedImage } from "../../models/viewed-image";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
@@ -270,7 +272,6 @@ export class ComposerComponent {
   protected readonly modeName: Signal<string>;
   protected readonly defaultModeId: Signal<string | null>;
   protected readonly defaultModeTag: Signal<string>;
-  protected readonly permissionsTitle: Signal<string>;
   protected readonly unrestricted: Signal<boolean>;
   protected readonly planFirstOffered: Signal<boolean>;
   protected readonly planFirstRefusal: Signal<string | null>;
@@ -309,6 +310,7 @@ export class ComposerComponent {
   public readonly teammateId: InputSignal<string | null> = input<string | null>(null);
   public readonly fanOut: InputSignal<ComposerFanOut | null> = input<ComposerFanOut | null>(null);
   public readonly whileReplying: InputSignal<MessageDelivery | null> = input<MessageDelivery | null>(null);
+  public readonly inPanel: InputSignal<boolean> = input<boolean>(false);
 
   protected readonly isFanOut: Signal<boolean> = computed(() => !Object.isNull(this.fanOut()));
   protected readonly replyingDelivery: Signal<MessageDelivery> = computed(() => this.whileReplying() ?? this.store.whileReplying());
@@ -347,7 +349,7 @@ export class ComposerComponent {
     });
     this.chosenKind = computed(() => {
       const responder = this.responder();
-      return Object.isNull(responder) ? this.kind() : store.providers().find(t => t.id === responder.providerId)!.kind;
+      return Object.isNull(responder) ? this.kind() : store.providerOf(responder).kind;
     });
     this.chosenDescriptor = computed(() => store.kinds().find(t => t.id === this.chosenKind()));
     this.ownProvider = computed(() => this.providerId() ?? store.usualProviderOf(this.kind()));
@@ -499,7 +501,6 @@ export class ComposerComponent {
       const responder = this.responder();
       return Object.isNull(responder) ? Resources.defaultModeTag : Resources.formatOwnDefaultMode(responder.name);
     });
-    this.permissionsTitle = computed(() => Resources.formatChatPermissionsOf(this.chosenDescriptor()!.displayName));
     this.unrestricted = computed(() => this.selectedMode()?.unrestricted === true);
     this.planFirstOffered = computed(() => !Object.isNull(this.catalog().planMode) && this.selectedMode()?.readOnly !== true);
     this.refusedModes = computed(() => RefusedMode.of(this.chosenDescriptor(), this.catalog().modes));
@@ -563,14 +564,15 @@ export class ComposerComponent {
           return;
         const follows = !Object.isNullOrUndefined(kept) && (conversationId !== this.keptConversationId || !ComposerComponent.sameResponder(kept, this.lastKept));
         const fresh = Object.isNullOrUndefined(kept) ? ComposerSettings.startingWith(preferred, null) ?? only : null;
-        const carried = Object.isNull(this.kind()) ? this.defaults.defaultChoice()
-          : conversationId === this.keptConversationId ? null : this.currentSettings()!.withResponder(null);
+        const current = this.currentSettings();
+        const carried = Object.isNull(current) ? this.defaults.defaultChoice()
+          : conversationId === this.keptConversationId ? null : current.withResponder(null);
         const found = own ?? fresh ?? carried?.withMode(null) ?? null;
         const opens = Object.isNull(own) && Object.isNullOrUndefined(kept) && (!Object.isNull(found) || Object.isNull(this.kind()));
         const local = opens ? this.store.startingChoiceOf(this.store.membersOf(conversationId).map(t => t.teammateId), found) : found;
         const listed = Object.isNull(local) || !kinds.some(t => t.id === local.kind) ? null : local;
         const base = listed ?? this.currentSettings() ?? new ComposerSettings(first.id, null, null, null);
-        const remembered = follows ? base.following(kept!) : local;
+        const remembered = follows ? base.following(kept) : local;
         const applies = !Object.isNull(remembered) && kinds.some(t => t.id === remembered.kind);
         if (applies) {
           if (!remembered.equals(this.currentSettings()))
@@ -845,7 +847,9 @@ export class ComposerComponent {
   }
 
   protected pickFiles(input: HTMLInputElement): void {
-    this.addFiles(Array.from(input.files!));
+    const files = input.files;
+    if (!Object.isNull(files))
+      this.addFiles(Array.from(files));
     input.value = String.empty;
   }
 
@@ -880,21 +884,20 @@ export class ComposerComponent {
   protected openAttachment(attachment: ComposerAttachment, frame: HTMLElement, mode: ImageOpenMode = this.viewer.openMode()): void {
     for (const tooltip of this.frameTooltips())
       tooltip.hide();
-    const images = this.attachments().filter(t => !Object.isNull(t.previewUrl())).map(t => ComposerComponent.imageOf(t, this.conversationId()));
-    const image = images.find(t => t.key === attachment.key)!;
+    const data = ImageViewerData.of(attachment.key, this.viewedImages());
     if (mode === ImageOpenMode.Tab) {
-      this.viewer.openTab(image);
+      this.viewer.openTab(data.image);
       return;
     }
-    ImageDialogComponent.open(this.dialogs, this.viewer, new ImageViewerData(image, images), frame);
+    ImageDialogComponent.open(this.dialogs, this.viewer, data, frame);
   }
 
   protected async copyAttachment(attachment: ComposerAttachment): Promise<void> {
-    this.reportImage(await this.viewer.copyAsync(ComposerComponent.imageOf(attachment, this.conversationId())), Resources.imageCopyFailed);
+    this.reportImage(await this.viewer.copyAsync(ImageViewerData.of(attachment.key, this.viewedImages()).image), Resources.imageCopyFailed);
   }
 
   protected async saveAttachment(attachment: ComposerAttachment): Promise<void> {
-    this.reportImage(await this.viewer.saveAsync(ComposerComponent.imageOf(attachment, this.conversationId())), Resources.imageSaveFailed);
+    this.reportImage(await this.viewer.saveAsync(ImageViewerData.of(attachment.key, this.viewedImages()).image), Resources.imageSaveFailed);
   }
 
   protected removeAttachment(attachment: ComposerAttachment): void {
@@ -1011,14 +1014,14 @@ export class ComposerComponent {
     return this.store.setMemberSettings(this.conversationId(), teammate.id, settings);
   }
 
-  protected selectMode(id: string): void {
+  protected selectMode(id: string, providerName: string): void {
     const catalog = this.catalog();
     const mode = id === this.defaultModeId() ? null : id;
     const teammate = this.responder();
     if (id === this.selectedMode()?.id)
       return;
     const conversationId = this.conversationId();
-    UnrestrictedModeConfirmation.choose(this.dialogs, catalog.modeOf(id), this.chosenDescriptor()!.displayName, () => {
+    UnrestrictedModeConfirmation.choose(this.dialogs, catalog.modeOf(id), providerName, () => {
       if (!Object.isNull(teammate)) {
         void this.store.setMemberMode(conversationId, teammate.id, mode);
         return;
@@ -1034,8 +1037,10 @@ export class ComposerComponent {
 
   protected selectResponder(id: string | null, chosen: boolean = true): void {
     this.responderId.set(id);
-    this.choices.remember(this.conversationId(), new ComposerSettings(this.kind()!, this.model(), this.effort(), this.ownProvider(), id, this.speed(), this.mode()));
-    this.keepChoice(this.conversationId(), this.currentSettings(), chosen);
+    const settings = this.currentSettings();
+    if (!Object.isNull(settings))
+      this.choices.remember(this.conversationId(), settings);
+    this.keepChoice(this.conversationId(), settings, chosen);
   }
 
   protected loadModels(refresh: boolean = false, quiet: boolean = false): void {
@@ -1095,7 +1100,7 @@ export class ComposerComponent {
       this.attachmentError.set(Resources.attachmentLimitExceeded);
       return;
     }
-    const added = files.map(t => new ComposerAttachment(t));
+    const added = files.map(t => new PickedAttachment(t));
     this.attachments.set([...existing, ...added]);
     this.showPreviews(added);
     this.attachmentError.set(null);
@@ -1198,7 +1203,7 @@ export class ComposerComponent {
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(draft?.text ?? String.empty);
-    const attachments = draft?.attachments.map(t => new ComposerAttachment(t)) ?? [];
+    const attachments = draft?.attachments.map(t => new SavedAttachment(t)) ?? [];
     this.attachments.set(attachments);
     this.showPreviews(attachments);
     this.attachmentError.set(Object.isNull(draft) || draft.missing.length === 0 ? null : Resources.formatDraftFilesMissing(draft.missing));
@@ -1225,7 +1230,7 @@ export class ComposerComponent {
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(offer.text);
-    const attachments = offer.attachments.map(t => new ComposerAttachment(t));
+    const attachments = offer.attachments.map(t => new SavedAttachment(t));
     this.attachments.set(attachments);
     this.attachmentError.set(null);
     this.changed();
@@ -1240,6 +1245,11 @@ export class ComposerComponent {
 
   private get drafts(): IComposerDrafts {
     return this.isFanOut() ? this.keptDrafts : this.chatDrafts;
+  }
+
+  private viewedImages(): readonly ViewedImage[] {
+    const conversationId = this.conversationId();
+    return this.attachments().map(t => t.viewedImageIn(conversationId)).filter(t => !Object.isNull(t));
   }
 
   private currentSettings(): ComposerSettings | null {
@@ -1308,12 +1318,13 @@ export class ComposerComponent {
           this.defaults.remember(settings);
         }
         const last = mentions.at(-1);
+        const current = this.currentSettings();
         if (!Object.isUndefined(last)) {
           this.choices.remember(conversationId, settings.withResponder(last.teammateId));
           this.keepChoice(conversationId, settings.withResponder(last.teammateId));
         }
-        else if (conversationId === this.conversationId() && !settings.equals(this.currentSettings()))
-          this.choices.remember(conversationId, this.currentSettings()!);
+        else if (conversationId === this.conversationId() && !Object.isNull(current) && !settings.equals(current))
+          this.choices.remember(conversationId, current);
         for (const attachment of drafted)
           attachment.dispose();
         if (conversationId === this.shownConversationId) {
@@ -1400,13 +1411,5 @@ export class ComposerComponent {
       this.attachmentError.set(failure);
     else if (this.attachmentError() === failure)
       this.attachmentError.set(null);
-  }
-
-  private static imageOf(attachment: ComposerAttachment, conversationId: string): ViewedImage {
-    const url = attachment.previewUrl()!;
-    const path = attachment.sharedPath;
-    return Object.isNull(path)
-      ? ViewedImage.fromData(attachment.key, conversationId, attachment.name, attachment.mediaType, url.slice(url.indexOf(Resources.dataUrlSeparator) + 1))
-      : new ViewedImage(attachment.key, conversationId, attachment.name, attachment.mediaType, path, null);
   }
 }

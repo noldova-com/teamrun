@@ -47,7 +47,10 @@
 .nol-teamrun-row + .nol-teamrun-conversation-list,
 nol-section-header + p.nol-teamrun-row,
 :is(.nol-teamrun-pins, .nol-teamrun-project-list, .nol-teamrun-chat-list) > .nol-teamrun-drag-item:first-child,
-.nol-teamrun-drag-item + :is(.nol-teamrun-drag-item, .nol-teamrun-row) {
+.nol-teamrun-drag-item + :is(.nol-teamrun-drag-item, .nol-teamrun-row),
+.nol-teamrun-organization-list > .nol-teamrun-row:first-child,
+.nol-teamrun-organization-list [role="group"] > .nol-teamrun-row:first-child,
+.nol-teamrun-organization-list [role="group"] + .nol-teamrun-row {
   margin-block-start: var(--nol-row-gap, calc(2 * var(--nol-tab-inset)));
 }
 

@@ -126,12 +126,14 @@ import { TerminalStep } from "../../../src/app/enums/terminal-step";
 import { FileGrantException } from "../../../src/app/exceptions/file-grant.exception";
 import { ListNotArrayException } from "../../../src/app/exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../../../src/app/exceptions/model-catalog-unavailable.exception";
+import { TeammateProviderMissingException } from "../../../src/app/exceptions/teammate-provider-missing.exception";
 import { AcpLocalVariable } from "../../../src/app/models/acp-local-variable";
 import { ComposerSettings } from "../../../src/app/models/composer-settings";
 import { MessageControlState } from "../../../src/app/models/message-control-state";
 import { MessageFocus } from "../../../src/app/models/message-focus";
 import { ProviderChoice } from "../../../src/app/models/provider-choice";
 import { ReadingPosition } from "../../../src/app/models/reading-position";
+import { TeammateColor } from "../../../src/app/models/teammate-color";
 import { TeammateModelSettings } from "../../../src/app/models/teammate-model-settings";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { Resources } from "../../../src/resources";
@@ -298,6 +300,14 @@ describe("ChatStoreService", () => {
 
     expect([states, context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationSetPlanFirst))
       .map(t => ChatPlanFirstParams.fromJson(t.parameters)).map(t => [t.chatId, t.planFirst])]).toEqual([[[true, true], [true, false]], [["c1", true], ["c1", false]]]);
+  });
+
+  it("gives a teammate's provider, and refuses a teammate whose provider isn't listed, naming both", async () => {
+    new TeammateFixture(context);
+    await store.initialize();
+
+    expect(store.providerOf(Required.of(store.teammate("alice"))).id).toBe("a1");
+    expect(() => store.providerOf(Required.of(store.teammate("offline")))).toThrow(new TeammateProviderMissingException("offline", "missing"));
   });
 
   it("loads and refreshes teammates and selected membership, with teammate-scoped mutation errors", async () => {
@@ -1217,6 +1227,46 @@ describe("ChatStoreService", () => {
     marks.push(store.markedConversationId());
 
     expect(marks).toEqual(["c1", "c2", "c1", null]);
+  });
+
+  it("marks no chat while an organization is in view, keeps it in view when another organization goes out of view, and marks the chat shown once it goes or is left", async () => {
+    context.answer(MethodName.ConversationList, () => [SampleData.conversation.toJson()]);
+    await store.initialize();
+    await store.conversationInView("c1");
+    const marks = [[store.organizationInView(), store.markedConversationId()]];
+    const record = (): void => void marks.push([store.organizationInView(), store.markedConversationId()]);
+
+    store.showOrganization("o1", true);
+    record();
+    store.showOrganization("o2", false);
+    record();
+    store.showOrganization("o1", false);
+    record();
+    store.showOrganization("o2", true);
+    record();
+    store.leaveOrganization();
+    record();
+
+    expect(marks).toEqual([[null, "c1"], ["o1", null], ["o1", null], [null, "c1"], ["o2", null], [null, "c1"]]);
+  });
+
+  it("colours each teammate by when it was made, keeps the colours through a rename, gives a teammate made later the next colour, and one outside the team its id colour", async () => {
+    const data = new TeammateFixture(context);
+    const made = (id: string, name: string, createdAt: string): Teammate => new Teammate(id, name, null, "a1", Harness.Provider, null, null, createdAt, createdAt);
+    data.teammates = [made("t1", "zoe", "2026-01-03"), made("t2", "amy", "2026-01-01"), made("t3", "bob", "2026-01-02")];
+    await store.initialize();
+    let reads = 0;
+    const first = computed(() => {
+      reads++;
+      return store.teammateColor("t1");
+    });
+    const before = [["t1", "t2", "t3", "gone", null].map(t => store.teammateColor(t)), first(), reads];
+
+    await store.saveTeammate(new TeammateUpdateParams("t1", "Dora", null, "a1", Harness.Provider, null, null));
+    const renamed = [first(), reads];
+    expect(await store.saveTeammate(new TeammateCreateParams("carl", null, "a1", Harness.Provider, null, null))).toBe(true);
+
+    expect([before, renamed, [store.teammateColor("created"), first(), reads]]).toEqual([[[4, 2, 3, TeammateColor.of("gone"), null], 4, 1], [4, 1], [5, 4, 2]]);
   });
 
   it("keeps the latest selection when earlier page requests finish late", async () => {

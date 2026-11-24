@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { OrganizationCardField } from "../../../src/app/enums/organization-card-field";
-import { OrganizationViewMode } from "../../../src/app/enums/organization-view-mode";
 import { OrganizationLayout } from "../../../src/app/models/organization-layout";
 
 describe("OrganizationLayout", () => {
@@ -15,30 +14,26 @@ describe("OrganizationLayout", () => {
   it("shows status and what a teammate is doing now on every card by default, with no department collapsed and no card's own choice", () => {
     const layout = new OrganizationLayout();
 
-    expect([layout.collapsedDepartments, fields(layout.cardsShow), layout.cards.size, fields(layout.fieldsOf("t1")), layout.hasOwnFields("t1"), layout.view, layout.focus])
-      .toEqual([[], [OrganizationCardField.Now, OrganizationCardField.Status], 0, [OrganizationCardField.Now, OrganizationCardField.Status], false, OrganizationViewMode.Tree, null]);
+    expect([layout.collapsedDepartments, fields(layout.cardsShow), layout.cards.size, fields(layout.fieldsOf("t1")), layout.hasOwnFields("t1")])
+      .toEqual([[], [OrganizationCardField.Now, OrganizationCardField.Status], 0, [OrganizationCardField.Now, OrganizationCardField.Status], false]);
   });
 
   it("round-trips through JSON, and reads what is missing or malformed as the defaults or nothing", () => {
     const layout = new OrganizationLayout(["d1", "d1", " ", "d2"], new Set([OrganizationCardField.Usage]),
       new Map<string, ReadonlySet<OrganizationCardField>>([["t1", new Set([OrganizationCardField.Model, OrganizationCardField.Artifacts])],
-        [" ", new Set([OrganizationCardField.Last])]]),
-      OrganizationViewMode.Board, "t1");
+        [" ", new Set([OrganizationCardField.Last])]]));
     const read = OrganizationLayout.fromJson(layout.toJson());
-    const odd = OrganizationLayout.fromJson({ collapsedDepartments: ["d1", 3], cardsShow: { Usage: true, Status: false, Ghost: true, Last: "yes" }, cards: { t2: [1], t3: { Now: true } },
-      view: "Ghost", focus: 3 });
+    const odd = OrganizationLayout.fromJson({ collapsedDepartments: ["d1", 3], cardsShow: { Usage: true, Status: false, Ghost: true, Last: "yes" }, cards: { t2: [1], t3: { Now: true } } });
 
     expect(layout.toJson()).toEqual({
       collapsedDepartments: ["d1", "d2"],
       cardsShow: { Status: false, Now: false, Usage: true, Last: false, Model: false, Git: false, PullRequests: false, Documents: false, Artifacts: false },
-      cards: { t1: { Status: false, Now: false, Usage: false, Last: false, Model: true, Git: false, PullRequests: false, Documents: false, Artifacts: true } },
-      view: "Board",
-      focus: "t1"
+      cards: { t1: { Status: false, Now: false, Usage: false, Last: false, Model: true, Git: false, PullRequests: false, Documents: false, Artifacts: true } }
     });
-    expect([read.collapsedDepartments, fields(read.cardsShow), fields(read.fieldsOf("t1")), read.view, read.focus])
-      .toEqual([["d1", "d2"], [OrganizationCardField.Usage], [OrganizationCardField.Artifacts, OrganizationCardField.Model], OrganizationViewMode.Board, "t1"]);
-    expect([odd.collapsedDepartments, fields(odd.cardsShow), fields(odd.fieldsOf("t2")), fields(odd.fieldsOf("t3")), odd.view, odd.focus])
-      .toEqual([["d1"], [OrganizationCardField.Usage], [], [OrganizationCardField.Now], OrganizationViewMode.Tree, null]);
+    expect([read.collapsedDepartments, fields(read.cardsShow), fields(read.fieldsOf("t1"))])
+      .toEqual([["d1", "d2"], [OrganizationCardField.Usage], [OrganizationCardField.Artifacts, OrganizationCardField.Model]]);
+    expect([odd.collapsedDepartments, fields(odd.cardsShow), fields(odd.fieldsOf("t2")), fields(odd.fieldsOf("t3"))])
+      .toEqual([["d1"], [OrganizationCardField.Usage], [], [OrganizationCardField.Now]]);
     for (const value of [null, [], "x", { cards: "x" }])
       expect(OrganizationLayout.fromJson(value).toJson()).toEqual(new OrganizationLayout().toJson());
   });
@@ -59,12 +54,11 @@ describe("OrganizationLayout", () => {
       .toEqual([[OrganizationCardField.Model, OrganizationCardField.Now], ["t2"], 0]);
   });
 
-  it("keeps the view and what Focus shows through every other change, and reads a blank focus as none", () => {
-    const layout = new OrganizationLayout().withView(OrganizationViewMode.Focus).withFocus("d1");
-    const changed = [layout.toggleDepartment("d1"), layout.withCardsShow(OrganizationCardField.Usage, true), layout.withCardField("t1", OrganizationCardField.Usage, true),
-      layout.withoutCardFields("t1"), layout.withoutAnyCardFields()];
+  it("reads a layout an earlier version kept with a view and a focus as the same layout without them, and writes neither back", () => {
+    const kept = { collapsedDepartments: ["d1"], cardsShow: { Usage: true }, cards: { t1: { Model: true } }, view: "Focus", focus: "Department:d1" };
+    const read = OrganizationLayout.fromJson(kept);
 
-    expect(changed.map(t => [t.view, t.focus])).toEqual(new Array<unknown[]>(5).fill([OrganizationViewMode.Focus, "d1"]));
-    expect([layout.withView(OrganizationViewMode.Board).focus, layout.withFocus(" ").focus, layout.withFocus(null).view]).toEqual(["d1", null, OrganizationViewMode.Focus]);
+    expect([read.collapsedDepartments, fields(read.cardsShow), fields(read.fieldsOf("t1"))]).toEqual([["d1"], [OrganizationCardField.Usage], [OrganizationCardField.Model]]);
+    expect(Object.keys(read.toJson())).toEqual(["collapsedDepartments", "cardsShow", "cards"]);
   });
 });

@@ -16,7 +16,8 @@ import { OrganizationTypeDialogComponent } from "../organization-type-dialog/org
 @Component({
   selector: "nol-teamrun-organization-type-choice",
   imports: [SelectComponent],
-  templateUrl: "./organization-type-choice.component.html"
+  templateUrl: "./organization-type-choice.component.html",
+  styleUrl: "./organization-type-choice.component.css"
 })
 export class OrganizationTypeChoiceComponent {
   private readonly dialogs: DialogService = inject(DialogService);

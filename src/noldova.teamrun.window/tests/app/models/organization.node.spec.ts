@@ -17,7 +17,7 @@ describe("OrganizationNode", () => {
   const shape = (nodes: readonly OrganizationNode[]): unknown[] =>
     nodes.map(t => [t.id, t.leader?.id ?? null, t.members.map(u => u.id), t.headcount, t.total, t.hidden, shape(t.departments)]);
 
-  it("nests departments in their order, each with its leader apart from its members in name order, and counts what collapsing it hides, its nested departments' people too", () => {
+  it("nests departments in their order, each with its leader apart from its members in name order, and counts what collapsing it hides, its leader and its nested departments' people too", () => {
     const organization = SampleData.organizationOf([
       new Department("design", "Design", "department", OrganizationParent.person, "dee", 1, "c", "u"),
       new Department("build", "Build", "department", OrganizationParent.person, null, 0, "c", "u"),
@@ -26,7 +26,7 @@ describe("OrganizationNode", () => {
       new TeammatePlacement("ada", OrganizationParent.department("design"), 2), new TeammatePlacement("bea", OrganizationParent.department("ui"), 0)]);
 
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea, cy, dee]).departments))
-      .toEqual([["build", null, [], 0, 0, 0, []], ["design", "dee", ["ada", "cy"], 3, 4, 3, [["ui", "bea", [], 1, 1, 0, []]]]]);
+      .toEqual([["build", null, [], 0, 0, 0, []], ["design", "dee", ["ada", "cy"], 3, 4, 4, [["ui", "bea", [], 1, 1, 1, []]]]]);
   });
 
   it("counts a nested department's leader and members once each in what collapsing its parent hides", () => {
@@ -37,7 +37,7 @@ describe("OrganizationNode", () => {
         new TeammatePlacement("eve", OrganizationParent.department("ui"), 2)]);
 
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea, cy, dee, eve]).departments))
-      .toEqual([["design", "ada", ["cy"], 2, 5, 4, [["ui", "bea", ["dee", "eve"], 3, 3, 2, []]]]]);
+      .toEqual([["design", "ada", ["cy"], 2, 5, 5, [["ui", "bea", ["dee", "eve"], 3, 3, 3, []]]]]);
   });
 
   it("counts the people of departments nested two levels down in what collapsing the top one hides", () => {
@@ -49,7 +49,7 @@ describe("OrganizationNode", () => {
         new TeammatePlacement("eve", OrganizationParent.department("icons"), 1), new TeammatePlacement("fay", OrganizationParent.department("icons"), 2)]);
 
     expect(shape(OrganizationNode.treeOf(organization, [ada, bea, cy, dee, eve, fay]).departments))
-      .toEqual([["design", "ada", [], 1, 6, 5, [["ui", "bea", ["cy"], 2, 5, 4, [["icons", "dee", ["eve", "fay"], 3, 3, 2, []]]]]]]);
+      .toEqual([["design", "ada", [], 1, 6, 6, [["ui", "bea", ["cy"], 2, 5, 5, [["icons", "dee", ["eve", "fay"], 3, 3, 3, []]]]]]]);
   });
 
   it("leaves out a leader or member whose teammate it doesn't know", () => {
@@ -67,7 +67,7 @@ describe("OrganizationNode", () => {
     const root = OrganizationNode.treeOf(organization, [fay, ada, dee, bea, cy]);
 
     expect([shape(root.departments), root.directReports.map(t => t.id), root.members.map(t => t.id), root.reports.map(t => t.directReports.map(u => u.id))]).toEqual([
-      [["design", "ada", [], 1, 2, 1, [["ui", null, ["bea"], 1, 1, 1, []]]]], ["fay"], ["cy", "fay"], [["cy"]]
+      [["design", "ada", [], 1, 2, 2, [["ui", null, ["bea"], 1, 1, 1, []]]]], ["fay"], ["cy", "fay"], [["cy"]]
     ]);
     expect(OrganizationNode.treeOf(organization, [ada, bea]).directReports).toEqual([]);
     expect([shape(OrganizationNode.treeOf(SampleData.organizationOf([], []), [bea, ada]).departments), OrganizationNode.treeOf(SampleData.organizationOf([], []), [bea, ada]).directReports.map(t => t.id)])
@@ -84,7 +84,7 @@ describe("OrganizationNode", () => {
 
     expect([root.directReports.map(t => t.id), adaNode?.directReports.map(t => t.id), adaNode?.members.map(t => t.id), root.subDepartments.map(t => t.id),
       shape(root.subDepartments), root.total, root.name, root.id]).toEqual([["ada"], ["bea", "dee"], ["bea", "dee"], ["ui"],
-      [["ui", "cy", ["eve"], 2, 2, 1, []]], 5, "You", "person"]);
+      [["ui", "cy", ["eve"], 2, 2, 2, []]], 5, "You", "person"]);
   });
 
   it("knows whom each teammate under a teammate reports to, at any depth, and none for a direct report or a department's members", () => {

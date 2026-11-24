@@ -6,7 +6,7 @@ This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 -->
 
-<form #form class="nol-teamrun-composer" [class.nol-teamrun-composer-tight]="fold() >= folds.tight" [attr.aria-label]="resources.composerLabel"
+<form #form class="nol-teamrun-composer" [class.nol-teamrun-composer-tight]="fold() >= folds.tight" [class.nol-teamrun-composer-panel]="inPanel()" [attr.aria-label]="resources.composerLabel"
   (submit)="submit($event)" (paste)="paste($event)" (dragover)="dragOver($event)" (dragleave)="dragLeave()" (drop)="drop($event)">
   <nol-teamrun-waiting-messages [chatId]="conversationId()" [editable]="text().length === 0 && attachments().length === 0" (edit)="editWaiting($event)" />
   <div #card class="nol-teamrun-composer-card" [class.nol-teamrun-composer-dropping]="dropping()" [class.nol-teamrun-composer-idle]="!canCompose()">
@@ -162,14 +162,14 @@ LICENSE file in the root directory of this source tree.
         @if (catalog().failed) {
           <button type="button" nol-menu-item [label]="resources.modelCatalogUnavailable" [disabled]="true"></button>
         }
-        @if (unlistedReason()) {
-          <button type="button" nol-menu-item [label]="unlistedReason()!" [disabled]="true"></button>
+        @if (unlistedReason(); as reason) {
+          <button type="button" nol-menu-item [label]="reason" [disabled]="true"></button>
         }
-        @if (planNote()) {
-          <button type="button" nol-menu-item [label]="planNote()!" [disabled]="true"></button>
+        @if (planNote(); as note) {
+          <button type="button" nol-menu-item [label]="note" [disabled]="true"></button>
         }
-        @if (chosenModel() && !selectedModel()) {
-          <button type="button" nol-menu-item [label]="resources.formatUnlisted(chosenModel()!)" [checked]="true" [disabled]="true"></button>
+        @if (!selectedModel() && chosenModel(); as model) {
+          <button type="button" nol-menu-item [label]="resources.formatUnlisted(model)" [checked]="true" [disabled]="true"></button>
         }
         @if (chosenDescriptor(); as descriptor) {
           <button type="button" nol-menu-item [label]="resources.formatProviderDefault(descriptor.displayName, defaultModelName())"
@@ -256,20 +256,22 @@ LICENSE file in the root directory of this source tree.
 </ng-template>
 <ng-template #permissionsMenu>
   <nol-menu class="nol-teamrun-composer-permissions" [attr.aria-label]="resources.chatPermissionsLabel" [minWidth]="resources.settingsMenuWidth">
-    <nol-menu-group [label]="permissionsTitle()">
-      @if (!selectedMode()) {
-        <button type="button" nol-menu-item [label]="modeName()" [checked]="true" [disabled]="true"></button>
-      }
-      @for (choice of catalog().modes; track choice.id) {
-        <button type="button" nol-menu-item [label]="choice.name" [description]="choice.description" [icon]="choice.unrestricted ? resources.unrestrictedModeGlyph : null"
-          [tag]="choice.id === defaultModeId() ? defaultModeTag() : null" [checked]="choice.id === selectedMode()?.id" [disabled]="modelsLoading()"
-          (triggered)="selectMode(choice.id)"></button>
-      }
-      @for (refused of refusedModes(); track refused.name) {
-        <button type="button" nol-menu-item class="nol-teamrun-refused-mode" [label]="refused.name" [icon]="refused.unrestricted ? resources.unrestrictedModeGlyph : null"
-          [disabled]="true" [nolTooltip]="refused.reason"></button>
-      }
-    </nol-menu-group>
+    @if (chosenDescriptor(); as descriptor) {
+      <nol-menu-group [label]="resources.formatChatPermissionsOf(descriptor.displayName)">
+        @if (!selectedMode()) {
+          <button type="button" nol-menu-item [label]="modeName()" [checked]="true" [disabled]="true"></button>
+        }
+        @for (choice of catalog().modes; track choice.id) {
+          <button type="button" nol-menu-item [label]="choice.name" [description]="choice.description" [icon]="choice.unrestricted ? resources.unrestrictedModeGlyph : null"
+            [tag]="choice.id === defaultModeId() ? defaultModeTag() : null" [checked]="choice.id === selectedMode()?.id" [disabled]="modelsLoading()"
+            (triggered)="selectMode(choice.id, descriptor.displayName)"></button>
+        }
+        @for (refused of refusedModes(); track refused.name) {
+          <button type="button" nol-menu-item class="nol-teamrun-refused-mode" [label]="refused.name" [icon]="refused.unrestricted ? resources.unrestrictedModeGlyph : null"
+            [disabled]="true" [nolTooltip]="refused.reason"></button>
+        }
+      </nol-menu-group>
+    }
     @if (planFirstRefusal(); as reason) {
       <nol-menu-separator />
       <button type="button" nol-menu-item class="nol-teamrun-plan-first" [label]="resources.planFirstLabel" [description]="resources.planFirstDescription"

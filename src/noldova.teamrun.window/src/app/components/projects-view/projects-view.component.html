@@ -46,14 +46,15 @@ LICENSE file in the root directory of this source tree.
     [attr.aria-label]="organizations().length === 0 ? null : resources.organizationsTitle">
     @if (isGroupOpen(groups.Organizations)) {
       @for (organization of organizations(); track organization.id) {
-        <div class="nol-teamrun-row nol-teamrun-organization-row" [nolTeamrunTreeItem]="organizationsTree" [treeKey]="organization.key"
+        <div class="nol-teamrun-row nol-teamrun-organization-row" [class.nol-teamrun-selected]="isOrganizationMarked(organization.id)"
+          [attr.aria-selected]="isOrganizationMarked(organization.id)" [nolTeamrunTreeItem]="organizationsTree" [treeKey]="organization.key"
           [treeLabel]="organization.name" [treeExpanded]="!isCollapsed(organization.key)" [nolTooltip]="organization.folder ?? organization.name" [nolTooltipSide]="beside"
           [attr.aria-owns]="isCollapsed(organization.key) ? null : listIdOf(organization.key)" [nolContextMenuTriggerFor]="organizationMenu"
           (toggled)="layout.toggleProject(organization.key)" (activated)="openOrganization(organization)">
           <span class="nol-teamrun-twistie" aria-hidden="true" (click)="layout.toggleProject(organization.key)">
             <span class="nol-teamrun-glyph material-symbols-rounded">{{ isCollapsed(organization.key) ? resources.collapsedIcon : resources.expandedIcon }}</span>
           </span>
-          <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="openOrganization(organization)">{{ organization.name }}</span>
+          <span class="nol-teamrun-label nol-teamrun-organization-name" (click)="chooseOrganization(organization)">{{ organization.name }}</span>
           <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon"
             [label]="resources.rowMenuLabel" [nolMenuTriggerFor]="organizationMenu"></button>
           <ng-template #organizationMenu>
@@ -187,9 +188,6 @@ LICENSE file in the root directory of this source tree.
     [nolTooltip]="placeOf(organizationId, teammate)" [nolTooltipSide]="beside" [nolContextMenuTriggerFor]="teammateMenu" (activated)="openTeammate(organizationId, teammate)">
     <span class="nol-teamrun-twistie"><nol-teamrun-teammate-status [teammateId]="teammate.id" [labelled]="false" /></span>
     <span class="nol-teamrun-label nol-teamrun-teammate-name" (click)="openTeammate(organizationId, teammate)">{{ teammate.name }}</span>
-    @if (chatOf(organizationId, teammate); as chat) {
-      <ng-container [ngTemplateOutlet]="indicator" [ngTemplateOutletContext]="{ $implicit: chat.id }" />
-    }
     <button type="button" nol-icon-button class="nol-teamrun-row-actions" tabindex="-1" aria-hidden="true" [tabAction]="true" [icon]="resources.moreIcon"
       [label]="resources.rowMenuLabel" [nolMenuTriggerFor]="teammateMenu"></button>
     <ng-template #teammateMenu>

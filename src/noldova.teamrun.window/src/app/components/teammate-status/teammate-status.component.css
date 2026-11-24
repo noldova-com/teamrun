@@ -24,13 +24,31 @@
 
 .dot {
   flex: none;
-  border: 0.25rem solid currentColor;
+  border: 0.1875rem solid currentColor;
   border-radius: 50%;
   color: var(--nol-badge);
 }
 
 .working {
   color: var(--nol-status-ok);
+  animation: fade 1.6s ease-in-out infinite;
+}
+
+@keyframes fade {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .working {
+    animation: none;
+  }
 }
 
 .waiting {

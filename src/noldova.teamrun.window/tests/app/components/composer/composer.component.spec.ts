@@ -1382,6 +1382,22 @@ describe("ComposerComponent", () => {
     expect(data.members).toEqual([]);
   });
 
+  it("lets go of a teammate who isn't in the chat while it has no provider, remembering no choice and keeping no responder", async () => {
+    context.answer(MethodName.ProviderKindList, () => []);
+    new TeammateFixture(context);
+    const store = await prepare();
+    fixture = TestBed.createComponent(ComposerComponent);
+    fixture.componentRef.setInput("conversationId", "c1");
+    fixture.componentRef.setInput("teammateId", "bob");
+    await fixture.whenStable();
+    const responder = store.conversation("c1")?.responder;
+
+    fixture.componentRef.setInput("teammateId", null);
+    await fixture.whenStable();
+
+    expect([choice(), store.conversation("c1")?.responder, context.count(MethodName.ConversationResponderSet)]).toEqual([null, responder, 0]);
+  });
+
   it("keeps the chat's own model for its teammate when making them its default fails", async () => {
     new TeammateFixture(context);
     await prepare();
@@ -2764,6 +2780,18 @@ describe("ComposerComponent", () => {
     const kept = store.conversation("c1")?.responder;
     expect([kept?.teammateId, kept?.requested?.kind, kept?.providerId].join()).toBe(",codex,a1");
     expect(ConversationResponderParams.fromJson(Required.of(context.parametersOf(MethodName.ConversationResponderSet))).responder?.requested?.kind).toBe("codex");
+  });
+
+  it("attaches nothing when a pick gives no file list", async () => {
+    await prepare();
+    await render();
+    const input = Required.of(root().querySelector<HTMLInputElement>('input[type="file"]'));
+    const files = vi.spyOn(input, "files", "get").mockReturnValue(null);
+
+    input.dispatchEvent(new Event("change"));
+    await fixture.whenStable();
+
+    expect([files.mock.calls.length, rows().length, input.value]).toEqual([1, 0, ""]);
   });
 
   it("refuses images only while no one in the chat takes them, and uses each model's effort levels", async () => {
@@ -6019,6 +6047,30 @@ describe("ComposerComponent", () => {
       AppearanceFixture.expectPixels(bar.top - text.bottom, space(2));
       AppearanceFixture.expectPixels(frame.bottom - bar.bottom, space(2) + border());
       expect(getComputedStyle(field()).borderTopStyle).toBe("none");
+    });
+
+    it("insets the card in a panel a space-3 from the sides and bottom and a space-1 from the top, wide and folded tight alike", async () => {
+      await prepare();
+      await render();
+      fixture.componentRef.setInput("inPanel", true);
+      await fixture.whenStable();
+      await ready();
+      const tight = (): boolean => part("form").classList.contains("nol-teamrun-composer-tight");
+      const expectInsets = (): void => {
+        const form = box(part("form"));
+        const frame = box(card());
+        AppearanceFixture.expectPixels(frame.left - form.left, space(3));
+        AppearanceFixture.expectPixels(form.right - frame.right, space(3));
+        AppearanceFixture.expectPixels(frame.top - form.top, space(1));
+        AppearanceFixture.expectPixels(form.bottom - frame.bottom, space(3));
+      };
+
+      root().style.width = "40rem";
+      await Wait.until(() => expect(tight()).toBe(false));
+      expectInsets();
+      root().style.width = "13.75rem";
+      await Wait.until(() => expect(tight()).toBe(true));
+      expectInsets();
     });
 
     it("grows the field with its text from two lines to ten, then scrolls", async () => {

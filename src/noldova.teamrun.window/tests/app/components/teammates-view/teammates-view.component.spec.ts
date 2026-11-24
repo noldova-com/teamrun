@@ -15,7 +15,7 @@ import {
   AuthStatus, Conversation, ConversationCreateParams, ConversationListParams, ConversationMemberParams, DefaultTeammate, DefaultTeammateSetParams, EventName, Harness,
   MethodName, PlanUsage, PlanWindow, PlanWindowName, Provider, ProviderKind, ProviderModel, ProviderModelList, RequestedSettings, Teammate, TeammateIdParams
 } from "@noldova/teamrun.protocol";
-import { ThemeMode } from "@noldova/ui.components.angular";
+import { AvatarComponent, ThemeMode } from "@noldova/ui.components.angular";
 import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 import { userEvent } from "vitest/browser";
 
@@ -32,7 +32,9 @@ import { AccessibilityFixture } from "../../../fixtures/accessibility.fixture";
 import { DeferredResponse } from "../../../fixtures/deferred-response.fixture";
 import { EmulatedMediaFixture } from "../../../fixtures/emulated-media.fixture";
 import { FakeWindowPartContext } from "../../../fixtures/fake-window-part-context.fixture";
+import { PartReads } from "../../../fixtures/part-reads.fixture";
 import { PointerEventsFixture } from "../../../fixtures/pointer-events.fixture";
+import { Required } from "../../../fixtures/required.fixture";
 import { SampleData } from "../../../fixtures/sample-data.fixture";
 import { TeammateFixture } from "../../../fixtures/teammate.fixture";
 import { Wait } from "../../../fixtures/wait.fixture";
@@ -43,7 +45,7 @@ describe("TeammatesViewComponent", () => {
   let fixture: ComponentFixture<TeammatesViewComponent>;
   let store: ChatStoreService;
 
-  const element = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const element = (): HTMLElement => PartReads.elementOf(fixture.nativeElement);
   const texts = (selector: string, root: ParentNode = element()): string[] => [...root.querySelectorAll(selector)].map(t => t.textContent?.trim() ?? "");
   const row = (name: string): HTMLElement => {
     const found = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-item")].find(t => t.querySelector(".nol-teamrun-item-name")?.textContent === name);
@@ -107,7 +109,7 @@ describe("TeammatesViewComponent", () => {
     await create();
 
     expect(fixture.debugElement.injector.get(ChatStoreService)).toBe(store);
-    const teammates = element().querySelector(".nol-teamrun-teammates")!;
+    const teammates = Required.of(element().querySelector(".nol-teamrun-teammates"));
     expect(texts(".nol-configuration-table-heading")).toEqual(["Default teammate", "Teammates"]);
     expect(texts(".nol-configuration-table-explanation", teammates)).toEqual(["Create and configure teammates here. Add them to a chat using its member strip or an @mention."]);
     expect(texts("th", teammates)).toEqual([Resources.teammateNameLabel, Resources.connectionColumn, Resources.modelLabel, Resources.effortLabel, String.empty]);
@@ -209,7 +211,7 @@ describe("TeammatesViewComponent", () => {
     const sets = (): JsonValue[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.DefaultTeammateSet)).map(t => t.parameters);
     const bounds = (target: Element): number[] => [target.getBoundingClientRect().left, target.getBoundingClientRect().right];
     const expectChangeOverEdit = (): void => bounds(button(".nol-teamrun-edit", row("Bob")))
-      .forEach((edge, index) => expect(Math.abs(edge - bounds(button(".nol-teamrun-change-default"))[index]!)).toBeLessThan(0.5));
+      .forEach((edge, index) => expect(Math.abs(edge - Required.of(bounds(button(".nol-teamrun-change-default"))[index]))).toBeLessThan(0.5));
     const reachable = (): number => element().querySelectorAll(".nol-teamrun-default-row button:not([inert])").length;
 
     expect(texts(".nol-teamrun-default-teammate .nol-configuration-table-explanation")).toEqual([Resources.defaultTeammateHint]);
@@ -236,7 +238,7 @@ describe("TeammatesViewComponent", () => {
     const edges = (table: string): number[] => [...element().querySelectorAll(`${table} thead th`)].slice(-3).flatMap(t => [t.getBoundingClientRect().left, t.getBoundingClientRect().right]);
     const chosen = edges(".nol-teamrun-default-teammate");
     expect(chosen).toHaveLength(6);
-    edges(".nol-teamrun-teammates").forEach((edge, index) => expect(Math.abs(edge - chosen[index]!)).toBeLessThan(0.5));
+    edges(".nol-teamrun-teammates").forEach((edge, index) => expect(Math.abs(edge - Required.of(chosen[index]))).toBeLessThan(0.5));
 
     button(".nol-teamrun-clear-default").click();
     await settle();
@@ -587,7 +589,7 @@ describe("TeammatesViewComponent", () => {
 
     it("brings forward the project's empty chat it started with the teammate, or with no one and adds the teammate, and starts another for a different teammate", async () => {
       const ids = ["c7", "c8", "c9"];
-      await create(t => SampleData.keepCreatedEmpty(t, u => data.start(u, new Conversation(ids[context.count(MethodName.ConversationCreate) - 1]!, "p1", "New chat",
+      await create(t => SampleData.keepCreatedEmpty(t, u => data.start(u, new Conversation(Required.of(ids[context.count(MethodName.ConversationCreate) - 1]), "p1", "New chat",
         SampleData.timestamp, SampleData.timestamp))));
       const added = (): string[] => context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationAddMember)).map(t => ConversationMemberParams.fromJson(t.parameters))
         .map(t => `${t.conversationId} ${t.teammateId}`);
@@ -718,6 +720,20 @@ describe("TeammatesViewComponent", () => {
     expect(element().querySelector(".nol-teamrun-error")).toBeNull();
   });
 
+  it("paints each teammate's avatar in the colour the store gives it by when it was made", async () => {
+    await create();
+    const fill = (name: string): string | undefined => row(name).querySelector<HTMLElement>("nol-avatar")?.style.getPropertyValue("--nol-avatar-fill");
+    const kit = TestBed.createComponent(AvatarComponent);
+    kit.componentRef.setInput("name", "Alice");
+    const paint = (color: number | null): string => {
+      kit.componentRef.setInput("color", color);
+      kit.detectChanges();
+      return PartReads.elementOf(kit.nativeElement).style.getPropertyValue("--nol-avatar-fill");
+    };
+
+    expect([fill("Alice"), fill("Bob"), store.teammateColor("alice"), store.teammateColor("bob")]).toEqual([paint(2), paint(3), 2, 3]);
+  });
+
   describe.each([
     { look: "the fixture theme", mode: ThemeMode.Light, forcedColors: "none" },
     { look: "dark", mode: ThemeMode.Dark, forcedColors: "none" },
@@ -779,15 +795,15 @@ describe("TeammatesViewComponent", () => {
       const shares = Object.values(Resources.teammateColumnShares);
       const total = shares.reduce((sum, t) => sum + t, 0);
       const headers = [...element().querySelectorAll<HTMLElement>(".nol-teamrun-teammates thead th")].map(t => box(t).width);
-      const ends = [...element().querySelectorAll<HTMLElement>("tbody .nol-teamrun-item")].map(t => box(t.querySelector("button:last-child")!).right);
+      const ends = [...element().querySelectorAll<HTMLElement>("tbody .nol-teamrun-item")].map(t => box(Required.of(t.querySelector("button:last-child"))).right);
 
       expect(headers).toHaveLength(shares.length);
-      headers.forEach((header, index) => expect(Math.abs(header - table.width * shares[index]! / total)).toBeLessThanOrEqual(shares.length / 64));
+      headers.forEach((header, index) => expect(Math.abs(header - table.width * Required.of(shares[index]) / total)).toBeLessThanOrEqual(shares.length / 64));
       expect(ends.length).toBeGreaterThan(1);
       for (const end of ends)
         AppearanceFixture.expectPixels(end, table.right);
       for (const action of element().querySelectorAll<HTMLButtonElement>(".nol-configuration-table-row-actions button")) {
-        const cell = box(action.closest("td")!);
+        const cell = box(Required.of(action.closest("td")));
         expect(box(action).left).toBeGreaterThanOrEqual(cell.left - 0.5);
         expect(box(action).right).toBeLessThanOrEqual(cell.right + 0.5);
       }

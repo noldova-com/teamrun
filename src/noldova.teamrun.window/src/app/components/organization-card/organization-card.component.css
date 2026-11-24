@@ -128,10 +128,6 @@
   min-width: 0;
 }
 
-.act .now-body {
-  column-gap: var(--nol-space-2);
-}
-
 .now-text {
   flex: 1 1 0;
   max-width: 100%;
@@ -144,25 +140,6 @@
   font-family: var(--nol-font-mono);
   font-size: var(--nol-text-code);
   white-space: nowrap;
-}
-
-.acts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nol-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nol-text-small);
-}
-
-.act {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--nol-space-2);
-  padding: calc(var(--nol-space-1) + var(--nol-space-half)) var(--nol-space-2);
-  border-radius: var(--nol-radius-small);
-  background: var(--nol-raised);
 }
 
 .usage {
@@ -203,37 +180,4 @@
   :host([data-nol-state="Focus"]) {
     outline: calc(var(--nol-border-width) * 2) solid Highlight;
   }
-}
-
-:host(.fluid) {
-  width: auto;
-}
-
-:host(.row) {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--nol-space-1) var(--nol-space-2);
-  width: auto;
-  padding: var(--nol-space-2);
-  border: none;
-  background: var(--nol-panel);
-}
-
-:host(.row:hover) {
-  background: var(--nol-hover);
-}
-
-:host(.row) .head {
-  display: contents;
-}
-
-:host(.row) .who {
-  flex-direction: row;
-  align-items: baseline;
-  gap: var(--nol-space-2);
-}
-
-:host(.row) > :not(.head) {
-  grid-column: 2;
 }

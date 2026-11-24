@@ -20,6 +20,10 @@
   padding-inline: var(--nol-space-2);
 }
 
+.nol-teamrun-composer-panel {
+  padding: var(--nol-space-1) var(--nol-space-3) var(--nol-space-3);
+}
+
 .nol-teamrun-composer-card {
   position: relative;
   display: flex;
@@ -104,6 +108,8 @@
 
 .nol-teamrun-composer-reach {
   padding-inline-start: var(--nol-space-1);
+  color: color-mix(in srgb, var(--nol-text-muted) 65%, transparent);
+  font-size: var(--nol-text-small);
 }
 
 .nol-teamrun-composer-attachments {
