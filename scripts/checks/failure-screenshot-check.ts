@@ -15,7 +15,9 @@ import { stripVTControlCharacters } from "node:util";
 import { ShortScreenshotNames } from "../angular/short-screenshot-names.ts";
 import type { ProcessResult } from "../processes/process-result.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
+import { FixtureRun } from "./fixture-run.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
+import { SocketStateCount } from "./socket-state-count.ts";
 
 export class FailureScreenshotCheck implements ICheck {
   private static readonly CLI: string = "node_modules/vitest/vitest.mjs";
@@ -64,8 +66,9 @@ export class FailureScreenshotCheck implements ICheck {
       const state = match.groups?.["state"] ?? "";
       counts.set(state, (counts.get(state) ?? 0) + 1);
     }
-    const states = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(t => `${t[0]} ${t[1]}`);
-    return states.length === 0 ? "none" : states.join(", ");
+    const states = Array.from(counts.keys(), t => new SocketStateCount(t, counts.get(t) ?? 0))
+      .sort((a, b) => b.count - a.count || a.state.localeCompare(b.state));
+    return states.length === 0 ? "none" : states.map(t => `${t.state} ${t.count}`).join(", ");
   }
 
   public static findingsOf(result: ProcessResult, files: readonly string[]): readonly string[] {
@@ -100,7 +103,7 @@ export class FailureScreenshotCheck implements ICheck {
     }
   }
 
-  private async runFixtureAsync(): Promise<{ readonly result: ProcessResult; readonly files: readonly string[] }> {
+  private async runFixtureAsync(): Promise<FixtureRun> {
     const attachments = path.join(this.root, ...FailureScreenshotCheck.ATTACHMENTS_SEGMENTS);
     await rm(attachments, { recursive: true, force: true });
     await mkdir(attachments, { recursive: true });
@@ -109,7 +112,7 @@ export class FailureScreenshotCheck implements ICheck {
         path.join(this.root, FailureScreenshotCheck.FIXTURE), FailureScreenshotCheck.TIMEOUT, { ...process.env, [FailureScreenshotCheck.ATTACHMENTS_VARIABLE]: attachments });
       const screenshots = path.join(attachments, FailureScreenshotCheck.SCREENSHOTS_FOLDER);
       const files = existsSync(screenshots) ? (await readdir(screenshots, { recursive: true, withFileTypes: true })).filter(t => t.isFile()).map(t => t.name) : [];
-      return { result, files };
+      return new FixtureRun(result, files);
     }
     finally {
       await rm(attachments, { recursive: true, force: true });

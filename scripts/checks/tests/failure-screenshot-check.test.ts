@@ -30,6 +30,20 @@ const netstatText = ["", "Active Connections", "", "  Proto  Local Address      
   "  TCP    [::1]:24315            [::1]:50004            TIME_WAIT", "  UDP    0.0.0.0:5353           *:*                    ", ""].join("\r\n");
 const sockets = new ProcessResult(0, netstatText, "");
 
+class CheckRun {
+  public readonly passed: boolean;
+  public readonly runs: number;
+  public readonly written: string;
+  public readonly netstatRuns: number;
+
+  public constructor(passed: boolean, runs: number, written: string, netstatRuns: number) {
+    this.passed = passed;
+    this.runs = runs;
+    this.written = written;
+    this.netstatRuns = netstatRuns;
+  }
+}
+
 class ScriptedRunner extends ProcessRunner {
   public runs: number = 0;
   public netstatRuns: number = 0;
@@ -62,7 +76,7 @@ class ScriptedRunner extends ProcessRunner {
 }
 
 const runAsync = async (results: readonly ProcessResult[], platform: string = "linux", netstat: ProcessResult | Error = sockets):
-  Promise<readonly [boolean, number, string, number]> => {
+  Promise<CheckRun> => {
   const root = await mkdtemp(path.join(tmpdir(), "failure-screenshot-check-"));
   try {
     const runner = new ScriptedRunner(results, netstat);
@@ -74,7 +88,7 @@ const runAsync = async (results: readonly ProcessResult[], platform: string = "l
       }
     });
     const passed = await new FailureScreenshotCheck(root, runner, platform).runAsync(output);
-    return [passed, runner.runs, written, runner.netstatRuns];
+    return new CheckRun(passed, runner.runs, written, runner.netstatRuns);
   }
   finally {
     await rm(root, { recursive: true, force: true });
@@ -112,8 +126,8 @@ describe("FailureScreenshotCheck", () => {
     const none = await runAsync([noTest, failed(logLine)]);
     const ran = await runAsync([failed(logLine)]);
 
-    assert.deepEqual([none[0], none[1], ran[0], ran[1]], [false, 1, true, 1]);
-    assert.match(none[2], /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/u);
+    assert.deepEqual([none.passed, none.runs, ran.passed, ran.runs], [false, 1, true, 1]);
+    assert.match(none.written, /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/u);
   });
 
   it("counts netstat's TCP connections by state, most first, over IPv4 and IPv6, and says none when it lists none", () => {
@@ -126,19 +140,19 @@ describe("FailureScreenshotCheck", () => {
     const ran = await runAsync([failed(logLine)], "win32");
     const linux = await runAsync([noTest], "linux");
 
-    assert.deepEqual([windows[0], windows[3], ran[0], ran[3], linux[0], linux[3]], [false, 1, true, 0, false, 0]);
-    assert.match(windows[2], /^Windows' TCP connections by state after that run, from netstat: TIME_WAIT 3, ESTABLISHED 1, LISTENING 1\.$/mu);
-    assert.doesNotMatch(`${ran[2]}${linux[2]}`, /netstat/u);
+    assert.deepEqual([windows.passed, windows.netstatRuns, ran.passed, ran.netstatRuns, linux.passed, linux.netstatRuns], [false, 1, true, 0, false, 0]);
+    assert.match(windows.written, /^Windows' TCP connections by state after that run, from netstat: TIME_WAIT 3, ESTABLISHED 1, LISTENING 1\.$/mu);
+    assert.doesNotMatch(`${ran.written}${linux.written}`, /netstat/u);
   });
 
   it("still fails a run that ran no test for that reason when netstat exits with an error or can't start, and says which", async () => {
     const exited = await runAsync([noTest], "win32", new ProcessResult(1, "", "The requested operation requires elevation."));
     const failedToStart = await runAsync([noTest], "win32", new Error(`"netstat" could not start.`));
 
-    assert.deepEqual([exited[0], failedToStart[0]], [false, false]);
-    assert.match(exited[2], /^netstat couldn't list Windows' TCP connections after that run, and exited with 1:\nThe requested operation requires elevation\.$/mu);
-    assert.match(failedToStart[2], /^netstat couldn't list Windows' TCP connections after that run: "netstat" could not start\.$/mu);
-    assert.match(failedToStart[2], /^The fixture's run should fail its one test, but ran no test/u);
+    assert.deepEqual([exited.passed, failedToStart.passed], [false, false]);
+    assert.match(exited.written, /^netstat couldn't list Windows' TCP connections after that run, and exited with 1:\nThe requested operation requires elevation\.$/mu);
+    assert.match(failedToStart.written, /^netstat couldn't list Windows' TCP connections after that run: "netstat" could not start\.$/mu);
+    assert.match(failedToStart.written, /^The fixture's run should fail its one test, but ran no test/u);
   });
 
   it("fails a run that didn't log the long name, logged a name that fits, or logged another file's path", () => {
