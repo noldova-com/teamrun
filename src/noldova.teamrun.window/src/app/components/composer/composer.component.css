@@ -353,3 +353,14 @@
 :host(.nol-teamrun-composer-fan-out) .nol-teamrun-composer-picker {
   display: none;
 }
+
+@container nol-teamrun-chat (height < 25rem) {
+  .nol-teamrun-composer {
+    padding-block-end: var(--nol-space-2);
+  }
+
+  .nol-teamrun-composer-text {
+    min-height: calc(1lh + var(--nol-space-3));
+    max-height: calc(4lh + var(--nol-space-3));
+  }
+}
