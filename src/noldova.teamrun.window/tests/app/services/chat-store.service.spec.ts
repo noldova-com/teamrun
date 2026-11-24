@@ -126,6 +126,7 @@ import { TerminalStep } from "../../../src/app/enums/terminal-step";
 import { FileGrantException } from "../../../src/app/exceptions/file-grant.exception";
 import { ListNotArrayException } from "../../../src/app/exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../../../src/app/exceptions/model-catalog-unavailable.exception";
+import { TeammateProviderMissingException } from "../../../src/app/exceptions/teammate-provider-missing.exception";
 import { AcpLocalVariable } from "../../../src/app/models/acp-local-variable";
 import { ComposerSettings } from "../../../src/app/models/composer-settings";
 import { MessageControlState } from "../../../src/app/models/message-control-state";
@@ -299,6 +300,14 @@ describe("ChatStoreService", () => {
 
     expect([states, context.requests.filter(t => t.method === FakeWindowPartContext.qualify(MethodName.ConversationSetPlanFirst))
       .map(t => ChatPlanFirstParams.fromJson(t.parameters)).map(t => [t.chatId, t.planFirst])]).toEqual([[[true, true], [true, false]], [["c1", true], ["c1", false]]]);
+  });
+
+  it("gives a teammate's provider, and refuses a teammate whose provider isn't listed, naming both", async () => {
+    new TeammateFixture(context);
+    await store.initialize();
+
+    expect(store.providerOf(Required.of(store.teammate("alice"))).id).toBe("a1");
+    expect(() => store.providerOf(Required.of(store.teammate("offline")))).toThrow(new TeammateProviderMissingException("offline", "missing"));
   });
 
   it("loads and refreshes teammates and selected membership, with teammate-scoped mutation errors", async () => {

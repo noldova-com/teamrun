@@ -256,20 +256,22 @@ LICENSE file in the root directory of this source tree.
 </ng-template>
 <ng-template #permissionsMenu>
   <nol-menu class="nol-teamrun-composer-permissions" [attr.aria-label]="resources.chatPermissionsLabel" [minWidth]="resources.settingsMenuWidth">
-    <nol-menu-group [label]="permissionsTitle()">
-      @if (!selectedMode()) {
-        <button type="button" nol-menu-item [label]="modeName()" [checked]="true" [disabled]="true"></button>
-      }
-      @for (choice of catalog().modes; track choice.id) {
-        <button type="button" nol-menu-item [label]="choice.name" [description]="choice.description" [icon]="choice.unrestricted ? resources.unrestrictedModeGlyph : null"
-          [tag]="choice.id === defaultModeId() ? defaultModeTag() : null" [checked]="choice.id === selectedMode()?.id" [disabled]="modelsLoading()"
-          (triggered)="selectMode(choice.id)"></button>
-      }
-      @for (refused of refusedModes(); track refused.name) {
-        <button type="button" nol-menu-item class="nol-teamrun-refused-mode" [label]="refused.name" [icon]="refused.unrestricted ? resources.unrestrictedModeGlyph : null"
-          [disabled]="true" [nolTooltip]="refused.reason"></button>
-      }
-    </nol-menu-group>
+    @if (chosenDescriptor(); as descriptor) {
+      <nol-menu-group [label]="resources.formatChatPermissionsOf(descriptor.displayName)">
+        @if (!selectedMode()) {
+          <button type="button" nol-menu-item [label]="modeName()" [checked]="true" [disabled]="true"></button>
+        }
+        @for (choice of catalog().modes; track choice.id) {
+          <button type="button" nol-menu-item [label]="choice.name" [description]="choice.description" [icon]="choice.unrestricted ? resources.unrestrictedModeGlyph : null"
+            [tag]="choice.id === defaultModeId() ? defaultModeTag() : null" [checked]="choice.id === selectedMode()?.id" [disabled]="modelsLoading()"
+            (triggered)="selectMode(choice.id, descriptor.displayName)"></button>
+        }
+        @for (refused of refusedModes(); track refused.name) {
+          <button type="button" nol-menu-item class="nol-teamrun-refused-mode" [label]="refused.name" [icon]="refused.unrestricted ? resources.unrestrictedModeGlyph : null"
+            [disabled]="true" [nolTooltip]="refused.reason"></button>
+        }
+      </nol-menu-group>
+    }
     @if (planFirstRefusal(); as reason) {
       <nol-menu-separator />
       <button type="button" nol-menu-item class="nol-teamrun-plan-first" [label]="resources.planFirstLabel" [description]="resources.planFirstDescription"

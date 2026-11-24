@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
+import { ViewedImageMissingException } from "../exceptions/viewed-image-missing.exception";
 import type { ViewedImage } from "./viewed-image";
 
 export class ImageViewerData {
@@ -17,6 +20,13 @@ export class ImageViewerData {
     this.image = image;
     this.images = images.includes(image) ? [...images] : [image];
     this.index = this.images.indexOf(image);
+  }
+
+  public static of(key: string, images: readonly ViewedImage[]): ImageViewerData {
+    const image = images.find(t => t.key === key);
+    if (Object.isUndefined(image))
+      throw new ViewedImageMissingException(key);
+    return new ImageViewerData(image, images);
   }
 
   public imageAt(index: number): ViewedImage {

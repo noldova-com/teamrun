@@ -147,6 +147,7 @@ import { DraftStaleException } from "../exceptions/draft-stale.exception";
 import { FileGrantException } from "../exceptions/file-grant.exception";
 import { ListNotArrayException } from "../exceptions/list-not-array.exception";
 import { ModelCatalogUnavailableException } from "../exceptions/model-catalog-unavailable.exception";
+import { TeammateProviderMissingException } from "../exceptions/teammate-provider-missing.exception";
 import type { IIdentified } from "../interfaces/i-identified";
 import type { ITerminalLauncher } from "../interfaces/i-terminal-launcher";
 import type { AcpLocalVariable } from "../models/acp-local-variable";
@@ -1031,6 +1032,13 @@ export class ChatStoreService {
     if (provider.authStatus === AuthStatus.LoggedOut)
       return TeammateStopReason.SignedOut;
     return this.hasKind(provider.kind) ? null : TeammateStopReason.KindMissing;
+  }
+
+  public providerOf(teammate: Teammate): Provider {
+    const provider = this.providers().find(t => t.id === teammate.providerId);
+    if (Object.isUndefined(provider))
+      throw new TeammateProviderMissingException(teammate.id, teammate.providerId);
+    return provider;
   }
 
   public isTeammateProviderDisabled(id: string): boolean {

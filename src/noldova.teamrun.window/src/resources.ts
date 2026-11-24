@@ -100,7 +100,6 @@ export class Resources {
   public static readonly draftNotSaved: string = "The unsent message could not be saved.";
   public static readonly draftStale: string = "Another window changed the unsent message since this one read it.";
   public static readonly draftUnreadable: string = "The unsent message could not be read, so what is written here is not kept.";
-  public static readonly missingValue: string = "A value the window relies on is missing.";
   public static readonly modelImagesUnsupported: string = "No one in this chat takes images.";
   public static readonly chatPermissionsLabel: string = "Permissions in this chat";
   public static readonly toolsFollowMode: string = "TeamRun's own tools follow this mode.";
@@ -759,7 +758,8 @@ export class Resources {
   public static readonly markdownEscapeBase: number = 0xe000;
   public static readonly markdownEscapedPattern: RegExp = /[\ue000-\ue07f]/g;
   public static readonly markdownEscapeMark: string = "\\";
-  public static readonly markdownCodeSpanPattern: RegExp = /(?<!`)(`+)(?!`)([\s\S]*?)(?<!`)\1(?!`)/g;
+  public static readonly markdownCodeSpanPattern: RegExp = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
+  public static readonly markdownCodeFencePattern: RegExp = /^`+|`+$/g;
   public static readonly markdownCodeSpacePattern: RegExp = /^ (?=[\s\S]*\S)([\s\S]*) $/;
   public static readonly markdownFencePattern: RegExp = /^ {0,3}(`{3,}|~{3,})/;
   public static readonly markdownIndentedCodePattern: RegExp = /^(?: {4}|\t)/;
@@ -2216,6 +2216,18 @@ export class Resources {
 
   public static formatListNotArray(kind: string): string {
     return `The runtime part answered a list with a value of kind ${kind}, which isn't a list.`;
+  }
+
+  public static formatTeammateProviderMissing(teammateId: string, providerId: string): string {
+    return `Teammate ${teammateId} answers through provider ${providerId}, which isn't listed.`;
+  }
+
+  public static formatViewedImageMissing(key: string): string {
+    return `Image ${key} isn't among the images to view.`;
+  }
+
+  public static formatSegmentDetailMissing(kind: string): string {
+    return `A reply's ${kind} segment has no detail of its own.`;
   }
 
   public static formatHistoryReadMismatch(start: number, end: number): string {

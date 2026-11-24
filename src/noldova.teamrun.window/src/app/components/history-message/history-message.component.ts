@@ -86,7 +86,6 @@ import { MarkdownImageSource } from "../../models/markdown-image-source";
 import { MessageControlState } from "../../models/message-control-state";
 import type { ModelCatalog } from "../../models/model-catalog";
 import type { ReplySegment } from "../../models/reply-segment";
-import { Required } from "../../models/required";
 import type { ReplyStats } from "../../models/reply-stats";
 import type { SustainHandover } from "../../models/sustain-handover";
 import { TimedSegment } from "../../models/timed-segment";
@@ -225,7 +224,7 @@ export class HistoryMessageComponent implements OnInit {
       : new Set(segments.filter((t, index) => index < lastActivity && t.detail?.kind === DetailKind.Text).map(t => t.key));
   });
   protected readonly stepEntries: Signal<readonly ActivityEntry[]> = computed(() => this.segments().flatMap(t => this.foldedKeys().has(t.key)
-    ? [new ActivityEntry(Required.of(t.detail), null)] : t.kind === SegmentKind.Activity ? t.entries : []));
+    ? [new ActivityEntry(t.requiredDetail, null)] : t.kind === SegmentKind.Activity ? t.entries : []));
   protected readonly latestStep: Signal<ActivityStep | null> = computed(() => !this.isActive() || this.isActivityOpen() ? null
     : this.formatter.latestStepOf(this.message(), this.stepEntries(), this.rootPath(), this.areStepsGrowing()));
   protected readonly edits: Signal<readonly FileEdit[]> = computed(() => new FileChangeReader().editsOf(this.message()));
@@ -267,7 +266,7 @@ export class HistoryMessageComponent implements OnInit {
     const rootPath = this.rootPath();
     const images = new Map<number, ViewedImage>();
     for (const t of this.segments().filter(u => u.kind === SegmentKind.Image)) {
-      const image = this.formatter.generatedImageOf(message, Required.of(t.detail), rootPath);
+      const image = this.formatter.generatedImageOf(message, t.requiredDetail, rootPath);
       if (!Object.isNull(image))
         images.set(t.key, image);
     }
@@ -277,12 +276,12 @@ export class HistoryMessageComponent implements OnInit {
     const message = this.message();
     const rootPath = this.rootPath();
     return this.segments().filter(t => t.kind === SegmentKind.Image).flatMap(t => {
-      const missing = this.formatter.missingImageOf(message, Required.of(t.detail), rootPath);
+      const missing = this.formatter.missingImageOf(message, t.requiredDetail, rootPath);
       return Object.isNull(missing) ? [] : [new KeyedMissingImage(t.key, missing)];
     });
   });
   protected readonly plan: Signal<ReplyPlan | null> = computed(() => this.formatter.planOf(this.message()));
-  protected readonly planKey: Signal<number> = computed(() => Required.of(this.segments().find(t => t.kind === SegmentKind.Plan)).key);
+  protected readonly planSegment: Signal<ReplySegment | undefined> = computed(() => this.segments().find(t => t.kind === SegmentKind.Plan));
   protected readonly isPlanOpen: Signal<boolean> = computed(() => this.state().expansion.plan());
   protected readonly approvalGroups: Signal<readonly ApprovalGroup[]> = computed(() => {
     const timed = this.timedSegments();

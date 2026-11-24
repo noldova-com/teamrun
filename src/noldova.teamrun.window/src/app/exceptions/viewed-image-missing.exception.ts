@@ -9,10 +9,12 @@
 import { Resources } from "../../resources";
 import { WindowException } from "./window.exception";
 
-export class MissingValueException extends WindowException {
-  public override readonly name: string = "MissingValueException";
+export class ViewedImageMissingException extends WindowException {
+  public override readonly name: string = "ViewedImageMissingException";
+  public readonly key: string;
 
-  public constructor() {
-    super(Resources.missingValue);
+  public constructor(key: string) {
+    super(Resources.formatViewedImageMissing(key));
+    this.key = key;
   }
 }

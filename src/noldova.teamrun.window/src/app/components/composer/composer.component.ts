@@ -96,10 +96,9 @@ import { ImageViewerData } from "../../models/image-viewer-data";
 import { ModelCatalog } from "../../models/model-catalog";
 import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
-import { Required } from "../../models/required";
 import type { RewoundDraft } from "../../models/rewound-draft";
 import { TeammateModelSettings } from "../../models/teammate-model-settings";
-import { ViewedImage } from "../../models/viewed-image";
+import type { ViewedImage } from "../../models/viewed-image";
 import { ChatStoreService } from "../../services/chat-store.service";
 import { CommandTargetsService } from "../../services/command-targets.service";
 import { ComposerChoicesService } from "../../services/composer-choices.service";
@@ -271,7 +270,6 @@ export class ComposerComponent {
   protected readonly modeName: Signal<string>;
   protected readonly defaultModeId: Signal<string | null>;
   protected readonly defaultModeTag: Signal<string>;
-  protected readonly permissionsTitle: Signal<string>;
   protected readonly unrestricted: Signal<boolean>;
   protected readonly planFirstOffered: Signal<boolean>;
   protected readonly planFirstRefusal: Signal<string | null>;
@@ -349,7 +347,7 @@ export class ComposerComponent {
     });
     this.chosenKind = computed(() => {
       const responder = this.responder();
-      return Object.isNull(responder) ? this.kind() : Required.of(store.providers().find(t => t.id === responder.providerId)).kind;
+      return Object.isNull(responder) ? this.kind() : store.providerOf(responder).kind;
     });
     this.chosenDescriptor = computed(() => store.kinds().find(t => t.id === this.chosenKind()));
     this.ownProvider = computed(() => this.providerId() ?? store.usualProviderOf(this.kind()));
@@ -501,7 +499,6 @@ export class ComposerComponent {
       const responder = this.responder();
       return Object.isNull(responder) ? Resources.defaultModeTag : Resources.formatOwnDefaultMode(responder.name);
     });
-    this.permissionsTitle = computed(() => Resources.formatChatPermissionsOf(Required.of(this.chosenDescriptor()).displayName));
     this.unrestricted = computed(() => this.selectedMode()?.unrestricted === true);
     this.planFirstOffered = computed(() => !Object.isNull(this.catalog().planMode) && this.selectedMode()?.readOnly !== true);
     this.refusedModes = computed(() => RefusedMode.of(this.chosenDescriptor(), this.catalog().modes));
@@ -848,7 +845,9 @@ export class ComposerComponent {
   }
 
   protected pickFiles(input: HTMLInputElement): void {
-    this.addFiles(Array.from(Required.of(input.files)));
+    const files = input.files;
+    if (!Object.isNull(files))
+      this.addFiles(Array.from(files));
     input.value = String.empty;
   }
 
@@ -883,21 +882,20 @@ export class ComposerComponent {
   protected openAttachment(attachment: ComposerAttachment, frame: HTMLElement, mode: ImageOpenMode = this.viewer.openMode()): void {
     for (const tooltip of this.frameTooltips())
       tooltip.hide();
-    const images = this.attachments().filter(t => !Object.isNull(t.previewUrl())).map(t => ComposerComponent.imageOf(t, this.conversationId()));
-    const image = Required.of(images.find(t => t.key === attachment.key));
+    const data = ImageViewerData.of(attachment.key, this.viewedImages());
     if (mode === ImageOpenMode.Tab) {
-      this.viewer.openTab(image);
+      this.viewer.openTab(data.image);
       return;
     }
-    ImageDialogComponent.open(this.dialogs, this.viewer, new ImageViewerData(image, images), frame);
+    ImageDialogComponent.open(this.dialogs, this.viewer, data, frame);
   }
 
   protected async copyAttachment(attachment: ComposerAttachment): Promise<void> {
-    this.reportImage(await this.viewer.copyAsync(ComposerComponent.imageOf(attachment, this.conversationId())), Resources.imageCopyFailed);
+    this.reportImage(await this.viewer.copyAsync(ImageViewerData.of(attachment.key, this.viewedImages()).image), Resources.imageCopyFailed);
   }
 
   protected async saveAttachment(attachment: ComposerAttachment): Promise<void> {
-    this.reportImage(await this.viewer.saveAsync(ComposerComponent.imageOf(attachment, this.conversationId())), Resources.imageSaveFailed);
+    this.reportImage(await this.viewer.saveAsync(ImageViewerData.of(attachment.key, this.viewedImages()).image), Resources.imageSaveFailed);
   }
 
   protected removeAttachment(attachment: ComposerAttachment): void {
@@ -1014,14 +1012,14 @@ export class ComposerComponent {
     return this.store.setMemberSettings(this.conversationId(), teammate.id, settings);
   }
 
-  protected selectMode(id: string): void {
+  protected selectMode(id: string, providerName: string): void {
     const catalog = this.catalog();
     const mode = id === this.defaultModeId() ? null : id;
     const teammate = this.responder();
     if (id === this.selectedMode()?.id)
       return;
     const conversationId = this.conversationId();
-    UnrestrictedModeConfirmation.choose(this.dialogs, catalog.modeOf(id), Required.of(this.chosenDescriptor()).displayName, () => {
+    UnrestrictedModeConfirmation.choose(this.dialogs, catalog.modeOf(id), providerName, () => {
       if (!Object.isNull(teammate)) {
         void this.store.setMemberMode(conversationId, teammate.id, mode);
         return;
@@ -1037,8 +1035,10 @@ export class ComposerComponent {
 
   protected selectResponder(id: string | null, chosen: boolean = true): void {
     this.responderId.set(id);
-    this.choices.remember(this.conversationId(), new ComposerSettings(Required.of(this.kind()), this.model(), this.effort(), this.ownProvider(), id, this.speed(), this.mode()));
-    this.keepChoice(this.conversationId(), this.currentSettings(), chosen);
+    const settings = this.currentSettings();
+    if (!Object.isNull(settings))
+      this.choices.remember(this.conversationId(), settings);
+    this.keepChoice(this.conversationId(), settings, chosen);
   }
 
   protected loadModels(refresh: boolean = false, quiet: boolean = false): void {
@@ -1245,6 +1245,11 @@ export class ComposerComponent {
     return this.isFanOut() ? this.keptDrafts : this.chatDrafts;
   }
 
+  private viewedImages(): readonly ViewedImage[] {
+    const conversationId = this.conversationId();
+    return this.attachments().map(t => t.viewedImageIn(conversationId)).filter(t => !Object.isNull(t));
+  }
+
   private currentSettings(): ComposerSettings | null {
     const kind = this.kind();
     return Object.isNull(kind) ? null : new ComposerSettings(kind, this.model(), this.effort(), this.ownProvider(), this.responderId(), this.speed(), this.mode());
@@ -1311,12 +1316,13 @@ export class ComposerComponent {
           this.defaults.remember(settings);
         }
         const last = mentions.at(-1);
+        const current = this.currentSettings();
         if (!Object.isUndefined(last)) {
           this.choices.remember(conversationId, settings.withResponder(last.teammateId));
           this.keepChoice(conversationId, settings.withResponder(last.teammateId));
         }
-        else if (conversationId === this.conversationId() && !settings.equals(this.currentSettings()))
-          this.choices.remember(conversationId, Required.of(this.currentSettings()));
+        else if (conversationId === this.conversationId() && !Object.isNull(current) && !settings.equals(current))
+          this.choices.remember(conversationId, current);
         for (const attachment of drafted)
           attachment.dispose();
         if (conversationId === this.shownConversationId) {
@@ -1403,13 +1409,5 @@ export class ComposerComponent {
       this.attachmentError.set(failure);
     else if (this.attachmentError() === failure)
       this.attachmentError.set(null);
-  }
-
-  private static imageOf(attachment: ComposerAttachment, conversationId: string): ViewedImage {
-    const url = Required.of(attachment.previewUrl());
-    const path = attachment.sharedPath;
-    return Object.isNull(path)
-      ? ViewedImage.fromData(attachment.key, conversationId, attachment.name, attachment.mediaType, url.slice(url.indexOf(Resources.dataUrlSeparator) + 1))
-      : new ViewedImage(attachment.key, conversationId, attachment.name, attachment.mediaType, path, null);
   }
 }

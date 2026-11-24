@@ -25,7 +25,6 @@ import type { ChatThread } from "../models/chat-thread";
 import { MissingImage } from "../models/missing-image";
 import { ModelCatalog } from "../models/model-catalog";
 import { ReplySegment } from "../models/reply-segment";
-import { Required } from "../models/required";
 import { SustainHandover } from "../models/sustain-handover";
 import { WakeReceived } from "../models/wake-received";
 import { WakeReply } from "../models/wake-reply";
@@ -300,7 +299,8 @@ export class FormatterService {
   }
 
   public planTitle(plan: ReplyPlan): string {
-    return Object.isNull(plan.text) || Resources.planHeading.test(plan.text) ? Resources.planTitle : Required.of(plan.title);
+    const title = plan.title;
+    return Object.isNull(plan.text) || Object.isNull(title) || Resources.planHeading.test(plan.text) ? Resources.planTitle : title;
   }
 
   public planProgress(plan: ReplyPlan): string | null {
@@ -315,8 +315,8 @@ export class FormatterService {
     if (this.hasStepStatus(detail, Resources.failedStepStatuses))
       return null;
     const reader = new WrittenImageReader();
-    const payload = Required.of(FormatterService.payloadOf(detail));
-    const saved = payload[Resources.savedPathField];
+    const payload = FormatterService.payloadOf(detail);
+    const saved = payload?.[Resources.savedPathField];
     const savedPath = Object.isString(saved) ? saved : null;
     const stored = reader.storedPathOf(detail);
     if (!Object.isNull(stored))
@@ -324,8 +324,8 @@ export class FormatterService {
     const path = Object.isNull(rootPath) ? null : reader.generatedPathOf(detail, rootPath);
     if (!Object.isNull(path))
       return ViewedImage.written(message.conversationId, message.id, path, this.isActive(message) ? detail.sequence : null);
-    const data = payload[Resources.imageDataField];
-    const mediaType = payload[Resources.mediaTypeField];
+    const data = payload?.[Resources.imageDataField];
+    const mediaType = payload?.[Resources.mediaTypeField];
     return Object.isString(data) && Object.isString(mediaType)
       ? ViewedImage.generated(message.conversationId, message.id, detail.sequence, savedPath, mediaType, data) : null;
   }
@@ -689,7 +689,7 @@ export class FormatterService {
   }
 
   private static imageFailureOf(detail: MessageDetail): string | null {
-    const failure = FormatterService.payloadOf(detail)![Resources.failureField] ?? null;
+    const failure = FormatterService.payloadOf(detail)?.[Resources.failureField] ?? null;
     if (!FormatterService.isJsonObject(failure))
       return null;
     if (failure[Resources.failureTypeField] === Resources.usageLimitFailure)
@@ -749,7 +749,7 @@ export class FormatterService {
     let plain = String.empty;
     let start = 0;
     for (const span of escaped.matchAll(Resources.markdownCodeSpanPattern)) {
-      const code = Required.of(span[2]).replace(Resources.markdownCodeSpacePattern, Resources.markdownMarkedText);
+      const code = span[0].replace(Resources.markdownCodeFencePattern, String.empty).replace(Resources.markdownCodeSpacePattern, Resources.markdownMarkedText);
       plain += FormatterService.unmarkedOf(escaped.slice(start, span.index)) + code.replace(Resources.markdownEscapedPattern, t => Resources.markdownEscapeMark + FormatterService.unescapedOf(t));
       start = span.index + span[0].length;
     }

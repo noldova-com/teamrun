@@ -12,6 +12,7 @@ import { AttachmentInput, type MessageAttachment, Resources as ProtocolResources
 
 import { Resources } from "../../resources";
 import type { FileShare } from "./file-share";
+import { ViewedImage } from "./viewed-image";
 
 export class ComposerAttachment {
   private readonly file: File | null;
@@ -47,6 +48,16 @@ export class ComposerAttachment {
 
   public get sharedPath(): string | null {
     return Object.isNull(this.share) ? null : this.savedFile!.path;
+  }
+
+  public viewedImageIn(conversationId: string): ViewedImage | null {
+    const url = this.previewUrl();
+    if (Object.isNull(url))
+      return null;
+    const path = this.sharedPath;
+    return Object.isNull(path)
+      ? ViewedImage.fromData(this.key, conversationId, this.name, this.mediaType, url.slice(url.indexOf(Resources.dataUrlSeparator) + 1))
+      : new ViewedImage(this.key, conversationId, this.name, this.mediaType, path, null);
   }
 
   public markSaved(file: MessageAttachment): void {

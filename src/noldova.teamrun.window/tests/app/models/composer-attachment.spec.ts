@@ -10,6 +10,7 @@ import { ErrorCode, MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
 import { FileShare } from "../../../src/app/models/file-share";
+import { ViewedImage } from "../../../src/app/models/viewed-image";
 import { CodedError } from "../../fixtures/coded-error.fixture";
 
 describe("ComposerAttachment", () => {
@@ -63,6 +64,20 @@ describe("ComposerAttachment", () => {
     expect(read).not.toHaveBeenCalled();
     attachment.dispose();
     expect(attachment.previewUrl()).toBeNull();
+  });
+
+  it("views a picked image from its bytes and a saved one from its stored path, and a file with no preview as no image", async () => {
+    const picked = new ComposerAttachment(new File(["image"], "picture.png", { type: "image/png" }));
+    const saved = new MessageAttachment("photo.png", "image/png", 5, "D:/data/attachments/drafts/c1/photo.png");
+    const stored = new ComposerAttachment(saved);
+    const text = new ComposerAttachment(new File(["notes"], "notes.txt", { type: "text/plain" }));
+    await Promise.all([picked.loadPreview(read), stored.loadPreview(read), text.loadPreview(read)]);
+
+    expect([picked.viewedImageIn("c1"), stored.viewedImageIn("c1"), text.viewedImageIn("c1")]).toEqual([
+      ViewedImage.fromData(picked.key, "c1", "picture.png", "image/png", "aW1hZ2U="),
+      new ViewedImage(stored.key, "c1", "photo.png", "image/png", saved.path, null),
+      null
+    ]);
   });
 
   it("previews a saved image by the address its stored path is shared at, and releases the share once when disposed", async () => {

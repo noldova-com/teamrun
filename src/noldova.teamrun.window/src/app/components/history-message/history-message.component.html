@@ -182,13 +182,15 @@ LICENSE file in the root directory of this source tree.
     </ng-template>
   }
   @if (plan(); as plan) {
-    <ng-template [nolMessageSlot]="planSlotOf(planKey())">
-      @if (areSlotsShown()) {
-        <nol-teamrun-plan-card class="reply-plan" [plan]="plan" [open]="isPlanOpen()" [revealStart]="revealsPlan() ? flashStart() : null" [revealRow]="message().sequence" [mentions]="mentions()"
-          [fileLinks]="true" [shellRuns]="runsShell()" (toggled)="togglePlan()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
-          [shellRunOutputs]="planRunOutputs()" [shellRunStates]="planRunStates()" [terminalOwner]="terminalOwner()" [messageId]="message().id" (shellRun)="runShell($event, resources.runPlanSite)" [approvable]="awaitsPlanApproval()" [approving]="approvingPlan()" (approve)="approvePlan()" />
-      }
-    </ng-template>
+    @if (planSegment(); as segment) {
+      <ng-template [nolMessageSlot]="planSlotOf(segment.key)">
+        @if (areSlotsShown()) {
+          <nol-teamrun-plan-card class="reply-plan" [plan]="plan" [open]="isPlanOpen()" [revealStart]="revealsPlan() ? flashStart() : null" [revealRow]="message().sequence" [mentions]="mentions()"
+            [fileLinks]="true" [shellRuns]="runsShell()" (toggled)="togglePlan()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
+            [shellRunOutputs]="planRunOutputs()" [shellRunStates]="planRunStates()" [terminalOwner]="terminalOwner()" [messageId]="message().id" (shellRun)="runShell($event, resources.runPlanSite)" [approvable]="awaitsPlanApproval()" [approving]="approvingPlan()" (approve)="approvePlan()" />
+        }
+      </ng-template>
+    }
   }
   <ng-template [nolMessageSlot]="resources.attachedImagesSlot">
     @if (areSlotsShown()) {
