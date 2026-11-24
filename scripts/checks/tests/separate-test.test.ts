@@ -42,7 +42,22 @@ describe("npm test's Angular tests in a job of their own", () => {
     const whole = await runWith([], { NOLDOVA_SEPARATE_TEST: "" });
 
     assert.equal(stoppedOf(separate.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Script types, Script tests");
-    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Angular tests and coverage, Failure screenshots, Script types, Script tests");
+    assert.equal(stoppedOf(whole.text), "Angular cdk copy rules, Packages, Same archives, Copy list, Package tests and coverage, Failure screenshots, Angular tests and coverage, Script types, Script tests");
+  });
+
+  it("runs the Failure screenshots check before the Angular tests in npm test -- angular, so its fixture's browser starts before the Angular tests load the machine", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "separate-test-"));
+    folders.push(root);
+    mkdirSync(path.join(root, "src", "noldova.teamrun.window", "tests", "fixtures", "failure-screenshot"), { recursive: true });
+    let text = "";
+    const output = new Writable({ write: (chunk, _encoding, done): void => { text += String(chunk); done(); } });
+
+    const exitCode = await new Test(root, new ProcessRunner(), output, {}).runAsync(["angular"]);
+
+    const screenshots = text.indexOf("\nFailure screenshots\n");
+    const angular = text.indexOf("\nAngular tests and coverage\n");
+    assert.equal(exitCode, 1);
+    assert.equal(screenshots >= 0 && angular > screenshots, true, text);
   });
 
   it("takes the skip options the shared build-and-test workflow passes, and runs the same checks", async () => {

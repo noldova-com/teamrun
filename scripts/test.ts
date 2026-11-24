@@ -93,7 +93,7 @@ export class Test {
     if (options.isDocuments)
       return await this.runChecksAsync([this.createDocumentChecks()], Test.DOCUMENTS_NOTICE, null, null);
     if (options.isAngular)
-      return await this.runChecksAsync([[new AngularTestCheck(new AngularProject(this.root, this.runner), null), new FailureScreenshotCheck(this.root, this.runner)]], null, null, null);
+      return await this.runChecksAsync([this.createAngularChecks(null)], null, null, null);
 
     const flaky = options.isRerunningFailed ? new FlakyRecord(this.root, this.environment) : null;
     await flaky?.clearAsync();
@@ -225,6 +225,11 @@ export class Test {
     return counts;
   }
 
+  private createAngularChecks(flaky: FlakyRecord | null): readonly ICheck[] {
+    const project = new AngularProject(this.root, this.runner);
+    return [new FailureScreenshotCheck(this.root, this.runner, project), new AngularTestCheck(project, flaky)];
+  }
+
   private createDocumentChecks(): readonly ICheck[] {
     return [new DocumentCheck(this.root, new RepositoryFiles(this.root, new Git(this.root, this.runner)))];
   }
@@ -239,7 +244,7 @@ export class Test {
       new CopyListCheck(this.root, async () => await new NpmCommand(this.runner, this.environment).runAsync(CopyListCheck.LIST_ARGUMENTS, this.root),
         async () => await build.readArchivesAsync()),
       new PackageTestCheck(this.root, build, this.runner, this.environment, flaky, options),
-      ...this.environment[Test.SEPARATE_VARIABLE] === Test.ANGULAR ? [] : [new AngularTestCheck(new AngularProject(this.root, this.runner), flaky), new FailureScreenshotCheck(this.root, this.runner)],
+      ...this.environment[Test.SEPARATE_VARIABLE] === Test.ANGULAR ? [] : this.createAngularChecks(flaky),
       new TypeCheck(this.root, this.runner),
       new ScriptTestCheck(this.root, this.runner)
     ];

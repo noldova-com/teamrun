@@ -13,6 +13,7 @@ import path from "node:path";
 import { Writable } from "node:stream";
 import { describe, it } from "node:test";
 
+import { AngularProject } from "../../angular/angular-project.ts";
 import { ShortScreenshotNames } from "../../angular/short-screenshot-names.ts";
 import { ProcessResult } from "../../processes/process-result.ts";
 import { ProcessRunner } from "../../processes/process-runner.ts";
@@ -75,10 +76,14 @@ class ScriptedRunner extends ProcessRunner {
   }
 }
 
-const runAsync = async (results: readonly ProcessResult[], platform: string = "linux", netstat: ProcessResult | Error = sockets):
+const runAsync = async (results: readonly ProcessResult[], platform: string = "linux", netstat: ProcessResult | Error = sockets, hasProject: boolean = false):
   Promise<CheckRun> => {
   const root = await mkdtemp(path.join(tmpdir(), "failure-screenshot-check-"));
   try {
+    if (hasProject) {
+      await mkdir(path.join(root, "src"));
+      await writeFile(path.join(root, "src", "angular.json"), "{}\n");
+    }
     const runner = new ScriptedRunner(results, netstat);
     let written = "";
     const output = new Writable({
@@ -87,7 +92,7 @@ const runAsync = async (results: readonly ProcessResult[], platform: string = "l
         done();
       }
     });
-    const passed = await new FailureScreenshotCheck(root, runner, platform).runAsync(output);
+    const passed = await new FailureScreenshotCheck(root, runner, new AngularProject(root, runner), platform).runAsync(output);
     return new CheckRun(passed, runner.runs, written, runner.netstatRuns);
   }
   finally {
@@ -127,7 +132,7 @@ describe("FailureScreenshotCheck", () => {
     const ran = await runAsync([failed(logLine)]);
 
     assert.deepEqual([none.passed, none.runs, ran.passed, ran.runs], [false, 1, true, 1]);
-    assert.match(none.written, /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/u);
+    assert.match(none.written, /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/mu);
   });
 
   it("counts netstat's TCP connections by state, most first, over IPv4 and IPv6, and says none when it lists none", () => {
@@ -135,13 +140,16 @@ describe("FailureScreenshotCheck", () => {
       ["TIME_WAIT 3, ESTABLISHED 1, LISTENING 1", "none"]);
   });
 
-  it("prints Windows' TCP connections by state after a run that ran no test, and asks netstat only then and only on Windows", async () => {
+  it("prints Windows' TCP connections by state after a run that failed the check in any way, and asks netstat only then and only on Windows", async () => {
     const windows = await runAsync([noTest], "win32");
+    const passing = await runAsync([new ProcessResult(0, logLine, "")], "win32");
     const ran = await runAsync([failed(logLine)], "win32");
     const linux = await runAsync([noTest], "linux");
 
-    assert.deepEqual([windows.passed, windows.netstatRuns, ran.passed, ran.netstatRuns, linux.passed, linux.netstatRuns], [false, 1, true, 0, false, 0]);
+    assert.deepEqual([windows.passed, windows.netstatRuns, passing.passed, passing.netstatRuns, ran.passed, ran.netstatRuns, linux.passed, linux.netstatRuns],
+      [false, 1, false, 1, true, 0, false, 0]);
     assert.match(windows.written, /^Windows' TCP connections by state after that run, from netstat: TIME_WAIT 3, ESTABLISHED 1, LISTENING 1\.$/mu);
+    assert.match(passing.written, /^Windows' TCP connections by state after that run, from netstat: TIME_WAIT 3, ESTABLISHED 1, LISTENING 1\.$/mu);
     assert.doesNotMatch(`${ran.written}${linux.written}`, /netstat/u);
   });
 
@@ -152,7 +160,16 @@ describe("FailureScreenshotCheck", () => {
     assert.deepEqual([exited.passed, failedToStart.passed], [false, false]);
     assert.match(exited.written, /^netstat couldn't list Windows' TCP connections after that run, and exited with 1:\nThe requested operation requires elevation\.$/mu);
     assert.match(failedToStart.written, /^netstat couldn't list Windows' TCP connections after that run: "netstat" could not start\.$/mu);
-    assert.match(failedToStart.written, /^The fixture's run should fail its one test, but ran no test/u);
+    assert.match(failedToStart.written, /^The fixture's run should fail its one test, but ran no test/mu);
+  });
+
+  it("prepares the Angular project's browser before the fixture runs, and fails without running it, naming why, when the project isn't installed", async () => {
+    const none = await runAsync([failed(logLine)]);
+    const uninstalled = await runAsync([failed(logLine)], "linux", sockets, true);
+
+    assert.deepEqual([none.passed, none.runs, uninstalled.passed, uninstalled.runs, uninstalled.netstatRuns], [true, 1, false, 0, 0]);
+    assert.match(none.written, /^No Angular project under src\/; there is nothing to prepare\.\n/u);
+    assert.equal(uninstalled.written, "The Angular project in src/ isn't installed; npm ci --no-audit --no-fund in the root installs it.\n");
   });
 
   it("fails a run that didn't log the long name, logged a name that fits, or logged another file's path", () => {
