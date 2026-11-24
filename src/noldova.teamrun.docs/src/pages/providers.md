@@ -159,7 +159,7 @@ fx uses the model provider your fx is set up with, such as Vercel AI Gateway, an
 - **Install:** TeamRun installs no copy of Muse Code and doesn't run its installer for you yet; install it with its maker's command, `curl -fsSL https://dev.meta.ai/install.sh | sh` on macOS and Linux, or `irm https://dev.meta.ai/install.ps1 | iex` on Windows.
 - **Your own Muse Code:** TeamRun runs your `muse`, from your PATH or `~/.local/bin`, and turns on its ACP connection for it.
   On macOS, Muse Code keeps its sign-in in the keychain, so a Mac has one Muse Code provider.
-- **Sign in:** you sign in by running `muse login` in a terminal; TeamRun doesn't run it for you yet.
+- **Sign in:** **Sign in** runs `muse login` in a terminal; this hasn't been checked with Muse Code yet.
 - **Update:** updates are yours; Muse Code updates itself.
 - **Features:** most of what TeamRun offers hasn't been checked with Muse Code yet, as [What each provider can do](provider-features.md) shows.
 

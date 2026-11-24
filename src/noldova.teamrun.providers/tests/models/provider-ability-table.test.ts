@@ -47,6 +47,14 @@ export class ProviderAbilityTableTests {
   }
 
   @TestMethod
+  public answersMuseCodesSignInAsTheTerminalOneItsMenuRunsNotYetChecked(): void {
+    const cell = ProviderAbilityTable.muse.cellOf(ProviderAbility.SignIn);
+
+    Assert.areEqual(`${AbilityAnswer.NotChecked}|${Resources.museSignInAbility}`, [cell.answer, cell.detail].join("|"));
+    Assert.isTrue(Resources.museSignInAbility.includes(`Sign in runs ${Resources.museSignInCommand} in a terminal`));
+  }
+
+  @TestMethod
   public answersChooseSpeedAsOneCursorAndMuseCodeCantGiveWithWhy(): void {
     const cells = [ProviderAbilityTable.cursor, ProviderAbilityTable.muse].map(t => t.cellOf(ProviderAbility.ChooseSpeed));
 

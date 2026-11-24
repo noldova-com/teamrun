@@ -2866,7 +2866,7 @@ export class Resources {
   public static readonly museGeneratedImagesAbility: string = "TeamRun can show an image in its reply, but hasn't seen it send one yet";
   public static readonly museTeamRunToolsAbility: string = "TeamRun offers it its tools, but hasn't seen it use them yet";
   public static readonly museSharedServersAbility: string = "TeamRun gives it the shared servers when a chat starts, but hasn't seen it use them yet";
-  public static readonly museSignInAbility: string = "you sign in by running muse login in a terminal; TeamRun doesn't run it for you yet";
+  public static readonly museSignInAbility: string = "the provider's Sign in runs muse login in a terminal, but this hasn't been checked with Muse Code yet";
   public static readonly museSignOutAbility: string = "TeamRun runs muse logout in a terminal, which hasn't been seen signing it out yet";
   public static readonly museInstallAbility: string = "you install it with its own command in a terminal; TeamRun doesn't run it for you yet";
   public static readonly museSeveralAccountsAbility: string = "it keeps an account in each profile, though on macOS only one provider per Mac; two signed-in profiles haven't been seen yet";
