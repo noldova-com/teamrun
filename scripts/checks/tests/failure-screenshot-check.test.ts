@@ -93,19 +93,12 @@ describe("FailureScreenshotCheck", () => {
     assert.deepEqual(findings.map(t => t.split(":")[0]), ["The fixture's run should fail its one test, but ran no test, as when its browser page can't open"]);
   });
 
-  it("runs the fixture once more when its run ran no test, and passes when that run fails its test as it should", async () => {
-    const [passed, runs, written] = await runAsync([noTest, failed(logLine)]);
+  it("runs the fixture once and fails a run that ran no test with that reason, and passes a run that failed its test as it should", async () => {
+    const none = await runAsync([noTest, failed(logLine)]);
+    const ran = await runAsync([failed(logLine)]);
 
-    assert.deepEqual([passed, runs], [true, 2]);
-    assert.match(written, /^The fixture's run ran no test, so it runs once more:/u);
-  });
-
-  it("runs the fixture only once when its run ran its test, and fails when the second run also ran no test", async () => {
-    const once = await runAsync([failed(logLine), noTest]);
-    const twice = await runAsync([noTest, noTest, failed(logLine)]);
-
-    assert.deepEqual([once[0], once[1], twice[0], twice[1]], [true, 1, false, 2]);
-    assert.match(twice[2], /^The fixture's run should fail its one test, but ran no test/mu);
+    assert.deepEqual([none[0], none[1], ran[0], ran[1]], [false, 1, true, 1]);
+    assert.match(none[2], /^The fixture's run should fail its one test, but ran no test, as when its browser page can't open:/u);
   });
 
   it("fails a run that didn't log the long name, logged a name that fits, or logged another file's path", () => {

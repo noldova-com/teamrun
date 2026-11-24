@@ -41,11 +41,7 @@ export class FailureScreenshotCheck implements ICheck {
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
-    let run = await this.runFixtureAsync();
-    if (FailureScreenshotCheck.ranNoTest(run.result)) {
-      output.write(`The fixture's run ran no test, so it runs once more:\n${run.result.text}\n`);
-      run = await this.runFixtureAsync();
-    }
+    const run = await this.runFixtureAsync();
     const findings = FailureScreenshotCheck.findingsOf(run.result, run.files);
     for (const finding of findings)
       output.write(`${finding}\n`);
