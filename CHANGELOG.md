@@ -96,6 +96,8 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
+- **Updates:** TeamRun's Linux AppImage and Debian package are signed for the update feed.
+  On Linux, TeamRun installs only an update signed with its own key (#196).
 - **Codex:** the Codex chats TeamRun starts no longer show in the Codex and ChatGPT apps' recent chats, and TeamRun still continues them after a restart; to do this, TeamRun downloads the app server Codex publishes for your installed version, checked against its SHA-256, until Codex's own `codex app-server` can do it.
   It downloads it as Noldova Desktop's Check for updates setting allows, when you choose Check for updates, and when you install or update Codex in TeamRun.
   Until that download is in place, the Codex row in the Providers tab says the chats show, and so do chats started before; they also no longer add to your Codex memories, though they still read them (#190).
