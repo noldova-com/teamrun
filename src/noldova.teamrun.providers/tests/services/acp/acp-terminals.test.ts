@@ -105,6 +105,26 @@ export class AcpTerminalsTests {
   }
 
   @TestMethod
+  public async showsWhyATerminalsCommandFailedToStartAndEndsItWithNoExitCodeThoughTheProcessGaveOne(): Promise<void> {
+    const started = new StartedProcess();
+    const tree: IProcessTree = { endTree: () => Promise.resolve(true), endOwnTree: () => Promise.resolve(true), endDescendants: () => Promise.resolve(),
+      endLeftovers: () => Promise.resolve() };
+    const terminals = new AcpTerminals(new RecordingTurnListener(), "Agent", { start: () => started, readEnvironmentAsync: own => Promise.resolve(own) }, new ManualTimer(),
+      process.cwd(), () => ({}), null, tree, "linux");
+    terminals.begin("s", () => undefined, () => undefined);
+    const created = await terminals.request("terminal/create", JsonReader.fromValue({ sessionId: "s", command: "node" }));
+    const terminalId = JsonReader.fromValue(created).readNonBlankString("terminalId");
+
+    started.fail(new Error("spawn node EACCES"));
+    started.end(-4092, null);
+    const exited = await terminals.request("terminal/wait_for_exit", JsonReader.fromValue({ sessionId: "s", terminalId }));
+    const output = await terminals.request("terminal/output", JsonReader.fromValue({ sessionId: "s", terminalId }));
+
+    Assert.areEqual(JSON.stringify([{ exitCode: null, signal: null }, `spawn node EACCES${Resources.lineSeparator}`]),
+      JSON.stringify([exited, JsonReader.fromValue(output).readString("output")]));
+  }
+
+  @TestMethod
   public async runsACommandNamedWithoutAFolderOnWindowsOnlyFromTheTurnsPathAndRefusesOneOnlyTheChatsFolderHolds(): Promise<void> {
     using directory = new TemporaryDirectory();
     const bin = directory.resolve("bin");
