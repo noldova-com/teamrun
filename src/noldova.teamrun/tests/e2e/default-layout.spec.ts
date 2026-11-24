@@ -34,11 +34,43 @@ class DockGroup {
 
 const EXPECTED: readonly DockGroup[] = [
   new DockGroup("Left", ["view/teamrun.projects"], "view/teamrun.projects"),
-  new DockGroup("Right", ["view/teamrun.backgroundTasks", "view/git.view", "view/teamrun.pages"], "view/teamrun.backgroundTasks"),
+  new DockGroup("Right", ["view/teamrun.backgroundTasks", "view/teamrun.pages", "view/git.view"], "view/teamrun.backgroundTasks"),
   new DockGroup("Right", ["view/teamrun.plan", "view/teamrun.subAgents"], "view/teamrun.plan"),
   new DockGroup("Bottom", ["view/teamrun.activity", "view/teamrun.changes"], "view/teamrun.activity")
 ];
 const SCHEMES: readonly ("light" | "dark")[] = ["light", "dark"];
+
+interface IRowPlace {
+  readonly rowLeft: number;
+  readonly rowRight: number;
+  readonly overflowLeft: number | null;
+  readonly pagesLeft: number;
+  readonly pagesRight: number;
+  readonly pages: string;
+  readonly git: string;
+}
+
+async function rightRowAsync(page: Page): Promise<IRowPlace> {
+  return page.locator("nol-tab-group[data-side='Right']").filter({ has: page.locator("nol-tab[data-tab-key='view/teamrun.pages']") }).evaluate(group => {
+    const row = group.querySelector(".nol-tab-group-scroller")?.getBoundingClientRect();
+    const overflow = group.querySelector("button[aria-label='Show all tabs']");
+    const tab = (key: string): Element | null => group.querySelector(`nol-tab[data-tab-key='${key}']`);
+    const pages = tab("view/teamrun.pages");
+    const git = tab("view/git.view");
+    if (Object.isUndefined(row) || Object.isNull(pages) || Object.isNull(git))
+      throw new Error("The right dock's upper tab row, Pages or Git isn't there.");
+    const box = pages.getBoundingClientRect();
+    return {
+      rowLeft: row.left,
+      rowRight: row.right,
+      overflowLeft: Object.isNull(overflow) || getComputedStyle(overflow).visibility === "hidden" ? null : overflow.getBoundingClientRect().left,
+      pagesLeft: box.left,
+      pagesRight: box.right,
+      pages: getComputedStyle(pages).visibility,
+      git: getComputedStyle(git).visibility
+    };
+  });
+}
 
 async function placesAsync(page: Page): Promise<readonly IGroupPlace[]> {
   return page.locator("nol-tab-group[data-side]").evaluateAll(groups => groups.map(group => {
@@ -80,7 +112,7 @@ async function dragAsync(page: Page, key: string, after: string): Promise<void> 
   await expect(page.locator(`nol-tab[data-tab-key='${key}']`)).toBeFocused();
 }
 
-test("a fresh install opens Explorer on the left, Background tasks, Git and Pages above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it after a view moves group, another tab shows and the dock is resized", async ({ app }, testInfo) => {
+test("a fresh install opens Explorer on the left, Background tasks, Pages and Git above Plans and Sub-agents on the right, and Activity and Changes along the bottom under both, each group showing its first tab, and Reset the layout returns to it after a view moves group, another tab shows and the dock is resized", async ({ app }, testInfo) => {
   const page = await app.startAsync();
   await expect(page.locator("nol-tab[data-tab-key='view/teamrun.projects']")).toBeVisible({ timeout: 60_000 });
 
@@ -94,6 +126,9 @@ test("a fresh install opens Explorer on the left, Background tasks, Git and Page
   expect([explorer.left < width / 4, upper.right > width * 3 / 4, upper.left > explorer.right, upper.bottom <= lower.top, upper.left === lower.left, upper.right === lower.right,
     bottom.top > height / 2, bottom.top >= explorer.bottom, bottom.top >= lower.bottom, bottom.left < explorer.right, bottom.right > upper.left])
     .toEqual([true, true, true, true, true, true, true, true, true, true, true]);
+  const row = await rightRowAsync(page);
+  expect([width, height, row.pages, row.git, row.overflowLeft !== null, row.pagesLeft >= row.rowLeft, row.pagesRight <= (row.overflowLeft ?? row.rowRight)],
+    "at 1280×800 Pages' tab lies whole in the right dock's tab row, before Show all tabs, which holds Git").toEqual([1280, 800, "visible", "hidden", true, true, true]);
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
     await testInfo.attach(`fresh-install-${scheme}.png`, { body: await page.screenshot(), contentType: "image/png" });
