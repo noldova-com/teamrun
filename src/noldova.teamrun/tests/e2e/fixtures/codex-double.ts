@@ -95,7 +95,9 @@ export class CodexDouble {
   public static readonly SIGN_IN_DENIED: string = "denied";
   public static readonly SIGN_IN_AWAY: string = "http://new-site.invalid/";
   public static readonly BROWSER_DENIED: string = "The person didn't allow it.";
+  public static readonly SOURCE_STARTED: string = "started with app-server --session-source app-server";
   private static readonly VERSION: string = "0.140.0";
+  private static readonly HELP: string = "Usage: codex app-server [OPTIONS]\n\nOptions:\n      --session-source <SOURCE>  Session source recorded for threads this server creates\n";
   private readonly threads: Map<string, JsonReader> = new Map();
   private readonly listed: Map<string, readonly string[]> = new Map();
   private threadCounter: number = 0;
@@ -111,6 +113,10 @@ export class CodexDouble {
     CodexDouble.log(`started with ${process.argv.slice(2).join(" ")}`);
     if (process.argv.includes("--version")) {
       process.stdout.write(`codex-cli ${CodexDouble.VERSION}\n`);
+      return;
+    }
+    if (process.argv.includes("app-server") && process.argv.includes("--help")) {
+      process.stdout.write(CodexDouble.HELP);
       return;
     }
     if (!process.argv.includes("app-server")) {

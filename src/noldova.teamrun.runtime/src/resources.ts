@@ -32,6 +32,7 @@ export class Resources {
   public static readonly copilotInstallSegments: readonly string[] = ["providers", "copilot"];
   public static readonly releaseChannelTimeout: number = 10_000;
   public static readonly codexUnpackTimeout: number = 600_000;
+  public static readonly codexAppServerSegments: readonly string[] = ["providers", "codex-app-server"];
   public static readonly copilotUnpackTimeout: number = 600_000;
   public static readonly cursorInstallSegments: readonly string[] = ["providers", "cursor"];
   public static readonly cursorUnpackTimeout: number = 600_000;

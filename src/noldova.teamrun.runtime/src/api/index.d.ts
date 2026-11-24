@@ -781,6 +781,10 @@ export declare class Resources {
    */
   public static readonly codexUnpackTimeout: number;
   /**
+   * Where the Codex app server downloads are kept in the data folder, `providers/codex-app-server`.
+   */
+  public static readonly codexAppServerSegments: readonly string[];
+  /**
    * How long unpacking a downloaded Copilot archive may take, in milliseconds.
    */
   public static readonly copilotUnpackTimeout: number;

@@ -25,6 +25,7 @@ import { InstallRename } from "../installs/install-rename.js";
 import { InstallStaging } from "../installs/install-staging.js";
 import { ReleaseDownload } from "../installs/release-download.js";
 import type { CommandRunner } from "../process/command-runner.js";
+import type { CodexAppServerProgram } from "./codex-app-server-program.js";
 
 export class CodexInstaller implements IProviderKindInstallation {
   private readonly locate: () => LocatedExecutable | null;
@@ -43,11 +44,13 @@ export class CodexInstaller implements IProviderKindInstallation {
   private readonly settle: (from: string, to: string) => Promise<void>;
   private readonly unpackTimeout: number;
   private readonly channelTimeout: number;
+  private readonly serverProgram: CodexAppServerProgram | null;
 
   public constructor(locate: () => LocatedExecutable | null, versionReader: ExecutableVersionReader, environment: NodeJS.ProcessEnv, channels: readonly string[],
     home: string, binDirectory: string, target: string | null, platform: string, extractor: LocatedExecutable | null, runner: CommandRunner,
     program: (path: string) => ProcessCommand, symlink: (target: string, path: string) => void, rename: (from: string, to: string) => void,
-    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number) {
+    settle: (from: string, to: string) => Promise<void>, unpackTimeout: number, channelTimeout: number,
+    serverProgram: CodexAppServerProgram | null = null) {
     this.locate = locate;
     this.versionReader = versionReader;
     this.environment = environment;
@@ -64,6 +67,7 @@ export class CodexInstaller implements IProviderKindInstallation {
     this.settle = settle;
     this.unpackTimeout = unpackTimeout;
     this.channelTimeout = channelTimeout;
+    this.serverProgram = serverProgram;
   }
 
   public get unavailable(): string | null {
@@ -96,12 +100,13 @@ export class CodexInstaller implements IProviderKindInstallation {
   public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
     const located = this.locate();
     const standalone = !Object.isNull(located) && this.isStandalone;
-    const [installed, latest] = await Promise.all([
+    const [installed, latest, notice] = await Promise.all([
       Object.isNull(located) ? null : this.versionReader.read(located.toCommand(), this.environment),
       !checksLatest || Object.isNull(this.target) || !standalone ? null
-        : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null)
+        : this.readRelease(this.target, AbortSignal.timeout(this.channelTimeout)).then(t => t.version, () => null),
+      Object.isNull(located) || Object.isNull(this.serverProgram) ? null : this.serverProgram.readNotice(located.toCommand(), this.environment, checksLatest)
     ]);
-    return new ProviderKindVersions(installed, latest);
+    return new ProviderKindVersions(installed, latest, notice);
   }
 
   public async install(progress: (received: number, total: number) => void, signal: AbortSignal, commit: () => void = () => undefined): Promise<string> {
@@ -168,6 +173,7 @@ export class CodexInstaller implements IProviderKindInstallation {
       const now = await this.versionReader.read(installed.toCommand(), this.environment);
       if (now !== release.version)
         throw new InstallFailedException(Resources.formatCodexShadowed(release.version, this.binDirectory, installed.path, now));
+      void this.serverProgram?.readNotice(installed.toCommand(), this.environment, true);
       InstallStaging.tidy(releases);
       return installed.path;
     }

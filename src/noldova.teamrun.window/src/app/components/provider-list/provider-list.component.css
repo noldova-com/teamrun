@@ -55,6 +55,14 @@
   font-weight: normal;
 }
 
+.nol-teamrun-group-notice {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--nol-space-2);
+  color: var(--nol-text-muted);
+  font-size: var(--nol-text-small);
+  line-height: var(--nol-line-label);
+}
+
 .nol-teamrun-group-actions {
   display: flex;
   flex-shrink: 0;

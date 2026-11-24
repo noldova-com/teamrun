@@ -6163,13 +6163,18 @@ export declare class ProviderKindVersions {
    * The version an install would bring now, or `null` when it can't be read.
    */
   public readonly latest: string | null;
+  /**
+   * What the person should know about how TeamRun runs the installed program, or `null`; the installation's `notice` while it's `Installed`.
+   */
+  public readonly notice: string | null;
 
   /**
    * Initializes the versions.
    * @param installed The installed version, or `null`.
    * @param latest The version an install would bring now, or `null`.
+   * @param notice What the person should know about how TeamRun runs the installed program, or `null`, the default.
    */
-  public constructor(installed: string | null, latest: string | null);
+  public constructor(installed: string | null, latest: string | null, notice?: string | null);
 
   /**
    * `latest` when both are known and it is newer than `installed`, comparing their dot-separated numbers in order, each missing one as 0 and each

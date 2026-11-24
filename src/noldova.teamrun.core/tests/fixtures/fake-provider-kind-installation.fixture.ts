@@ -90,6 +90,6 @@ export class FakeProviderKindInstallation implements IProviderKindInstallation {
   }
 
   private versionsFor(checksLatest: boolean): ProviderKindVersions {
-    return checksLatest ? this.versions : new ProviderKindVersions(this.versions.installed, null);
+    return checksLatest ? this.versions : new ProviderKindVersions(this.versions.installed, null, this.versions.notice);
   }
 }
