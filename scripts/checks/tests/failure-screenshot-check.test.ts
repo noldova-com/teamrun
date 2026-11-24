@@ -76,6 +76,20 @@ class ScriptedRunner extends ProcessRunner {
   }
 }
 
+class ThrowingProject extends AngularProject {
+  private readonly failure: Error;
+
+  public constructor(root: string, runner: ProcessRunner, failure: Error) {
+    super(root, runner);
+    this.failure = failure;
+  }
+
+  public override async prepareAsync(_output: Writable): Promise<void> {
+    await Promise.resolve();
+    throw this.failure;
+  }
+}
+
 const runAsync = async (results: readonly ProcessResult[], platform: string = "linux", netstat: ProcessResult | Error = sockets, hasProject: boolean = false):
   Promise<CheckRun> => {
   const root = await mkdtemp(path.join(tmpdir(), "failure-screenshot-check-"));
@@ -170,6 +184,22 @@ describe("FailureScreenshotCheck", () => {
     assert.deepEqual([none.passed, none.runs, uninstalled.passed, uninstalled.runs, uninstalled.netstatRuns], [true, 1, false, 0, 0]);
     assert.match(none.written, /^No Angular project under src\/; there is nothing to prepare\.\n/u);
     assert.equal(uninstalled.written, "The Angular project in src/ isn't installed; npm ci --no-audit --no-fund in the root installs it.\n");
+  });
+
+  it("lets a failure other than a process's out of the browser install, without running the fixture or netstat", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "failure-screenshot-check-"));
+    try {
+      const runner = new ScriptedRunner([failed(logLine)], sockets);
+      const failure = new RangeError("The install's own failure.");
+      const project = new ThrowingProject(root, runner, failure);
+      const output = new Writable({ write: (_chunk, _encoding, done): void => done() });
+
+      await assert.rejects(new FailureScreenshotCheck(root, runner, project, "win32").runAsync(output), failure);
+      assert.deepEqual([runner.runs, runner.netstatRuns], [0, 0]);
+    }
+    finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("fails a run that didn't log the long name, logged a name that fits, or logged another file's path", () => {
