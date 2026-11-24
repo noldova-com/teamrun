@@ -85,7 +85,7 @@ import { CatalogReads } from "../../models/catalog-reads";
 import { CatalogSource } from "../../models/catalog-source";
 import type { ChatContext } from "../../models/chat-context";
 import { ChatThread } from "../../models/chat-thread";
-import { ComposerAttachment } from "../../models/composer-attachment";
+import type { ComposerAttachment } from "../../models/composer-attachment";
 import { ComposerBar } from "../../models/composer-bar";
 import { ComposerDraft } from "../../models/composer-draft";
 import type { ComposerFanOut } from "../../models/composer-fan-out";
@@ -94,9 +94,11 @@ import { ConfirmRequest } from "../../models/confirm-request";
 import { FoldWidths } from "../../models/fold-widths";
 import { ImageViewerData } from "../../models/image-viewer-data";
 import { ModelCatalog } from "../../models/model-catalog";
+import { PickedAttachment } from "../../models/picked-attachment";
 import { ProviderChoice } from "../../models/provider-choice";
 import { RefusedMode } from "../../models/refused-mode";
 import type { RewoundDraft } from "../../models/rewound-draft";
+import { SavedAttachment } from "../../models/saved-attachment";
 import { TeammateModelSettings } from "../../models/teammate-model-settings";
 import type { ViewedImage } from "../../models/viewed-image";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -1098,7 +1100,7 @@ export class ComposerComponent {
       this.attachmentError.set(Resources.attachmentLimitExceeded);
       return;
     }
-    const added = files.map(t => new ComposerAttachment(t));
+    const added = files.map(t => new PickedAttachment(t));
     this.attachments.set([...existing, ...added]);
     this.showPreviews(added);
     this.attachmentError.set(null);
@@ -1201,7 +1203,7 @@ export class ComposerComponent {
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(draft?.text ?? String.empty);
-    const attachments = draft?.attachments.map(t => new ComposerAttachment(t)) ?? [];
+    const attachments = draft?.attachments.map(t => new SavedAttachment(t)) ?? [];
     this.attachments.set(attachments);
     this.showPreviews(attachments);
     this.attachmentError.set(Object.isNull(draft) || draft.missing.length === 0 ? null : Resources.formatDraftFilesMissing(draft.missing));
@@ -1228,7 +1230,7 @@ export class ComposerComponent {
     for (const attachment of this.attachments())
       attachment.dispose();
     this.value.set(offer.text);
-    const attachments = offer.attachments.map(t => new ComposerAttachment(t));
+    const attachments = offer.attachments.map(t => new SavedAttachment(t));
     this.attachments.set(attachments);
     this.attachmentError.set(null);
     this.changed();

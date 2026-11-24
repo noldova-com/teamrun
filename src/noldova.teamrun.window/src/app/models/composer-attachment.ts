@@ -8,16 +8,15 @@
 
 import { type Signal, signal, type WritableSignal } from "@angular/core";
 import "@noldova/context.core";
-import { AttachmentInput, type MessageAttachment, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { RuntimeRequestException } from "@noldova/desktop.window";
+import { type AttachmentInput, type MessageAttachment, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources";
 import type { FileShare } from "./file-share";
 import { ViewedImage } from "./viewed-image";
 
-export class ComposerAttachment {
-  private readonly file: File | null;
+export abstract class ComposerAttachment {
   private readonly preview: WritableSignal<string | null>;
-  private savedFile: MessageAttachment | null;
   private share: FileShare | null = null;
   private disposed: boolean = false;
 
@@ -27,13 +26,10 @@ export class ComposerAttachment {
   public readonly size: number;
   public readonly previewUrl: Signal<string | null>;
 
-  public constructor(source: File | MessageAttachment) {
-    const isFile = source instanceof File;
-    this.file = isFile ? source : null;
-    this.savedFile = isFile ? null : source;
-    this.name = source.name;
-    this.mediaType = isFile ? source.type || Resources.binaryMediaType : source.mediaType;
-    this.size = source.size;
+  protected constructor(name: string, mediaType: string, size: number) {
+    this.name = name;
+    this.mediaType = mediaType;
+    this.size = size;
     this.preview = signal(null);
     this.previewUrl = this.preview.asReadonly();
   }
@@ -42,12 +38,12 @@ export class ComposerAttachment {
     return ProtocolResources.attachmentImageMediaTypes.includes(this.mediaType);
   }
 
-  public get isSaved(): boolean {
-    return !Object.isNull(this.savedFile);
-  }
+  public abstract get isSaved(): boolean;
 
-  public get sharedPath(): string | null {
-    return Object.isNull(this.share) ? null : this.savedFile!.path;
+  public abstract get sharedPath(): string | null;
+
+  protected get isShared(): boolean {
+    return !Object.isNull(this.share);
   }
 
   public viewedImageIn(conversationId: string): ViewedImage | null {
@@ -60,16 +56,14 @@ export class ComposerAttachment {
       : new ViewedImage(this.key, conversationId, this.name, this.mediaType, path, null);
   }
 
-  public markSaved(file: MessageAttachment): void {
-    this.savedFile = file;
-  }
+  public abstract markSaved(file: MessageAttachment): void;
 
   public async loadPreview(share: (path: string) => Promise<FileShare>): Promise<void> {
     if (!this.isImage)
       return;
     let url: string;
     try {
-      url = Object.isNull(this.file) ? this.keep(await share(this.savedFile!.path)) : await ComposerAttachment.readDataUrl(this.file);
+      url = await this.readPreview(share);
     }
     catch (error) {
       if (ComposerAttachment.isReadFailure(error))
@@ -86,11 +80,7 @@ export class ComposerAttachment {
     this.preview.set(null);
   }
 
-  public async toInput(grant: (file: File) => Promise<string>): Promise<AttachmentInput> {
-    if (!Object.isNull(this.savedFile))
-      return new AttachmentInput(this.name, this.mediaType, null, this.savedFile.path);
-    return new AttachmentInput(this.name, this.mediaType, null, null, await grant(this.file!));
-  }
+  public abstract toInput(grant: (file: File) => Promise<string>): Promise<AttachmentInput>;
 
   public dispose(): void {
     this.disposed = true;
@@ -98,7 +88,9 @@ export class ComposerAttachment {
     this.preview.set(null);
   }
 
-  private keep(share: FileShare): string {
+  protected abstract readPreview(share: (path: string) => Promise<FileShare>): Promise<string>;
+
+  protected keep(share: FileShare): string {
     if (this.disposed)
       share.release();
     else
@@ -112,15 +104,6 @@ export class ComposerAttachment {
   }
 
   private static isReadFailure(error: unknown): boolean {
-    return error instanceof DOMException || (error instanceof Error && typeof Reflect.get(error, Resources.errorCodeField) === "string");
-  }
-
-  private static readDataUrl(file: File): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    return error instanceof DOMException || error instanceof RuntimeRequestException;
   }
 }
