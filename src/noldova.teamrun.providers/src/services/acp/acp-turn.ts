@@ -425,7 +425,7 @@ export class AcpTurn implements IAcpClientListener {
         return { outcome: { outcome: Resources.acpSelected, optionId: allow.id } };
     }
     if (this.refusesWrites)
-      return this.refuseAsync(tool, options, Resources.formatReadOnlyChatRefused(this.providerName, title), scope);
+      return this.refuseAsync(tool, options, Resources.formatReadOnlyChatRefused(this.providerName, AcpTurn.cleaned(title)), scope);
     const allowed = this.allowsAll && !this.planning ? options.find(t => t.outcome === ApprovalOutcome.Approved) : undefined;
     if (!Object.isUndefined(allowed))
       return { outcome: { outcome: Resources.acpSelected, optionId: allowed.id } };

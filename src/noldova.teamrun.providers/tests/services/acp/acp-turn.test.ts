@@ -682,7 +682,7 @@ export class AcpTurnTests {
     await turn.beginAsync("s", false, new ObservedSettings("copilot", null, null, null));
 
     await ask("Run npm test", { command: "npm test 2>&1 | tail -30", commands: ["npm test 2>&1 | tail -30"] });
-    await ask("Run tests", { command: "  npm test\n\u0007npm run lint‮  " });
+    await ask("Run tests", { command: "  npm test\n\u0007npm run lint\u202e  " });
     await ask("Run tests", { command: `npm test ${"x".repeat(600)}` });
     await ask("find . -name \"notes.txt\"", { CommandLine: "find . -name \"notes.txt\"", Cwd: "/work" });
     await ask("Execute `npm test`", { variant: "Bash", command: "npm test", description: "Run the tests", is_background: false });
@@ -715,7 +715,7 @@ export class AcpTurnTests {
       JsonReader.fromValue({ sessionId: "s", toolCall: { toolCallId: "toolu_1", title, kind: "execute", status: "pending", rawInput: { command } },
         options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
     await turn.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
-    const hidden = "rm -rf ~‮\u0008\u0008 ls";
+    const hidden = "rm -rf ~\u202e\u0008\u0008 ls";
     const long = `ls ${"x".repeat(600)}`;
 
     await ask(hidden, hidden);
@@ -725,6 +725,46 @@ export class AcpTurnTests {
     const summaries = listener.asks.map(t => t.summary);
     Assert.areEqual(["rm -rf ~    ls", "Execute `rm -rf ~    ls`"].join("|"), summaries.slice(0, 2).join("|"));
     Assert.areEqual(JSON.stringify([500, true, true]), JSON.stringify(summaries.slice(2).flatMap(t => [t.length, t.startsWith("ls xxx"), t.endsWith("x…")])));
+  }
+
+  @TestMethod
+  public async cleansAndCapsTheTitleOfARequestThatHasNoCommand(): Promise<void> {
+    const listener = new RecordingTurnListener();
+    const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1);
+    const ask = (title: string, kind: string, rawInput: JsonValue): Promise<unknown> => turn.onRequest("id", "session/request_permission",
+      JsonReader.fromValue({ sessionId: "s", toolCall: { toolCallId: "toolu_1", title, kind, status: "pending", rawInput },
+        options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
+    await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
+
+    await ask("Edit notes.md‮\u0008\u0008.exe", "edit", { path: "notes.md" });
+    await ask("Run tests⁦", "execute", {});
+    await ask(`Edit ${"n".repeat(600)}`, "edit", {});
+
+    const summaries = listener.asks.map(t => t.summary);
+    Assert.areEqual(["Edit notes.md   .exe", "Run tests "].join("|"), summaries.slice(0, 2).join("|"));
+    Assert.areEqual(JSON.stringify([500, true, true]), JSON.stringify(summaries.slice(2).flatMap(t => [t.length, t.startsWith("Edit nnn"), t.endsWith("n…")])));
+  }
+
+  @TestMethod
+  public async cleansAndCapsTheToolsTitleInTheNoteOfARequestAReadOnlyChatRefusesOnceItsPlanIsApproved(): Promise<void> {
+    const listener = new RecordingTurnListener();
+    listener.decisions.push(Resources.acpApprovePlanOption);
+    const plans: IAcpPlanReader = { methods: ["plan/review"], nativeKind: "plan/review", leavesPlan: false,
+      read: () => ({ text: "Fix the bug", steps: [] }), reply: (_params, approved) => ({ approved }) };
+    const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined, null, plans,
+      undefined, [], undefined, undefined, false, false, null, true);
+    await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
+    await turn.onRequest("7", "plan/review", JsonReader.fromValue({ sessionId: "s" }));
+    const ask = (title: string): Promise<unknown> => turn.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s",
+      toolCall: { toolCallId: "toolu_1", title, kind: "edit", status: "pending", rawInput: {} },
+      options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
+
+    await ask("Edit notes.md‮\u0008.exe");
+    await ask(`Edit ${"n".repeat(600)}`);
+
+    const notes = listener.texts.filter(t => t.startsWith("TeamRun refused"));
+    Assert.areEqual(JSON.stringify([Resources.formatReadOnlyChatRefused("Agent", "Edit notes.md  .exe"),
+      Resources.formatReadOnlyChatRefused("Agent", `Edit ${"n".repeat(494)}…`), 0]), JSON.stringify([...notes, listener.asks.length - 1]));
   }
 
   @TestMethod
