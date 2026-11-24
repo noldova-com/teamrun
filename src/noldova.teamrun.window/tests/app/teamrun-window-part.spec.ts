@@ -107,7 +107,7 @@ describe("TeamRun's window part", () => {
     expect(context.views.map(t => [t.name, t.title, t.icon, t.defaultSide, t.defaultGroup, t.defaultOrder, t.isShownByDefault])).toEqual([
       ["teamrun.projects", "Explorer", "folder_open", DockSide.Left, 0, 10, true],
       ["teamrun.backgroundTasks", "Background tasks", "pending_actions", DockSide.Right, 0, 10, true],
-      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, 0, 30, true],
+      ["teamrun.pages", "Pages", "web_asset", DockSide.Right, 0, 15, true],
       ["teamrun.plan", "Plans", "checklist", DockSide.Right, 1, 10, true],
       ["teamrun.subAgents", "Sub-agents", "device_hub", DockSide.Right, 1, 20, true],
       ["teamrun.activity", "Activity", "list_alt", DockSide.Bottom, 0, 10, true],
