@@ -36,6 +36,18 @@ export class AcpCommandLineTests {
   }
 
   @TestMethod
+  public refusesOnWindowsAProgramNamedWithoutAFolderThatOnlyTheWorkingFolderHolds(): void {
+    const environment = { PATH: ".;bin", PATHEXT: ".exe" };
+
+    const refused = Assert.throws(() => AcpCommandLine.of("win32", environment, {}, "agent", []), AgentLaunchException);
+    const posix = AcpCommandLine.of("linux", environment, {}, "agent", []);
+
+    Assert.areEqual(JSON.stringify([Resources.formatCommandNotOnPath("agent"), "agent"]), JSON.stringify([refused.message, posix.executable]));
+    Assert.areEqual("No agent is on PATH, and TeamRun runs a command named without a folder only from PATH, never from the chat's folder.",
+      Resources.formatCommandNotOnPath("agent"));
+  }
+
+  @TestMethod
   public refusesALineBreakOnlyInABatchFilesArgument(): void {
     using directory = new TemporaryDirectory();
     const batch = directory.resolve("agent.cmd");

@@ -63,6 +63,7 @@ import type {
   ISharedMcpSignIn,
   ITeammatesService,
   ITimer,
+  IToolUpdateChecks,
   ITurnToolSession,
   ITurnToolSessions,
   IWindowsService,
@@ -785,6 +786,10 @@ export declare class Resources {
    * How long unpacking a downloaded Codex package may take, in milliseconds.
    */
   public static readonly codexUnpackTimeout: number;
+  /**
+   * Where the Codex app server downloads are kept in the data folder, `providers/codex-app-server`.
+   */
+  public static readonly codexAppServerSegments: readonly string[];
   /**
    * How long unpacking a downloaded Copilot archive may take, in milliseconds.
    */
@@ -1966,6 +1971,31 @@ export declare class HopLimitSetting {
 }
 
 /**
+ * Whether the provider kinds may look for their tools' newer versions without the person asking, following the app's Check for updates
+ * setting, `desktop.updateChecks`, for this device.
+ */
+export declare class ToolUpdateChecks implements IToolUpdateChecks {
+  /**
+   * Takes the setting's value `read` gives, `Automatic` when it gives none, and starts following the setting's changes.
+   * @param settings The module's settings.
+   */
+  public constructor(settings: IModuleSettings);
+
+  /**
+   * `true` for `Automatic`, and for `AtStart` until the first check; `false` for `OnRequest`. The choice is the value `read` gives at
+   * construction, and then each change; a value that isn't a string, such as a reset's, counts as the default, `Automatic`. The runtime
+   * reads the default until it knows its device (noldova-com/desktop#96), so until a change brings a stored choice it counts as `Automatic`.
+   */
+  public takeCheck(): boolean;
+
+  /**
+   * Calls `listener` each time a change of the setting turns it to allow a check that it didn't allow before.
+   * @param listener What to call.
+   */
+  public onAllowed(listener: () => void): void;
+}
+
+/**
  * The chat engine's migrations and Pages', as the statements Noldova Desktop applies to the module's database.
  */
 export declare class HostedMigrations {
@@ -2543,13 +2573,14 @@ export declare class RuntimeProcessStarter implements IProcessStarter {
    * Initializes the starter.
    * @param context The part's context.
    * @param workFolder The working folder of a program that names none.
+   * @param platform The platform the programs run on, as `process.platform`.
    */
-  public constructor(context: IRuntimePartContext, workFolder: string);
+  public constructor(context: IRuntimePartContext, workFolder: string, platform: string);
 
   /**
    * Starts the program with the environment's variables as the request's own.
    * @param command How to run the program.
-   * @param environment The program's environment; unset variables, names Noldova Desktop refuses and `Resources.crashPipeVariable` are left out, so a provider's Electron tools don't open the app's crash handler pipe.
+   * @param environment The program's environment, as `SharedMcpLauncher.environmentToStart` gives it for the platform; unset variables, names Noldova Desktop refuses and `Resources.crashPipeVariable` are left out, so a provider's Electron tools don't open the app's crash handler pipe.
    * @param directory The program's working folder, or `null` for the work folder.
    * @returns The process.
    */

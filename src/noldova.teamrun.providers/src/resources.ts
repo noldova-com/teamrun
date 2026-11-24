@@ -995,6 +995,15 @@ export class Resources {
   public static readonly codexPackagePrefix: string = "codex-package-";
   public static readonly codexPackageSuffix: string = ".tar.gz";
   public static readonly sha256DigestPrefix: string = "sha256:";
+  public static readonly releaseTagField: string = "tag_name";
+  public static readonly releaseAssetsField: string = "assets";
+  public static readonly releaseAssetNameField: string = "name";
+  public static readonly releaseAssetDigestField: string = "digest";
+  public static readonly releaseAssetSizeField: string = "size";
+  public static readonly releaseAssetUrlField: string = "browser_download_url";
+  public static readonly claudePlatformsField: string = "platforms";
+  public static readonly claudeChecksumField: string = "checksum";
+  public static readonly claudeSizeField: string = "size";
   public static readonly acceptHeader: string = "accept";
   public static readonly jsonContentType: string = "application/json";
   public static readonly acpRegistryUrl: string = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
@@ -1119,6 +1128,20 @@ export class Resources {
   public static readonly codexStandaloneSegments: readonly string[] = ["packages", "standalone"];
   public static readonly codexReleasesDirectoryName: string = "releases";
   public static readonly codexArchiveName: string = "codex-package.tar.gz";
+  public static readonly codexAppServerReleaseAddress: string = "https://api.github.com/repos/openai/codex/releases/tags/";
+  public static readonly codexAppServerPackagePrefix: string = "codex-app-server-package-";
+  public static readonly codexAppServerDisplayName: string = "Codex app server";
+  public static readonly codexAppServerProgram: string = "bin/codex-app-server";
+  public static readonly codexAppServerUnpackedName: string = "package";
+  public static readonly codexAppServerExecutableMembers: readonly string[] = ["bin/codex-app-server", "bin/codex-code-mode-host", "bin/codex-exec-server",
+    "codex-path/rg", "codex-resources/bwrap"];
+  public static readonly codexSessionSourceArgument: string = "--session-source";
+  public static readonly codexHiddenSessionSource: string = "app-server";
+  public static readonly codexThreadsListedNotice: string = "TeamRun's Codex chats show in the Codex app's recent chats until TeamRun downloads "
+    + "Codex's app server for this version from GitHub, which it does when Noldova Desktop's Check for updates setting allows it, when you choose "
+    + "Check for updates, and when you install or update Codex here.";
+  public static readonly helpArgument: string = "--help";
+  public static readonly windowsExecutableExtension: string = ".exe";
   public static readonly codexPreviousReleaseName: string = "previous";
   public static readonly codexPackageProgram: string = "bin/codex";
   public static readonly codexWindowsPackageProgram: string = "bin/codex.exe";
@@ -3614,6 +3637,10 @@ export class Resources {
     return `The ${name} download left HTTPS, and it has no SHA-256 to check it against, so it was stopped.`;
   }
 
+  public static formatCommandNotOnPath(command: string): string {
+    return `No ${command} is on PATH, and TeamRun runs a command named without a folder only from PATH, never from the chat's folder.`;
+  }
+
   public static formatAcpArgumentLineBreak(command: string): string {
     return `${command} is a batch file, and Windows ends a batch file's command line at a line break, so an argument with one can't reach it.`;
   }
@@ -3779,6 +3806,35 @@ export class Resources {
   public static formatClaudeSetupFailed(version: string, exitCode: number | null): string {
     return Object.isNull(exitCode) ? `Setting up Claude Code ${version} was stopped before it finished.`
       : `Setting up Claude Code ${version} failed with exit code ${exitCode}.`;
+  }
+
+  public static formatCodexAppServerPackageMissing(version: string): string {
+    return `Codex ${version} lists no app server package for this computer with its SHA-256.`;
+  }
+
+  public static formatCodexAppServerReleaseFailed(version: string, status: number): string {
+    return `Reading the Codex ${version} release failed with HTTP status ${status}.`;
+  }
+
+  public static formatCodexAppServerUnpackFailed(exitCode: number | null): string {
+    return Object.isNull(exitCode) ? "Unpacking the Codex app server download was stopped."
+      : `Unpacking the Codex app server download failed with exit code ${exitCode}.`;
+  }
+
+  public static formatCodexAppServerIncomplete(version: string): string {
+    return `The Codex ${version} app server package has no ${Resources.codexAppServerProgram}.`;
+  }
+
+  public static formatCodexAppServerNotDownloaded(version: string, reason: string): string {
+    return `The Codex ${version} app server wasn't downloaded, so Codex threads TeamRun starts still show in the Codex app: ${reason}`;
+  }
+
+  public static formatCodexAppServerNotRemoved(path: string, reason: string): string {
+    return `An older Codex app server download at ${path} wasn't removed: ${reason}`;
+  }
+
+  public static formatCodexAppServerRefused(program: string, reason: string): string {
+    return `The downloaded Codex app server at ${program} didn't start, so TeamRun runs codex app-server instead, and its Codex threads show in the Codex app: ${reason}`;
   }
 
   public static formatCodexPackageMissing(version: string): string {

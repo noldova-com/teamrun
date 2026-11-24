@@ -11,7 +11,6 @@ import { computed, type FactoryProvider, inject, type Signal } from "@angular/co
 import { type IWindowPartContext, WindowPartTokens } from "@noldova/desktop.window";
 
 import type { OrganizationCardField } from "../enums/organization-card-field";
-import type { OrganizationViewMode } from "../enums/organization-view-mode";
 import type { OrganizationLayout } from "../models/organization-layout";
 import { OrganizationLayoutState } from "./organization-layout-state";
 import { OrganizationScope } from "./organization-scope";
@@ -54,13 +53,5 @@ export class OrganizationLayoutService {
 
   public clearEveryCard(): void {
     this.state().clearEveryCard();
-  }
-
-  public showView(view: OrganizationViewMode): void {
-    this.state().showView(view);
-  }
-
-  public focusOn(id: string | null): void {
-    this.state().focusOn(id);
   }
 }

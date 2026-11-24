@@ -14,21 +14,10 @@ LICENSE file in the root directory of this source tree.
     } @else {
       <button type="button" class="name" [attr.aria-label]="resources.formatOrganizationMessageNamed(teammate().name)" (click)="message.emit()">{{ teammate().name }}</button>
     }
-    @if (shape() === shapes.Fluid) {
-      @if (roleLine(); as line) {
-        <span class="role">{{ line }}</span>
-      }
-    } @else if (teammate().role; as role) {
+    @if (teammate().role; as role) {
       <span class="role">{{ role }}</span>
     }
-    @if (reportsTo(); as note) {
-      <span class="role reports-to">{{ note }}</span>
-    }
   </div>
-  @if (shape() === shapes.Fluid && !editing()) {
-    <button type="button" nol-icon-button class="chat" [icon]="resources.organizationBoardMessageIcon" [label]="resources.formatOrganizationMessageNamed(teammate().name)"
-      (click)="message.emit()"></button>
-  }
   @if (editsIn(); as department) {
     <button type="button" nol-icon-button class="remove" [icon]="resources.organizationLeaveUnitIcon"
       [label]="resources.formatOrganizationLeaveUnitNamed(teammate().name, department.name)" (click)="confirmLeaveUnit(department)"></button>
@@ -50,19 +39,7 @@ LICENSE file in the root directory of this source tree.
 @if (fields().has(fieldNames.Status)) {
   <nol-teamrun-teammate-status class="status" [teammateId]="teammate().id" />
 }
-@if (fields().has(fieldNames.Now) && shape() === shapes.Fluid && activities().length > 0) {
-  <ul class="acts" [attr.aria-label]="resources.formatOrganizationNowOf(teammate().name)">
-    @for (activity of activities(); track activity.chatId) {
-      <li class="act">
-        <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ resources.organizationNowRunningIcon }}</span>
-        <span class="now-body">
-          <span class="now-text">{{ activity.text }}</span>
-          <span class="now-for">{{ activity.lasted }}</span>
-        </span>
-      </li>
-    }
-  </ul>
-} @else if (fields().has(fieldNames.Now)) {
+@if (fields().has(fieldNames.Now)) {
   @let shown = now();
   <div class="now">
     <span class="now-icon material-symbols-rounded" aria-hidden="true">{{ shown.icon }}</span>

@@ -23,10 +23,11 @@ export class ProviderKindInstallation {
   public readonly cancellable: boolean;
   public readonly missingTool: string | null;
   public readonly foundPath: string | null;
+  public readonly notice: string | null;
 
   public constructor(kind: string, state: ProviderKindInstallState, reason: string | null = null, received: number = 0, total: number = 0,
     version: string | null = null, update: string | null = null, cancellable: boolean = true, missingTool: string | null = null,
-    foundPath: string | null = null) {
+    foundPath: string | null = null, notice: string | null = null) {
     ArgumentException.throwIfNullOrWhitespace(kind, Resources.kindField);
 
     this.kind = kind;
@@ -39,6 +40,7 @@ export class ProviderKindInstallation {
     this.cancellable = cancellable;
     this.missingTool = missingTool;
     this.foundPath = foundPath;
+    this.notice = notice;
   }
 
   public static fromJson(value: unknown, path?: string): ProviderKindInstallation {
@@ -53,7 +55,8 @@ export class ProviderKindInstallation {
       reader.readNullableString(Resources.updateField),
       reader.readBoolean(Resources.cancellableField),
       reader.hasField(Resources.missingToolField) ? reader.readNullableString(Resources.missingToolField) : null,
-      reader.hasField(Resources.foundPathField) ? reader.readNullableString(Resources.foundPathField) : null);
+      reader.hasField(Resources.foundPathField) ? reader.readNullableString(Resources.foundPathField) : null,
+      reader.hasField(Resources.noticeField) ? reader.readNullableString(Resources.noticeField) : null);
   }
 
   public toJson(): JsonObject {
@@ -67,7 +70,8 @@ export class ProviderKindInstallation {
       [Resources.updateField]: this.update,
       [Resources.cancellableField]: this.cancellable,
       [Resources.missingToolField]: this.missingTool,
-      [Resources.foundPathField]: this.foundPath
+      [Resources.foundPathField]: this.foundPath,
+      [Resources.noticeField]: this.notice
     };
   }
 }

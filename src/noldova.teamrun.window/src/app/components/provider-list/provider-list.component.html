@@ -25,6 +25,9 @@ LICENSE file in the root directory of this source tree.
           </span>
         }
       </div>
+      @if (group.installation?.notice; as notice) {
+        <p class="nol-teamrun-group-notice" [attr.data-kind]="group.kind">{{ notice }}</p>
+      }
       <ul class="nol-teamrun-provider-list" [attr.aria-label]="group.name" [attr.data-kind]="group.kind">
         @for (row of group.rows; track row.provider.id) {
           @let asked = row.provider.id === asking();

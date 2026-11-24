@@ -65,10 +65,10 @@ export class SharedMcpLaunchTests {
 
     const seen: Record<string, string> = JSON.parse(output);
     const windows = process.platform === SharedMcpLaunchTests.WINDOWS;
-    const allowed = new Set([...windows ? [...SharedMcpLauncher.windowsBasics, "LOGONSERVER"] : SharedMcpLauncher.posixBasics, ...SharedMcpLauncher.certificateVariables,
-      "SEARCH_KEY"].map(t => windows ? t.toUpperCase() : t));
-    Assert.areEqual(JSON.stringify([0, "s1", path.resolve("certs/ca.pem"), []]), JSON.stringify([code, seen["SEARCH_KEY"], seen["SSL_CERT_FILE"],
-      Object.keys(seen).filter(t => !allowed.has(windows ? t.toUpperCase() : t))]));
+    const allowed = new Set([...windows ? [...SharedMcpLauncher.windowsBasics, "LOGONSERVER", "NoDefaultCurrentDirectoryInExePath"] : SharedMcpLauncher.posixBasics,
+      ...SharedMcpLauncher.certificateVariables, "SEARCH_KEY"].map(t => windows ? t.toUpperCase() : t));
+    Assert.areEqual(JSON.stringify([0, "s1", path.resolve("certs/ca.pem"), [], windows ? "1" : undefined]), JSON.stringify([code, seen["SEARCH_KEY"], seen["SSL_CERT_FILE"],
+      Object.keys(seen).filter(t => !allowed.has(windows ? t.toUpperCase() : t)), seen["NoDefaultCurrentDirectoryInExePath"]]));
     Assert.areEqual(JSON.stringify([undefined, undefined, undefined]), JSON.stringify(["TEAMRUN_SENDER_TOKEN", "ELECTRON_RUN_AS_NODE", "OTHER_KEY"].map(t => seen[t])));
   }
 

@@ -159,21 +159,21 @@ LICENSE file in the root directory of this source tree.
       }
     </ng-template>
   }
-  @for (entry of generatedImageEntries(); track entry[0]) {
-    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+  @for (entry of generatedImageEntries(); track entry.key) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry.key)">
       @if (areSlotsShown()) {
-        <nol-teamrun-image-preview class="reply-image" [image]="entry[1]" [images]="generatedImageList()" />
+        <nol-teamrun-image-preview class="reply-image" [image]="entry.image" [images]="generatedImageList()" />
       }
     </ng-template>
   }
-  @for (entry of missingImages(); track entry[0]) {
-    <ng-template [nolMessageSlot]="imageSlotOf(entry[0])">
+  @for (entry of missingImages(); track entry.key) {
+    <ng-template [nolMessageSlot]="imageSlotOf(entry.key)">
       @if (areSlotsShown()) {
         <div class="reply-error reply-image-missing">
           <span class="reply-error-glyph material-symbols-rounded" aria-hidden="true">{{ resources.replyErrorGlyph }}</span>
           <div class="reply-error-body">
-            <p class="reply-error-text">{{ entry[1].text }}</p>
-            @if (entry[1].reason; as reason) {
+            <p class="reply-error-text">{{ entry.missing.text }}</p>
+            @if (entry.missing.reason; as reason) {
               <p class="reply-error-text">{{ reason }}</p>
             }
           </div>
@@ -182,13 +182,15 @@ LICENSE file in the root directory of this source tree.
     </ng-template>
   }
   @if (plan(); as plan) {
-    <ng-template [nolMessageSlot]="planSlotOf(planKey())">
-      @if (areSlotsShown()) {
-        <nol-teamrun-plan-card class="reply-plan" [plan]="plan" [open]="isPlanOpen()" [revealStart]="revealsPlan() ? flashStart() : null" [revealRow]="message().sequence" [mentions]="mentions()"
-          [fileLinks]="true" [shellRuns]="runsShell()" (toggled)="togglePlan()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
-          [shellRunOutputs]="planRunOutputs()" [shellRunStates]="planRunStates()" [terminalOwner]="terminalOwner()" [messageId]="message().id" (shellRun)="runShell($event, resources.runPlanSite)" [approvable]="awaitsPlanApproval()" [approving]="approvingPlan()" (approve)="approvePlan()" />
-      }
-    </ng-template>
+    @if (planSegment(); as segment) {
+      <ng-template [nolMessageSlot]="planSlotOf(segment.key)">
+        @if (areSlotsShown()) {
+          <nol-teamrun-plan-card class="reply-plan" [plan]="plan" [open]="isPlanOpen()" [revealStart]="revealsPlan() ? flashStart() : null" [revealRow]="message().sequence" [mentions]="mentions()"
+            [fileLinks]="true" [shellRuns]="runsShell()" (toggled)="togglePlan()" (linkOpen)="openLink($event)" (fileActivate)="openFile($event)"
+            [shellRunOutputs]="planRunOutputs()" [shellRunStates]="planRunStates()" [terminalOwner]="terminalOwner()" [messageId]="message().id" (shellRun)="runShell($event, resources.runPlanSite)" [approvable]="awaitsPlanApproval()" [approving]="approvingPlan()" (approve)="approvePlan()" />
+        }
+      </ng-template>
+    }
   }
   <ng-template [nolMessageSlot]="resources.attachedImagesSlot">
     @if (areSlotsShown()) {
@@ -222,10 +224,10 @@ LICENSE file in the root directory of this source tree.
       </div>
     }
   </ng-template>
-  @for (group of approvalGroups(); track group[0]) {
-    <ng-template [nolMessageSlot]="approvalsSlotOf(group[0])">
+  @for (group of approvalGroups(); track group.key) {
+    <ng-template [nolMessageSlot]="approvalsSlotOf(group.key)">
       @if (areSlotsShown()) {
-        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group[1]" [controls]="state()" (focused)="approachApproval($event)" />
+        <nol-teamrun-reply-approvals [reply]="message()" [ids]="group.ids" [controls]="state()" (focused)="approachApproval($event)" />
       }
     </ng-template>
   }

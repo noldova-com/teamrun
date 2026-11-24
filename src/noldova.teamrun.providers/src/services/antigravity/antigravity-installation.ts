@@ -12,13 +12,14 @@ import { type IProviderKindInstallation, ProviderKindVersions } from "@noldova/t
 
 import { ExecutableSource } from "../../enums/executable-source.js";
 import type { AntigravityServer } from "../../models/antigravity-server.js";
+import { FoundServer } from "../../models/found-server.js";
 import { Resources } from "../../resources.js";
 
 export class AntigravityInstallation implements IProviderKindInstallation {
   private readonly installer: IProviderKindInstallation;
   private readonly locate: (chosen: string | null) => AntigravityServer | null;
   private readonly readVersion: () => Promise<string | null>;
-  private found: { readonly path: string; readonly stamp: number; readonly version: string | null } | null = null;
+  private found: FoundServer | null = null;
 
   public constructor(installer: IProviderKindInstallation, locate: (chosen: string | null) => AntigravityServer | null,
     readVersion: () => Promise<string | null>) {
@@ -50,13 +51,13 @@ export class AntigravityInstallation implements IProviderKindInstallation {
       : Resources.formatAntigravityPathUnsupported(found.path, found.version);
   }
 
-  public async readVersions(): Promise<ProviderKindVersions> {
-    const own = await this.installer.readVersions();
+  public async readVersions(checksLatest: boolean): Promise<ProviderKindVersions> {
+    const own = await this.installer.readVersions(checksLatest);
     const path = this.onPath();
     if (Object.isNull(path))
       return own;
     const stamp = AntigravityInstallation.stampOf(path);
-    const found = this.found?.path === path && this.found.stamp === stamp ? this.found : { path, stamp, version: await this.readVersion().catch(() => null) };
+    const found = this.found?.path === path && this.found.stamp === stamp ? this.found : new FoundServer(path, stamp, await this.readVersion().catch(() => null));
     this.found = found;
     return AntigravityInstallation.accepts(found.version) ? new ProviderKindVersions(found.version, own.latest) : own;
   }
@@ -65,7 +66,7 @@ export class AntigravityInstallation implements IProviderKindInstallation {
     return this.installer.install(progress, signal, commit);
   }
 
-  private current(): { readonly path: string; readonly version: string | null } | null {
+  private current(): FoundServer | null {
     const path = this.onPath();
     return Object.isNull(path) || this.found?.path !== path || this.found.stamp !== AntigravityInstallation.stampOf(path) ? null : this.found;
   }

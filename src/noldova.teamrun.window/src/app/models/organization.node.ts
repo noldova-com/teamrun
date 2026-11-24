@@ -46,7 +46,7 @@ export class OrganizationNode {
     this.headcount = (Object.isNull(leader) ? 0 : 1) + this.members.length;
     const nested = [...departments, ...reports.flatMap(t => t.subDepartments)].reduce((sum, t) => sum + t.total, 0);
     this.total = this.headcount + nested;
-    this.hidden = this.total - (Object.isNull(leader) ? 0 : 1);
+    this.hidden = this.total;
   }
 
   public get id(): string {

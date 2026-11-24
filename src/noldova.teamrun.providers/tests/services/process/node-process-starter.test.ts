@@ -7,7 +7,8 @@
  */
 
 import { once } from "node:events";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { CommandRunner, LocalAcpCommand, NodeProcessStarter, ProcessCommand, ProcessTerminator } from "@noldova/teamrun.providers";
@@ -31,6 +32,31 @@ export class NodeProcessStarterTests {
     const result = await new CommandRunner(new NodeProcessStarter(new ProcessTerminator("win32"))).run(command, environment, 30_000);
 
     Assert.areEqual(JSON.stringify(args), result.stdout, result.stderr);
+  }
+
+  @TestMethod
+  public async runsTheNodeOnPathFromABatchShimOnWindowsAndNotANodeCmdInTheWorkingFolder(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    using directory = new TemporaryDirectory();
+    const bin = directory.resolve("bin");
+    const work = directory.resolve("work");
+    mkdirSync(bin);
+    mkdirSync(work);
+    writeFileSync(path.join(bin, "agent.cmd"), "@node -e \"process.stdout.write('path')\"\r\n");
+    writeFileSync(path.join(work, "node.cmd"), "@echo planted\r\n");
+    const inherited = Object.entries(process.env).filter(t => !["PATH", "PATHEXT", "NODEFAULTCURRENTDIRECTORYINEXEPATH"].includes(t[0].toUpperCase()));
+    const environment = { ...Object.fromEntries(inherited), PATH: `${bin};${path.dirname(process.execPath)}`, PATHEXT: ".EXE;.CMD" };
+    const command = new LocalAcpCommand("agent", "Agent", "agent", []).commandFor("win32", environment);
+
+    const child = new NodeProcessStarter(new ProcessTerminator("win32")).start(command, environment, work);
+    let read = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => read += chunk);
+    child.stderr.resume();
+    await once(child, "close");
+
+    Assert.areEqual("path", read.trim());
   }
 
   @TestMethod

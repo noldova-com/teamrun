@@ -10,40 +10,44 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { JsonValue } from "@noldova/context.json";
+import "@noldova/context.core";
+import { JsonReader, type JsonValue } from "@noldova/context.json";
 import { QualifiedName, SettingChange, SettingKey, type SettingScope } from "@noldova/desktop.protocol";
 import type { IModuleSettings } from "@noldova/desktop.runtime";
+
+import { SettingDeclaration } from "./setting-declaration.fixture.js";
 
 export class DeclaredSettings implements IModuleSettings {
   private static readonly DEVICE_LOCALITY: string = "Device";
   private static readonly SHARED_DEVICE: string = "";
+  private static readonly UPDATE_CHECKS: SettingDeclaration = new SettingDeclaration("desktop.updateChecks", "Automatic", DeclaredSettings.DEVICE_LOCALITY);
 
   public readonly device: string;
-  private readonly declarations: ReadonlyMap<string, { readonly default: JsonValue; readonly locality: string; readonly type: { readonly minimum?: number; readonly maximum?: number } }>;
+  private readonly declarations: ReadonlyMap<string, SettingDeclaration>;
   private readonly values: Map<string, JsonValue> = new Map();
   private readonly listeners: Map<string, ((change: SettingChange) => void)[]> = new Map();
 
   public constructor(device: string = "device-1") {
     const file = join(dirname(fileURLToPath(import.meta.resolve("@noldova/teamrun/package.json"))), "settings.json");
-    const declared = JSON.parse(readFileSync(file, "utf8")) as { settings: readonly { name: string; default: JsonValue; locality: string; type: { minimum?: number; maximum?: number } }[] };
+    const declared = JsonReader.parse(readFileSync(file, "utf8"), file).readObjectArray("settings").map(t => SettingDeclaration.fromJson(t));
     this.device = device;
-    this.declarations = new Map(declared.settings.map(t => [t.name, t]));
+    this.declarations = new Map([...declared, DeclaredSettings.UPDATE_CHECKS].map(t => [t.name, t]));
   }
 
   public read(name: string, _scope: SettingScope | null = null, device: string | null = null): JsonValue {
     const declaration = this.declare(name);
-    if (declaration.locality === DeclaredSettings.DEVICE_LOCALITY && device === null)
-      return declaration.default;
+    if (declaration.locality === DeclaredSettings.DEVICE_LOCALITY && Object.isNull(device))
+      return declaration.defaultValue;
 
-    return this.values.get(this.keyOf(name, device)) ?? declaration.default;
+    return this.values.get(this.keyOf(name, device)) ?? declaration.defaultValue;
   }
 
   public write(name: string, value: JsonValue, _scope: SettingScope | null = null, device: string | null = null): void {
     const declaration = this.declare(name);
-    if (declaration.locality === DeclaredSettings.DEVICE_LOCALITY && device === null)
+    if (declaration.locality === DeclaredSettings.DEVICE_LOCALITY && Object.isNull(device))
       throw new Error(`${name} is a device setting given no device.`);
-    if (typeof value === "number" && (value < (declaration.type.minimum ?? value) || value > (declaration.type.maximum ?? value)))
-      throw new Error(`${name} takes ${declaration.type.minimum} to ${declaration.type.maximum}, not ${value}.`);
+    if (declaration.refuses(value))
+      throw new Error(`${name} takes ${declaration.minimum} to ${declaration.maximum}, not ${value}.`);
 
     this.values.set(this.keyOf(name, device), value);
     for (const listener of this.listeners.get(name) ?? [])
@@ -70,9 +74,9 @@ export class DeclaredSettings implements IModuleSettings {
     throw new Error("The fixture keeps no scopes.");
   }
 
-  private declare(name: string): { readonly default: JsonValue; readonly locality: string; readonly type: { readonly minimum?: number; readonly maximum?: number } } {
+  private declare(name: string): SettingDeclaration {
     const declaration = this.declarations.get(name);
-    if (declaration === undefined)
+    if (Object.isUndefined(declaration))
       throw new Error(`No setting ${name} is declared.`);
 
     return declaration;

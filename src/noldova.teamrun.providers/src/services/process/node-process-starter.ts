@@ -13,6 +13,7 @@ import "@noldova/context.core";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import { Resources } from "../../resources.js";
+import { SharedMcpLauncher } from "../mcp/shared-mcp-launcher.js";
 import type { ProcessTerminator } from "./process-terminator.js";
 import { StartedProcess } from "./started-process.js";
 
@@ -27,7 +28,7 @@ export class NodeProcessStarter implements IProcessStarter {
     const started = new StartedProcess();
     const child = spawn(command.executable, command.arguments, {
       ...(Object.isNull(directory) ? {} : { cwd: directory }),
-      env: environment,
+      env: SharedMcpLauncher.environmentToStart(process.platform, environment),
       stdio: "pipe",
       detached: command.ownsGroup && process.platform !== Resources.windowsPlatform,
       windowsHide: true,

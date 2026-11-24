@@ -67,7 +67,7 @@ LICENSE file in the root directory of this source tree.
           <tr class="nol-teamrun-item" [attr.data-teammate]="teammate.id">
             <td>
               <span class="nol-teamrun-name">
-                <nol-avatar [name]="teammate.name" [initials]="initials(teammate)" [colorKey]="teammate.id" [size]="small"
+                <nol-avatar [name]="teammate.name" [initials]="initials(teammate)" [color]="store.teammateColor(teammate.id)" [size]="small"
                   [unavailable]="store.isTeammateUnavailable(teammate.id)" [label]="summary(teammate)" />
                 <span class="nol-teamrun-item-name" [class.nol-teamrun-unavailable]="store.isTeammateUnavailable(teammate.id)">{{ store.disabledMarkedName(teammate) }}</span>
               </span>

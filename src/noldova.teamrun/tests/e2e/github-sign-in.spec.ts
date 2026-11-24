@@ -11,6 +11,7 @@ import path from "node:path";
 
 import { type Locator, type Page, expect } from "playwright/test";
 
+import { CodexDouble } from "./fixtures/codex-double.ts";
 import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
 
 interface IEdges {
@@ -140,6 +141,7 @@ test("Settings' GitHub page lines up with Settings' other pages, opens a device 
   expect(answered[0]).toBe(DEVICE_CODE_ANSWERED);
   expect(new Set(answered)).toEqual(new Set([DEVICE_CODE_ANSWERED, TOKEN_ANSWERED, USER_ANSWERED]));
   expect(lines.filter(t => t.startsWith("refused "))).toEqual([OTHER_HOST_REFUSED]);
+  await expect.poll(() => linesOf(app.codexLog).some(t => t.includes(CodexDouble.SOURCE_STARTED)), TeamRunApp.pollOf(30_000)).toBe(true);
   expect(app.unexpectedFailures).toEqual([]);
 });
 

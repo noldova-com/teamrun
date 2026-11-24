@@ -16,8 +16,10 @@ import { AttachmentInput, ConversationIdParams, Draft, DraftSaveParams, ErrorCod
 
 import { DraftNotSavedException } from "../../../src/app/exceptions/draft-not-saved.exception";
 import { DraftUnreadableException } from "../../../src/app/exceptions/draft-unreadable.exception";
-import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
+import type { ComposerAttachment } from "../../../src/app/models/composer-attachment";
 import { ComposerDraft } from "../../../src/app/models/composer-draft";
+import { PickedAttachment } from "../../../src/app/models/picked-attachment";
+import { SavedAttachment } from "../../../src/app/models/saved-attachment";
 import { ChatStoreService } from "../../../src/app/services/chat-store.service";
 import { ClockService } from "../../../src/app/services/clock.service";
 import { ComposerDraftService } from "../../../src/app/services/composer-draft.service";
@@ -86,7 +88,7 @@ describe("ComposerDraftService", () => {
 
   it("sends each new file once by a grant of its own, never its bytes, saves the draft by paths, and sends the stored path after", async () => {
     const chosen = [new File(["a"], "notes.txt", { type: "text/plain" }), new File(["b"], "more.txt", { type: "text/plain" })];
-    const files = chosen.map(t => new ComposerAttachment(t));
+    const files = chosen.map(t => new PickedAttachment(t));
 
     drafts.schedule(draft("", "c1", files));
     await drafts.save();
@@ -106,7 +108,7 @@ describe("ComposerDraftService", () => {
   });
 
   it("marks as saved only the files the saved draft holds", async () => {
-    const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new ComposerAttachment(t));
+    const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new PickedAttachment(t));
     context.answer(MethodName.DraftSave, t => {
       const draft = SampleData.savedDraft(DraftSaveParams.fromJson(t), 1);
       return new Draft(draft.chatId, draft.text, draft.attachments.slice(0, 1), [], draft.revision, draft.updatedAt).toJson();
@@ -119,7 +121,7 @@ describe("ComposerDraftService", () => {
   });
 
   it("discards the files it prepared when a file or the save fails, and says why", async () => {
-    const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new ComposerAttachment(t));
+    const files = [new File(["a"], "notes.txt"), new File(["b"], "more.txt")].map(t => new PickedAttachment(t));
     let prepared = 0;
     context.answer(MethodName.AttachmentPrepare, t => {
       if (++prepared === 2)
@@ -145,7 +147,7 @@ describe("ComposerDraftService", () => {
 
   it("says a draft whose file the window can't grant isn't saved, and asks the runtime nothing for it", async () => {
     context.refusesGrants = true;
-    drafts.schedule(draft("", "c1", [new ComposerAttachment(new File(["a"], "notes.txt"))]));
+    drafts.schedule(draft("", "c1", [new PickedAttachment(new File(["a"], "notes.txt"))]));
 
     await expect(drafts.save()).rejects.toThrow(Resources.draftNotSaved);
 
@@ -169,7 +171,7 @@ describe("ComposerDraftService", () => {
   });
 
   it("keeps a saved file's stored path", async () => {
-    const attachment = new ComposerAttachment(new MessageAttachment("a.txt", "text/plain", 1, "D:/kept/a.txt"));
+    const attachment = new SavedAttachment(new MessageAttachment("a.txt", "text/plain", 1, "D:/kept/a.txt"));
 
     drafts.schedule(draft("", "c1", [attachment]));
     await drafts.save();
@@ -240,7 +242,7 @@ describe("ComposerDraftService", () => {
       .refuse(MethodName.DraftSave, ErrorCode.Conflict, "The draft changed.", "c1");
     await drafts.restore("c1");
 
-    drafts.schedule(draft("mine", "c1", [new ComposerAttachment(new File(["a"], "notes.txt", { type: "text/plain" }))]));
+    drafts.schedule(draft("mine", "c1", [new PickedAttachment(new File(["a"], "notes.txt", { type: "text/plain" }))]));
     await drafts.save();
     await drafts.discard("c1");
     unwatch();

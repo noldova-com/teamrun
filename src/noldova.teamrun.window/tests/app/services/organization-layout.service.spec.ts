@@ -11,7 +11,6 @@ import { signal } from "@angular/core";
 import { MethodName, OrganizationIdParams, OrganizationLayoutSaveParams } from "@noldova/teamrun.protocol";
 
 import { OrganizationCardField } from "../../../src/app/enums/organization-card-field";
-import { OrganizationViewMode } from "../../../src/app/enums/organization-view-mode";
 import { OrganizationLayout } from "../../../src/app/models/organization-layout";
 import { OrganizationLayoutService } from "../../../src/app/services/organization-layout.service";
 import { OrganizationScope } from "../../../src/app/services/organization-scope";
@@ -32,7 +31,7 @@ describe("OrganizationLayoutService", () => {
       .answer(MethodName.OrganizationLayoutSave, t => {
         const params = OrganizationLayoutSaveParams.fromJson(t);
         const layout = OrganizationLayout.fromJson(params.layout);
-        saves.push(`${params.organizationId} ${layout.collapsedDepartments.join("+")} ${String(layout.cardsShow.has(OrganizationCardField.Usage))} ${[...layout.cards.keys()].join("+")} ${layout.view} ${String(layout.focus)}`);
+        saves.push(`${params.organizationId} ${layout.collapsedDepartments.join("+")} ${String(layout.cardsShow.has(OrganizationCardField.Usage))} ${[...layout.cards.keys()].join("+")}`);
         return params.layout;
       });
     const instance = signal("my-organization");
@@ -48,15 +47,12 @@ describe("OrganizationLayoutService", () => {
     layout.clearCard("t1");
     layout.showOnCard("t2", OrganizationCardField.Model, true);
     layout.clearEveryCard();
-    layout.showView(OrganizationViewMode.Focus);
-    layout.focusOn("d1");
-    await Wait.until(() => expect(saves).toHaveLength(8));
+    await Wait.until(() => expect(saves).toHaveLength(6));
     instance.set("o2");
 
     await Wait.until(() => expect(layout.layout().collapsedDepartments).toEqual(["d2"]));
     expect(before).toEqual([]);
-    expect(saves).toEqual(["my-organization d0+d1 false  Tree null", "my-organization d0+d1 true  Tree null", "my-organization d0+d1 true t1 Tree null",
-      "my-organization d0+d1 true  Tree null", "my-organization d0+d1 true t2 Tree null", "my-organization d0+d1 true  Tree null", "my-organization d0+d1 true  Focus null",
-      "my-organization d0+d1 true  Focus d1"]);
+    expect(saves).toEqual(["my-organization d0+d1 false ", "my-organization d0+d1 true ", "my-organization d0+d1 true t1", "my-organization d0+d1 true ",
+      "my-organization d0+d1 true t2", "my-organization d0+d1 true "]);
   });
 });
