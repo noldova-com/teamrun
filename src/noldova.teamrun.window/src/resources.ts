@@ -100,6 +100,7 @@ export class Resources {
   public static readonly draftNotSaved: string = "The unsent message could not be saved.";
   public static readonly draftStale: string = "Another window changed the unsent message since this one read it.";
   public static readonly draftUnreadable: string = "The unsent message could not be read, so what is written here is not kept.";
+  public static readonly missingValue: string = "A value the window relies on is missing.";
   public static readonly modelImagesUnsupported: string = "No one in this chat takes images.";
   public static readonly chatPermissionsLabel: string = "Permissions in this chat";
   public static readonly toolsFollowMode: string = "TeamRun's own tools follow this mode.";

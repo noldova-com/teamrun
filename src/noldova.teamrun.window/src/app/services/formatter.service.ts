@@ -25,6 +25,7 @@ import type { ChatThread } from "../models/chat-thread";
 import { MissingImage } from "../models/missing-image";
 import { ModelCatalog } from "../models/model-catalog";
 import { ReplySegment } from "../models/reply-segment";
+import { Required } from "../models/required";
 import { SustainHandover } from "../models/sustain-handover";
 import { WakeReceived } from "../models/wake-received";
 import { WakeReply } from "../models/wake-reply";
@@ -299,7 +300,7 @@ export class FormatterService {
   }
 
   public planTitle(plan: ReplyPlan): string {
-    return Object.isNull(plan.text) || Resources.planHeading.test(plan.text) ? Resources.planTitle : plan.title!;
+    return Object.isNull(plan.text) || Resources.planHeading.test(plan.text) ? Resources.planTitle : Required.of(plan.title);
   }
 
   public planProgress(plan: ReplyPlan): string | null {
@@ -314,7 +315,7 @@ export class FormatterService {
     if (this.hasStepStatus(detail, Resources.failedStepStatuses))
       return null;
     const reader = new WrittenImageReader();
-    const payload = FormatterService.payloadOf(detail)!;
+    const payload = Required.of(FormatterService.payloadOf(detail));
     const saved = payload[Resources.savedPathField];
     const savedPath = Object.isString(saved) ? saved : null;
     const stored = reader.storedPathOf(detail);
@@ -748,7 +749,7 @@ export class FormatterService {
     let plain = String.empty;
     let start = 0;
     for (const span of escaped.matchAll(Resources.markdownCodeSpanPattern)) {
-      const code = span[2]!.replace(Resources.markdownCodeSpacePattern, Resources.markdownMarkedText);
+      const code = Required.of(span[2]).replace(Resources.markdownCodeSpacePattern, Resources.markdownMarkedText);
       plain += FormatterService.unmarkedOf(escaped.slice(start, span.index)) + code.replace(Resources.markdownEscapedPattern, t => Resources.markdownEscapeMark + FormatterService.unescapedOf(t));
       start = span.index + span[0].length;
     }

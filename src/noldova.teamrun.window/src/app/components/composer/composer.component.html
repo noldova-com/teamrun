@@ -162,14 +162,14 @@ LICENSE file in the root directory of this source tree.
         @if (catalog().failed) {
           <button type="button" nol-menu-item [label]="resources.modelCatalogUnavailable" [disabled]="true"></button>
         }
-        @if (unlistedReason()) {
-          <button type="button" nol-menu-item [label]="unlistedReason()!" [disabled]="true"></button>
+        @if (unlistedReason(); as reason) {
+          <button type="button" nol-menu-item [label]="reason" [disabled]="true"></button>
         }
-        @if (planNote()) {
-          <button type="button" nol-menu-item [label]="planNote()!" [disabled]="true"></button>
+        @if (planNote(); as note) {
+          <button type="button" nol-menu-item [label]="note" [disabled]="true"></button>
         }
-        @if (chosenModel() && !selectedModel()) {
-          <button type="button" nol-menu-item [label]="resources.formatUnlisted(chosenModel()!)" [checked]="true" [disabled]="true"></button>
+        @if (!selectedModel() && chosenModel(); as model) {
+          <button type="button" nol-menu-item [label]="resources.formatUnlisted(model)" [checked]="true" [disabled]="true"></button>
         }
         @if (chosenDescriptor(); as descriptor) {
           <button type="button" nol-menu-item [label]="resources.formatProviderDefault(descriptor.displayName, defaultModelName())"
