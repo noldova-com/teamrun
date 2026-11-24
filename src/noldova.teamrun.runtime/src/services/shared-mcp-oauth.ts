@@ -12,8 +12,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import "@noldova/context.core";
 import { auth, extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
 import { type OAuthClientInformationFull, OAuthClientInformationFullSchema, type OAuthTokens, OAuthTokensSchema } from "@modelcontextprotocol/sdk/shared/auth.js";
-import type { IModuleSecrets } from "@noldova/desktop.runtime";
-import { type ISharedMcpSignIn, SharedMcpAccess } from "@noldova/teamrun.core";
+import type { IModuleLog, IModuleSecrets } from "@noldova/desktop.runtime";
+import { type ISharedMcpSignIn, Resources as CoreResources, SharedMcpAccess } from "@noldova/teamrun.core";
 
 import type { ISharedMcpChallenge } from "../interfaces/i-shared-mcp-challenge.js";
 import { SharedMcpSavedSignIn } from "../models/shared-mcp-saved-sign-in.js";
@@ -22,19 +22,23 @@ import { SharedMcpOauthFlow } from "./shared-mcp-oauth-flow.js";
 
 export class SharedMcpOauth implements ISharedMcpSignIn {
   private readonly secrets: IModuleSecrets;
+  private readonly log: IModuleLog;
   private readonly expiry: () => AbortSignal;
   private readonly now: () => number;
   private readonly deadline: () => AbortSignal;
+  private readonly serverOf: () => Server;
   private readonly reads: Map<string, Promise<SharedMcpAccess>> = new Map();
   private readonly attempts: Map<string, () => void> = new Map();
   private readonly queues: Map<string, Promise<void>> = new Map();
 
-  public constructor(secrets: IModuleSecrets, expiry: () => AbortSignal = () => AbortSignal.timeout(Resources.sharedMcpSignInTimeout), now: () => number = Date.now,
-    deadline: () => AbortSignal = () => AbortSignal.timeout(Resources.sharedMcpRequestTimeout)) {
+  public constructor(secrets: IModuleSecrets, log: IModuleLog, expiry: () => AbortSignal = () => AbortSignal.timeout(Resources.sharedMcpSignInTimeout),
+    now: () => number = Date.now, deadline: () => AbortSignal = () => AbortSignal.timeout(Resources.sharedMcpRequestTimeout), serverOf: () => Server = createServer) {
     this.secrets = secrets;
+    this.log = log;
     this.expiry = expiry;
     this.now = now;
     this.deadline = deadline;
+    this.serverOf = serverOf;
   }
 
   public async startAsync(url: string, reference: string, finished: (access: SharedMcpAccess) => void): Promise<string | null> {
@@ -51,8 +55,9 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
         this.attempts.delete(reference);
     });
 
-    const server = createServer();
+    const server = this.serverOf();
     const port = await SharedMcpOauth.listenAsync(server);
+    server.on(Resources.errorEvent, (error: unknown) => this.log.write(Resources.formatSharedMcpCallbackFailed(CoreResources.formatFailureKind(error))));
     if (!isLive) {
       SharedMcpOauth.close(server);
       return null;
@@ -224,8 +229,7 @@ export class SharedMcpOauth implements ISharedMcpSignIn {
       }, () => true);
   }
 
-  private optionsOf(url: string, challenge: ISharedMcpChallenge, code: string | null)
-    : { serverUrl: string; resourceMetadataUrl?: URL; scope?: string; authorizationCode?: string; fetchFn: typeof fetch } {
+  private optionsOf(url: string, challenge: ISharedMcpChallenge, code: string | null): Parameters<typeof auth>[1] {
     return { serverUrl: url, fetchFn: (input, init) => fetch(input, { ...init, signal: this.deadline() }), ...(Object.isNull(challenge.resourceMetadataUrl) ? {} : { resourceMetadataUrl: new URL(challenge.resourceMetadataUrl) }),
       ...(Object.isNull(challenge.scope) ? {} : { scope: challenge.scope }), ...(Object.isNull(code) ? {} : { authorizationCode: code }) };
   }

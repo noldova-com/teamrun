@@ -17,6 +17,8 @@ export class AcpCommandLine {
   public static of(platform: string, environment: NodeJS.ProcessEnv, variables: Readonly<Record<string, string>>, command: string, args: readonly string[]): ProcessCommand {
     const values = Object.fromEntries(Object.entries({ ...environment, ...variables }).filter((t): t is [string, string] => !Object.isUndefined(t[1])));
     const launched = new SharedMcpLauncher(platform, environment, String.empty, String.empty).commandOf(command, args, values);
+    if (Object.isNull(launched))
+      throw new AgentLaunchException(Resources.formatCommandNotOnPath(command));
     if (launched.verbatim && args.some(t => Resources.acpLineBreakPattern.test(t)))
       throw new AgentLaunchException(Resources.formatAcpArgumentLineBreak(command));
     return new ProcessCommand(launched.command, launched.args, null, launched.verbatim);

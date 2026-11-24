@@ -49,6 +49,7 @@ export type { IAppDescriptions } from "../interfaces/i-app-descriptions.js";
 export type { IComputerUseGrantsService } from "../interfaces/i-computer-use-grants.service.js";
 export type { IRememberedAppGrants } from "../interfaces/i-remembered-app-grants.js";
 export type { ITeammatesService } from "../interfaces/i-teammates.service.js";
+export type { IToolUpdateChecks } from "../interfaces/i-tool-update-checks.js";
 export type { IOrganizationService } from "../interfaces/i-organization.service.js";
 export type { ITimer } from "../interfaces/i-timer.js";
 export type { ICommandStarter } from "../interfaces/i-command-starter.js";

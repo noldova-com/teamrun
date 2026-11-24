@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 import { FocusMonitor } from "@angular/cdk/a11y";
+import { signal } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 
 import "@noldova/context.core";
@@ -107,7 +108,8 @@ describe("OrganizationDetailsComponent", () => {
     const data = new TeammateFixture(context);
     data.teammates.push(data.reviewer);
     configure(context);
-    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context }] });
+    TestBed.configureTestingModule({ providers: [{ provide: WindowPartTokens.context, useValue: context },
+      { provide: WindowPartTokens.activeDocument, useValue: signal(true).asReadonly() }] });
     fixture = TestBed.createComponent(OrganizationViewComponent);
     element().style.width = "100rem";
     element().style.height = "70rem";
@@ -296,37 +298,6 @@ describe("OrganizationDetailsComponent", () => {
     expect(closed).toEqual([]);
   });
 
-  describe.each(["Board", "Focus"])("on the %s", view => {
-    const createIn = async (): Promise<void> => {
-      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
-      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
-    };
-
-    it("opens a card's details, the same as the Tree's, when the card takes the keyboard focus, and closes them when it loses it", async () => {
-      await createIn();
-
-      const details = await focus("Alice");
-      const opened = [details.getAttribute("role"), details.getAttribute("aria-label"), card("Alice").getAttribute("role"), card("Alice").getAttribute("aria-label"),
-        card("Alice").getAttribute("aria-expanded"), texts(".head .name", details), fact("Reports to")];
-      await blur();
-      await Wait.until(() => expect(card("Alice").getAttribute("aria-expanded")).toBe("false"));
-
-      expect(opened).toEqual(["dialog", "Alice's details", "group", "Alice", "true", ["Alice"], "You"]);
-    });
-
-    it("opens a card's details once the pointer rests on it, and closes them when it leaves the card and them", async () => {
-      await createIn();
-
-      await userEvent.hover(card("Code Reviewer"));
-      await Wait.until(() => expect(popovers()).toHaveLength(1));
-      const opened = [popover().getAttribute("aria-label"), document.activeElement === card("Code Reviewer")];
-      await userEvent.hover(one(".top"));
-      await Wait.until(() => expect(popovers()).toEqual([]));
-
-      expect(opened).toEqual(["Code Reviewer's details", false]);
-    });
-  });
-
   describe.each(ThemeCase.every)("in $look", ({ mode, forcedColors }) => {
     beforeAll(() => EmulatedMediaFixture.emulateAsync("forced-colors", forcedColors));
 
@@ -336,9 +307,8 @@ describe("OrganizationDetailsComponent", () => {
 
     afterAll(() => EmulatedMediaFixture.resetAsync());
 
-    it.each(["Board", "Focus"])("keeps every card's details on the %s inside the window", async view => {
-      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
-      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
+    it("keeps every card's details inside the window", async () => {
+      await create();
       const outside: string[] = [];
 
       for (const shown of all("nol-teamrun-organization-card")) {
@@ -464,9 +434,8 @@ describe("OrganizationDetailsComponent", () => {
       expect(box(ago).bottom).toBeLessThanOrEqual(box(details).bottom);
     });
 
-    it.each(["Tree", "Board", "Focus"])("rings a card the keyboard reached on the %s in the accent's colour, inside its edge", async view => {
-      await create(context => context.answer(MethodName.OrganizationLayoutRead, () => ({ view })));
-      await Wait.until(() => expect(all("nol-teamrun-organization-card").length).toBeGreaterThan(0));
+    it("rings a card the keyboard reached in the accent's colour, inside its edge", async () => {
+      await create();
       const alice = card("Alice");
       alice.setAttribute("data-nol-state", "Focus");
       await settle();

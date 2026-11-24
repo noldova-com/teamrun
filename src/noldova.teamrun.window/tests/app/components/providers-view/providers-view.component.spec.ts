@@ -2148,6 +2148,42 @@ describe("ProvidersViewComponent", () => {
       expect([headNote("antigravity"), accountOf("Space")]).toEqual([["version 1.21.0 is available"], "The download failed its check."]);
     });
 
+  it("says under Your providers where and when TeamRun looks for newer tools, and looks from Check for updates, off and busy while it looks, showing what it finds",
+    async () => {
+      const checked = new DeferredResponse();
+      providers.push(spaceProvider);
+      await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), grok.toJson(), antigravity.toJson()])
+        .answer(MethodName.ProviderKindInstallationList, () => [
+          new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", null).toJson()])
+        .answer(MethodName.ProviderKindInstallationCheck, () => checked.promise));
+      const check = button(".nol-teamrun-your-providers .nol-teamrun-update-checks .nol-teamrun-check-updates");
+
+      expect([texts(".nol-teamrun-your-providers .nol-teamrun-update-checks-note"), check.textContent?.trim(), check.disabled, headNote("antigravity")])
+        .toEqual([[Resources.toolUpdateChecksNote], Resources.checkUpdatesLabel, false, []]);
+      expect(element().querySelector(".nol-teamrun-update-checks")?.getAttribute("role")).toBe("note");
+      check.click();
+      await settle();
+      expect([context.count(MethodName.ProviderKindInstallationCheck), check.disabled, check.getAttribute("aria-busy")]).toEqual([1, true, "true"]);
+      checked.resolve([new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", "1.21.0").toJson()]);
+      await settle();
+
+      expect([check.disabled, check.getAttribute("aria-busy"), headNote("antigravity")]).toEqual([false, null, ["version 1.21.0 is available"]]);
+    });
+
+  it("shows a failed Check for updates in the view's error line and keeps what it listed", async () => {
+    providers.push(spaceProvider);
+    await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), grok.toJson(), antigravity.toJson()])
+      .answer(MethodName.ProviderKindInstallationList, () => [
+        new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", "1.21.0").toJson()])
+      .fail(MethodName.ProviderKindInstallationCheck, "The release channel didn't answer."));
+
+    button(".nol-teamrun-check-updates").click();
+    await settle();
+
+    expect([texts(".nol-teamrun-error-text"), headNote("antigravity"), button(".nol-teamrun-check-updates").disabled])
+      .toEqual([["The release channel didn't answer."], ["version 1.21.0 is available"], false]);
+  });
+
   it("shows the install of a kind with no provider once, on a line atop Your providers, with its percent and Cancel", async () => {
     await create(t => t.answer(MethodName.ProviderKindList, () => [SampleData.codex.toJson(), grok.toJson(), antigravity.toJson()])
       .answer(MethodName.ProviderKindInstallationList, () => [installation(ProviderKindInstallState.Installing, null, 420, 1000).toJson()]));
@@ -2860,6 +2896,24 @@ describe("ProvidersViewComponent", () => {
       expect(update.classList).toContain("nol-button-outlined");
     });
 
+    it("puts what TeamRun says about how it runs a kind on a muted line of its own between the kind's heading and its card, from the card's left edge, half a " +
+      "rem from each", async () => {
+      const said = "TeamRun's chats show in the app's recent chats until TeamRun downloads its app server.";
+      await createWithInstall(new ProviderKindInstallation("antigravity", ProviderKindInstallState.Installed, null, 0, 0, "1.20.0", null, true, null, null, said));
+      const head = headOf("antigravity");
+      const list = part(element(), ".nol-teamrun-your-providers .nol-teamrun-provider-list[data-kind=\"antigravity\"]");
+      const name = part(head, ".nol-teamrun-group-name");
+      const notice = part(element(), ".nol-teamrun-your-providers .nol-teamrun-group-notice[data-kind=\"antigravity\"]");
+
+      expect([notice.textContent?.trim(), element().querySelectorAll(".nol-teamrun-group-notice").length, head.querySelector(".nol-teamrun-group-note")])
+        .toEqual([said, 1, null]);
+      AppearanceFixture.expectPixels(textBox(notice).left, box(list).left);
+      AppearanceFixture.expectPixels(box(notice).right, box(list).right);
+      AppearanceFixture.expectPixels(box(notice).top - box(head).bottom, space(2));
+      AppearanceFixture.expectPixels(box(list).top - box(notice).bottom, space(2));
+      expect([style(notice).color, style(notice).fontSize]).toEqual([lookOf("color: var(--nol-text-muted)", "color"), style(name).fontSize]);
+    });
+
     it("keeps a heading with Update to <n> or Installing and Cancel at a plain heading's height, so its card sits as far under its text", async () => {
       AppearanceFixture.apply(DefaultTheme.theme, mode);
       providers.push(signedIn("c3", "codex", "Overnight builds"), spaceProvider);
@@ -2931,6 +2985,23 @@ describe("ProvidersViewComponent", () => {
       const long = part(row("Lab"), ".nol-teamrun-account");
       expect([style(long).textOverflow, long.scrollWidth > long.clientWidth]).toEqual(["ellipsis", true]);
       expect(element().scrollWidth).toBeLessThanOrEqual(element().clientWidth);
+    });
+
+    it("puts the tool update note in muted text on the list's left edge a step under the rows, and Check for updates outlined at its right edge a step after " +
+      "the note, centred on it", async () => {
+      await create();
+      const checks = part(element(), ".nol-teamrun-your-providers .nol-teamrun-update-checks");
+      const list = part(element(), ".nol-teamrun-your-providers .nol-teamrun-provider-groups");
+      const note = part(checks, ".nol-teamrun-update-checks-note");
+      const check = part(checks, ".nol-teamrun-check-updates");
+      const center = (target: Element): number => box(target).top + box(target).height / 2;
+
+      AppearanceFixture.expectPixels(box(note).left, box(list).left);
+      AppearanceFixture.expectPixels(box(check).right, box(list).right);
+      AppearanceFixture.expectPixels(box(check).left - box(note).right, space(3));
+      AppearanceFixture.expectPixels(box(checks).top - box(list).bottom, space(3));
+      expect(Math.abs(center(note) - center(check))).toBeLessThanOrEqual(1);
+      expect([style(note).color, check.classList.contains("nol-button-outlined")]).toEqual([lookOf("color: var(--nol-text-muted)", "color"), true]);
     });
 
     it("puts a kind's install line on the list's edges, its spinner half a rem before its text and Cancel at the end, centred, a step and a half above the list",

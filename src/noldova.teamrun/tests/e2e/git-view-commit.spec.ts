@@ -25,7 +25,7 @@ test("the person commits a staged file in the shown chat's repository through th
   app.run(["teamrun", "new-chat", String(projectId), "--title", "Site work", "--json"]);
 
   await page.getByRole("treeitem", { name: /Site work/ }).first().click({ timeout: 60_000 });
-  await page.getByRole("tab", { name: /^Git/ }).first().click({ timeout: 60_000 });
+  await TeamRunApp.showTabAsync(page, "Git");
   await page.getByRole("button", { name: "Stage README.md", exact: true }).click({ timeout: 60_000 });
   await page.getByRole("textbox", { name: "Commit message", exact: true }).fill(MESSAGE);
   await page.getByRole("button", { name: "Commit 1 file", exact: true }).click({ timeout: 60_000 });

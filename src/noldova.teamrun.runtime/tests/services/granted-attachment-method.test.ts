@@ -15,7 +15,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { JsonValue } from "@noldova/context.json";
 import { AttachmentStore } from "@noldova/teamrun.core";
 import { AttachmentInput, MessageAttachment } from "@noldova/teamrun.protocol";
-import { GrantedAttachmentMethod } from "@noldova/teamrun.runtime";
+import { GrantedAttachmentMethod, Resources } from "@noldova/teamrun.runtime";
 
 import { GrantedFiles } from "../fixtures/granted-files.fixture.js";
 import { TemporaryDirectory } from "../fixtures/temporary-directory.fixture.js";
@@ -36,9 +36,26 @@ export class GrantedAttachmentMethodTests {
     Assert.areEqual("report.pdf application/pdf 6", `${prepared.name} ${prepared.mediaType} ${prepared.size}`);
     Assert.areEqual(join(directory.path, "attachments", "drafts"), dirname(prepared.path));
     Assert.areEqual("report", readFileSync(prepared.path, "utf8"));
-    Assert.areEqual("g1", granted.redeemed.map(t => t[0]).join(","));
-    Assert.isTrue(granted.redeemed[0]![1] === request);
-    Assert.areEqual(-1, granted.opened[0]!.fd);
+    Assert.areEqual("g1", granted.redeemed.join(","));
+    Assert.isTrue(granted.requests.length === 1 && granted.requests[0] === request);
+    Assert.areEqual("-1", granted.opened.map(t => t.fd).join(","));
+  }
+
+  @TestMethod
+  public async keepsACopysResultWhenClosingTheFileFailsAndLogsTheCloseByKind(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const chosen = join(directory.path, "report.pdf");
+    writeFileSync(chosen, "report");
+    const granted = new GrantedFiles();
+    granted.grant("g1", chosen);
+    granted.failsClose = true;
+    const logged: string[] = [];
+    const request = GrantedAttachmentMethodTests.request(new AttachmentInput("report.pdf", "application/pdf", null, null, "g1").toJson());
+
+    const prepared = MessageAttachment.fromJson(await GrantedAttachmentMethodTests.method(directory.path, granted, null, logged).handleAsync(request));
+
+    Assert.areEqual("report", readFileSync(prepared.path, "utf8"));
+    Assert.areEqual(Resources.formatAttachmentNotClosed("Error"), logged.join("|"));
   }
 
   @TestMethod
@@ -91,14 +108,14 @@ export class GrantedAttachmentMethodTests {
     const refused = await Assert.throwsAsync(() => GrantedAttachmentMethodTests.method(directory.path, granted).handleAsync(request), MethodFailureException);
 
     Assert.areEqual(`${FailureCode.InvalidParams} Attach up to 10 files: 10 MiB per image and 100 MiB per file.`, `${refused.failure.code} ${refused.failure.message}`);
-    Assert.areEqual(-1, granted.opened[0]!.fd);
+    Assert.areEqual("-1", granted.opened.map(t => t.fd).join(","));
     Assert.isFalse(existsSync(join(directory.path, "attachments", "drafts")));
   }
 
-  private static method(folder: string, granted: GrantedFiles, method: IMethodHandler | null = null): GrantedAttachmentMethod {
+  private static method(folder: string, granted: GrantedFiles, method: IMethodHandler | null = null, logged: string[] = []): GrantedAttachmentMethod {
     const store = new AttachmentStore(folder);
     const wrapped: IMethodHandler = method ?? { handleAsync: (): Promise<JsonValue> => Promise.reject(new Error("The test passes no inputs on.")) };
-    return new GrantedAttachmentMethod(wrapped, { files: granted }, { prepareOpenedAttachmentAsync: (input, source) => store.prepareOpenedAsync(input, source) });
+    return new GrantedAttachmentMethod(wrapped, { files: granted, log: { write: t => logged.push(t) } }, { prepareOpenedAttachmentAsync: (input, source) => store.prepareOpenedAsync(input, source) });
   }
 
   private static request(payload: JsonValue): RequestContext {

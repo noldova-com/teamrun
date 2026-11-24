@@ -321,6 +321,7 @@ export class Resources {
   public static readonly cancellableField: string = "cancellable";
   public static readonly missingToolField: string = "missingTool";
   public static readonly foundPathField: string = "foundPath";
+  public static readonly noticeField: string = "notice";
   public static readonly labelField: string = "label";
   public static readonly valueField: string = "value";
   public static readonly moduleField: string = "module";

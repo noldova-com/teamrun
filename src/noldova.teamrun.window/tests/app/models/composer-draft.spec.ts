@@ -8,11 +8,11 @@
 
 import { AttachmentInput, MessageAttachment } from "@noldova/teamrun.protocol";
 
-import { ComposerAttachment } from "../../../src/app/models/composer-attachment";
 import { ComposerDraft } from "../../../src/app/models/composer-draft";
+import { SavedAttachment } from "../../../src/app/models/saved-attachment";
 
 describe("ComposerDraft", () => {
-  const saved = new ComposerAttachment(new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/notes.txt"));
+  const saved = new SavedAttachment(new MessageAttachment("notes.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/notes.txt"));
 
   it("is empty while it holds only blank text and no files", () => {
     expect(new ComposerDraft("c1", " \n\t", []).isEmpty).toBe(true);
@@ -30,7 +30,7 @@ describe("ComposerDraft", () => {
   });
 
   it("becomes the save parameters of its conversation, text, files and the revision it replaces, taking each file's input after the one before", async () => {
-    const other = new ComposerAttachment(new MessageAttachment("other.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/other.txt"));
+    const other = new SavedAttachment(new MessageAttachment("other.txt", "text/plain", 1, "D:/data/attachments/drafts/c1/other.txt"));
     const asked: string[] = [];
     let open = 0;
 

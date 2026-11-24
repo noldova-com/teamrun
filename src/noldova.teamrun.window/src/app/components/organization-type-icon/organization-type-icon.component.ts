@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Component, computed, type InputSignal, input, type Signal } from "@angular/core";
+import { Component, type InputSignal, input } from "@angular/core";
 import type { NodeType } from "@noldova/teamrun.protocol";
 import { ColorChoices } from "@noldova/ui.components.angular";
 
@@ -17,8 +17,8 @@ import { ColorChoices } from "@noldova/ui.components.angular";
 })
 export class OrganizationTypeIconComponent {
   public readonly type: InputSignal<NodeType | null> = input.required<NodeType | null>();
-  public readonly fallback: InputSignal<string | null> = input<string | null>(null);
 
-  protected readonly icon: Signal<string | null> = computed(() => this.type()?.icon ?? this.fallback());
-  protected readonly color: Signal<string | null> = computed(() => ColorChoices.toCss(this.type()?.color ?? null));
+  protected colorOf(type: NodeType): string | null {
+    return ColorChoices.toCss(type.color);
+  }
 }

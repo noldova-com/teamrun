@@ -98,6 +98,7 @@ import { OutsideSessions } from "./outside-sessions.js";
 import { RuntimeToolSessions } from "./runtime-tool-sessions.js";
 import { SendTool } from "./send-tool.js";
 import { ServedCalls } from "./served-calls.js";
+import { ToolUpdateChecks } from "./tool-update-checks.js";
 import { SharedMcpAccounts } from "./shared-mcp-accounts.js";
 import { SharedMcpOauth } from "./shared-mcp-oauth.js";
 import { SubAgentTool } from "./sub-agent-tool.js";
@@ -224,7 +225,7 @@ export class RuntimePart implements IRuntimePart {
   }
 
   private async composeAsync(context: IRuntimePartContext): Promise<void> {
-    const starter = new RuntimeProcessStarter(context, await context.getWorkFolderAsync());
+    const starter = new RuntimeProcessStarter(context, await context.getWorkFolderAsync(), process.platform);
     const version = this.productVersion ?? RuntimeBuild.identity.productVersion;
     const registry = this.registries.create(version, context.moduleFolder, starter,
       context.log);
@@ -246,9 +247,9 @@ export class RuntimePart implements IRuntimePart {
     const teammates = new TeammatesService(database, providers, conversations, organization);
     const planUsage = new PlanUsageService(events);
     this.planUsage = planUsage;
-    const kinds = new ProviderKindsService(registry, providers, events, planUsage, teammates, context.log);
+    const kinds = new ProviderKindsService(registry, providers, events, new ToolUpdateChecks(context.settings), planUsage, teammates, context.log);
     const sharedServers = new SharedMcpServersService(database, providers, teammates, registry, () => context.readEnvironmentAsync(), context.secrets,
-      new SharedMcpOauth(context.secrets), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
+      new SharedMcpOauth(context.secrets, context.log), new SharedMcpAccounts(() => context.findService(Resources.gitHubAccessService, SharedMcpAccounts.isGitHubAccess)),
       events, context.log);
     const catalog = this.registries.createAcpCatalog?.(version, context.moduleFolder, starter, context.secrets, context.log) ?? null;
     const acpAgents = Object.isNull(catalog) ? null : new AcpAgentsService(database, registry, kinds, providers, catalog, context.secrets, events, context.log);

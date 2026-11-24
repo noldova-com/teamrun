@@ -25,6 +25,8 @@ describe("TreeFlowLines", () => {
     `<div data-flow-node="loose" data-flow-shape="Grid"></div>`,
     `<div data-flow-node="outside" data-flow-shape="Bus"></div>`,
     `<div class="kid"><div data-flow-node="kidless" data-flow-shape="Bus"></div></div>`,
+    `<div><div class="kids" style="${at(200, 120, 180, 60)}"><div class="kid" style="${at(100, 12, 60, 48)}"><div data-flow-node="kidReport" data-flow-parent="you"
+      data-flow-shape="Grid" style="${at(0, 12, 60, 36)}"></div></div></div></div>`,
     `<div><div class="reports" style="${at(0, 200, 120, 60)}; column-gap: 10px"><div style="${at(10, 20, 40, 15)}"></div><div style="${at(60, 20, 40, 15)}"></div>`,
     `<div data-flow-node="second" data-flow-parent="head" data-flow-shape="Grid" style="${at(10, 41, 40, 15)}"></div></div><div class="adds"></div>`,
     `<div class="kids" style="${at(0, 260, 120, 40)}"><div class="kid" style="${at(0, 8, 60, 30)}"><div data-flow-node="nested"`,
@@ -45,14 +47,15 @@ describe("TreeFlowLines", () => {
 
   afterEach(() => container.remove());
 
-  it("reads each marked node's parent, box and line up to its parent in the container's own unzoomed pixels, along a stem, a report grid's bus or a department bus", () => {
+  it("reads each marked node's parent, box and line up to its parent in the container's own unzoomed pixels, along a stem, a report grid's bus or a department bus, which a report in no grid takes too", () => {
     const nodes = TreeFlowLines.nodesIn(container);
     const lines = (key: string): string[] => (nodes.get(key)?.uplink ?? []).map(t => `${t.x},${t.y}`);
 
-    expect([...nodes.keys()]).toEqual(["you", "leader", "member", "report", "lonely", "loose", "outside", "kidless", "second", "nested", "under", "aside"]);
+    expect([...nodes.keys()]).toEqual(["you", "leader", "member", "report", "lonely", "loose", "outside", "kidless", "kidReport", "second", "nested", "under", "aside"]);
     expect([nodes.get("you")?.parentKey, nodes.get("member")?.parentKey, nodes.get("leader")?.box]).toEqual([null, "leader", new FlowBox(60, 30, 100, 40)]);
     expect(["leader", "member", "report"].map(lines)).toEqual([["101,30", "101,10"], ["100,100", "100,92", "95,92", "95,80"], ["250,50", "250,20", "290,20", "290,0"]]);
     expect(["you", "lonely", "loose", "outside", "kidless"].map(lines)).toEqual([[], [], [], [], []]);
+    expect(lines("kidReport")).toEqual(["330,144", "330,132", "290,132", "290,120"]);
   });
 
   it("takes a report below a grid's first row and a department under a grid past one side, half the grid's column gap from the cards, then over the bus or, past a one-column grid, into its head", () => {

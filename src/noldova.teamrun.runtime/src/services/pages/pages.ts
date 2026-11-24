@@ -42,14 +42,14 @@ export class Pages {
   private ping: PagePing | null = null;
 
   public constructor(connection: SqlConnection, dataDirectory: string, host: IPagesHost, log: IModuleLog, server: Server = createServer()) {
-    this.store = new PagesStore(connection, new PageFiles(dataDirectory));
-    this.canvases = new CanvasStore(connection, this.store);
+    this.store = new PagesStore(connection, new PageFiles(dataDirectory), log);
+    this.canvases = new CanvasStore(this.store);
     this.host = host;
     this.log = log;
     this.server = new PageServer(async (id, version) => {
       const page = await this.store.findAsync(id);
       return (await this.store.readAsync(page.chatId, id, version)).html;
-    }, server);
+    }, error => this.log.write(PagesResources.formatServerFailed(PagesResources.formatFailureKind(error))), server);
   }
 
   public register(moduleId: string, tools: Pick<IToolsContext, "register">): void {
@@ -72,7 +72,7 @@ export class Pages {
       await this.server.listenAsync();
     }
     catch (error) {
-      this.log.write(PagesResources.formatServerNotListening(Pages.kindOf(error)));
+      this.log.write(PagesResources.formatServerNotListening(PagesResources.formatFailureKind(error)));
       return;
     }
     this.origins = new PageOrigins(() => context.webViews, document, this.log);
@@ -99,7 +99,7 @@ export class Pages {
       chatIds = await this.store.chatIdsAsync();
     }
     catch (error) {
-      this.log.write(PagesResources.formatChatsNotListed(Pages.kindOf(error)));
+      this.log.write(PagesResources.formatChatsNotListed(PagesResources.formatFailureKind(error)));
       return;
     }
     for (const chatId of chatIds) {
@@ -108,7 +108,7 @@ export class Pages {
           await this.store.removeChatAsync(chatId);
       }
       catch (error) {
-        this.log.write(PagesResources.formatChatNotSwept(chatId, Pages.kindOf(error)));
+        this.log.write(PagesResources.formatChatNotSwept(chatId, PagesResources.formatFailureKind(error)));
       }
     }
   }
@@ -119,7 +119,7 @@ export class Pages {
       page = await this.store.findAsync(pageId);
     }
     catch (error) {
-      this.log.write(PagesResources.formatEventNotSent(PageEventName.PageStopped, Pages.kindOf(error)));
+      this.log.write(PagesResources.formatEventNotSent(PageEventName.PageStopped, PagesResources.formatFailureKind(error)));
       return;
     }
     this.publish(PageEventName.PageStopped, page);
@@ -130,11 +130,7 @@ export class Pages {
       this.channels.get(event)?.publish(page.toJson());
     }
     catch (error) {
-      this.log.write(PagesResources.formatEventNotSent(event, Pages.kindOf(error)));
+      this.log.write(PagesResources.formatEventNotSent(event, PagesResources.formatFailureKind(error)));
     }
-  }
-
-  private static kindOf(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
   }
 }

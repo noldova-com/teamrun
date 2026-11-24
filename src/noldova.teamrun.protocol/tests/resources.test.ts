@@ -46,6 +46,7 @@ export class ResourcesTests {
     Assert.areEqual("received", Resources.receivedField);
     Assert.areEqual("missingTool", Resources.missingToolField);
     Assert.areEqual("foundPath", Resources.foundPathField);
+    Assert.areEqual("notice", Resources.noticeField);
     Assert.areEqual("binaryPath", Resources.binaryPathField);
     Assert.areEqual("choosesServerPath", Resources.choosesServerPathField);
     Assert.areEqual("reportsLimits", Resources.reportsLimitsField);

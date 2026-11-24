@@ -9,11 +9,11 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { SecretFailureReason, SecretFailures } from "@noldova/desktop.protocol";
-import { type IModuleSecrets, type IModuleSettings, MethodFailureException } from "@noldova/desktop.runtime";
+import { type IAppWindows, type IModuleSecrets, type IModuleSettings, MethodFailureException } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import type { JsonObject, JsonValue } from "@noldova/context.json";
 import {
-  type IEventListener,
+  type EventHub,
   type ILog,
   type IOutsideMessages,
   type ITimer,
@@ -31,11 +31,11 @@ export class OutsideSessions implements IMcpEndpointHost {
   private readonly settings: IModuleSettings;
   private readonly secrets: IModuleSecrets;
   private readonly outside: IOutsideMessages;
-  private readonly events: { subscribe(listener: IEventListener): Disposable };
+  private readonly events: Pick<EventHub, "subscribe">;
   private readonly timer: ITimer;
   private readonly endpointOf: () => McpHttpEndpoint;
   private readonly log: ILog;
-  private readonly appWindows: { onChanged(listener: () => void): () => void };
+  private readonly appWindows: Pick<IAppWindows, "onChanged">;
   private unfollowWindows: () => void = () => undefined;
   private waitingForApp: boolean = false;
   private appChanges: number = 0;
@@ -48,8 +48,8 @@ export class OutsideSessions implements IMcpEndpointHost {
   private closed: boolean = false;
 
   public constructor(settings: IModuleSettings, secrets: IModuleSecrets, outside: IOutsideMessages,
-    events: { subscribe(listener: IEventListener): Disposable }, timer: ITimer, endpointOf: () => McpHttpEndpoint, log: ILog,
-    appWindows: { onChanged(listener: () => void): () => void }) {
+    events: Pick<EventHub, "subscribe">, timer: ITimer, endpointOf: () => McpHttpEndpoint, log: ILog,
+    appWindows: Pick<IAppWindows, "onChanged">) {
     this.settings = settings;
     this.secrets = secrets;
     this.outside = outside;
@@ -66,7 +66,7 @@ export class OutsideSessions implements IMcpEndpointHost {
 
   private get port(): number {
     const value = this.settings.read(Resources.outsidePortSetting);
-    return typeof value === "number" && Number.isInteger(value) ? value : Resources.outsideDefaultPort;
+    return Object.isNumber(value) && Number.isInteger(value) ? value : Resources.outsideDefaultPort;
   }
 
   public startAsync(): Promise<void> {
@@ -154,7 +154,7 @@ export class OutsideSessions implements IMcpEndpointHost {
     const ids = Array.isArray(given) ? given.filter((t): t is string => Object.isString(t)) : [];
     if (!Array.isArray(given) || ids.length !== given.length || ids.length === 0 || ids.length > Resources.outsideReadLimit)
       throw new ServiceException(ErrorCode.InvalidParams, Resources.outsideIdsRequired);
-    if (typeof seconds !== "number" || !Number.isInteger(seconds) || seconds < 0 || seconds > Resources.outsideWaitLimit)
+    if (!Object.isNumber(seconds) || !Number.isInteger(seconds) || seconds < 0 || seconds > Resources.outsideWaitLimit)
       throw new ServiceException(ErrorCode.InvalidParams, Resources.outsideWaitOutOfRange);
     const readAsync = (): Promise<readonly OutsideReply[]> => Promise.all(ids.map(t => this.outside.readOutsideAsync(t)));
     if (seconds === 0)
@@ -169,6 +169,8 @@ export class OutsideSessions implements IMcpEndpointHost {
       void this.timer.delayAsync(seconds * Resources.millisecondsPerSecond, ended).then(() => stop.abort(), () => undefined);
       while (!ended.aborted && !replies.every(t => t.hasEnded)) {
         await woken;
+        if (ended.aborted)
+          break;
         woken = OutsideSessions.nextEventAsync(this.events, ended);
         replies = await readAsync();
       }
@@ -280,7 +282,7 @@ export class OutsideSessions implements IMcpEndpointHost {
     this.waits = new AbortController();
   }
 
-  private static nextEventAsync(events: { subscribe(listener: IEventListener): Disposable }, ended: AbortSignal): Promise<void> {
+  private static nextEventAsync(events: Pick<EventHub, "subscribe">, ended: AbortSignal): Promise<void> {
     return new Promise(resolve => {
       if (ended.aborted) {
         resolve();

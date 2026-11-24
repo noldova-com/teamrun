@@ -15,13 +15,11 @@ import { DialogService, IconButtonComponent, MenuComponent, MenuGroupComponent, 
 
 import { Resources } from "../../../resources";
 import { OrganizationCardField } from "../../enums/organization-card-field";
-import { OrganizationCardShape } from "../../enums/organization-card-shape";
 import { TeammateStatus } from "../../enums/teammate-status";
 import { ConfirmRequest } from "../../models/confirm-request";
 import { OrganizationCardNow } from "../../models/organization-card-now";
 import { OrganizationCardUsage } from "../../models/organization-card-usage";
 import { OrganizationPlaceChoice } from "../../models/organization-place-choice";
-import { OrganizationRunningReply } from "../../models/organization-running-reply";
 import { OrganizationNode } from "../../models/organization.node";
 import { ChatPlacement } from "../../services/chat-placement";
 import { ChatStoreService } from "../../services/chat-store.service";
@@ -43,7 +41,7 @@ import { TeammateWorkComponent } from "../teammate-work/teammate-work.component"
     SelectComponent, TeammateAvatarComponent, TeammateStatusComponent, TeammateWorkComponent],
   providers: [ChatStoreService.provider, OrganizationLayoutService.provider, OrganizationStoreService.provider, ProjectsLayoutService.provider,
     TeammateStatusStoreService.provider],
-  host: { "class": "nol-teamrun-organization-card", "[class.fluid]": "shape() === shapes.Fluid", "[class.row]": "shape() === shapes.Row", "(focusin)": "closeDetails($event)" },
+  host: { "class": "nol-teamrun-organization-card", "(focusin)": "closeDetails($event)" },
   templateUrl: "./organization-card.component.html",
   styleUrl: "./organization-card.component.css"
 })
@@ -60,16 +58,12 @@ export class OrganizationCardComponent {
   private readonly details: PopoverTriggerDirective | null = inject(PopoverTriggerDirective, { self: true, optional: true });
 
   public readonly teammate: InputSignal<Teammate> = input.required<Teammate>();
-  public readonly shape: InputSignal<OrganizationCardShape> = input<OrganizationCardShape>(OrganizationCardShape.Card);
   public readonly editing: InputSignal<boolean> = input(false);
   public readonly department: InputSignal<Department | null> = input<Department | null>(null);
-  public readonly departmentName: InputSignal<string | undefined> = input<string | undefined>(undefined);
-  public readonly reportsTo: InputSignal<string | null> = input<string | null>(null);
   public readonly message: OutputEmitterRef<void> = output<void>();
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly fieldNames: typeof OrganizationCardField = OrganizationCardField;
-  protected readonly shapes: typeof OrganizationCardShape = OrganizationCardShape;
   protected readonly layout: OrganizationLayoutService = inject(OrganizationLayoutService);
   protected readonly fields: Signal<ReadonlySet<OrganizationCardField>> = computed(() => this.layout.layout().fieldsOf(this.teammate().id));
   protected readonly showsWork: Signal<boolean> = computed(() => Resources.organizationWorkFields.some(t => this.fields().has(t)));
@@ -95,10 +89,6 @@ export class OrganizationCardComponent {
       Resources.formatOrganizationNowFor(this.time() - Date.parse(first.startedAt), others.length));
   });
 
-  protected readonly activities: Signal<readonly OrganizationRunningReply[]> = computed(() =>
-    this.statuses.activitiesOf(this.teammate().id)().map(t => new OrganizationRunningReply(t.chatId, this.store.conversation(t.chatId)?.title ?? Resources.organizationNowReplying,
-      Resources.formatOrganizationNowFor(this.time() - Date.parse(t.startedAt), 0))));
-  protected readonly roleLine: Signal<string | null> = computed(() => Resources.formatOrganizationRoleIn(this.teammate().role, this.departmentName() ?? this.department()?.name ?? null));
 
   protected readonly last: Signal<TeammateLastReply | null> = computed(() => this.statuses.lastReplyOf(this.teammate().id)());
 

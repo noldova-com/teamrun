@@ -88,7 +88,7 @@ export class TeamRunWindowPart implements IWindowPart {
     context.registerView(new ViewContribution(Resources.backgroundTasksViewName, Resources.backgroundTasksTitle, Resources.backgroundTasksViewIcon, DockSide.Right, true,
       () => import("./components/background-tasks-view/background-tasks-view.component").then(t => t.BackgroundTasksViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.pagesViewName, Resources.pagesTitle, Resources.pagesViewIcon, DockSide.Right, true,
-      () => Promise.resolve(PagesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 30 }));
+      () => Promise.resolve(PagesViewComponent), ContentPadding.None, { defaultGroup: 0, defaultOrder: 15 }));
     context.registerView(new ViewContribution(Resources.planViewName, Resources.plansTitle, Resources.planViewIcon, DockSide.Right, true,
       () => import("./components/plan-view/plan-view.component").then(t => t.PlanViewComponent), ContentPadding.None, { defaultGroup: 1, defaultOrder: 10 }));
     context.registerView(new ViewContribution(Resources.subAgentsViewName, Resources.subAgentsTitle, Resources.subAgentsViewIcon, DockSide.Right, true,

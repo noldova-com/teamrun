@@ -40,10 +40,17 @@ export class SharedMcpLauncher {
   private static readonly PATH_VARIABLE: string = "PATH";
   private static readonly EXTENSIONS_VARIABLE: string = "PATHEXT";
   private static readonly SHELL_VARIABLE: string = "COMSPEC";
+  private static readonly NO_FOLDER_LOOKUP_VARIABLE: string = "NoDefaultCurrentDirectoryInExePath";
+  private static readonly NO_FOLDER_LOOKUP: string = "1";
   private static readonly DEFAULT_EXTENSIONS: string = ".COM;.EXE;.BAT;.CMD";
   private static readonly LIST_SEPARATOR: string = ";";
   private static readonly FOLDER_SEPARATOR: RegExp = /[\\/]/u;
   private static readonly SHELL: string = "cmd.exe";
+  private static readonly SYSTEM_ROOT_VARIABLE: string = "SYSTEMROOT";
+  private static readonly WINDOWS_FOLDER_VARIABLE: string = "WINDIR";
+  private static readonly WINDOWS_FOLDER: string = "C:\\Windows";
+  private static readonly SYSTEM_FOLDER: string = "System32";
+  private static readonly POWERSHELL_FOLDER: readonly string[] = ["WindowsPowerShell", "v1.0"];
   private static readonly SHELL_ARGUMENTS: readonly string[] = ["/d", "/s", "/c"];
   private static readonly BATCH_FILE: RegExp = /\.(?:cmd|bat)$/iu;
   private static readonly SHELL_META: RegExp = /([()\][%!^"`<>&|;, *?])/gu;
@@ -79,8 +86,9 @@ export class SharedMcpLauncher {
   private static readonly HOLD_SHELL_VARIABLES: readonly string[] = ["PWD", "SHLVL"];
   private static readonly HOLD_UNSET: string = "-u";
   private static readonly HOLD_RELEASE: string = "go\n";
+  private static readonly NOT_FOUND: string = "ENOENT";
   private static readonly HOLD_REFUSALS: ReadonlyMap<string, { readonly exit: number; readonly reason: string }> = new Map([
-    ["missing", { exit: 127, reason: "ENOENT" }],
+    ["missing", { exit: 127, reason: SharedMcpLauncher.NOT_FOUND }],
     ["denied", { exit: 126, reason: "EACCES" }]
   ]);
   private static readonly SPAWN_VERB: string = "spawn";
@@ -134,6 +142,10 @@ export class SharedMcpLauncher {
     return SharedMcpLauncher.withheldVariables.some(t => t.toUpperCase() === name.toUpperCase());
   }
 
+  public static environmentToStart<T extends Readonly<Record<string, string | undefined>>>(platform: string, environment: T): T {
+    return platform === SharedMcpLauncher.WINDOWS ? { ...environment, [SharedMcpLauncher.NO_FOLDER_LOOKUP_VARIABLE]: SharedMcpLauncher.NO_FOLDER_LOOKUP } : environment;
+  }
+
   public environmentOf(names: readonly string[]): Record<string, string> {
     const wanted = new Set([...this.isWindows ? SharedMcpLauncher.windowsBasics : SharedMcpLauncher.posixBasics, ...names].map(t => this.keyOf(t)));
     const certificates = new Map(SharedMcpLauncher.certificateVariables.map(t => [this.keyOf(t), t]));
@@ -146,16 +158,19 @@ export class SharedMcpLauncher {
     return Object.fromEntries([...entries.filter(t => wanted.has(this.keyOf(t[0])) && !replaced.has(this.keyOf(t[0]))), ...found]);
   }
 
-  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean } {
+  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean } | null {
     if (!this.isWindows)
       return { command, args: [...args], verbatim: false };
 
     const located = this.locate(command, environment);
+    if (Object.isNull(located))
+      return null;
     if (!SharedMcpLauncher.BATCH_FILE.test(located))
       return { command: located, args: [...args], verbatim: false };
     const line = [located.replace(SharedMcpLauncher.SHELL_META, "^$1"), ...args.map(t => SharedMcpLauncher.escapeArgument(t))].join(" ");
-    return { command: SharedMcpLauncher.valueOf(environment, SharedMcpLauncher.SHELL_VARIABLE) ?? SharedMcpLauncher.SHELL,
-      args: [...SharedMcpLauncher.SHELL_ARGUMENTS, `"${line}"`], verbatim: true };
+    const shell = SharedMcpLauncher.valueOf(environment, SharedMcpLauncher.SHELL_VARIABLE);
+    return { command: !Object.isUndefined(shell) && path.win32.isAbsolute(shell) ? shell : path.win32.join(SharedMcpLauncher.systemFolderOf(environment),
+      SharedMcpLauncher.SHELL), args: [...SharedMcpLauncher.SHELL_ARGUMENTS, `"${line}"`], verbatim: true };
   }
 
   private async launchAsync(args: readonly string[]): Promise<number> {
@@ -165,8 +180,10 @@ export class SharedMcpLauncher {
 
     const environment = this.environmentOf(String(names).split(SharedMcpLauncher.nameSeparator).filter(t => t.length > 0));
     const target = this.commandOf(command, rest, environment);
-    const watch = this.start(this.program, [this.script, SharedMcpLauncher.watchOption],
-      { env: this.environment, stdio: ["pipe", "ignore", this.isWindows ? "inherit" : "ignore"], detached: true, windowsHide: true }).on("error", () => undefined);
+    if (Object.isNull(target))
+      return this.refuse([SharedMcpLauncher.SPAWN_VERB, command, SharedMcpLauncher.NOT_FOUND].join(" "), SharedMcpLauncher.FAILED_EXIT);
+    const watch = this.start(this.program, [this.script, SharedMcpLauncher.watchOption], { env: this.environment, stdio: ["pipe", "ignore", this.isWindows ? "inherit" : "ignore"],
+      detached: true, windowsHide: true, ...this.isWindows ? { cwd: SharedMcpLauncher.systemFolderOf(this.environment) } : {} }).on("error", () => undefined);
     watch.stdin?.on("error", () => undefined);
     const script = [SharedMcpLauncher.HOLD_SCRIPT, ...SharedMcpLauncher.HOLD_SHELL_VARIABLES.filter(t => environment[t] === undefined)
       .flatMap(t => [SharedMcpLauncher.HOLD_UNSET, t]), SharedMcpLauncher.HOLD_COMMAND].join(" ");
@@ -179,7 +196,8 @@ export class SharedMcpLauncher {
     for (const signal of SharedMcpLauncher.forwardedSignals)
       this.host.on(signal, forward);
     try {
-      const server = this.start(held.command, held.args, { env: environment, stdio: this.isWindows ? "inherit" : ["inherit", "inherit", "inherit", "pipe"],
+      const server = this.start(held.command, held.args, { env: SharedMcpLauncher.environmentToStart(this.platform, environment),
+        stdio: this.isWindows ? "inherit" : ["inherit", "inherit", "inherit", "pipe"],
         windowsHide: true, windowsVerbatimArguments: held.verbatim, detached: !this.isWindows });
       processId = server.pid;
       if (processId === undefined)
@@ -280,8 +298,9 @@ export class SharedMcpLauncher {
 
   private async runPowerShellOnceAsync(script: string, limit: number, attempt: number): Promise<number | null> {
     const started = this.now();
-    const powershell = this.start(SharedMcpLauncher.POWERSHELL, [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")],
-      { env: this.environment, stdio: "ignore", windowsHide: true });
+    const folder = SharedMcpLauncher.systemFolderOf(this.environment);
+    const powershell = this.start(path.win32.join(folder, ...SharedMcpLauncher.POWERSHELL_FOLDER, SharedMcpLauncher.POWERSHELL),
+      [...SharedMcpLauncher.POWERSHELL_ARGUMENTS, Buffer.from(script, "utf16le").toString("base64")], { cwd: folder, env: this.environment, stdio: "ignore", windowsHide: true });
     const ended = new Promise<number>(resolve => {
       powershell.once("exit", code => resolve(code ?? SharedMcpLauncher.FAILED_EXIT))
         .once("error", () => resolve(SharedMcpLauncher.POWERSHELL_START_FAILED));
@@ -314,11 +333,12 @@ export class SharedMcpLauncher {
     }
   }
 
-  private locate(command: string, environment: Readonly<Record<string, string>>): string {
+  private locate(command: string, environment: Readonly<Record<string, string>>): string | null {
     const extensions = (SharedMcpLauncher.valueOf(environment, SharedMcpLauncher.EXTENSIONS_VARIABLE) ?? SharedMcpLauncher.DEFAULT_EXTENSIONS)
       .split(SharedMcpLauncher.LIST_SEPARATOR).filter(t => t.length > 0);
-    const folders = SharedMcpLauncher.FOLDER_SEPARATOR.test(command) ? [String()]
-      : (SharedMcpLauncher.valueOf(environment, SharedMcpLauncher.PATH_VARIABLE) ?? String()).split(SharedMcpLauncher.LIST_SEPARATOR).filter(t => t.length > 0);
+    const isPath = SharedMcpLauncher.FOLDER_SEPARATOR.test(command);
+    const folders = isPath ? [String()] : (SharedMcpLauncher.valueOf(environment, SharedMcpLauncher.PATH_VARIABLE) ?? String())
+      .split(SharedMcpLauncher.LIST_SEPARATOR).filter(t => path.win32.isAbsolute(t));
     const extension = path.extname(command).toUpperCase();
     const named = extensions.some(t => t.toUpperCase() === extension);
     for (const folder of folders) {
@@ -327,14 +347,20 @@ export class SharedMcpLauncher {
       if (found !== undefined)
         return found;
     }
-    return command;
+    return isPath ? command : null;
   }
 
   private keyOf(name: string): string {
     return this.isWindows ? name.toUpperCase() : name;
   }
 
-  private static valueOf(environment: Readonly<Record<string, string>>, name: string): string | undefined {
+  private static systemFolderOf(environment: Readonly<Record<string, string | undefined>>): string {
+    const windows = [SharedMcpLauncher.SYSTEM_ROOT_VARIABLE, SharedMcpLauncher.WINDOWS_FOLDER_VARIABLE].map(t => SharedMcpLauncher.valueOf(environment, t))
+      .find(t => t !== undefined && path.win32.isAbsolute(t));
+    return path.win32.join(windows ?? SharedMcpLauncher.WINDOWS_FOLDER, SharedMcpLauncher.SYSTEM_FOLDER);
+  }
+
+  private static valueOf(environment: Readonly<Record<string, string | undefined>>, name: string): string | undefined {
     return Object.entries(environment).filter(t => t[0].toUpperCase() === name).map(t => t[1])[0];
   }
 

@@ -14,7 +14,7 @@ import { ProviderKindInstallation, ProviderKindInstallState } from "@noldova/tea
 @TestClass
 export class ProviderKindInstallationTests {
   private static readonly json: object = { kind: "claude", state: "Installing", reason: null, received: 420, total: 1000, version: "2.1.211", update: null, cancellable: false,
-    missingTool: null, foundPath: null };
+    missingTool: null, foundPath: null, notice: null };
 
   @TestMethod
   public roundTripsThroughJson(): void {
@@ -28,7 +28,7 @@ export class ProviderKindInstallationTests {
   @TestMethod
   public carriesTheInstalledVersionAndTheUpdateWithTheReasonTheLastUpdateFailed(): void {
     const json = { kind: "claude", state: "Installed", reason: "The download failed.", received: 0, total: 0, version: "2.1.211", update: "2.1.212", cancellable: true,
-      missingTool: null, foundPath: null };
+      missingTool: null, foundPath: null, notice: null };
     const value = ProviderKindInstallation.fromJson(json);
 
     Assert.areEqual("2.1.211", value.version);
@@ -40,7 +40,7 @@ export class ProviderKindInstallationTests {
   @TestMethod
   public carriesTheToolAnUnavailableInstallLacks(): void {
     const json = { kind: "antigravity", state: "Unavailable", reason: "Installing Antigravity needs unzip, which this computer does not have.", received: 0, total: 0,
-      version: null, update: null, cancellable: true, missingTool: "unzip", foundPath: null };
+      version: null, update: null, cancellable: true, missingTool: "unzip", foundPath: null, notice: null };
     const value = ProviderKindInstallation.fromJson(json);
 
     Assert.areEqual("unzip", value.missingTool);
@@ -49,19 +49,31 @@ export class ProviderKindInstallationTests {
   }
 
   @TestMethod
-  public readsAnInstallationWithoutTheMissingToolOrFoundPathKeyAsNamingNone(): void {
-    const { missingTool: _missingTool, foundPath: _foundPath, ...older } = new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled).toJson();
+  public readsAnInstallationWithoutTheMissingToolFoundPathOrNoticeKeyAsNamingNone(): void {
+    const { missingTool: _missingTool, foundPath: _foundPath, notice: _notice, ...older } = new ProviderKindInstallation("claude", ProviderKindInstallState.NotInstalled).toJson();
     const value = ProviderKindInstallation.fromJson(older);
 
     Assert.isNull(value.missingTool);
     Assert.isNull(value.foundPath);
-    Assert.areEqual(JSON.stringify({ ...older, missingTool: null, foundPath: null }), JSON.stringify(value.toJson()));
+    Assert.isNull(value.notice);
+    Assert.areEqual(JSON.stringify({ ...older, missingTool: null, foundPath: null, notice: null }), JSON.stringify(value.toJson()));
+  }
+
+  @TestMethod
+  public carriesTheNoticeAboutHowTeamRunRunsTheKind(): void {
+    const json = { kind: "codex", state: "Installed", reason: null, received: 0, total: 0, version: "0.171.0", update: null, cancellable: true, missingTool: null,
+      foundPath: null, notice: "TeamRun's Codex chats show in the Codex app's recent chats." };
+    const value = ProviderKindInstallation.fromJson(json);
+
+    Assert.areEqual(json.notice, value.notice);
+    Assert.areEqual(JSON.stringify(json), JSON.stringify(value.toJson()));
+    Assert.areEqual("shown", new ProviderKindInstallation("codex", ProviderKindInstallState.Installed, null, 0, 0, "0.171.0", null, true, null, null, "shown").notice);
   }
 
   @TestMethod
   public carriesThePathOfACopyFoundOutsideTeamRunsOwnInstall(): void {
     const json = { kind: "codex", state: "Installed", reason: null, received: 0, total: 0, version: "0.166.0", update: null, cancellable: true, missingTool: null,
-      foundPath: "/opt/homebrew/bin/codex" };
+      foundPath: "/opt/homebrew/bin/codex", notice: null };
     const value = ProviderKindInstallation.fromJson(json);
 
     Assert.areEqual("/opt/homebrew/bin/codex", value.foundPath);
@@ -73,7 +85,7 @@ export class ProviderKindInstallationTests {
   public startsWithNoReasonNothingReceivedNoVersionsAndCancellable(): void {
     const value = new ProviderKindInstallation("antigravity", ProviderKindInstallState.NotInstalled);
 
-    Assert.areEqual("{\"kind\":\"antigravity\",\"state\":\"NotInstalled\",\"reason\":null,\"received\":0,\"total\":0,\"version\":null,\"update\":null,\"cancellable\":true,\"missingTool\":null,\"foundPath\":null}",
+    Assert.areEqual("{\"kind\":\"antigravity\",\"state\":\"NotInstalled\",\"reason\":null,\"received\":0,\"total\":0,\"version\":null,\"update\":null,\"cancellable\":true,\"missingTool\":null,\"foundPath\":null,\"notice\":null}",
       JSON.stringify(value.toJson()));
     Assert.throws(() => new ProviderKindInstallation(" ", ProviderKindInstallState.Installed), ArgumentException);
   }

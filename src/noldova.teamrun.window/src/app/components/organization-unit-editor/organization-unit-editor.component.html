@@ -1,0 +1,37 @@
+<!--
+@license
+Copyright (c) Noldova.
+
+This source code is licensed under the license found in the
+LICENSE file in the root directory of this source tree.
+-->
+
+<header class="head">
+  <nol-teamrun-organization-type-icon [type]="node().type" />
+  <h2 class="title">{{ node().name }}</h2>
+  <button type="button" nol-icon-button class="close" [icon]="resources.closeIcon" [label]="resources.closeLabel" (click)="closed.emit()"></button>
+</header>
+@if (node().department; as department) {
+  <div class="nol-teamrun-form">
+    <label class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationUnitNameField }}</span>
+      <input nol-text-field class="name-field" [attr.aria-label]="resources.organizationUnitNameField" [value]="node().name" (change)="rename($event, department)">
+    </label>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationTypeLabel }}</span>
+      <nol-teamrun-organization-type-choice class="type-field" [department]="department" />
+    </div>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationLeaderLabel }}</span>
+      <nol-select class="leader-field" [label]="resources.organizationLeaderLabel" [options]="leaderOptions()" [value]="node().leader?.id ?? ''"
+        (valueChange)="setLeader($event)" />
+    </div>
+    <div class="nol-teamrun-field">
+      <span class="nol-teamrun-field-label">{{ resources.organizationDetailsReportsTo }}</span>
+      <nol-select class="place-field" [label]="resources.organizationDetailsReportsTo" [options]="placeOptions()" [value]="placeKeyOf(department)"
+        (valueChange)="move(department, $event)" />
+    </div>
+  </div>
+  <button type="button" nol-button class="delete" [variant]="outlined" (click)="confirmDelete(department)"><span nolButtonIcon class="material-symbols-rounded"
+    aria-hidden="true">{{ resources.organizationDeleteIcon }}</span>{{ resources.formatOrganizationDeleteUnit(node().type) }}</button>
+}

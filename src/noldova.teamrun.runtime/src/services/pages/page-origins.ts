@@ -47,7 +47,7 @@ export class PageOrigins {
       return this.views().list().filter(t => t.pane.name.text === this.document);
     }
     catch (error) {
-      this.log.write(PagesResources.formatOriginsNotListed(PageOrigins.kindOf(error)));
+      this.log.write(PagesResources.formatOriginsNotListed(PagesResources.formatFailureKind(error)));
       return [];
     }
   }
@@ -57,11 +57,7 @@ export class PageOrigins {
       await this.views().setAllowedOriginsAsync(id, origins);
     }
     catch (error) {
-      this.log.write(PagesResources.formatOriginsNotSet(PageOrigins.kindOf(error)));
+      this.log.write(PagesResources.formatOriginsNotSet(PagesResources.formatFailureKind(error)));
     }
-  }
-
-  private static kindOf(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
   }
 }

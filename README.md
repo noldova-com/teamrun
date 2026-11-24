@@ -1,7 +1,7 @@
 # TeamRun
 
 TeamRun is a desktop app for working with AI agents as a team.
-People chat with agents from several AI providers, give them teammates' roles, and follow and approve their work in one place.
+People chat with agents from several AI providers, give them teammates' roles, organize them into units with leaders, and follow and approve their work in one place.
 The product word is "chat": every text a person sees says "chat" or "chats", never "conversation", and new work uses it from the start.
 
 It is built on [Noldova Desktop](https://github.com/noldova-com/desktop) and targets Windows and Linux on x64 and ARM64, and macOS on both Apple Silicon and Intel.
@@ -10,6 +10,14 @@ Report a security problem privately, as its [security policy](https://github.com
 
 TeamRun names the AI providers a person connects to, such as Claude, Codex, Grok, OpenCode, Cursor, fx, Antigravity, Pi, Muse Code and GitHub Copilot, in its code, documents and app.
 Product names and trademarks belong to their owners.
+
+## Organization
+
+The Organization view shows the person's teammates as an organization: units of the types the person names, such as Department or Team, each with an optional leader and its members, nested to any depth, with the person at the root.
+It draws them as one tree of cards: the top-level units and the person's direct reports sit under the person, and every other unit and teammate under the unit it reports to.
+Each card shows its teammate's status (working, waiting for you, idle, usage limit or stopped) and what it is doing now, and can also show the last thing it said and its Git branch, pull requests, documents and artifacts.
+The Messages panel sends one message to a teammate, a unit (its leader first, then its members), all leaders and the person's direct reports, or everyone; it shows how many teammates the message goes to before sending, and Stop sends it to no one else, drops the copies still waiting in a chat's queue and stops the replies already running.
+ARCHITECTURE.md describes the organization's storage, the statuses and the messages.
 
 ## Building from source
 
@@ -90,6 +98,10 @@ To list the person's own MCP servers, it reads Claude's `.claude.json` whole, Co
 These can hold secrets, such as a server's token, and `.claude.json` holds the person's account details and may hold Claude's own API key; TeamRun keeps only the servers' names.
 With Claude's own MCP servers switched on, a chat also passes those servers' entries to Claude's program, with their variables filled in, and TeamRun still keeps only the names.
 Noldova Desktop starts every program TeamRun runs for a provider, and the Modules page lists it under TeamRun's running programs for as long as it runs.
+TeamRun looks for newer versions of the tools it installs only as Noldova Desktop's Check for updates setting allows, and whenever the person chooses Check for updates in the Providers tab: Claude Code's at `downloads.claude.ai`, Codex's at `releases.openai.com` and `api.github.com`, GitHub Copilot's at `api.github.com`, and an ACP agent's from the ACP registry at `cdn.agentclientprotocol.com`; nothing of the person's is sent.
+At those times, and when the person installs or updates Codex in TeamRun, TeamRun also downloads the app server Codex publishes for the installed Codex's version, from its GitHub release at `api.github.com` and `github.com`, which hands the file to GitHub's release asset host, unless that Codex's own `codex app-server` already takes `--session-source`: with it, TeamRun's Codex chats stay out of the Codex app's recent chats, and until it's in place the Codex row in the Providers tab says they show there.
+With Only at start it looks once, at the first listing after TeamRun starts, and with Only when I ask only when asked; until Noldova Desktop says this device's choice, it counts the choice as the default, Automatic, so with either of the others it may still look at start-up before the choice arrives, until [noldova-com/desktop#96](https://github.com/noldova-com/desktop/issues/96) is fixed and pinned.
+Antigravity's, Cursor's and Grok's versions are pinned in TeamRun, so reading them sends nothing; installing or updating a tool, and opening the ACP agents dialog, reads its source when the person does it.
 Codex's app-server stays running for each profile between turns until TeamRun stops; Claude Code, GitHub Copilot, Grok, OpenCode, Cursor, Antigravity, Pi and Muse Code run only while a turn, a model listing, a sign-in or a sign-in check needs them, so they show only then; an Antigravity model listing starts nothing.
 
 When GitHub Copilot, Grok, OpenCode, Cursor or Antigravity doesn't offer the chosen model, the reply fails saying to open the teammate or the composer's model menu, refresh the models, and choose one.
@@ -399,6 +411,8 @@ Vitest then copies each screenshot to the attachments folder's root under a SHA-
 The command keeps Vitest's own timing, right after the failed test and before its `afterEach` hooks clean the page up, and does what Vitest's does after the name: the Playwright provider's `__vitest_takeScreenshot` takes the screenshot.
 Two checks guard it, since it leans on two of Vitest's internal command names:
 - The Failure screenshots check, `scripts/checks/failure-screenshot-check.ts`, which runs after the Angular tests, runs Vitest's browser mode on `src/noldova.teamrun.window/tests/fixtures/failure-screenshot/` with the Angular project's Vitest, whose one test fails with a title past 255 bytes, and fails unless the run saves one screenshot under the cut name in the `failure-screenshots/` folder, leaving Vitest's SHA-1 copy aside, and prints the long name beside its path, so it catches a Vitest that no longer sends its failure screenshot through `__vitest_screenshot`; its attachments go to `_build/failure-screenshot-check/`, under the repository, since Vitest saves a screenshot only inside the folders its server may serve.
+  A fixture run that ran no test, as when its browser page can't open, fails with that reason rather than a missing screenshot.
+  On Windows, it then prints the machine's TCP connections by state from `netstat -an`, for a page that failed with `net::ERR_NO_BUFFER_SPACE`.
 - `src/noldova.teamrun.window/tests/short-screenshot-names.spec.ts` fails if `__vitest_screenshot` or `__vitest_takeScreenshot` is renamed, or if `__vitest_takeScreenshot` stops giving back the image and its path.
 
 Neither catches a change in what Vitest's own `__vitest_screenshot` does before or after calling the provider, such as a new option, so a Vitest update means comparing its `packages/browser/src/node/commands/screenshot.ts` with `short-screenshot-names.ts`.

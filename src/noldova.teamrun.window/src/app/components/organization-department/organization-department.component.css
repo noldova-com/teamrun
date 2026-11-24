@@ -25,6 +25,11 @@
   background: light-dark(var(--nol-panel), var(--nol-raised));
 }
 
+.department.selected {
+  border-color: var(--nol-accent);
+  outline: var(--nol-border-width) solid var(--nol-accent);
+}
+
 .department-row {
   display: flex;
   align-items: center;
@@ -59,15 +64,6 @@
   white-space: nowrap;
 }
 
-.department-field {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.leader-choice {
-  width: 100%;
-}
-
 .department-summary,
 .hidden {
   color: var(--nol-text-muted);
@@ -75,7 +71,17 @@
 }
 
 .message {
-  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.message:hover {
+  text-decoration: underline;
 }
 
 .hidden {

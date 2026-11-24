@@ -19,11 +19,13 @@ import { PagesResources } from "./pages-resources.js";
 export class PageServer {
   private readonly server: Server;
   private readonly readAsync: (id: string, version: number | null) => Promise<string>;
+  private readonly failed: (error: unknown) => void;
   private readonly secret: Buffer = randomBytes(PagesResources.secretBytes);
   private port: number = 0;
 
-  public constructor(readAsync: (id: string, version: number | null) => Promise<string>, server: Server = createServer()) {
+  public constructor(readAsync: (id: string, version: number | null) => Promise<string>, failed: (error: unknown) => void, server: Server = createServer()) {
     this.readAsync = readAsync;
+    this.failed = failed;
     this.server = server;
     server.on(PagesResources.requestEvent, (request: IncomingMessage, response: ServerResponse) => void this.handleAsync(request, response));
   }
@@ -41,6 +43,7 @@ export class PageServer {
       this.server.once(PagesResources.errorEvent, reject);
       this.server.listen(0, PagesResources.loopbackAddress, () => {
         this.server.off(PagesResources.errorEvent, reject);
+        this.server.on(PagesResources.errorEvent, this.failed);
         resolve();
       });
     });

@@ -19,6 +19,8 @@ import {
   MethodName, Organization, OrganizationChat, OrganizationParent, OrganizationTarget, TeammateLastReply, TeammatePlacement, WaitingMessage, WaitingMessageAddParams,
   WaitingMessageIdParams, WaitingMessagesPayload
 } from "@noldova/teamrun.protocol";
+import { ThemeMode } from "@noldova/ui.components.angular";
+import { AppearanceFixture, FixtureTheme } from "@noldova/ui.components.angular/testing";
 
 import { ComposerComponent } from "../../../../src/app/components/composer/composer.component";
 import { OrganizationChatComponent } from "../../../../src/app/components/organization-chat/organization-chat.component";
@@ -228,6 +230,39 @@ describe("OrganizationChatComponent", () => {
       expect([whileOpening, context.count(MethodName.ConversationList) > 1]).toEqual([null, true]);
       release();
     });
+
+  it("shows a teammate's new chat's first message, sent before the window listed the chat, once the window has read its chats, and then the reply", async () => {
+    const first = new Message("org-alice-u", "org-alice", 0, MessageAuthor.User, null, MessageStatus.Completed, [SampleData.detail(0, DetailKind.Text, "First words")],
+      null, SampleData.timestamp, null, SampleData.timestamp);
+    let release = (): void => undefined;
+    const held = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    pages = new Map([["org-alice", []]]);
+    openAnswer = id => {
+      kept = [chatOf(id)];
+      listing = held;
+      context.emit(EventName.StateInvalidated, null);
+      return chatOf(id).toJson();
+    };
+    await create(OrganizationTarget.teammate("alice"));
+    await Wait.until(() => expect(box()).not.toBeNull());
+    await type("First words");
+    await sendNow();
+    await Wait.until(() => expect(sent().map(t => [t.chatId, t.text])).toEqual([["org-alice", "First words"]]));
+    pages = new Map([["org-alice", [first]]]);
+    context.emit(EventName.MessageCreated, first.toJson());
+    await fixture.whenStable();
+    const whileListing = texts("nol-teamrun-history-message");
+
+    release();
+
+    await Wait.until(() => expect(texts("nol-teamrun-history-message").some(t => t.includes("First words"))).toBe(true));
+    context.emit(EventName.MessageCreated, reply("org-alice", MessageStatus.Completed).toJson());
+    await Wait.until(() => expect(texts("nol-teamrun-history-message").some(t => t.includes("Working"))).toBe(true));
+
+    expect([whileListing, ChatStoreService.of(context).selectedConversationId()]).toEqual([[], "org-alice"]);
+  });
 
   it.each(["my-organization", "studio"])("talks to a teammate in %s only in that organization's own chat, never one kept for another organization or left by a deleted one", async id => {
     const own = (organizationId: string, teammateId: string, chat: OrganizationChat | null = new OrganizationChat(organizationId, teammateId)): Conversation =>
@@ -552,6 +587,38 @@ describe("OrganizationChatComponent", () => {
 
     expect([described[0] === described[1], described[0]?.startsWith(Resources.composerReachIdPrefix), reach(), box()?.hasAttribute("aria-describedby")])
       .toEqual([true, true, null, false]);
+  });
+
+  it("lists a group's recipients above its composer, which ends the panel with its card a space-3 in from the sides and bottom under the count in muted small text", async () => {
+    AppearanceFixture.apply(FixtureTheme.theme, ThemeMode.Light);
+    try {
+      await create(OrganizationTarget.department("d1"));
+      element().style.width = "22rem";
+      await Wait.until(() => expect(texts(".nol-teamrun-composer-reach")).toEqual(["Goes to 2 teammates"]));
+      await fixture.whenStable();
+      const rect = (selector: string): DOMRect => Required.of(element().querySelector(selector)).getBoundingClientRect();
+      const space = (n: number): number => AppearanceFixture.measureLook(`space-${n}`);
+      const list = rect(".nol-teamrun-organization-recipients");
+      const composer = rect("nol-teamrun-composer");
+      const card = rect(".nol-teamrun-composer-card");
+      const reach = getComputedStyle(Required.of(element().querySelector(".nol-teamrun-composer-reach")));
+      const probe = document.createElement("span");
+      probe.style.cssText = "color: color-mix(in srgb, var(--nol-text-muted) 65%, transparent); font-size: var(--nol-text-small)";
+      element().append(probe);
+      const expected = [getComputedStyle(probe).color, getComputedStyle(probe).fontSize];
+      probe.remove();
+
+      expect(list.bottom).toBeLessThanOrEqual(composer.top + 0.5);
+      AppearanceFixture.expectPixels(composer.bottom, element().getBoundingClientRect().bottom);
+      AppearanceFixture.expectPixels(card.left, composer.left + space(3));
+      AppearanceFixture.expectPixels(card.right, composer.right - space(3));
+      AppearanceFixture.expectPixels(card.bottom, composer.bottom - space(3));
+      expect([reach.color, reach.fontSize]).toEqual(expected);
+      expect(reach.fontSize).not.toBe(getComputedStyle(Required.of(element().querySelector("nol-teamrun-composer textarea"))).fontSize);
+    }
+    finally {
+      AppearanceFixture.reset();
+    }
   });
 
   it("shows no reply yet for recipients whose chats exist but who never replied", async () => {

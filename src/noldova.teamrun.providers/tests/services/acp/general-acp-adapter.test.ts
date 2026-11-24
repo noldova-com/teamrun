@@ -121,8 +121,12 @@ export class GeneralAcpAdapterTests {
         JSON.stringify([running?.hasField("exitStatus"), kill?.toJson(), ended?.hasField("exitCode"), freed?.toJson(), killed.taskStarts.length]));
 
       const [made, failed, said, dropped] = await answersOf("terminal-missing", new RecordingTurnListener());
-      Assert.areEqual(JSON.stringify([true, { exitCode: null, signal: null }, true, {}]), JSON.stringify([!Object.isUndefined(made?.readOptionalString("terminalId")),
-        failed?.toJson(), said?.readString("output").includes("ENOENT"), dropped?.toJson()]));
+      if (process.platform === "win32")
+        Assert.areEqual(JSON.stringify([-32602, Resources.formatCommandNotOnPath("teamrun-missing-command")]),
+          JSON.stringify([made?.readNullableInteger("code"), made?.readString("message")]));
+      else
+        Assert.areEqual(JSON.stringify([true, { exitCode: null, signal: null }, true, {}]), JSON.stringify([!Object.isUndefined(made?.readOptionalString("terminalId")),
+          failed?.toJson(), said?.readString("output").includes("ENOENT"), dropped?.toJson()]));
 
       const [opened, stopped, closed, unbound] = await answersOf("terminal-nulls", new RecordingTurnListener());
       Assert.areEqual(JSON.stringify([true, {}, true, {}]), JSON.stringify([!Object.isUndefined(opened?.readOptionalString("terminalId")), stopped?.toJson(),
