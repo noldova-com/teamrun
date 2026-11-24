@@ -16,8 +16,8 @@ on:
         options:
           - staging
           - production
-      commit:
-        description: The full hash of the main commit the release built, whose docs image the Docs workflow built when it reached main
+      tag:
+        description: The TeamRun release to deploy, such as teamrun-0.0.10, whose noldova-com/downloads release names the main commit it was built from
         required: true
         type: string
 
@@ -42,38 +42,52 @@ jobs:
       packages: read
     outputs:
       digest: ${{ steps.find.outputs.digest }}
+      commit: ${{ steps.source.outputs.commit }}
     env:
       CRANE_VERSION: v0.22.1
       CRANE_SHA256: 0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0
     steps:
-      - name: Check the commit and the environment
+      - name: Check the release tag, its commit and the environment
+        id: source
         env:
-          COMMIT: ${{ inputs.commit }}
+          TAG: ${{ inputs.tag }}
           ENVIRONMENT: ${{ inputs.environment }}
           GH_TOKEN: ${{ github.token }}
+          RELEASES: noldova-com/downloads
         run: |
           set -euo pipefail
           if [ "$GITHUB_REF" != refs/heads/main ]; then
             echo "::error::A deploy starts on main, not \"$GITHUB_REF\"."
             exit 1
           fi
-          if [[ ! "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::A deploy needs a full commit hash, not \"$COMMIT\"."
+          if [[ ! "$TAG" =~ ^teamrun-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::A deploy needs a TeamRun release tag, such as teamrun-0.0.10, not \"$TAG\"."
             exit 1
           fi
+          if ! release=$(gh api "repos/$RELEASES/releases/tags/$TAG" --jq 'if .draft then error("a draft") else .body end'); then
+            echo "::error::$RELEASES has no published release tagged $TAG, so no label moves."
+            exit 1
+          fi
+          built=$(tr -d '\r' <<< "$release" | grep -oE "^Built from $GITHUB_REPOSITORY at [0-9a-f]{40}\.\$" || true)
+          if [ "$(printf '%s' "$built" | grep -c .)" != 1 ]; then
+            echo "::error::The $TAG release doesn't name exactly one $GITHUB_REPOSITORY commit it was built from, so no label moves."
+            exit 1
+          fi
+          commit=$(printf '%s' "$built" | grep -oE '[0-9a-f]{40}')
           if [ "$ENVIRONMENT" != staging ] && [ "$ENVIRONMENT" != production ]; then
             echo "::error::A deploy moves staging or production, not \"$ENVIRONMENT\"."
             exit 1
           fi
-          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$COMMIT...main" --jq .status)
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$commit...main" --jq .status)
           if [ "$status" != ahead ] && [ "$status" != identical ]; then
-            echo "::error::main doesn't hold $COMMIT, so it isn't a release's commit."
+            echo "::error::main doesn't hold $commit, which the $TAG release names, so no label moves."
             exit 1
           fi
           if ! gh api "repos/$GITHUB_REPOSITORY/environments/deploy-$ENVIRONMENT" --silent; then
             echo "::error::This repository has no deploy-$ENVIRONMENT environment, and a run would create it unprotected, so no label moves."
             exit 1
           fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
       - name: Download crane
         run: |
@@ -92,7 +106,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REGISTRY_TOKEN: ${{ github.token }}
           DOCS_IMAGE: teamrun-angular-docs
-          COMMIT: ${{ inputs.commit }}
+          COMMIT: ${{ steps.source.outputs.commit }}
         run: |
           set -euo pipefail
           image="ghcr.io/${OWNER,,}/$DOCS_IMAGE"
@@ -117,15 +131,16 @@ jobs:
     steps:
       - name: Name what was approved
         env:
-          COMMIT: ${{ inputs.commit }}
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ needs.find.outputs.commit }}
           DIGEST: ${{ needs.find.outputs.digest }}
           ENVIRONMENT: ${{ inputs.environment }}
-        run: echo "Approved $COMMIT, $DIGEST, for $ENVIRONMENT."
+        run: echo "Approved $TAG, $COMMIT, $DIGEST, for $ENVIRONMENT."
 
   move:
     name: Move the environment's label
     needs: [find, approve]
-    uses: noldova-com/.github/.github/workflows/move-image-label.yml@aded76d5bd26adfaace92fe98adf4890a969c4ca # v2.44.0
+    uses: noldova-com/.github/.github/workflows/move-image-label.yml@10413f5b0f85b476830388e7c34e573393ea1daf # v2.45.0
     permissions:
       packages: write
     with:
@@ -142,12 +157,13 @@ jobs:
     steps:
       - name: Write the summary
         env:
-          COMMIT: ${{ inputs.commit }}
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ needs.find.outputs.commit }}
           DIGEST: ${{ needs.find.outputs.digest }}
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
           {
-            echo '| Commit | Digest | Environment | Approved in |'
-            echo '|---|---|---|---|'
-            echo "| \`$COMMIT\` | \`$DIGEST\` | $ENVIRONMENT | deploy-$ENVIRONMENT |"
+            echo '| Release | Commit | Digest | Environment | Approved in |'
+            echo '|---|---|---|---|---|'
+            echo "| $TAG | \`$COMMIT\` | \`$DIGEST\` | $ENVIRONMENT | deploy-$ENVIRONMENT |"
           } >> "$GITHUB_STEP_SUMMARY"

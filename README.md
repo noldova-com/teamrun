@@ -299,10 +299,10 @@ A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/dr
 The "Docs" workflow, `.github/workflows/docs.yml`, runs on each push to `main`, as the UI kit's does: it builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.45.0, whose image keeps no request log, running `npm ci --no-audit --no-fund && npm run build:docs`, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit, then moves the image's `latest` label to it, which the sandbox follows.
 Release notes show the versions [CHANGELOG.md](CHANGELOG.md) names as released at that commit.
 
-The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and the full hash of a `main` commit, such as the one a release built, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
+The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and a TeamRun release tag, such as `teamrun-0.0.10`, reads that release in noldova-com/downloads, takes the one teamrun commit its "Built from" line names, checks that `main` holds it, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
 
 ```sh
-gh workflow run deploy.yml -f environment=staging -f commit=<released commit>
+gh workflow run deploy.yml -f environment=staging -f tag=teamrun-<version>
 ```
 
 The site counts visits to its production, teamrun.noldova.dev, with Cloudflare Web Analytics, which sets no cookie and stores nothing in the browser.

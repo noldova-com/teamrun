@@ -170,10 +170,10 @@ describe("DocsOnThisPageComponent", () => {
     await settledAsync(host);
     window.scrollTo(0, targetOf(DocsFixture.byText(host, ".nol-docs-outline-link", "Your first chat")).getBoundingClientRect().top + window.scrollY);
     await DocsFixture.untilAsync(() => expect(current(host)).toEqual(["Your first chat"]));
-    const marks = links(host).map(t => [t.textContent.trim(), getComputedStyle(t).borderInlineStartColor] as const);
+    const highlight = ForcedColorsFixture.resolve("Highlight");
+    const link = ForcedColorsFixture.resolve("LinkText");
 
-    expect(marks.filter(([title]) => title === "Your first chat").map(([, color]) => color)).toEqual([ForcedColorsFixture.resolve("Highlight")]);
-    expect(new Set(marks.filter(([title]) => title !== "Your first chat").map(([, color]) => color))).toEqual(new Set([ForcedColorsFixture.resolve("LinkText")]));
+    expect(links(host).map(t => getComputedStyle(t).borderInlineStartColor)).toEqual(links(host).map(t => t.textContent.trim() === "Your first chat" ? highlight : link));
   });
 
   it("stops holding a reached section once the reader scrolls", async () => {

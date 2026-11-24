@@ -17,6 +17,7 @@ import { userEvent } from "vitest/browser";
 import { routes } from "../../../../src/app/app.routes";
 import { DocsLinksDirective } from "../../../../src/app/components/docs-links/docs-links.directive";
 import { DocsCatalog } from "../../../../src/app/models/docs-catalog";
+import type { DocsPage } from "../../../../src/app/models/docs-page";
 import { Resources } from "../../../../src/resources";
 import { DocsFixture } from "../../../fixtures/docs.fixture";
 
@@ -151,12 +152,13 @@ describe("DocsLinksDirective", () => {
 
   it("finds an in-site link on the site's pages, and every one leads to a page of the catalog", () => {
     const paths = new Set(routes.map(t => t.path));
-    const links = DocsCatalog.pages.flatMap(page => [...page.text.matchAll(siteLinks)].map(t => [page.file, String(t[1])] as const));
+    const linksOf = (page: DocsPage): string[] => [...page.text.matchAll(siteLinks)].map(t => String(t[1]));
+    const links = DocsCatalog.pages.flatMap(t => linksOf(t));
     const pathOf = (link: string): string => link.slice(Resources.siteLink.length).replace(/#.*$/u, String()).replace(/\/$/u, String());
 
     expect(links.length).toBeGreaterThan(0);
-    expect(links.filter(([, link]) => !paths.has(pathOf(link)))).toEqual([]);
-    expect(links).toContainEqual(["home", `${Resources.siteLink}getting-started`]);
+    expect(links.filter(t => !paths.has(pathOf(t)))).toEqual([]);
+    expect(DocsCatalog.pages.filter(t => t.file === "home").flatMap(t => linksOf(t))).toContain(`${Resources.siteLink}getting-started`);
   });
 
   it("leaves no page's link to another page as a relative Markdown file the site can't open", () => {
