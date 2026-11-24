@@ -265,7 +265,7 @@ Product names and trademarks, such as the providers' names above, belong to thei
 - On activation it registers the Projects view, `teamrun.projects`, in the left dock.
   Each view declares its side, group and order through Noldova Desktop's view contribution, so a fresh install and Reset the layout open the same layout: Explorer on the left; on the right an upper group of Background tasks, Pages and Git above a lower group of Plans and Sub-agents; Activity and Changes at the bottom; each group showing its first tab.
   Pages comes before Git, which Noldova Desktop's Git module orders at 20, so at the default window size of 1280×800, where the right dock's tab row holds only two of the three, Pages shows and Git waits behind Show all tabs.
-  Git declares its own place, between Background tasks and Pages, in the git module.
+  Git declares its own place, after Pages, in the git module.
   The view lists the open projects and their conversations, pinned ones first, from the window part's store, so it follows changes made in any window.
   Each section header is a tree row's height, as New chat, Open folder and Open browser are; the first stands a section header's space under them, and each later one the action rows' gap under the section above, whether that section is open or folded, so header to header and row to header match action to action top to top.
   It registers with `ContentPadding.None`, so its list scrolls over the whole pane with the scrollbar along the pane's end edge from top to bottom, and carries the view padding inside it: `--nol-content-padding-inline` on both sides, `--nol-view-padding-block` above, and that and `--nol-space-2` below.

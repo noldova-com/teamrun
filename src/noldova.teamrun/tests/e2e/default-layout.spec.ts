@@ -127,7 +127,7 @@ test("a fresh install opens Explorer on the left, Background tasks, Pages and Gi
     bottom.top > height / 2, bottom.top >= explorer.bottom, bottom.top >= lower.bottom, bottom.left < explorer.right, bottom.right > upper.left])
     .toEqual([true, true, true, true, true, true, true, true, true, true, true]);
   const row = await rightRowAsync(page);
-  expect([width, height, row.pages, row.git, row.overflowLeft !== null, row.pagesLeft >= row.rowLeft, row.pagesRight <= (row.overflowLeft ?? row.rowRight)],
+  expect([width, height, row.pages, row.git, !Object.isNull(row.overflowLeft), row.pagesLeft >= row.rowLeft, row.pagesRight <= (row.overflowLeft ?? row.rowRight)],
     "at 1280×800 Pages' tab lies whole in the right dock's tab row, before Show all tabs, which holds Git").toEqual([1280, 800, "visible", "hidden", true, true, true]);
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
