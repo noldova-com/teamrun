@@ -100,7 +100,7 @@ export class FailureScreenshotCheck implements ICheck {
     }
   }
 
-  private async runFixtureAsync():Promise<{ readonly result: ProcessResult; readonly files: readonly string[] }> {
+  private async runFixtureAsync(): Promise<{ readonly result: ProcessResult; readonly files: readonly string[] }> {
     const attachments = path.join(this.root, ...FailureScreenshotCheck.ATTACHMENTS_SEGMENTS);
     await rm(attachments, { recursive: true, force: true });
     await mkdir(attachments, { recursive: true });
