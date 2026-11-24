@@ -129,17 +129,17 @@
     "@noldova/context.exceptions": "0.0.12",
     "@noldova/context.json": "0.0.12",
     "@noldova/context.text": "0.0.12",
-    "@noldova/desktop.cli": "0.0.14",
-    "@noldova/desktop.electron": "0.0.14",
-    "@noldova/desktop.protocol": "0.0.14",
-    "@noldova/desktop.runtime": "0.0.14",
+    "@noldova/desktop.cli": "0.0.16",
+    "@noldova/desktop.electron": "0.0.16",
+    "@noldova/desktop.protocol": "0.0.16",
+    "@noldova/desktop.runtime": "0.0.16",
     "@noldova/git": "0.0.6",
     "@noldova/git.github": "0.0.6",
     "@noldova/teamrun": "0.0.7",
     "@noldova/terminal": "0.0.7"
   },
   "devDependencies": {
-    "@noldova/desktop.build": "0.0.14",
+    "@noldova/desktop.build": "0.0.16",
     "electron": "44.9.1"
   },
   "overrides": {
