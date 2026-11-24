@@ -736,8 +736,8 @@ export class AcpTurnTests {
         options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
     await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
 
-    await ask("Edit notes.md‮\u0008\u0008.exe", "edit", { path: "notes.md" });
-    await ask("Run tests⁦", "execute", {});
+    await ask("Edit notes.md\u202e\u0008\u0008.exe", "edit", { path: "notes.md" });
+    await ask("Run tests\u2066", "execute", {});
     await ask(`Edit ${"n".repeat(600)}`, "edit", {});
 
     const summaries = listener.asks.map(t => t.summary);
@@ -759,7 +759,7 @@ export class AcpTurnTests {
       toolCall: { toolCallId: "toolu_1", title, kind: "edit", status: "pending", rawInput: {} },
       options: [{ optionId: "allow_once", kind: "allow_once", name: "Allow once" }, { optionId: "reject_once", kind: "reject_once", name: "Deny" }] }));
 
-    await ask("Edit notes.md‮\u0008.exe");
+    await ask("Edit notes.md\u202e\u0008.exe");
     await ask(`Edit ${"n".repeat(600)}`);
 
     const notes = listener.texts.filter(t => t.startsWith("TeamRun refused"));
