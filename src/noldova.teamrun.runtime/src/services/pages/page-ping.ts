@@ -58,7 +58,7 @@ export class PagePing {
       views = this.views().list().filter(t => t.pane.name.text === this.document);
     }
     catch (error) {
-      this.log.write(PagesResources.formatPingNotListed(PagePing.kindOf(error)));
+      this.log.write(PagesResources.formatPingNotListed(PagesResources.formatFailureKind(error)));
       return;
     }
     for (const id of [...this.stuck].filter(t => !views.some(u => u.id === t)))
@@ -79,9 +79,5 @@ export class PagePing {
       this.stuck.add(view.id);
       await this.stoppedAsync(pageId);
     }
-  }
-
-  private static kindOf(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
   }
 }

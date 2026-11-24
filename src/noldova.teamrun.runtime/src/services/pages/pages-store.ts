@@ -185,7 +185,7 @@ export class PagesStore {
         this.files.write(write.page.chatId, write.page.id, write.html);
       }
       catch (error) {
-        this.log.write(PagesResources.formatCopyNotSaved(PagesStore.kindOf(error)));
+        this.log.write(PagesResources.formatCopyNotSaved(PagesResources.formatFailureKind(error)));
       }
     return result;
   }
@@ -289,9 +289,5 @@ export class PagesStore {
   private static requireSize(bytes: number): void {
     if (bytes > PagesResources.maximumBytes)
       throw new PageException(ToolFailureCode.TooLarge, PagesResources.tooLarge);
-  }
-
-  private static kindOf(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
   }
 }

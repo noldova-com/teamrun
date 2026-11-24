@@ -277,6 +277,10 @@ export class PagesResources {
     return `A page's version was saved, but its copy for showing could not be written (${kind}).`;
   }
 
+  public static formatFailureKind(error: unknown): string {
+    return error instanceof Error ? error.name : typeof error;
+  }
+
   public static formatServerNotListening(kind: string): string {
     return `The page server could not listen, so pages can't be shown (${kind}).`;
   }
