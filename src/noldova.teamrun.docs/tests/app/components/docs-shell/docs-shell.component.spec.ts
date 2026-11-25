@@ -438,7 +438,7 @@ describe("DocsShellComponent", () => {
     });
 
     it("keeps the menu right below the header, in front of the page and in the window wherever the page is scrolled, scrolling on its own in a window too short for it", async () => {
-      const { host, header } = await scrolledAsync();
+      const { host } = await scrolledAsync();
       const menu = DocsFixture.one(host, "#nol-docs-menu");
       if (width === DocsFixture.PHONE_WIDTH) {
         await userEvent.click(DocsFixture.one(host, "button.nol-docs-menu-button"));
