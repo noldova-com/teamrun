@@ -13,7 +13,7 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testin
 import { Resources as CoreResources, TurnOutcome, TurnRequest, TurnSteer, WakeTurn } from "@noldova/teamrun.core";
 import { BackgroundTaskStatus, DetailKind, ErrorCode, RequestedSettings, Resources as ProtocolResources, SharedMcpServerDefinition, SharedMcpTransport, SubAgent,
   SubAgentStatus } from "@noldova/teamrun.protocol";
-import { ClaudeChat, ClaudeTurn, DeltaStream, ProviderTimings, Resources } from "@noldova/teamrun.providers";
+import { ClaudeChat, ClaudeTurn, DeltaStream, InvalidOperationException, ProviderTimings, Resources } from "@noldova/teamrun.providers";
 
 import { ClaudeTestHost } from "../../fixtures/claude-test-host.fixture.js";
 import { FailureStep } from "../../fixtures/failure-step.fixture.js";
@@ -980,6 +980,69 @@ export class ClaudeChatTests {
       Assert.areEqual("Checking", second.texts[0]);
     }
     finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async keepsTheChatOpenWhenAFrameComesForAReplyWhoseTurnClaudeAnsweredItselfAfterTheNextTurnEndedTheSameWay(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-220", "none", null, []),
+      SdkMessages.sessionState("s-220", "running"),
+      new StampedStep(SdkMessages.assistant("22022022-0220-2202-2022-022022022022", [SdkMessages.text("First")], "claude-opus-5")),
+      SdkMessages.sessionState("s-220", "idle"),
+      new WaitForInputStep(),
+      SdkMessages.sessionState("s-220", "running"),
+      SdkMessages.sessionState("s-220", "idle"),
+      SdkMessages.assistant("22022022-0220-2202-2022-022022022023", [SdkMessages.text("Late")], "claude-opus-5"),
+      SdkMessages.success("s-220", "Late"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const first = new RecordingTurnListener();
+    const second = new RecordingTurnListener();
+
+    try {
+      await adapter.runTurn(host.createRequest("First"), first, new AbortController().signal);
+      const next = await adapter.runTurn(host.createRequest("Second", null, "s-220"), second, new AbortController().signal);
+      await Wait.until(() => first.texts.includes("Late"), "The late frame did not reach the reply it belongs to.");
+
+      Assert.areEqual(JSON.stringify([TurnOutcome.Completed, [Resources.claudeAnsweredInOwnTurn], 0, 1]),
+        JSON.stringify([next.outcome, second.texts, query.closeCount, host.factory.queries.length]));
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async preparesNoTurnBeforeAQueryIsAttached(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+
+    Assert.isFalse(await chat.prepare({}, new RecordingTurnListener()));
+  }
+
+  @TestMethod
+  public async refusesToRunATurnBeforeAQueryIsAttached(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+    const listener = new RecordingTurnListener();
+
+    const error = await Assert.throwsAsync(() => chat.run(new ClaudeTurn(listener, null, new DeltaStream(listener, 1), null, chat.tasks),
+      SdkMessages.user("11111111-1111-1111-1111-111111111111", "hello"), {}, () => undefined), InvalidOperationException);
+
+    Assert.areEqual(Resources.claudeChatNotStarted, error.message);
+  }
+
+  @TestMethod
+  public async refusesToRunATurnWhoseMessageHasNoId(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+    const query = new FakeClaudeQuery([]);
+    chat.attach(query, "acceptEdits");
+    const listener = new RecordingTurnListener();
+
+    const error = await Assert.throwsAsync(() => chat.run(new ClaudeTurn(listener, null, new DeltaStream(listener, 1), null, chat.tasks),
+      SdkMessages.user(undefined, "hello"), {}, () => undefined), InvalidOperationException);
+
+    Assert.areEqual(JSON.stringify([Resources.claudeMessageWithoutId, 0]), JSON.stringify([error.message, query.inputs.length]));
   }
 
   @TestMethod
