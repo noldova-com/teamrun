@@ -1304,16 +1304,18 @@ export declare class ClaudeRun {
    * Initializes the run.
    * @param query The session.
    * @param abort The controller that ends the session's process.
+   * @param wait How long a stop waits for the session to answer its interrupt, in milliseconds.
    */
-  public constructor(query: IClaudeQuery, abort: AbortController);
+  public constructor(query: IClaudeQuery, abort: AbortController, wait: number);
 
   /**
-   * Interrupts the session, tolerating a session that no longer answers, then aborts it.
+   * Interrupts the session, waiting at most `wait` for its answer and tolerating a session that refuses it, then aborts and
+   * closes it.
    */
   public stop(): Promise<void>;
 
   /**
-   * Closes the session, tolerating one that already ended.
+   * Closes the session once, tolerating one that already ended.
    */
   public close(): void;
 }

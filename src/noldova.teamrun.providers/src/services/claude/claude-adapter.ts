@@ -217,7 +217,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       env: ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider?.profileDir ?? null), this.appVersion),
       settingSources: [], strictMcpConfig: true, mcpServers: {}, plugins: [], tools: [], persistSession: false, abortController: abort
     }, this.originOf(provider));
-    const run = new ClaudeRun(query, abort);
+    const run = new ClaudeRun(query, abort, this.timings.interruptTimeout);
     this.runs.add(run);
     let timer: NodeJS.Timeout | undefined;
     try {
