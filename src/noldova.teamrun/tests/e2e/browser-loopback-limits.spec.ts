@@ -96,6 +96,11 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
   return navigated();
 };
 
+const resolvedInViewsAsync = async (app: TeamRunApp): Promise<string[]> => [...new Set(await app.electronApp.evaluate(({ webContents }, host) => Promise.all(
+  webContents.getAllWebContents()
+    .filter(t => !t.getURL().startsWith("file:"))
+    .map(async t => (await t.session.resolveHost(host)).endpoints.map(endpoint => endpoint.address).join(" "))), "app.test"))];
+
 test("a page's request to a name that resolves to this computer is refused before it reaches it", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const local = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
@@ -105,8 +110,9 @@ test("a page's request to a name that resolves to this computer is refused befor
     await app.nameLocalSitesAsync(local.origin);
 
     await LinkedSite.openAsync(page, `${local.origin}/`, "Failed TypeError: Failed to fetch");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect(service.hits).toEqual([]);
+    expect([service.hits, resolved]).toEqual([[], ["127.0.0.1"]]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
@@ -120,11 +126,9 @@ test("a navigation to an allowed name that resolves to this computer is refused 
     const page = await app.openChatAsync();
 
     const navigated = await allowByNavigationAsync(app, page, `http://${service.name}/`);
-    const resolved = await app.electronApp.evaluate(({ webContents }, host) => Promise.all(webContents.getAllWebContents()
-      .filter(t => !t.getURL().startsWith("file:"))
-      .map(async t => (await t.session.resolveHost(host)).endpoints.map(endpoint => endpoint.address).join(" "))), "app.test");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect([navigated?.endsWith(` ${CodexDouble.NAVIGATE_OPENED}`), service.hits, [...new Set(resolved)]]).toEqual([false, [], ["127.0.0.1"]]);
+    expect([navigated?.endsWith(` ${CodexDouble.NAVIGATE_OPENED}`), service.hits, resolved]).toEqual([false, [], ["127.0.0.1"]]);
   }
   finally {
     await service.closeAsync();
@@ -144,8 +148,9 @@ test("a page's WebSocket to an allowed name that resolves to this computer is re
     await expect(page.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(0);
 
     await LinkedSite.openAsync(page, `${local.origin}/`, "Failed");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect(service.hits).toEqual([]);
+    expect([service.hits, resolved]).toEqual([[], ["127.0.0.1"]]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
