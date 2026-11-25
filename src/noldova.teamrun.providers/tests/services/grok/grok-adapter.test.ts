@@ -758,7 +758,9 @@ export class GrokAdapterTests {
     const checked: string[] = [];
     const probe = join(host.directory.resolve("person"), "probe.txt");
     process.env["TEAMRUN_PROBE_FILE"] = probe;
-    const load = Array.from({ length: availableParallelism() * 2 }, () => spawn(process.execPath, ["-e", "for(;;){}"], { stdio: "ignore" }));
+    const load = Array.from({ length: availableParallelism() * 2 }, () => spawn(process.execPath, ["-e",
+      "const fs=require('fs');const f=require('path').join(require('os').tmpdir(),'load-'+process.pid);const b=Buffer.alloc(1<<20,1);for(;;){const d=fs.openSync(f,'w');fs.writeSync(d,b);fs.fsyncSync(d);fs.closeSync(d)}"],
+    { stdio: "ignore" }));
     for (const [read, mode] of [["ACCOUNT", "hangNamespaced"], ["ACCOUNT", "hang"], ["BILLING", "hangNamespaced"], ["BILLING", "hang"]]) {
       const started = performance.now();
       const check = await host.createAdapter({ ...host.environment, TEAMRUN_PROBE_FILE: probe, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
