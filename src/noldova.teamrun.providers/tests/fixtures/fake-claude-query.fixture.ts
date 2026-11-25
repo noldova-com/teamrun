@@ -52,6 +52,7 @@ export class FakeClaudeQuery implements IClaudeQuery {
   public planUsageFailure: Error | null = null;
   public planUsageHang: boolean = false;
   public interruptFailure: Error | null = null;
+  public interruptHang: boolean = false;
   public closeFailure: Error | null = null;
   public stopTaskFailure: Error | null = null;
   public stopTaskGate: GateStep | null = null;
@@ -138,7 +139,7 @@ export class FakeClaudeQuery implements IClaudeQuery {
 
     this.interruptCount += 1;
     this.interrupted.resolve();
-    return Promise.resolve(undefined);
+    return this.interruptHang ? new Promise<unknown>(() => undefined) : Promise.resolve(undefined);
   }
 
   public stopTask(taskId: string): Promise<void> {

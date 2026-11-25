@@ -422,8 +422,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       await run.stop();
     const chats = [...this.chats];
     this.chats.clear();
-    for (const chat of chats)
-      await chat.stop();
+    await Promise.all(chats.map(t => t.stop()));
   }
 
   private async readBeforeStartAsync(shutdowns: number = this.shutdowns): Promise<NodeJS.ProcessEnv> {
