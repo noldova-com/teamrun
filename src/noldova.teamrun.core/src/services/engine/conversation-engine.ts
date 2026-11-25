@@ -27,6 +27,7 @@ import {
   ConversationIdParams,
   type ConversationRewindParams,
   ConversationRewindResult,
+  type Department,
   DetailEventPayload,
   DetailKind,
   type Draft,
@@ -504,15 +505,17 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
   }
 
   private static reportsOf(organization: Organization, teammateId: string, teammates: readonly Teammate[]): readonly string[] {
-    const nameOf = (id: string | null): string | null => teammates.find(t => t.id === id)?.name ?? null;
-    const led = organization.departments.filter(t => t.leaderId === teammateId).map(t => OrganizationParent.department(t.id));
-    return [OrganizationParent.teammate(teammateId), ...led].flatMap(parent => [
-      ...organization.departmentsUnder(parent).filter(t => t.leaderId !== teammateId).map(t => {
-        const leader = nameOf(t.leaderId);
-        return Object.isNull(leader) ? Resources.formatOrganizationUnledReport(t.name) : Resources.formatOrganizationDepartmentReport(t.name, leader);
-      }),
-      ...organization.placementsUnder(parent).flatMap(t => teammates.filter(u => u.id === t.teammateId && u.id !== teammateId).map(u => u.name))
-    ]);
+    const reports = teammates.filter(t => organization.managerOf(t.id) === teammateId);
+    const departmentOf = (id: string): Department | undefined => organization.departments.find(t => t.id === organization.departmentOf(id));
+    return reports.flatMap(t => {
+      const department = departmentOf(t.id);
+      if (Object.isUndefined(department) || department.leaderId === teammateId)
+        return [t.name];
+      if (department.leaderId === t.id)
+        return [Resources.formatOrganizationDepartmentReport(department.name, t.name)];
+      const members = reports.filter(u => departmentOf(u.id)?.id === department.id);
+      return members.indexOf(t) === 0 ? [Resources.formatOrganizationUnledReport(department.name, members.map(u => u.name))] : [];
+    });
   }
 
   private async sendMessageAsync(params: MessageSendParams, prompt: string | null, allowed: SendAllowance | null,

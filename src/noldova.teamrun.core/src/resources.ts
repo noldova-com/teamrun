@@ -1560,8 +1560,8 @@ export class Resources {
     return `the ${department} department, led by ${leader}`;
   }
 
-  public static formatOrganizationUnledReport(department: string): string {
-    return `the ${department} department, which has no leader`;
+  public static formatOrganizationUnledReport(department: string, members: readonly string[]): string {
+    return `the ${department} department, which has no leader, with ${members.join(", ")}`;
   }
 
   public static formatOrganizationRolePrompt(role: string, text: string): string {
