@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { appendFileSync } from "node:fs";
+import { EOL } from "node:os";
 import "@noldova/context.core";
 import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { type ITimer, NodeTimer, TimeoutException } from "@noldova/teamrun.core";
@@ -119,7 +121,10 @@ export class AcpClient {
       return Promise.reject(new AcpConnectionException(Resources.acpTooManyRequests));
     const id = ++this.nextId;
     const resolvers = Promise.withResolvers<JsonValue>();
+    const sent = performance.now();
+    AcpClient.probe(`send ${id} ${method} at ${Date.now()}`);
     const timer = Object.isNull(timeout) ? null : setTimeout(() => {
+      AcpClient.probe(`timeout ${id} ${method} at ${Date.now()} late ${Math.round(performance.now() - sent - timeout)}`);
       this.pending.get(id)?.fail(new TimeoutException(Resources.formatAcpTimeout(method)));
       this.pending.delete(id);
     }, timeout);
@@ -231,6 +236,12 @@ export class AcpClient {
     }
   }
 
+  private static probe(line: string): void {
+    const file = process.env["TEAMRUN_PROBE_FILE"];
+    if (!Object.isUndefined(file))
+      appendFileSync(file, `${line}${EOL}`);
+  }
+
   private abandon(error: Error): void {
     this.failPending(error);
     void this.stop().catch(() => undefined);
@@ -270,6 +281,7 @@ export class AcpClient {
     if (!Object.isNumber(id))
       return;
     const pending = this.pending.get(id);
+    AcpClient.probe(`reply ${id} at ${Date.now()} ${Object.isUndefined(pending) ? "after its timeout" : "pending"}`);
     if (Object.isUndefined(pending))
       return;
     const result = message.toJson()[Resources.resultField];

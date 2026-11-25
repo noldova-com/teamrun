@@ -754,13 +754,18 @@ export class GrokAdapterTests {
     const provider = new Provider("a", "grok", "Dedicated", host.directory.resolve("added"), AuthStatus.Unknown, null, null, null, null, "t");
     const timings = new ProviderTimings(2000, 2000, 10_000, 10_000, 100, 100, 100, 5000, 100, 1, 10, Resources.wakeGrace, Resources.taskOutputFollowInterval, 500);
     const checked: string[] = [];
+    const probe = join(host.directory.resolve("person"), "probe.txt");
+    process.env["TEAMRUN_PROBE_FILE"] = probe;
     for (const [read, mode] of [["ACCOUNT", "hangNamespaced"], ["ACCOUNT", "hang"], ["BILLING", "hangNamespaced"], ["BILLING", "hang"]]) {
       const started = performance.now();
-      const check = await host.createAdapter({ ...host.environment, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
+      const check = await host.createAdapter({ ...host.environment, TEAMRUN_PROBE_FILE: probe, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
         .checkSignIn(provider);
       checked.push([check.authStatus, check.identity?.email ?? "none", check.identity?.plan ?? "none", String(performance.now() - started < timings.requestTimeout)]
         .join(" "));
     }
+    delete process.env["TEAMRUN_PROBE_FILE"];
+    const lines = readFileSync(probe, "utf8");
+    process.stdout.write(`PROBE ${checked.join(",")}\n${lines}`);
 
     Assert.areEqual(["LoggedIn person@example.com SuperGrok Heavy true", "LoggedIn none SuperGrok Heavy true", "LoggedIn person@example.com none true",
       "LoggedIn person@example.com none true"].join(","), checked.join(","));

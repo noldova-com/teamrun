@@ -879,6 +879,9 @@ export class FakeAcpAgent {
 
   private answerUsage(id: number, method: string, mode: string | undefined, answer: JsonObject, answered: () => void = (): void => undefined): void {
     appendFileSync(join(process.cwd(), "usage-requests.txt"), `${method}\n`);
+    const probe = process.env["TEAMRUN_PROBE_FILE"];
+    if (!Object.isUndefined(probe))
+      appendFileSync(probe, `fake got ${id} ${method} at ${Date.now()}\n`);
     if (mode === "hang" || (mode === "hangNamespaced" && method.startsWith("_")))
       return;
     if (mode === "fail")
