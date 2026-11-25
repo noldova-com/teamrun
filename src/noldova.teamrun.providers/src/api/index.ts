@@ -277,6 +277,7 @@ export { ReadOnlyMcpTools } from "../services/mcp/read-only-mcp-tools.js";
 export { ServedToolNames } from "../services/mcp/served-tool-names.js";
 export { SharedMcpLaunch } from "../services/mcp/shared-mcp-launch.js";
 export { SharedMcpLauncher } from "../services/mcp/shared-mcp-launcher.js";
+export { SharedMcpCommand } from "../models/shared-mcp-command.js";
 export { CommandTitleReader } from "../services/command-title.reader.js";
 export { TerminalToolReader } from "../services/terminal-tool.reader.js";
 export { TerminalSignIn } from "../services/terminal-sign-in.js";

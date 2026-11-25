@@ -18,6 +18,7 @@ import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { SharedMcpLauncher } from "@noldova/teamrun.providers";
 
 import { FakeLauncherHost } from "../../fixtures/fake-launcher-host.fixture.js";
+import { LaunchRecorder } from "../../fixtures/launch-recorder.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 
@@ -53,16 +54,16 @@ export class SharedMcpLauncherTests {
 
   @TestMethod
   public async refusesArgumentsThatAreNeitherALaunchNorAWatch(): Promise<void> {
-    const refused: [number[], number, boolean][] = [];
+    const refused: string[] = [];
 
     for (const args of [[], ["--variables"], ["--variables", "KEY", "npx"], ["--variables", "KEY", "--"], ["--watch", "4321"], ["--watch", "1", "2", "3"]]) {
       const host = new FakeLauncherHost();
       const recorder = SharedMcpLauncherTests.recorder();
       await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, args);
-      refused.push([host.codes, recorder.starts.length, host.errors.startsWith("Usage: ")]);
+      refused.push([host.codes.join(), recorder.starts.length, host.errors.startsWith("Usage: ")].join("|"));
     }
 
-    Assert.areEqual(JSON.stringify(Array.from({ length: 6 }, () => [[2], 0, true])), JSON.stringify(refused));
+    Assert.areEqual(Array.from({ length: 6 }, () => "2|0|true").join(","), refused.join(","));
   }
 
   @TestMethod
@@ -108,10 +109,12 @@ export class SharedMcpLauncherTests {
   public async releasesTheHeldServerOnlyOnceItsWatchHasTheServersLine(): Promise<void> {
     const host = new FakeLauncherHost();
     const input = new PassThrough();
-    const released: [string, string][] = [];
+    const lines: string[] = [];
+    const handed: string[] = [];
     const release = new Writable({
       write: (chunk: Buffer, _encoding, done) => {
-        released.push([chunk.toString(), String(input.read() ?? "")]);
+        lines.push(chunk.toString());
+        handed.push(String(input.read() ?? ""));
         done();
       }
     });
@@ -119,8 +122,8 @@ export class SharedMcpLauncherTests {
 
     await new SharedMcpLauncher("linux", {}, "node", "launch.js", host, recorder.start).runAsync(true, ["--variables", "", "--", "server"]);
 
-    const [[line, handed] = ["", ""]] = released;
-    Assert.areEqual(JSON.stringify(["go\n", true, 1, true, [0]]), JSON.stringify([line, handed === SharedMcpLauncherTests.HANDED, released.length, release.writableFinished, host.codes]));
+    Assert.areEqual(JSON.stringify(["go\n", true, 1, true, [0]]), JSON.stringify([lines[0] ?? "", handed[0] === SharedMcpLauncherTests.HANDED, lines.length, release.writableFinished,
+      host.codes]));
   }
 
   @TestMethod
@@ -251,7 +254,7 @@ export class SharedMcpLauncherTests {
   public async exitsWith1AndSaysWhatNodeSaysOutsideWindowsWhenTheHeldServersCommandIsMissing(): Promise<void> {
     if (process.platform === "win32")
       return;
-    const [direct] = await once(spawn(SharedMcpLauncherTests.NO_SUCH_PROGRAM, [], { windowsHide: true }), "error") as [Error];
+    const direct = await SharedMcpLauncherTests.errorOfAsync(spawn(SharedMcpLauncherTests.NO_SUCH_PROGRAM, [], { windowsHide: true }));
     const host = new FakeLauncherHost();
 
     await new SharedMcpLauncher(process.platform, { ...process.env }, "node", "launch.js", host, SharedMcpLauncherTests.held())
@@ -267,7 +270,7 @@ export class SharedMcpLauncherTests {
     using directory = new TemporaryDirectory();
     const command = directory.resolve("search-server");
     writeFileSync(command, "#!/bin/sh\n", { mode: 0o644 });
-    const [direct] = await once(spawn(command, [], { windowsHide: true }), "error") as [Error];
+    const direct = await SharedMcpLauncherTests.errorOfAsync(spawn(command, [], { windowsHide: true }));
     const host = new FakeLauncherHost();
 
     await new SharedMcpLauncher(process.platform, { ...process.env }, "node", "launch.js", host, SharedMcpLauncherTests.held())
@@ -284,7 +287,7 @@ export class SharedMcpLauncherTests {
     const folder = directory.resolve("search-server");
     mkdirSync(folder);
     for (const command of [folder, directory.resolve("no-such-server")]) {
-      const [direct] = await once(spawn(command, [], { windowsHide: true }), "error") as [Error];
+      const direct = await SharedMcpLauncherTests.errorOfAsync(spawn(command, [], { windowsHide: true }));
       const host = new FakeLauncherHost();
 
       await new SharedMcpLauncher(process.platform, { ...process.env }, "node", "launch.js", host, SharedMcpLauncherTests.held())
@@ -792,17 +795,8 @@ export class SharedMcpLauncherTests {
     return listening;
   }
 
-  private static recorder(...makers: (() => ChildProcess)[]): { starts: { command: string; args: readonly string[]; options: SpawnOptions }[]; children: ChildProcess[];
-    start: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess; } {
-    const starts: { command: string; args: readonly string[]; options: SpawnOptions }[] = [];
-    const children: ChildProcess[] = [];
-    const start = (command: string, args: readonly string[], options: SpawnOptions): ChildProcess => {
-      starts.push({ command, args, options });
-      const child = (makers[starts.length - 1] ?? SharedMcpLauncherTests.exiting(0))();
-      children.push(child);
-      return child;
-    };
-    return { starts, children, start };
+  private static recorder(...makers: (() => ChildProcess)[]): LaunchRecorder {
+    return new LaunchRecorder(SharedMcpLauncherTests.exiting(0), makers);
   }
 
   private static exiting(code: number): () => ChildProcess {
@@ -847,6 +841,11 @@ export class SharedMcpLauncherTests {
     catch {
       return false;
     }
+  }
+
+  private static async errorOfAsync(child: ChildProcess): Promise<Error> {
+    const [error] = await once(child, "error");
+    return error instanceof Error ? error : new Error(String(error));
   }
 
   private static failing(): () => ChildProcess {

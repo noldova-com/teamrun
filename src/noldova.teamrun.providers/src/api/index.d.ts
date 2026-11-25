@@ -11227,7 +11227,32 @@ export declare class SharedMcpLauncher {
    * @param environment The environment it is found in.
    * @returns The program, its arguments and whether they go to it verbatim, or `null` on Windows when a command named without a folder isn't on `PATH`.
    */
-  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): { command: string; args: string[]; verbatim: boolean } | null;
+  public commandOf(command: string, args: readonly string[], environment: Readonly<Record<string, string>>): SharedMcpCommand | null;
+}
+
+/**
+ * What `SharedMcpLauncher.commandOf` starts for a command: a program, its arguments, and whether they go to it verbatim.
+ */
+export declare class SharedMcpCommand {
+  /**
+   * The program to start.
+   */
+  public readonly command: string;
+  /**
+   * Its arguments.
+   */
+  public readonly args: string[];
+  /**
+   * Whether the arguments go to the program verbatim, as Windows' `cmd.exe` takes a batch file's quoted line.
+   */
+  public readonly verbatim: boolean;
+
+  /**
+   * @param command The program to start.
+   * @param args Its arguments, copied.
+   * @param verbatim Whether the arguments go to the program verbatim.
+   */
+  public constructor(command: string, args: readonly string[], verbatim: boolean);
 }
 
 /**
