@@ -147,6 +147,7 @@ export { ClaudeAdapter } from "../services/claude/claude-adapter.js";
 export { ClaudeChat } from "../services/claude/claude-chat.js";
 export { ClaudeEnvironment } from "../services/claude/claude-environment.js";
 export { ClaudeInput } from "../services/claude/claude-input.js";
+export { ClaudePendingRun } from "../services/claude/claude-pending-run.js";
 export { ClaudePlan } from "../services/claude/claude-plan.js";
 export { ClaudePrompt } from "../services/claude/claude-prompt.js";
 export { ClaudeCompactionReader } from "../services/claude/claude-compaction.reader.js";

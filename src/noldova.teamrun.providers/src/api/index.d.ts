@@ -8877,6 +8877,59 @@ export declare class ClaudeChat {
 }
 
 /**
+ * The turn a Claude chat is running, until Claude Code's reply to its message ends: what its replies are matched by, and its message while
+ * the chat holds it.
+ */
+export declare class ClaudePendingRun {
+  /**
+   * The turn the run reports through.
+   */
+  public readonly turn: ClaudeTurn;
+
+  /**
+   * The id of the turn's message, which Claude Code's replies are matched by.
+   */
+  public readonly uuid: string;
+
+  /**
+   * Resolves once the run ends: `false` once its turn has finished, `true` when the chat settled it while holding its message, so its caller
+   * finishes the turn.
+   */
+  public readonly done: PromiseWithResolvers<boolean>;
+
+  /**
+   * The environment the turn's message asked for.
+   */
+  public readonly environment: Readonly<Record<string, string>>;
+
+  /**
+   * Tells the turn's caller once the chat stops the turn.
+   */
+  public readonly interrupted: () => void;
+
+  /**
+   * The turn's message while the chat holds it back from Claude Code, or `null`.
+   */
+  public held: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage | null;
+
+  /**
+   * Whether Claude Code has begun working on the turn's message.
+   */
+  public taken: boolean;
+
+  /**
+   * Initializes the run, holding no message and with its message not yet taken.
+   * @param turn The turn the run reports through.
+   * @param uuid The id of the turn's message.
+   * @param done Resolves once the run ends.
+   * @param environment The environment the turn's message asked for.
+   * @param interrupted Tells the turn's caller once the chat stops the turn.
+   */
+  public constructor(turn: ClaudeTurn, uuid: string, done: PromiseWithResolvers<boolean>, environment: Readonly<Record<string, string>>,
+    interrupted: () => void);
+}
+
+/**
  * One Claude Code turn: consumes the session's messages, reports them to the turn listener, and
  * decides tool use through it.
  */
