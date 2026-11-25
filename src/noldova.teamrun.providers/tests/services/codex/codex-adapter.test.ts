@@ -1016,17 +1016,18 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
-  @TestData("fail")
-  @TestData("hang")
-  public async stopsAnAppServerWhoseInitializeFails(initialize: string): Promise<void> {
+  @TestData("fail", 60_000, AppServerException)
+  @TestData("hang", 300, AppServerUnavailableException)
+  public async stopsAnAppServerWhoseInitializeFails(initialize: string, initializeTimeout: number,
+    expected: typeof AppServerException | typeof AppServerUnavailableException): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CODEX_INIT: initialize }, host.command,
-      new ProviderTimings(5000, 5000, 300, 60_000, 1000, 300, 500, 500, 200, 1, 20));
+      new ProviderTimings(5000, 5000, initializeTimeout, 60_000, 1000, 300, 500, 500, 200, 1, 20));
     try {
       const failure = await adapter.listModels(host.createProvider()).then(() => null, (error: unknown) => error);
       await host.programs.endedAt(1);
 
-      Assert.isInstanceOf(failure, Error);
+      Assert.isInstanceOf(failure, expected);
       Assert.areEqual(1, host.programs.started.length);
       Assert.areEqual(0, adapter.clientCount);
     }
