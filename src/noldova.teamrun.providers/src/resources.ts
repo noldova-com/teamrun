@@ -3035,6 +3035,10 @@ export class Resources {
     return `A Codex turn on thread ${threadId} waits for the turn running on it to end.`;
   }
 
+  public static formatCodexFailedStartStopFailed(kind: string): string {
+    return `A Codex app-server whose start failed did not stop: ${kind}.`;
+  }
+
   public static formatProcessEnvironmentPath(processId: number): string {
     return `/proc/${String(processId)}/environ`;
   }

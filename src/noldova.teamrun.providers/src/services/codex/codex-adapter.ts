@@ -1198,11 +1198,8 @@ export class CodexAdapter implements IProviderAdapter {
       await started;
     }
     catch (error) {
-      if (!Object.isNull(choice.download)) {
-        await client.stop();
-        throw error;
-      }
-      if (FailureDescriber.describe(error).includes(Resources.codexPackageMismatch))
+      await this.stopFailedStart(client);
+      if (Object.isNull(choice.download) && FailureDescriber.describe(error).includes(Resources.codexPackageMismatch))
         throw new ProviderStoppedException(Resources.codexUpdatedWhileInUse);
       throw error;
     }
@@ -1211,6 +1208,15 @@ export class CodexAdapter implements IProviderAdapter {
     }
 
     return client;
+  }
+
+  private async stopFailedStart(client: AppServerClient): Promise<void> {
+    try {
+      await client.stop();
+    }
+    catch (error) {
+      this.log?.write(Resources.formatCodexFailedStartStopFailed(CoreResources.formatFailureKind(error)));
+    }
   }
 
   private forget(key: string, starting: Promise<AppServerClient>): void {
