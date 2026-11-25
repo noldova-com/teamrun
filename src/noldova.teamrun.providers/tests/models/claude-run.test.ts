@@ -10,6 +10,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ClaudeRun } from "@noldova/teamrun.providers";
 
 import { FakeClaudeQuery } from "../fixtures/fake-claude-query.fixture.js";
+import { Wait } from "../fixtures/wait.fixture.js";
 
 @TestClass
 export class ClaudeRunTests {
@@ -17,7 +18,7 @@ export class ClaudeRunTests {
   public async stopsByInterruptingThenAborting(): Promise<void> {
     const query = new FakeClaudeQuery([]);
     const abort = new AbortController();
-    const run = new ClaudeRun(query, abort);
+    const run = new ClaudeRun(query, abort, 1000);
 
     await run.stop();
     run.close();
@@ -28,12 +29,28 @@ export class ClaudeRunTests {
   }
 
   @TestMethod
+  public async abortsAndClosesOnceTheWaitPassesWhenTheQueryNeverAnswersItsInterrupt(): Promise<void> {
+    const query = new FakeClaudeQuery([]);
+    query.interruptHang = true;
+    const abort = new AbortController();
+    const run = new ClaudeRun(query, abort, 10);
+
+    const stopping = run.stop();
+    await Wait.until(() => abort.signal.aborted, "The stop did not abort once its wait passed.");
+    await stopping;
+    const closedByStop = query.closeCount;
+    run.close();
+
+    Assert.areEqual(JSON.stringify([1, 1, 1]), JSON.stringify([query.interruptCount, closedByStop, query.closeCount]));
+  }
+
+  @TestMethod
   public async toleratesAQueryThatRefusesToInterruptOrClose(): Promise<void> {
     const query = new FakeClaudeQuery([]);
     query.interruptFailure = new Error("gone");
     query.closeFailure = new Error("closed");
     const abort = new AbortController();
-    const run = new ClaudeRun(query, abort);
+    const run = new ClaudeRun(query, abort, 1000);
 
     await run.stop();
     run.close();

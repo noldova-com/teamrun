@@ -217,7 +217,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       env: ClaudeEnvironment.build(passed, this.ownFolderOf(passed, provider?.profileDir ?? null), this.appVersion),
       settingSources: [], strictMcpConfig: true, mcpServers: {}, plugins: [], tools: [], persistSession: false, abortController: abort
     }, this.originOf(provider));
-    const run = new ClaudeRun(query, abort);
+    const run = new ClaudeRun(query, abort, this.timings.interruptTimeout);
     this.runs.add(run);
     let timer: NodeJS.Timeout | undefined;
     try {
@@ -418,11 +418,9 @@ export class ClaudeAdapter implements IProviderAdapter {
     this.shutdowns += 1;
     const runs = [...this.runs];
     this.runs.clear();
-    for (const run of runs)
-      await run.stop();
     const chats = [...this.chats];
     this.chats.clear();
-    await Promise.all(chats.map(t => t.stop()));
+    await Promise.all([...runs.map(t => t.stop()), ...chats.map(t => t.stop())]);
   }
 
   private async readBeforeStartAsync(shutdowns: number = this.shutdowns): Promise<NodeJS.ProcessEnv> {
