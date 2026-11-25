@@ -793,6 +793,31 @@ export class SustainTurnsTests {
   }
 
   @TestMethod
+  public async startsNoContinuationWhenTheChatIsStoppedWhileItsHandoverIsBuilt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const { conversation, work, bob } = await SustainTurnsTests.arrangeAsync(host, true);
+    const reading = Promise.withResolvers<void>();
+    const summary = Promise.withResolvers<string | null>();
+    host.adapter.readCompaction = (): Promise<string | null> => {
+      reading.resolve();
+      return summary.promise;
+    };
+    await SustainTurnsTests.ask(host, conversation, bob, "first-ask");
+    host.adapter.extraDetails = [new TurnDetail(DetailKind.Note, "Context compacted", { [Resources.compactionField]: true }, "compact-1")];
+    host.adapter.limits.set(work.id, new UsageLimit(null));
+
+    const asking = SustainTurnsTests.ask(host, conversation, bob, "limit-ask");
+    await reading.promise;
+    const stopping = host.engine.cancelConversationAsync(new ConversationIdParams(conversation.id));
+    summary.resolve("The work so far.");
+    await asking;
+    await stopping;
+
+    Assert.areEqual([work.id, work.id].join(","), host.adapter.requests.map(t => t.provider?.id).join(","));
+    Assert.areEqual([MessageStatus.Completed, MessageStatus.Failed].join(","), (await SustainTurnsTests.repliesAsync(host, conversation)).map(t => t.status).join(","));
+  }
+
+  @TestMethod
   public async writesTeamRunsOwnSummaryOnTheEntryWhenTheSessionHasNoneAndReusesItForTheMoveBack(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const { conversation, work, spare, bob } = await SustainTurnsTests.arrangeAsync(host, true);
