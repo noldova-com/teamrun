@@ -1757,8 +1757,9 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const next = await this.context.database.connection.runInTransactionAsync(async transaction => {
       const continued = await this.prepareTeammateReplyAsync(teammate, item.trigger, await this.messages.nextSequenceAsync(reply.conversationId, transaction),
         new Date().toISOString(), item.hop, item.chain, failed, transaction);
-      if (!Object.isNull(continued))
-        await this.messages.insertAsync(continued.message, transaction);
+      if (Object.isNull(continued) || item.run.isCancelled)
+        return null;
+      await this.messages.insertAsync(continued.message, transaction);
       return continued;
     });
     if (Object.isNull(next))
