@@ -57,10 +57,14 @@ export class DocsFixture {
   }
 
   public static setMode(mode: string | null): void {
-    if (Object.isNull(mode))
+    if (Object.isNull(mode)) {
       document.documentElement.removeAttribute(DocsFixture.MODE_ATTRIBUTE);
-    else
+      localStorage.removeItem(DocsFixture.STORAGE_KEY);
+    }
+    else {
       document.documentElement.setAttribute(DocsFixture.MODE_ATTRIBUTE, mode);
+      localStorage.setItem(DocsFixture.STORAGE_KEY, mode.toLowerCase());
+    }
   }
 
   public static async viewAsync(width: number, height: number): Promise<void> {

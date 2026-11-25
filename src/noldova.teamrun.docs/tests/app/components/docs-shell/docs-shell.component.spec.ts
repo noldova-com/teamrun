@@ -330,7 +330,8 @@ describe("DocsShellComponent", () => {
     const button = DocsFixture.one(host, "button.nol-docs-menu-button");
 
     expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(main.getBoundingClientRect().left);
-    expect(getComputedStyle(button).display).toBe("none");
+    expect(getComputedStyle(DocsFixture.one(host, "nol-docs-pages-bar")).display).toBe("none");
+    expect(button.getBoundingClientRect().width).toBe(0);
 
     await DocsFixture.viewAsync(DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT);
     await DocsFixture.untilAsync(() => expect(getComputedStyle(menu).display).toBe("none"));
@@ -720,7 +721,8 @@ describe("DocsShellComponent", () => {
       };
 
       expectInView();
-      window.scrollTo(0, document.documentElement.scrollHeight / 2);
+      const end = DocsFixture.one(host, ".nol-docs-body").getBoundingClientRect().bottom - window.innerHeight;
+      window.scrollTo(0, Math.min(document.documentElement.scrollHeight / 2, end));
       await DocsFixture.untilAsync(() => expect(window.scrollY).toBeGreaterThan(0));
       expectInView();
     });

@@ -8,7 +8,7 @@
 
 :host {
   position: sticky;
-  z-index: 1;
+  z-index: 0;
   inset-block-start: calc(var(--nol-docs-header-height, calc(var(--nol-site-header-height) * 2)) - var(--nol-site-header-height));
   display: flex;
   align-items: center;
