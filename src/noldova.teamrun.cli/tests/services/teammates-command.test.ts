@@ -54,7 +54,9 @@ export class TeammatesCommandTests {
       "t4  Dana  Provider  Home  (none)  (none)  chats: Scratch (c4)  idle",
       "  in Acme: the Devs department, reports to Alice",
       "t5  Eve  Provider  Pilot (octo)  (none)  (none)  no chats  idle",
-      "t6  Finn  Provider  Desk (Account not reported)  (none)  (none)  no chats  idle"
+      "  in Lab: no department, reports to t9",
+      "t6  Finn  Provider  Desk (Account not reported)  (none)  (none)  no chats  idle",
+      "  in Lab: no department, reports to the person"
     ].join("\n"), result.text);
   }
 
@@ -73,6 +75,8 @@ export class TeammatesCommandTests {
       organizations: [{ id: "o1", name: "Acme", department: "Devs", manager: null }]
     }), JSON.stringify(rows[0]));
     Assert.areEqual(JSON.stringify([{ id: "o1", name: "Acme", department: "Devs", manager: { id: "t1", name: "Alice" } }]), JSON.stringify(rows[3]?.["organizations"]));
+    Assert.areEqual(JSON.stringify([[{ id: "o2", name: "Lab", department: null, manager: { id: "t9", name: null } }], [{ id: "o2", name: "Lab", department: null, manager: null }]]),
+      JSON.stringify([rows[4]?.["organizations"], rows[5]?.["organizations"]]));
     Assert.areEqual(JSON.stringify([{ chatId: "c1" }]), JSON.stringify(rows[1]!["usage"]));
     Assert.areEqual(JSON.stringify({
       id: "t3", name: "Bob", role: null, harness: "Provider", provider: null, model: null, effort: null, chats: [], answering: false, usage: [], planWindows: [],
@@ -102,6 +106,9 @@ export class TeammatesCommandTests {
       [new Department("d1", "Devs", "u1", OrganizationParent.person, "t1", 0, time, time)],
       [new TeammatePlacement("t1", OrganizationParent.department("d1"), 0), new TeammatePlacement("t2", OrganizationParent.department("d1"), 1),
         new TeammatePlacement("t4", OrganizationParent.teammate("t1"), 0)]);
+    const lab = new Organization("o2", "Lab", null, 1, time, time, [], [],
+      [new TeammatePlacement("t6", OrganizationParent.person, 0), new TeammatePlacement("t9", OrganizationParent.person, 1),
+        new TeammatePlacement("t5", OrganizationParent.teammate("t9"), 0)]);
     const context = await RecordingCliContext.activateAsync();
     context.answer("teamrun.teammateList", () => [SampleData.alice, SampleData.chat, bob, dana, eve, finn].map(t => t.toJson()))
       .answer("teamrun.providerList", () => [work.toJson(), home.toJson(), pilot.toJson(), desk.toJson()])
@@ -118,7 +125,7 @@ export class TeammatesCommandTests {
       ])
       .answer("teamrun.planUsageList", () => [new PlanUsage("codex", "a1", windows, time, "free").toJson(), new PlanUsage("copilot", "a3", [], time, "pro").toJson(),
         new PlanUsage("claude", "a1", [new PlanWindow(PlanWindowName.WeeklyOpus, 90, null)], time).toJson()])
-      .answer("teamrun.organizationList", () => [acme.toJson()]);
+      .answer("teamrun.organizationList", () => [acme.toJson(), lab.toJson()]);
     return context;
   }
 }

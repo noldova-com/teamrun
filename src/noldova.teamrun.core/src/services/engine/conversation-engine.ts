@@ -511,7 +511,7 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
         const leader = nameOf(t.leaderId);
         return Object.isNull(leader) ? Resources.formatOrganizationUnledReport(t.name) : Resources.formatOrganizationDepartmentReport(t.name, leader);
       }),
-      ...organization.placementsUnder(parent).filter(t => t.teammateId !== teammateId).flatMap(t => nameOf(t.teammateId) ?? [])
+      ...organization.placementsUnder(parent).flatMap(t => teammates.filter(u => u.id === t.teammateId && u.id !== teammateId).map(u => u.name))
     ]);
   }
 
