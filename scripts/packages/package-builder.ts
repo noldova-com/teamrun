@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import type { ProcessResult } from "../processes/process-result.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import type { NpmCommand } from "../toolchain/npm-command.ts";
@@ -165,7 +167,7 @@ export class PackageBuilder {
       for (const [file, entry] of await PackageBuilder.listFilesAsync(source, `${PackageBuilder.ARCHIVE_FOLDER}/${path.basename(source)}`)) {
         const copy = packed.get(entry);
         const origin = path.relative(this.layout.root, file).split(path.sep).join(path.posix.sep);
-        if (copy === undefined)
+        if (Object.isUndefined(copy))
           differences.push(`${path.basename(archive)} lacks ${entry}, the copy of ${origin}.`);
         else if (!copy.equals(await readFile(file)))
           differences.push(`${path.basename(archive)} holds a ${entry} that differs from ${origin}.`);

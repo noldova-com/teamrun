@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 export class AppLockfile {
   private static readonly PACKAGES_FIELD: string = "packages";
   private static readonly ROOT_ENTRY: string = "";
@@ -71,7 +73,7 @@ export class AppLockfile {
   private static isLockedAs(locked: unknown, installed: unknown): boolean {
     const lockedEntry = AppLockfile.asRecord(locked);
     const installedEntry = AppLockfile.asRecord(installed);
-    return locked !== undefined && AppLockfile.COMPARED_FIELDS.every(t => lockedEntry[t] === installedEntry[t]);
+    return !Object.isUndefined(locked) && AppLockfile.COMPARED_FIELDS.every(t => lockedEntry[t] === installedEntry[t]);
   }
 
   private static async isDependedOnAsAsync(locked: unknown, manifest: string): Promise<boolean> {
@@ -90,7 +92,7 @@ export class AppLockfile {
   private static pin(entry: unknown, manifest: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
     const pinned: Record<string, unknown> = { ...AppLockfile.asRecord(entry) };
     for (const section of AppLockfile.PINNED_SECTIONS)
-      if (manifest[section] !== undefined)
+      if (!Object.isUndefined(manifest[section]))
         pinned[section] = manifest[section];
     return pinned;
   }
@@ -108,6 +110,6 @@ export class AppLockfile {
   }
 
   private static asRecord(value: unknown): Readonly<Record<string, unknown>> {
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {};
+    return Object.isObject(value) && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {};
   }
 }

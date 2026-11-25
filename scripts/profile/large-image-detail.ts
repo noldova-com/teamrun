@@ -10,6 +10,8 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import "@noldova/context.core";
+
 import { ModuleDatabases } from "./module-databases.ts";
 
 export class LargeImageDetail {
@@ -27,7 +29,7 @@ export class LargeImageDetail {
           continue;
         const rows = database.prepare("SELECT rowid AS id, json FROM messages ORDER BY rowid DESC").all() as { id: number; json: string }[];
         const row = rows.find(t => LargeImageDetail.FILE_CHANGE.test(t.json) && LargeImageDetail.PNG_PATH.test(t.json));
-        if (row === undefined)
+        if (Object.isUndefined(row))
           continue;
         const message = JSON.parse(row.json) as { id: string; createdAt: string; details: { createdAt: string }[] } & Record<string, unknown>;
         const base64 = randomBytes(LargeImageDetail.IMAGE_BYTES).toString("base64");

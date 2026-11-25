@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { TotalsException } from "./totals.exception.ts";
 
 export class JsonFields {
@@ -16,7 +18,7 @@ export class JsonFields {
   public constructor(value: unknown, source: string, place: readonly string[] = []) {
     this.source = source;
     this.place = place;
-    if (typeof value !== "object" || value === null || Array.isArray(value))
+    if (!Object.isObject(value) || Array.isArray(value))
       throw new TotalsException(`${this.subject} is not a JSON object.`);
     this.value = value;
   }
@@ -34,21 +36,21 @@ export class JsonFields {
 
   public count(name: string): number {
     const value: unknown = Reflect.get(this.value, name);
-    if (typeof value !== "number" || !Number.isInteger(value) || value < 0)
+    if (!Object.isNumber(value) || !Number.isInteger(value) || value < 0)
       throw new TotalsException(`${this.subject} has no count ${name}.`);
     return value;
   }
 
   public number(name: string): number {
     const value: unknown = Reflect.get(this.value, name);
-    if (typeof value !== "number" || !Number.isFinite(value))
+    if (!Object.isNumber(value) || !Number.isFinite(value))
       throw new TotalsException(`${this.subject} has no number ${name}.`);
     return value;
   }
 
   public text(name: string): string {
     const value: unknown = Reflect.get(this.value, name);
-    if (typeof value !== "string")
+    if (!Object.isString(value))
       throw new TotalsException(`${this.subject} has no text ${name}.`);
     return value;
   }
@@ -62,7 +64,7 @@ export class JsonFields {
 
   public texts(name: string): readonly string[] {
     const values = this.list(name);
-    if (values.some(t => typeof t !== "string"))
+    if (values.some(t => !Object.isString(t)))
       throw new TotalsException(`${this.subject} has a list ${name} that is not all text.`);
     return values.map(t => String(t));
   }
@@ -76,7 +78,7 @@ export class JsonFields {
   }
 
   public has(name: string): boolean {
-    return Reflect.has(this.value, name) && Reflect.get(this.value, name) !== null;
+    return Reflect.has(this.value, name) && !Object.isNull(Reflect.get(this.value, name));
   }
 
   private get subject(): string {

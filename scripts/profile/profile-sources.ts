@@ -9,6 +9,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import type { ProfileNode } from "./profile.node.ts";
 
 export class ProfileSources {
@@ -26,7 +28,7 @@ export class ProfileSources {
   public snippetOf(node: ProfileNode): string {
     const lines = this.linesOf(node.fileName);
     const line = lines?.[node.lineNumber];
-    if (line === undefined)
+    if (Object.isUndefined(line))
       return "";
     return line.slice(Math.max(0, node.columnNumber - ProfileSources.BEFORE), node.columnNumber + ProfileSources.AFTER);
   }

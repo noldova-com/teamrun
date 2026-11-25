@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { SetVersionException } from "./set-version.exception.ts";
 
 export class VersionSetter {
@@ -65,7 +67,7 @@ export class VersionSetter {
     if (!section.some(t => t.trim().length > 0 && !t.startsWith(VersionSetter.GROUP_START)))
       throw nothing;
     const heading = `${VersionSetter.SECTION_START}${version}`;
-    if (released === null)
+    if (Object.isNull(released))
       return [...lines.slice(0, start), VersionSetter.UNRELEASED, String(), heading, ...section, ...lines.slice(end)].join("\n");
     const shipped = VersionSetter.readShipped(released);
     const moved = VersionSetter.keep(section, t => shipped.has(t));
@@ -103,7 +105,7 @@ export class VersionSetter {
       }
       if (line.length === 0 || !isKept(line))
         continue;
-      if (group !== null) {
+      if (!Object.isNull(group)) {
         kept.push(String(), group, String());
         group = null;
       }
@@ -123,7 +125,7 @@ export class VersionSetter {
       const file = path.posix.join(VersionSetter.PACKAGES_FOLDER, entry.name, VersionSetter.MANIFEST_NAME);
       if (entry.isDirectory() && existsSync(path.join(this.root, file))) {
         const name = VersionSetter.parse(await this.readAsync(file), file)["name"];
-        if (typeof name === "string")
+        if (Object.isString(name))
           names.add(name);
       }
     }
@@ -141,7 +143,7 @@ export class VersionSetter {
 
   private static readVersion(text: string, file: string): string {
     const version = VersionSetter.parse(text, file)["version"];
-    if (typeof version !== "string")
+    if (!Object.isString(version))
       throw new SetVersionException(`${file} holds no version string.`);
     return version;
   }
@@ -168,7 +170,7 @@ export class VersionSetter {
       packages[location] = VersionSetter.setPins({
         ...record,
         ...((isWorkspace || isOwn) && record["version"] === current ? { version } : {}),
-        ...(isOwn && typeof resolved === "string" ? { resolved: resolved.replace(`-${current}.tgz`, `-${version}.tgz`) } : {})
+        ...(isOwn && Object.isString(resolved) ? { resolved: resolved.replace(`-${current}.tgz`, `-${version}.tgz`) } : {})
       }, own, current, version);
     }
     return { ...lockfile, ...(lockfile["version"] === current ? { version } : {}), packages };
@@ -196,6 +198,6 @@ export class VersionSetter {
   }
 
   private static asRecord(value: unknown): Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
+    return Object.isObject(value) && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
   }
 }

@@ -12,6 +12,8 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 
+import "@noldova/context.core";
+
 import type { AngularProject } from "../angular/angular-project.ts";
 import { ShortScreenshotNames } from "../angular/short-screenshot-names.ts";
 import { ProcessException } from "../processes/process.exception.ts";
@@ -92,10 +94,10 @@ export class FailureScreenshotCheck implements ICheck {
     const logged = FailureScreenshotCheck.LOGGED.exec(result.text)?.groups;
     const file = files.length === 1 ? files[0] : undefined;
     const findings: string[] = [];
-    if (file === undefined || !FailureScreenshotCheck.SHORT_NAME.test(file) || Buffer.byteLength(file) > ShortScreenshotNames.NAME_LIMIT)
+    if (Object.isUndefined(file) || !FailureScreenshotCheck.SHORT_NAME.test(file) || Buffer.byteLength(file) > ShortScreenshotNames.NAME_LIMIT)
       findings.push(`The failed test should leave one screenshot named with the start of its title and 16 hexadecimal digits, within ${ShortScreenshotNames.NAME_LIMIT} bytes, `
         + `but left ${JSON.stringify(files)}:\n${result.text}`);
-    if (logged?.["name"] === undefined || Buffer.byteLength(logged["name"]) <= ShortScreenshotNames.NAME_LIMIT || path.basename(logged["path"] ?? "") !== file)
+    if (Object.isUndefined(logged?.["name"]) || Buffer.byteLength(logged["name"]) <= ShortScreenshotNames.NAME_LIMIT || path.basename(logged["path"] ?? "") !== file)
       findings.push(`The run should print "Screenshot of" the test's name, past ${ShortScreenshotNames.NAME_LIMIT} bytes, beside the saved screenshot's path:\n${result.text}`);
     return findings;
   }

@@ -11,6 +11,8 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { setTimeout as delay } from "node:timers/promises";
 
+import "@noldova/context.core";
+
 import { ProcessRunner } from "../processes/process-runner.ts";
 import { FirstLaunchRecord } from "./first-launch-record.ts";
 import { LargeImageDetail } from "./large-image-detail.ts";
@@ -48,7 +50,7 @@ export class Profile {
 
   public async runAsync(args: readonly string[]): Promise<number> {
     const options = ProfileOptions.parse(args);
-    if (options === null)
+    if (Object.isNull(options))
       return this.usage();
     if (!existsSync(path.join(this.root, ...Profile.MAIN))) {
       this.output.write(`The app isn't installed and built in app/; run npm run install:app and npm run build:app first.\n`);
@@ -59,7 +61,7 @@ export class Profile {
     mkdirSync(folder, { recursive: true });
 
     if (options.seed) {
-      const seeded = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Profile.SEED_SCRIPT), ...options.pairs === null ? [] : [Profile.PAIRS_OPTION, options.pairs]],
+      const seeded = await this.runner.runAsync(process.execPath, [path.join(this.root, ...Profile.SEED_SCRIPT), ...Object.isNull(options.pairs) ? [] : [Profile.PAIRS_OPTION, options.pairs]],
         path.join(this.root, "app"), { ...this.environment, [Profile.DATA_VARIABLE]: data });
       if (seeded !== 0)
         return seeded ?? 1;
@@ -82,8 +84,8 @@ export class Profile {
         this.output.write(`No scenario ${unknown.join(", ")}; the scenarios are ${scenarios.names.join(", ")}.\n`);
         return Profile.USAGE_EXIT_CODE;
       }
-      for (const name of scenarios.names.filter(t => options.scenarios === null || options.scenarios.includes(t))) {
-        if (failed !== null)
+      for (const name of scenarios.names.filter(t => Object.isNull(options.scenarios) || options.scenarios.includes(t))) {
+        if (!Object.isNull(failed))
           recorder.skip(name, failed);
         else if (!await Profile.runScenarioAsync(recorder, scenarios, name))
           failed = name;
@@ -94,12 +96,12 @@ export class Profile {
     finally {
       await app.stopAsync();
     }
-    if (nodeProfiles !== null)
+    if (!Object.isNull(nodeProfiles))
       recorder.summarizeNodeProfiles(nodeProfiles);
     this.log(`RESULTS ${options.label}, in ${path.relative(this.root, folder)}`);
     for (const line of recorder.results)
       this.log(`  ${line}`);
-    return failed === null ? 0 : 1;
+    return Object.isNull(failed) ? 0 : 1;
   }
 
   private static async runScenarioAsync(recorder: ProfileRecorder, scenarios: ProfileScenarios, name: string): Promise<boolean> {

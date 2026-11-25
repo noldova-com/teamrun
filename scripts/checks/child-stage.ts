@@ -10,6 +10,8 @@ import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { ProcessEnd } from "../processes/process-end.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import { ProcessTimeoutException } from "../processes/process-timeout.exception.ts";
@@ -42,14 +44,14 @@ export class ChildStage {
         throw t;
       });
     const results = end?.isSuccessful === true ? await this.readAsync(titles.length) : null;
-    if (results !== null)
+    if (!Object.isNull(results))
       return results;
     output.write(`The ${titles.length} checks ran in a process of their own, which ${ChildStage.describe(end, this.limit)}; its output is above and in ${path.relative(this.root, this.log)}.\n`);
     return titles.map(() => false);
   }
 
   private static describe(end: ProcessEnd | null, limit: number): string {
-    if (end === null)
+    if (Object.isNull(end))
       return `was stopped at its limit of ${limit / 1000} s`;
     return end.isSuccessful ? `ended ${end.describe()} without their results` : `ended ${end.describe()}, so their results don't count`;
   }
@@ -65,6 +67,6 @@ export class ChildStage {
     if (!Array.isArray(parsed))
       return null;
     const listed: readonly unknown[] = parsed;
-    return listed.length === count && listed.every((t): t is boolean => typeof t === "boolean") ? listed : null;
+    return listed.length === count && listed.every((t): t is boolean => Object.isBoolean(t)) ? listed : null;
   }
 }

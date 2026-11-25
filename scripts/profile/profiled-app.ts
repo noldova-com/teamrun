@@ -12,6 +12,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+import "@noldova/context.core";
 import type { Browser, Frame, Page } from "playwright";
 
 export class ProfiledApp {
@@ -58,7 +59,7 @@ export class ProfiledApp {
     const electron = String(createRequire(path.join(appFolder, "package.json"))("electron"));
     const { chromium } = createRequire(path.join(root, "package.json"))("playwright") as typeof import("playwright");
     const environment = Object.fromEntries(Object.entries(process.env).filter(t => t[0] !== "ELECTRON_RUN_AS_NODE"));
-    if (nodeProfiles !== null)
+    if (!Object.isNull(nodeProfiles))
       environment["NODE_OPTIONS"] = `--cpu-prof --cpu-prof-dir=${nodeProfiles}`;
     const port = await ProfiledApp.findFreePortAsync();
     const child = spawn(electron, [path.join(appFolder, ...ProfiledApp.MAIN), `--data-dir=${data}`, `--device-dir=${device}`, `--remote-debugging-port=${port}`],
@@ -77,15 +78,15 @@ export class ProfiledApp {
     const started = Date.now();
     let browser: Browser | null = null;
     try {
-      while (Date.now() - started < ProfiledApp.START_LIMIT && browser === null && !exited) {
+      while (Date.now() - started < ProfiledApp.START_LIMIT && Object.isNull(browser) && !exited) {
         browser = await fetch(`http://${ProfiledApp.HOST}:${port}/json/version`)
           .then(t => t.ok ? chromium.connectOverCDP(`http://${ProfiledApp.HOST}:${port}`) : null, () => null);
-        if (browser === null)
+        if (Object.isNull(browser))
           await delay(ProfiledApp.POLL);
       }
-      const found = browser === null ? null : await ProfiledApp.findExplorerAsync(browser, started);
-      if (browser === null || found === null)
-        throw new Error(`TeamRun's explorer didn't show within ${ProfiledApp.START_LIMIT / 1000} s; connected: ${browser !== null}, exited: ${exited}.`);
+      const found = Object.isNull(browser) ? null : await ProfiledApp.findExplorerAsync(browser, started);
+      if (Object.isNull(browser) || Object.isNull(found))
+        throw new Error(`TeamRun's explorer didn't show within ${ProfiledApp.START_LIMIT / 1000} s; connected: ${!Object.isNull(browser)}, exited: ${exited}.`);
       await found[0].setViewportSize(ProfiledApp.VIEWPORT);
       log(`ready in ${Date.now() - started} ms; frames: ${found[0].frames().length}; viewport ${ProfiledApp.VIEWPORT.width}x${ProfiledApp.VIEWPORT.height}`);
       return new ProfiledApp(child, browser, found[0], found[1], data, log);
@@ -129,7 +130,7 @@ export class ProfiledApp {
       server.once("error", reject);
       server.listen(0, ProfiledApp.HOST, () => {
         const address = server.address();
-        server.close(() => typeof address === "object" && address !== null ? resolve(address.port) : reject(new Error("No free port for the debugging protocol.")));
+        server.close(() => Object.isObject(address) ? resolve(address.port) : reject(new Error("No free port for the debugging protocol.")));
       });
     });
   }
@@ -146,7 +147,7 @@ export class ProfiledApp {
   }
 
   private static stopTree(child: ChildProcess, exited: boolean): void {
-    if (exited || child.pid === undefined)
+    if (exited || Object.isUndefined(child.pid))
       return;
     try {
       if (process.platform === "win32")

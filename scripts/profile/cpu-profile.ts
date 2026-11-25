@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { ProfileException } from "./profile.exception.ts";
 import type { ProfileGroup } from "./profile-group.ts";
 import { ProfileNode } from "./profile.node.ts";
@@ -36,7 +38,7 @@ export class CpuProfile {
   public static parse(text: string): CpuProfile {
     const profile: unknown = JSON.parse(text);
     if (!CpuProfile.isRecord(profile) || !Array.isArray(profile["nodes"]) || !CpuProfile.isNumbers(profile["samples"]) || !CpuProfile.isNumbers(profile["timeDeltas"])
-      || typeof profile["startTime"] !== "number" || typeof profile["endTime"] !== "number")
+      || !Object.isNumber(profile["startTime"]) || !Object.isNumber(profile["endTime"]))
       throw new ProfileException("The file is not a CPU profile: it needs nodes, samples, timeDeltas, startTime and endTime.");
     return new CpuProfile(profile["nodes"].map(t => CpuProfile.parseNode(t)), profile["samples"], profile["timeDeltas"], profile["startTime"], profile["endTime"]);
   }
@@ -82,14 +84,14 @@ export class CpuProfile {
 
   public callersOf(id: number, limit: number): readonly ProfileNode[] {
     const callers: ProfileNode[] = [];
-    for (let at = this.parents.get(id); at !== undefined && callers.length < limit; at = this.parents.get(at))
+    for (let at = this.parents.get(id); !Object.isUndefined(at) && callers.length < limit; at = this.parents.get(at))
       callers.push(this.nodeOf(at));
     return callers;
   }
 
   private nodeOf(id: number): ProfileNode {
     const node = this.nodes.get(id);
-    if (node === undefined)
+    if (Object.isUndefined(node))
       throw new ProfileException(`The profile samples node ${id}, which it doesn't list.`);
     return node;
   }
@@ -97,17 +99,17 @@ export class CpuProfile {
   private static parseNode(value: unknown): ProfileNode {
     const frame = CpuProfile.isRecord(value) ? value["callFrame"] : undefined;
     const children = CpuProfile.isRecord(value) ? value["children"] ?? [] : undefined;
-    if (!CpuProfile.isRecord(value) || typeof value["id"] !== "number" || !CpuProfile.isRecord(frame) || !CpuProfile.isNumbers(children)
-      || typeof frame["functionName"] !== "string" || typeof frame["url"] !== "string" || typeof frame["lineNumber"] !== "number" || typeof frame["columnNumber"] !== "number")
+    if (!CpuProfile.isRecord(value) || !Object.isNumber(value["id"]) || !CpuProfile.isRecord(frame) || !CpuProfile.isNumbers(children)
+      || !Object.isString(frame["functionName"]) || !Object.isString(frame["url"]) || !Object.isNumber(frame["lineNumber"]) || !Object.isNumber(frame["columnNumber"]))
       throw new ProfileException("A profile node needs an id, a call frame with functionName, url, lineNumber and columnNumber, and child ids.");
     return new ProfileNode(value["id"], frame["functionName"], frame["url"], frame["lineNumber"], frame["columnNumber"], children);
   }
 
   private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private static isNumbers(value: unknown): value is readonly number[] {
-    return Array.isArray(value) && value.every(t => typeof t === "number");
+    return Array.isArray(value) && value.every(t => Object.isNumber(t));
   }
 }

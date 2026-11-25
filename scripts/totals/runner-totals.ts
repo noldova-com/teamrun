@@ -11,6 +11,8 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { ICoverageCount } from "./interfaces/i-coverage-count.ts";
 import type { IRunnerCounts } from "./interfaces/i-runner-counts.ts";
 import type { IRunnerFindings } from "./interfaces/i-runner-findings.ts";
@@ -75,7 +77,7 @@ export class RunnerTotals {
 
   public get missing(): readonly string[] {
     const files = new Set(this.files);
-    return this.shard === null ? this.expected.filter(t => !files.has(t)) : [];
+    return Object.isNull(this.shard) ? this.expected.filter(t => !files.has(t)) : [];
   }
 
   public get problems(): readonly string[] {
@@ -84,7 +86,7 @@ export class RunnerTotals {
       RunnerTotals.formatList(`${this.title} name more than one test the same:`, this.duplicates),
       RunnerTotals.formatList(`${this.title} found no tests in these files:`, this.empty),
       RunnerTotals.formatList(`${this.title} have no result for these files:`, this.missing)
-    ].filter(t => t !== null);
+    ].filter(t => !Object.isNull(t));
   }
 
   public static parse(text: string, source: string): RunnerTotals {
@@ -98,7 +100,7 @@ export class RunnerTotals {
       { discovered: fields.count("discovered"), passed: fields.count("passed"), failed: fields.count("failed"), rerunPassed: fields.count("rerunPassed"), skipped: fields.count("skipped"), unselected: fields.count("unselected"), unreached: fields.count("unreached") },
       fields.objects("skips").map(t => ({ test: t.text("test"), reason: t.text("reason") })),
       fields.texts("files"),
-      coverage === null ? null : { unit: coverage.text("unit"), covered: coverage.count("covered"), total: coverage.count("total") },
+      Object.isNull(coverage) ? null : { unit: coverage.text("unit"), covered: coverage.count("covered"), total: coverage.count("total") },
       { duplicates: fields.texts("duplicates"), empty: fields.texts("empty") },
       { expected: fields.texts("expected"), shard: fields.has("shard") ? fields.text("shard") : null });
   }
@@ -183,7 +185,7 @@ export class RunnerTotals {
   }
 
   private formatCoverage(): string {
-    if (this.coverage === null)
+    if (Object.isNull(this.coverage))
       return RunnerTotals.NOT_MEASURED;
     const share = this.coverage.total === 0 ? 100 : this.coverage.covered / this.coverage.total * 100;
     return `${share.toFixed(1)}% of ${this.coverage.total} ${this.coverage.unit}`;

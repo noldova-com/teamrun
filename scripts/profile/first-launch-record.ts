@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import "@noldova/context.core";
+
 import { ModuleDatabases } from "./module-databases.ts";
 
 export class FirstLaunchRecord {
@@ -30,7 +32,7 @@ export class FirstLaunchRecord {
       if (!ModuleDatabases.hasTable(database, FirstLaunchRecord.PREFERENCES_TABLE))
         return true;
       const [preference] = database.prepare(FirstLaunchRecord.PREFERENCE_QUERY).all() as { json: string }[];
-      return preference === undefined || (JSON.parse(preference.json) as { finishedAt: string | null }).finishedAt === null;
+      return Object.isUndefined(preference) || Object.isNull((JSON.parse(preference.json) as { finishedAt: string | null }).finishedAt);
     }
     finally {
       database.close();

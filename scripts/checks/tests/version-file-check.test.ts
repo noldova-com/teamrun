@@ -13,6 +13,8 @@ import path from "node:path";
 import { Writable } from "node:stream";
 import { afterEach, describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { VersionSetter } from "../../packages/version-setter.ts";
 import { VersionFileCheck } from "../version-file-check.ts";
 
@@ -25,12 +27,12 @@ const rootWith = (versionFile: string | null, manifests: Readonly<Record<string,
   folders.push(root);
   for (const file of [...VersionSetter.MANIFESTS, "src/noldova.teamrun/module.json"]) {
     const text = Object.hasOwn(manifests, file) ? manifests[file] : manifest("0.0.2");
-    if (text === null || text === undefined)
+    if (Object.isNullOrUndefined(text))
       continue;
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     writeFileSync(path.join(root, file), text);
   }
-  if (versionFile !== null)
+  if (!Object.isNull(versionFile))
     writeFileSync(path.join(root, "version.json"), versionFile);
   return root;
 };

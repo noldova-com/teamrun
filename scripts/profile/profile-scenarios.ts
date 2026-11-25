@@ -8,6 +8,7 @@
 
 import { setTimeout as delay } from "node:timers/promises";
 
+import "@noldova/context.core";
 import type { Frame, Locator, Page } from "playwright";
 
 export class ProfileScenarios {
@@ -150,7 +151,7 @@ export class ProfileScenarios {
 
   private async scrollAsync(): Promise<void> {
     const box = await this.frame.locator(ProfileScenarios.VIEWPORT).first().boundingBox();
-    if (box === null)
+    if (Object.isNull(box))
       throw new Error("No visible history viewport.");
     await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     for (let i = 0; i < ProfileScenarios.SCROLL_STEPS; i++) {

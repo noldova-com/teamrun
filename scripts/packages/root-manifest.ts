@@ -9,6 +9,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { PackageException } from "./package.exception.ts";
 
 export class RootManifest {
@@ -52,16 +54,16 @@ export class RootManifest {
     catch (error) {
       throw new PackageException(RootManifest.INVALID, { cause: error });
     }
-    if (!RootManifest.isRecord(manifest) || typeof manifest["version"] !== "string")
+    if (!RootManifest.isRecord(manifest) || !Object.isString(manifest["version"]))
       throw new PackageException(RootManifest.INVALID);
     const section = manifest[RootManifest.SECTION];
     const protocolVersion = RootManifest.isRecord(section) ? section[RootManifest.PROTOCOL_FIELD] : undefined;
-    if (typeof protocolVersion !== "string")
+    if (!Object.isString(protocolVersion))
       throw new PackageException(RootManifest.INVALID_PROTOCOL);
     return new RootManifest(manifest["version"], protocolVersion);
   }
 
   private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 }

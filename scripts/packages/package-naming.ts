@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { PackageException } from "./package.exception.ts";
 
 export class PackageNaming {
@@ -36,7 +38,7 @@ export class PackageNaming {
 
   public static nameSourcePackage(directory: string): string {
     const name = PackageNaming.nameFolder(directory);
-    if (name === null)
+    if (Object.isNull(name))
       throw new PackageException(`${directory} is not a package folder directly under src/, named noldova and its package's segments such as src/noldova.teamrun.protocol.`);
     return name;
   }
@@ -44,12 +46,12 @@ export class PackageNaming {
   public static locatePackageFolder(filePath: string): string | null {
     const [source, folder, ...rest] = filePath.split(PackageNaming.FOLDER_SEPARATOR);
     const directory = `${source}${PackageNaming.FOLDER_SEPARATOR}${folder}`;
-    return rest.length > 0 && PackageNaming.nameFolder(directory) !== null ? directory : null;
+    return rest.length > 0 && !Object.isNull(PackageNaming.nameFolder(directory)) ? directory : null;
   }
 
   private static nameFolder(directory: string): string | null {
     const [source, folder, ...rest] = directory.split(PackageNaming.FOLDER_SEPARATOR);
-    if (source !== PackageNaming.SOURCE_FOLDER || folder === undefined || rest.length > 0 || !PackageNaming.FOLDER_PATTERN.test(folder))
+    if (source !== PackageNaming.SOURCE_FOLDER || Object.isUndefined(folder) || rest.length > 0 || !PackageNaming.FOLDER_PATTERN.test(folder))
       return null;
     const name = `${PackageNaming.SCOPE}${folder.split(PackageNaming.SEGMENT_SEPARATOR).slice(1).join(PackageNaming.SEGMENT_SEPARATOR)}`;
     return PackageNaming.isOwn(name) ? name : null;

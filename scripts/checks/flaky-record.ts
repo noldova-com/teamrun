@@ -11,6 +11,8 @@ import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { FlakyRecordException } from "./flaky-record.exception.ts";
 import { FlakyTest } from "./flaky-test.ts";
 
@@ -45,7 +47,7 @@ export class FlakyRecord {
     if (!Array.isArray(value))
       throw new FlakyRecordException(FlakyRecord.MALFORMED);
     return value.map(t => {
-      if (typeof t !== "object" || t === null || FlakyRecord.FIELDS.some(u => typeof (t as Record<string, unknown>)[u] !== "string"))
+      if (!Object.isObject(t) || FlakyRecord.FIELDS.some(u => !Object.isString((t as Record<string, unknown>)[u])))
         throw new FlakyRecordException(FlakyRecord.MALFORMED);
       const fields = t as Record<string, string>;
       return new FlakyTest(String(fields["runner"]), String(fields["file"]), String(fields["name"]), String(fields["failure"]));
@@ -74,7 +76,7 @@ export class FlakyRecord {
     await writeFile(this.file, `${JSON.stringify([...recorded, ...added], null, 2)}\n`);
     output.write(`Flaky, passed when run again: ${added.map(t => `${t.name} (${t.file})`).join(", ")}\n`);
     const summary = this.environment[FlakyRecord.SUMMARY_VARIABLE];
-    if (summary !== undefined)
+    if (!Object.isUndefined(summary))
       await appendFile(summary, `${FlakyRecord.SUMMARY_HEADER}${added.map(t => `| ${FlakyRecord.escape(t.runner)} | ${FlakyRecord.escape(t.name)} | ${FlakyRecord.escape(t.file)} | ${FlakyRecord.escape(t.failure.split("\n", 1).join(""))} |\n`).join("")}\n`);
   }
 

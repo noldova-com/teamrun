@@ -8,6 +8,8 @@
 
 import path from "node:path";
 
+import "@noldova/context.core";
+
 export class SourceFile {
   public static readonly SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]);
   public static readonly STYLE_EXTENSIONS: ReadonlySet<string> = new Set([".css"]);
@@ -33,7 +35,7 @@ export class SourceFile {
     let quote: string | null = null;
     for (let position = lineStart; position < index; position++) {
       const character = text[position] as string;
-      if (quote === null) {
+      if (Object.isNull(quote)) {
         if (SourceFile.QUOTES.includes(character))
           quote = character;
       }
@@ -42,7 +44,7 @@ export class SourceFile {
       else if (character === quote)
         quote = null;
     }
-    return quote !== null;
+    return !Object.isNull(quote);
   }
 
   public get isScript(): boolean {

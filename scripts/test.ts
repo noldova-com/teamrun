@@ -10,6 +10,8 @@ import { appendFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { AngularProject } from "./angular/angular-project.ts";
 import { AngularTestCheck } from "./checks/angular-test-check.ts";
 import { ArchiveReuseCheck } from "./checks/archive-reuse-check.ts";
@@ -138,7 +140,7 @@ export class Test {
   }
 
   private async runChecksAsync(stages: readonly (readonly ICheck[])[], notice: string | null, flaky: FlakyRecord | null, reading: ChildStage | null): Promise<number> {
-    if (notice !== null)
+    if (!Object.isNull(notice))
       this.output.write(notice);
     const earlier = (await flaky?.readAsync())?.length ?? 0;
 
@@ -151,7 +153,7 @@ export class Test {
       if (failures > 0)
         break;
       const titles = stage.map(t => t.title);
-      const results = index === 0 && reading !== null ? await reading.runAsync(titles, this.output) : await Test.runStageAsync(stage, this.output);
+      const results = index === 0 && !Object.isNull(reading) ? await reading.runAsync(titles, this.output) : await Test.runStageAsync(stage, this.output);
       for (const [position, title] of titles.entries()) {
         const passed = results[position] === true;
         summary += `| ${title} | ${passed ? "Passed" : "Failed"} |\n`;
@@ -181,7 +183,7 @@ export class Test {
 
   private async writeSummaryAsync(summary: string): Promise<void> {
     const summaryPath = this.environment[Test.SUMMARY_VARIABLE];
-    if (summaryPath !== undefined)
+    if (!Object.isUndefined(summaryPath))
       await appendFile(summaryPath, summary);
   }
 

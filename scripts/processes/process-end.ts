@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class ProcessEnd {
   private static readonly HEX_FROM: number = 0x10000;
 
@@ -22,9 +24,9 @@ export class ProcessEnd {
   }
 
   public describe(): string {
-    if (this.signal !== null)
+    if (!Object.isNull(this.signal))
       return `on signal ${this.signal}`;
-    if (this.exitCode === null)
+    if (Object.isNull(this.exitCode))
       return "with no exit code or signal";
     return this.exitCode >= ProcessEnd.HEX_FROM
       ? `with exit code ${this.exitCode} (0x${this.exitCode.toString(16).toUpperCase()})`

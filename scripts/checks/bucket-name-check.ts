@@ -9,6 +9,7 @@
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
 import ts from "typescript";
 
 import type { RepositoryFiles } from "../repository/repository-files.ts";
@@ -56,7 +57,7 @@ export class BucketNameCheck implements ICheck {
     const findings: string[] = [];
     const visit = (node: ts.Node): void => {
       const name = BucketNameCheck.readName(node);
-      if (name !== null && BucketNameCheck.BUCKETS.has(name.replace(BucketNameCheck.BEFORE_LAST_WORD, "").toLowerCase()))
+      if (!Object.isNull(name) && BucketNameCheck.BUCKETS.has(name.replace(BucketNameCheck.BEFORE_LAST_WORD, "").toLowerCase()))
         findings.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}: the name ${name} ends in a bucket word; ${BucketNameCheck.RULE}`);
       node.forEachChild(visit);
     };

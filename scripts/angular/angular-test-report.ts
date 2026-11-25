@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import type { IRunnerSkip } from "../totals/interfaces/i-runner-skip.ts";
 import { JsonFields } from "../totals/json-fields.ts";
 import { RunnerResult } from "../totals/runner-result.ts";
@@ -60,7 +62,7 @@ export class AngularTestReport {
       this.failed++;
     else if (status === AngularTestReport.PENDING)
       this.unreached++;
-    else if (reason !== undefined)
+    else if (!Object.isUndefined(reason))
       this.skips.push({ file, names, reason });
     else
       throw new TotalsException(`${this.source} gives ${file} an unknown test status ${JSON.stringify(status)}.`);

@@ -10,6 +10,8 @@ import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import type { ICodeDigest } from "./interfaces/i-code-digest.ts";
 import type { ISpecTransform } from "./interfaces/i-spec-transform.ts";
 import type { ISpecTransformPlugin } from "./interfaces/i-spec-transform-plugin.ts";
@@ -64,7 +66,7 @@ export class SpecTransformCheck {
 
   private async compareAsync(code: string, id: string): Promise<null> {
     const served = this.servedCode.get(id);
-    if (served === undefined)
+    if (Object.isUndefined(served))
       return null;
     this.servedCode.delete(id);
     const file = SpecTransformCheck.fileOf(id);

@@ -11,6 +11,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { PackageException } from "../packages/package.exception.ts";
 import type { ProcessResult } from "../processes/process-result.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
@@ -72,7 +74,7 @@ export class CopyListCheck implements ICheck {
   private async findLineProblemsAsync(line: string, archives: ReadonlyMap<string, ReadonlyMap<string, Buffer>>): Promise<readonly string[]> {
     const fields = line.split(CopyListCheck.FIELD_SEPARATOR);
     const [source, name, entry] = fields;
-    if (fields.length !== CopyListCheck.FIELD_COUNT || source === undefined || name === undefined || entry === undefined || fields.some(t => t.length === 0))
+    if (fields.length !== CopyListCheck.FIELD_COUNT || Object.isUndefined(source) || Object.isUndefined(name) || Object.isUndefined(entry) || fields.some(t => t.length === 0))
       return [`"${line}" isn't a source, a package name and a path in the package, separated by tabs.`];
     const problems: string[] = [];
     for (const value of [source, entry])
@@ -84,10 +86,10 @@ export class CopyListCheck implements ICheck {
     if (!existsSync(file))
       return [`"${line}" names ${source}, which isn't in the repository.`];
     const archive = archives.get(name);
-    if (archive === undefined)
+    if (Object.isUndefined(archive))
       return [`"${line}" names ${name}, which isn't a package under src/.`];
     const copy = archive.get(`${CopyListCheck.ARCHIVE_FOLDER}/${entry}`);
-    if (copy === undefined)
+    if (Object.isUndefined(copy))
       return [`${name}'s archive lacks ${entry}, the copy of ${source}.`];
     if (!copy.equals(await readFile(file)))
       return [`${name}'s archive holds a ${entry} that differs from ${source}.`];

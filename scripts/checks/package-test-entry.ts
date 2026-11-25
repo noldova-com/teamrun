@@ -11,6 +11,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import "@noldova/context.core";
 import type { DiscoveredTestClass, DiscoveredTestMethod, TestClassResult, TestConsoleReporter, TestRunResult } from "@noldova/context.testing";
 
 import { PackageTestMethod } from "./package-test-method.ts";
@@ -91,7 +92,7 @@ export class PackageTestEntry {
   private static async discoverAloneAsync(testing: typeof import("@noldova/context.testing"), projects: readonly PackageTestProject[],
     alone: string): Promise<DiscoveredTestClass[]> {
     const project = projects.find(t => alone.startsWith(`${t.name}/`));
-    if (project === undefined)
+    if (Object.isUndefined(project))
       throw new TypeError(PackageTestEntry.ALONE_UNKNOWN);
     const filePath = alone.slice(project.name.length + 1);
     const moduleExports: object = await import(pathToFileURL(path.join(project.folder, filePath)).href);
@@ -140,14 +141,14 @@ export class PackageTestEntry {
       const filters = this.readList(PackageTestEntry.FILTERS_VARIABLE, PackageTestEntry.FILTERS_INVALID);
       const projects = this.readProjects();
       const alone = this.environment[PackageTestEntry.ALONE_VARIABLE];
-      const discovered = alone === undefined ? await new testing.TestDiscovery().discoverAsync(projects.map(t => new testing.TestProject(t.name, t.folder)))
+      const discovered = Object.isUndefined(alone) ? await new testing.TestDiscovery().discoverAsync(projects.map(t => new testing.TestProject(t.name, t.folder)))
         : await PackageTestEntry.discoverAloneAsync(testing, projects, alone);
       const selected = new testing.TestRunner(new testing.TestDiscovery(), new testing.TestExecutor(PackageTestEntry.TIMEOUT_MILLISECONDS)).select(discovered, filters);
       wanted = PackageTestEntry.countMethods(selected);
       reporter.start();
       let ran: readonly DiscoveredTestClass[] = selected;
       let classResults: TestClassResult[];
-      if (alone !== undefined || claims === undefined)
+      if (!Object.isUndefined(alone) || Object.isUndefined(claims))
         classResults = await PackageTestEntry.executeAsync(testing, selected, progress);
       else {
         const isolated = new Set(this.readList(PackageTestEntry.ISOLATED_VARIABLE, PackageTestEntry.ISOLATED_INVALID));
@@ -184,7 +185,7 @@ export class PackageTestEntry {
     const skips = methods.filter(t => t.method.outcome === testing.TestOutcome.Skipped)
       .map(t => ({ file: t.file, names: [t.method.displayName], reason: String(t.method.skipReason) }));
     const resultFile = this.environment[PackageTestEntry.RESULT_VARIABLE];
-    if (resultFile !== undefined)
+    if (!Object.isUndefined(resultFile))
       await writeFile(resultFile, JSON.stringify({
         discovered: result.selection.discovered,
         selected: result.selection.selected,
@@ -197,7 +198,7 @@ export class PackageTestEntry {
         files: [...new Set(methods.map(t => t.file))]
       }));
     const resultsFile = this.environment[PackageTestEntry.RESULTS_VARIABLE];
-    if (resultsFile !== undefined)
+    if (!Object.isUndefined(resultsFile))
       await writeFile(resultsFile, JSON.stringify({ isComplete: !this.isStopped && unreached === 0, failed }));
     return result.failed + unreached === 0 ? 0 : PackageTestEntry.FAILED_EXIT_CODE;
   }
@@ -222,7 +223,7 @@ export class PackageTestEntry {
     catch (error) {
       throw new TypeError(invalid, { cause: error });
     }
-    if (!Array.isArray(list) || list.some(t => typeof t !== "string"))
+    if (!Array.isArray(list) || list.some(t => !Object.isString(t)))
       throw new TypeError(invalid);
     return list.map(String);
   }

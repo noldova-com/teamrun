@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import { SourceFile } from "../structure/source-file.ts";
 import { SourceTree } from "../structure/source-tree.ts";
@@ -127,7 +129,7 @@ export class TestWaitCheck implements ICheck {
       return files;
     for (let index = start + 2; index < lines.length && (lines[index] as string).startsWith(TestWaitCheck.TABLE_ROW_PREFIX); index++) {
       const file = TestWaitCheck.LIST_ROW.exec(lines[index] as string)?.[1];
-      if (file !== undefined)
+      if (!Object.isUndefined(file))
         files.set(file, index + 1);
     }
     return files;

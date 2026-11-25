@@ -14,6 +14,8 @@ import path from "node:path";
 import { Writable } from "node:stream";
 import { afterEach, describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { PackageBuild } from "../../packages/package-build.ts";
 import { ProcessEnd } from "../../processes/process-end.ts";
 import { ProcessRunner } from "../../processes/process-runner.ts";
@@ -111,7 +113,7 @@ describe("PackageTestCheck with a package's isolated tests", () => {
     const { text, environments } = await runAsync([], ["services/b.test.ts", "a.test.ts"]);
 
     const isolated = JSON.stringify(["@noldova/teamrun.sample/a.test.js", "@noldova/teamrun.sample/services/b.test.js"]);
-    assert.deepEqual(environments.map(t => [t[PackageTestEntry.ISOLATED_VARIABLE], t[PackageTestEntry.ALONE_VARIABLE], t[PackageTestEntry.CLAIMS_VARIABLE] !== undefined]), [
+    assert.deepEqual(environments.map(t => [t[PackageTestEntry.ISOLATED_VARIABLE], t[PackageTestEntry.ALONE_VARIABLE], !Object.isUndefined(t[PackageTestEntry.CLAIMS_VARIABLE])]), [
       [isolated, "@noldova/teamrun.sample/a.test.js", false],
       [isolated, "@noldova/teamrun.sample/services/b.test.js", false],
       [isolated, undefined, true]

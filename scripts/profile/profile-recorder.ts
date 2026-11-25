@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from "node:module";
 import path from "node:path";
 
+import "@noldova/context.core";
 import type { CDPSession, Frame, Page } from "playwright";
 
 import { CpuProfile } from "./cpu-profile.ts";
@@ -140,7 +141,7 @@ export class ProfileRecorder {
       if (!ProfileRecorder.SCRIPT_FILE.test(name))
         continue;
       const source = await this.cdp.send("Debugger.getScriptSource", { scriptId }).catch(() => null);
-      if (source !== null)
+      if (!Object.isNull(source))
         writeFileSync(path.join(folder, name), source.scriptSource);
     }
   }
@@ -184,7 +185,7 @@ export class ProfileRecorder {
   private nameOf(node: ProfileNode): string {
     const map = node.url.length > 0 ? this.mapOf(node.fileName) : null;
     const original = map?.originalPositionFor({ line: node.lineNumber + 1, column: node.columnNumber });
-    if (original !== undefined && original.source !== null)
+    if (!Object.isUndefined(original) && !Object.isNull(original.source))
       return `${original.name ?? (node.functionName || "(anonymous)")} ${original.source.replace(ProfileRecorder.SOURCE_PREFIX, "$1")}:${original.line}`;
     return node.label;
   }
@@ -197,7 +198,7 @@ export class ProfileRecorder {
       let map = null;
       try {
         const { SourceMapConsumer } = this.fromSrc("source-map-js") as { SourceMapConsumer: new (map: unknown) => NonNullable<ReturnType<ProfileRecorder["maps"]["get"]>> };
-        map = file === null ? null : new SourceMapConsumer(JSON.parse(readFileSync(file, "utf8")));
+        map = Object.isNull(file) ? null : new SourceMapConsumer(JSON.parse(readFileSync(file, "utf8")));
       }
       catch (error) {
         this.log(`map failed ${fileName}: ${String(error).slice(0, 200)}`);
@@ -211,7 +212,7 @@ export class ProfileRecorder {
     for (const entry of existsSync(folder) ? readdirSync(folder, { withFileTypes: true }) : []) {
       const full = path.join(folder, entry.name);
       const found = entry.isDirectory() ? ProfileRecorder.find(full, name) : entry.name === name ? full : null;
-      if (found !== null)
+      if (!Object.isNull(found))
         return found;
     }
     return null;

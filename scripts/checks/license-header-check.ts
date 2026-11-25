@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import { LicenseHeader } from "../structure/license-header.ts";
 import { SourceFile } from "../structure/source-file.ts";
@@ -37,7 +39,7 @@ export class LicenseHeaderCheck implements ICheck {
     let failures = 0;
     for (const file of await this.files.listAsync()) {
       const header = LicenseHeaderCheck.HEADERS.get(path.posix.extname(file));
-      if (header === undefined)
+      if (Object.isUndefined(header))
         continue;
       checked++;
       if ((await readFile(path.join(this.root, file), "utf8")).startsWith(header))

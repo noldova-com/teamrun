@@ -9,6 +9,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { PackageNaming } from "./package-naming.ts";
 import { PackageException } from "./package.exception.ts";
 
@@ -51,7 +53,7 @@ export class PackageManifest {
     catch (error) {
       throw new PackageException(`${file} could not be read as JSON.`, { cause: error });
     }
-    if (typeof manifest !== "object" || manifest === null || !("name" in manifest) || typeof manifest.name !== "string")
+    if (!Object.isObject(manifest) || !("name" in manifest) || !Object.isString(manifest.name))
       throw new PackageException(`${file} must have a name.`);
     if (!("version" in manifest) || manifest.version !== PackageManifest.VERSION_PLACEHOLDER)
       throw new PackageException(`${file} must have the version "${PackageManifest.VERSION_PLACEHOLDER}"; the build stamps the root package.json's version.`);
@@ -61,13 +63,13 @@ export class PackageManifest {
       throw new PackageException(`${file} must have no publishConfig; TeamRun publishes no package to a registry.`);
 
     const dependencies = "dependencies" in manifest ? manifest.dependencies : {};
-    if (typeof dependencies !== "object" || dependencies === null)
+    if (!Object.isObject(dependencies))
       throw new PackageException(`${file} must list its dependencies as an object.`);
     const peers = "peerDependencies" in manifest ? manifest.peerDependencies : {};
-    if (typeof peers !== "object" || peers === null)
+    if (!Object.isObject(peers))
       throw new PackageException(`${file} must list its peer dependencies as an object.`);
     const own = [...Object.entries(dependencies), ...Object.entries(peers)].filter(([name]) => PackageNaming.isOwn(name));
-    const unpinned = Object.entries(dependencies).filter(([name, version]) => !PackageNaming.isOwn(name) && typeof version !== "string").map(([name]) => name);
+    const unpinned = Object.entries(dependencies).filter(([name, version]) => !PackageNaming.isOwn(name) && !Object.isString(version)).map(([name]) => name);
     if (unpinned.length > 0)
       throw new PackageException(`${file} must pin ${unpinned.join(", ")} to an exact version.`);
     const unstamped = own.filter(([, version]) => version !== PackageManifest.VERSION_PLACEHOLDER).map(([name]) => name);
@@ -75,13 +77,13 @@ export class PackageManifest {
       throw new PackageException(`${file} must depend on ${unstamped.join(", ")} at version "${PackageManifest.VERSION_PLACEHOLDER}".`);
 
     const settings = "noldova" in manifest ? manifest.noldova : {};
-    if (typeof settings !== "object" || settings === null)
+    if (!Object.isObject(settings))
       throw new PackageException(`${file} must keep its noldova settings in an object.`);
     const exclusions = "coverageExclusions" in settings ? settings.coverageExclusions : [];
     if (!Array.isArray(exclusions))
       throw new PackageException(`${file} must list its coverage exclusions in an array.`);
     const isolated: unknown = "isolatedTests" in settings ? settings.isolatedTests : [];
-    if (!Array.isArray(isolated) || isolated.some(t => typeof t !== "string"))
+    if (!Array.isArray(isolated) || isolated.some(t => !Object.isString(t)))
       throw new PackageException(`${file} must list its isolated tests as an array of paths under its tests folder.`);
     return new PackageManifest(directory, manifest.name, [...new Set(own.map(([name]) => name))], JSON.stringify(exclusions), Object.keys(peers), isolated.map(String));
   }

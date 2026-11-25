@@ -13,6 +13,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { FirstLaunchRecord } from "../first-launch-record.ts";
 
 const folders: string[] = [];
@@ -20,7 +22,7 @@ const folders: string[] = [];
 const dataFolder = (statements: readonly string[] | null): string => {
   const data = mkdtempSync(path.join(tmpdir(), "first-launch-"));
   folders.push(data);
-  if (statements === null)
+  if (Object.isNull(statements))
     return data;
   const file = path.join(data, ...FirstLaunchRecord.DATABASE);
   mkdirSync(path.dirname(file), { recursive: true });
