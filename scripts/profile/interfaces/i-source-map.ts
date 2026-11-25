@@ -9,7 +9,3 @@
 export interface ISourceMap {
   originalPositionFor(position: { line: number; column: number }): { source: string | null; line: number | null; name: string | null };
 }
-
-export interface ISourceMapModule {
-  SourceMapConsumer: new (map: unknown) => ISourceMap;
-}

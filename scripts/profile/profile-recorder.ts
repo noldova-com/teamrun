@@ -16,7 +16,8 @@ import type { CDPSession, Frame, Page } from "playwright";
 import { CpuProfile } from "./cpu-profile.ts";
 import { FrameStatistics } from "./frame-statistics.ts";
 import type { IPagePerformance } from "./interfaces/i-page-performance.ts";
-import type { ISourceMap, ISourceMapModule } from "./interfaces/i-source-map.ts";
+import type { ISourceMap } from "./interfaces/i-source-map.ts";
+import type { ISourceMapModule } from "./interfaces/i-source-map-module.ts";
 import type { ProfileNode } from "./profile.node.ts";
 import { ProfileSources } from "./profile-sources.ts";
 
