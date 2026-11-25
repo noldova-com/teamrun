@@ -1189,6 +1189,35 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async startsTheNewQueryForOtherSettingsOnlyOnceTheOpenQueryHasStoppedWhileItsTaskStopIsPending(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const open = new FakeClaudeQuery([
+      SdkMessages.init("s-other-model", "none", null, []),
+      SdkMessages.taskStarted("s-other-model", "server", undefined, true, "npm start"),
+      SdkMessages.success("s-other-model", "Started"),
+      new WaitForCloseStep()
+    ]);
+    open.stopTaskGate = new GateStep();
+    const next = new FakeClaudeQuery([SdkMessages.init("s-other-model", "none", null, []), SdkMessages.success("s-other-model", "Again")]);
+    const closedAtStart: number[] = [];
+    host.factory.repeat = () => {
+      if (host.factory.queries.length === 0)
+        return open;
+      closedAtStart.push(open.closeCount);
+      return next;
+    };
+
+    await adapter.runTurn(host.createRequest("Start"), new RecordingTurnListener(), new AbortController().signal);
+    const result = await adapter.runTurn(host.createRequest("Again", null, "s-other-model", "sonnet"), new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, result.outcome);
+    Assert.areEqual(JSON.stringify([undefined, "s-other-model"]), JSON.stringify(host.factory.optionsList.map(t => t.resume)));
+    Assert.areEqual(JSON.stringify(["server", [1]]), JSON.stringify([open.stoppedTasks.join(","), closedAtStart]));
+  }
+
+  @TestMethod
   public async failsTheTurnNamingWhyWhenTeamRunsToolEndpointIsntServing(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();

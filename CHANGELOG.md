@@ -38,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Claude Code:** a turn with other settings, such as another model, starts its new query only once the open one has stopped, waiting for its tasks' stops up to the interrupt timeout, so two Claude Code processes never hold the chat's session at once (#44).
 - **Organization:** a teammate is told who reports to it: its Organization line names everyone whose manager it is: a department one of them leads, with its leader, a department with no leader with its teammates who report to it, and each other teammate by name, or says no one reports to it; and `teamrun_list_teammates` gives each teammate's department and manager in each organization (#206).
 - **Providers:** Muse Code's sign-in reads the same everywhere: What each provider can do and the Providers page say the provider's **Sign in** runs `muse login` in a terminal, as its sign-in notice does, and no longer that TeamRun doesn't run it (#199).
 - **Approvals:** an added ACP agent's command approval whose title is its own command shows it with control and direction characters replaced and cut at the usual length, like every other approval (#187).

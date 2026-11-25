@@ -542,7 +542,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       if (open.isRunningTasks && JSON.stringify(this.servedTools.get(open)) !== JSON.stringify(tools))
         await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForToolsChange, null, null));
       this.chats.delete(open);
-      void open.stop();
+      await open.stop();
     }
 
     const base = await this.readBeforeStartAsync(shutdowns);
