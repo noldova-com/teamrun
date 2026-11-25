@@ -34,6 +34,18 @@ export class JsonFields {
     return new JsonFields(value, source);
   }
 
+  public static read(value: unknown, name: string): unknown {
+    return Object.isObject(value) && !Array.isArray(value) ? Reflect.get(value, name) : undefined;
+  }
+
+  public static record(value: unknown): Readonly<Record<string, unknown>> {
+    return Object.isObject(value) && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : {};
+  }
+
+  public field(name: string): unknown {
+    return Reflect.get(this.value, name);
+  }
+
   public count(name: string): number {
     const value: unknown = Reflect.get(this.value, name);
     if (!Object.isNumber(value) || !Number.isInteger(value) || value < 0)

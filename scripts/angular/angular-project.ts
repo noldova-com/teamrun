@@ -165,7 +165,7 @@ export class AngularProject {
   }
 
   private static field(value: unknown, name: string): unknown {
-    return Object.isObject(value) && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
+    return JsonFields.read(value, name);
   }
 
   public hasProject(): boolean {
