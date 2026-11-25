@@ -8905,6 +8905,26 @@ export declare class WorkFolder {
 }
 
 /**
+ * A waiting message's folder of attachment files, under its chat's folder.
+ */
+export declare class WaitingFolder {
+  /**
+   * The id of the chat the message waits in, its parent folder's name.
+   */
+  public readonly chatId: string;
+  /**
+   * The waiting message's id, the folder's name.
+   */
+  public readonly waitingId: string;
+
+  /**
+   * @param chatId The id of the chat the message waits in.
+   * @param waitingId The waiting message's id.
+   */
+  public constructor(chatId: string, waitingId: string);
+}
+
+/**
  * TeamRun's MCP endpoint as one turn reaches it: its URL, and the bearer tokens a provider session presents to it, each issued for
  * the turn's tool session and revoked when that provider session ends.
  */
@@ -10365,11 +10385,11 @@ export declare class AttachmentStore {
   public listDraftFolders(): readonly string[];
 
   /**
-   * Lists the waiting messages' folders, as each chat's id and message id.
-   * @returns The folders two levels under the waiting files directory, or none when it is reached through a link the store refuses;
-   * a linked chat folder is left out.
+   * Lists the waiting messages' folders.
+   * @returns The folders two levels under the waiting files directory, each as its chat's id and its message's id, or none when it is
+   * reached through a link the store refuses; a linked chat folder is left out.
    */
-  public listWaitingFolders(): readonly (readonly [string, string])[];
+  public listWaitingFolders(): readonly WaitingFolder[];
 
   /**
    * Tells whether an attachment's file is still there; one reached through a link the store refuses counts as gone.

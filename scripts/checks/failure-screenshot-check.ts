@@ -12,7 +12,9 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { stripVTControlCharacters } from "node:util";
 
+import type { AngularProject } from "../angular/angular-project.ts";
 import { ShortScreenshotNames } from "../angular/short-screenshot-names.ts";
+import { ProcessException } from "../processes/process.exception.ts";
 import type { ProcessResult } from "../processes/process-result.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import { FixtureRun } from "./fixture-run.ts";
@@ -39,22 +41,33 @@ export class FailureScreenshotCheck implements ICheck {
 
   private readonly root: string;
   private readonly runner: ProcessRunner;
+  private readonly project: AngularProject;
   private readonly platform: string;
 
   public readonly title: string = "Failure screenshots";
 
-  public constructor(root: string, runner: ProcessRunner, platform: string = process.platform) {
+  public constructor(root: string, runner: ProcessRunner, project: AngularProject, platform: string = process.platform) {
     this.root = root;
     this.runner = runner;
+    this.project = project;
     this.platform = platform;
   }
 
   public async runAsync(output: Writable): Promise<boolean> {
+    try {
+      await this.project.prepareAsync(output);
+    }
+    catch (error) {
+      if (!(error instanceof ProcessException))
+        throw error;
+      output.write(`${error.message}\n`);
+      return false;
+    }
     const run = await this.runFixtureAsync();
     const findings = FailureScreenshotCheck.findingsOf(run.result, run.files);
     for (const finding of findings)
       output.write(`${finding}\n`);
-    if (this.platform === FailureScreenshotCheck.WINDOWS_PLATFORM && FailureScreenshotCheck.ranNoTest(run.result))
+    if (this.platform === FailureScreenshotCheck.WINDOWS_PLATFORM && findings.length > 0)
       output.write(`${await this.describeSocketsAsync()}\n`);
     output.write(`Ran ${FailureScreenshotCheck.FIXTURE} in Vitest's browser mode and found ${run.files.length} failure screenshot files.\n`);
     return findings.length === 0;

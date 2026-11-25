@@ -76,6 +76,8 @@ export class ComputerUseHarness {
         return true;
       },
       onChanged: () => undefined,
+      isDeviceKnown: true,
+      onDeviceKnown: ComputerUseHarness.unusedSetting,
       write: ComputerUseHarness.unusedSetting,
       reset: ComputerUseHarness.unusedSetting,
       setScopeParent: ComputerUseHarness.unusedSetting,

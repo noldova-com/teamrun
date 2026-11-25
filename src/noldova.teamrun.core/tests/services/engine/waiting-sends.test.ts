@@ -923,7 +923,7 @@ export class WaitingSendsTests {
     await host.engine.reconcileAsync();
     await host.engine.waitForIdle();
 
-    Assert.areEqual(`${chat.id}/waiting-0`, host.attachments.listWaitingFolders().map(t => t.join("/")).join());
+    Assert.areEqual(`${chat.id}/waiting-0`, host.attachments.listWaitingFolders().map(t => `${t.chatId}/${t.waitingId}`).join());
   }
 
   @TestMethod
