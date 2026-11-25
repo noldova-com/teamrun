@@ -42,7 +42,6 @@ export class DocsShellComponent {
   private static readonly LINK: string = "a";
   private static readonly ADDRESS_END: RegExp = /[?#]/u;
   private static readonly PRIMARY_BUTTON: number = 0;
-  private static readonly ROOT: string = "/";
 
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly document: Document = inject(DOCUMENT);
@@ -162,7 +161,6 @@ export class DocsShellComponent {
 
   private static pathOf(url: string): string {
     const end = url.search(DocsShellComponent.ADDRESS_END);
-    const path = end < 0 ? url : url.slice(0, end);
-    return path.length > DocsShellComponent.ROOT.length && path.endsWith(DocsShellComponent.ROOT) ? path.slice(0, -DocsShellComponent.ROOT.length) : path;
+    return end < 0 ? url : url.slice(0, end);
   }
 }
