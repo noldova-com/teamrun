@@ -796,9 +796,10 @@ export class AcpTurn implements IAcpClientListener {
   }
 
   private static blockImageOf(block: JsonObject): SavedImage | null {
-    const data = block[Resources.dataField];
-    const mediaType = ImageDataReader.mediaTypeOf(Object.isString(data) ? data : null);
-    return Object.isNull(mediaType) ? null : new SavedImage(null, mediaType, data as string);
+    const value = block[Resources.dataField];
+    const data = Object.isString(value) ? value : null;
+    const mediaType = ImageDataReader.mediaTypeOf(data);
+    return Object.isNull(mediaType) || Object.isNull(data) ? null : new SavedImage(null, mediaType, data);
   }
 
   private async isTeamRunTool(name: string | null): Promise<boolean> {
