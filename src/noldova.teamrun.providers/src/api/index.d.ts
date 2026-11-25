@@ -6059,6 +6059,14 @@ export declare class Resources {
   public static readonly codexSignInUnreadable: string;
   public static readonly claudeNoResult: string;
   /**
+   * Why a Claude chat refuses to run a turn before its Claude Code query is attached.
+   */
+  public static readonly claudeChatNotStarted: string;
+  /**
+   * Why a Claude chat refuses to run a turn whose message has no id, which Claude Code's replies name it by.
+   */
+  public static readonly claudeMessageWithoutId: string;
+  /**
    * The note on a reply whose message Claude Code answered inside a turn it started itself.
    */
   public static readonly claudeAnsweredInOwnTurn: string;

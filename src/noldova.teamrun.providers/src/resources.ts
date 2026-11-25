@@ -2558,6 +2558,8 @@ export class Resources {
   public static readonly codexSignInPageRefused: string = "Codex asked to open a sign-in page that isn't on auth.openai.com over HTTPS, so TeamRun didn't open it.";
   public static readonly codexSignInUnreadable: string = "Codex reported the end of the sign-in in a form TeamRun can't read.";
   public static readonly claudeNoResult: string = "Claude Code ended without a result message.";
+  public static readonly claudeChatNotStarted: string = "The Claude chat has no Claude Code query yet, so it can't run a turn.";
+  public static readonly claudeMessageWithoutId: string = "A message sent to Claude Code needs an id, which its turn's replies are matched by.";
   public static readonly claudeAnsweredInOwnTurn: string = "Claude Code answered this message inside a turn of its own, the one it started when a background task ended.";
   public static readonly turnNotSettled: string = "The turn has not ended yet, so it has no result.";
   public static readonly claudeDenied: string = "Denied by the TeamRun user.";

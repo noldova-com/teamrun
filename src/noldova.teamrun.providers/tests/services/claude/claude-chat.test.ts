@@ -13,7 +13,7 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testin
 import { Resources as CoreResources, TurnOutcome, TurnRequest, TurnSteer, WakeTurn } from "@noldova/teamrun.core";
 import { BackgroundTaskStatus, DetailKind, ErrorCode, RequestedSettings, Resources as ProtocolResources, SharedMcpServerDefinition, SharedMcpTransport, SubAgent,
   SubAgentStatus } from "@noldova/teamrun.protocol";
-import { ClaudeChat, ClaudeTurn, DeltaStream, ProviderTimings, Resources } from "@noldova/teamrun.providers";
+import { ClaudeChat, ClaudeTurn, DeltaStream, InvalidOperationException, ProviderTimings, Resources } from "@noldova/teamrun.providers";
 
 import { ClaudeTestHost } from "../../fixtures/claude-test-host.fixture.js";
 import { FailureStep } from "../../fixtures/failure-step.fixture.js";
@@ -979,6 +979,37 @@ export class ClaudeChatTests {
       Assert.areEqual("Checking", second.texts[0]);
     }
     finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async preparesNoTurnBeforeAQueryIsAttached(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+
+    Assert.isFalse(await chat.prepare({}, new RecordingTurnListener()));
+  }
+
+  @TestMethod
+  public async refusesToRunATurnBeforeAQueryIsAttached(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+    const listener = new RecordingTurnListener();
+
+    const error = await Assert.throwsAsync(() => chat.run(new ClaudeTurn(listener, null, new DeltaStream(listener, 1), null, chat.tasks),
+      SdkMessages.user("11111111-1111-1111-1111-111111111111", "hello"), {}, () => undefined), InvalidOperationException);
+
+    Assert.areEqual(Resources.claudeChatNotStarted, error.message);
+  }
+
+  @TestMethod
+  public async refusesToRunATurnWhoseMessageHasNoId(): Promise<void> {
+    const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
+    const query = new FakeClaudeQuery([]);
+    chat.attach(query, "acceptEdits");
+    const listener = new RecordingTurnListener();
+
+    const error = await Assert.throwsAsync(() => chat.run(new ClaudeTurn(listener, null, new DeltaStream(listener, 1), null, chat.tasks),
+      SdkMessages.user(undefined, "hello"), {}, () => undefined), InvalidOperationException);
+
+    Assert.areEqual(JSON.stringify([Resources.claudeMessageWithoutId, 0]), JSON.stringify([error.message, query.inputs.length]));
   }
 
   @TestMethod
