@@ -291,10 +291,12 @@ export class ClaudeChat {
 
   private async end(): Promise<void> {
     await this.closeStepAsync(this.tasks.endAllAsync(this.wait, this.log));
+    let timer: NodeJS.Timeout | undefined;
     try {
-      await this.query?.interrupt();
+      await Promise.race([this.query?.interrupt(), new Promise<void>(resolve => timer = setTimeout(resolve, this.wait))]);
     }
     catch { }
+    clearTimeout(timer);
     this.abort.abort();
     this.close();
   }
