@@ -126,7 +126,7 @@ export class AngularProject {
 
   private async readResultsAsync(report: string): Promise<readonly unknown[]> {
     const results = AngularProject.field(await this.readJsonAsync(report), "testResults");
-    if (!Array.isArray(results) || results.some(t => typeof AngularProject.field(t, "name") !== "string"))
+    if (!Array.isArray(results) || results.some(t => !Object.isString(AngularProject.field(t, "name"))))
       throw new ProcessException(`The Angular test report ${this.describe(report)} lists no test files.`);
     return results;
   }
