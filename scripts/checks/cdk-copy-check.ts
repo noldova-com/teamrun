@@ -13,6 +13,7 @@ import "@noldova/context.core";
 
 import { ProcessException } from "../processes/process.exception.ts";
 import type { NpmCommand } from "../toolchain/npm-command.ts";
+import { JsonFields } from "../totals/json-fields.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
 export class CdkCopyCheck implements ICheck {
@@ -80,6 +81,6 @@ export class CdkCopyCheck implements ICheck {
   }
 
   private static field(value: unknown, name: string): unknown {
-    return Object.isObject(value) && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
+    return JsonFields.read(value, name);
   }
 }

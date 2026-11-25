@@ -7,6 +7,7 @@
  */
 import "@noldova/context.core";
 
+import { JsonFields } from "../totals/json-fields.ts";
 import type { PackageManifest } from "./package-manifest.ts";
 
 export class PackageVersions {
@@ -25,9 +26,9 @@ export class PackageVersions {
   }
 
   public stampManifest(manifest: PackageManifest, text: string): string {
-    const fields = JSON.parse(text) as Readonly<Record<string, unknown>>;
+    const fields = JsonFields.record(JSON.parse(text));
     const stamped = PackageVersions.DEPENDENCY_FIELDS.filter(t => t in fields).map(field => [field, Object.fromEntries(
-      Object.entries(fields[field] as Readonly<Record<string, string>>).map(([name, version]) => [name, manifest.dependencies.includes(name) ? this.version : version]))]);
+      Object.entries(JsonFields.record(fields[field])).map(([name, version]) => [name, manifest.dependencies.includes(name) ? this.version : version]))]);
     return JSON.stringify({
       ...fields,
       [PackageVersions.VERSION_FIELD]: this.version,

@@ -24,6 +24,7 @@ import { ProcessRunner } from "./processes/process-runner.ts";
 import { ProcessException } from "./processes/process.exception.ts";
 import { TemporaryFolder } from "./processes/temporary-folder.ts";
 import { NpmCommand } from "./toolchain/npm-command.ts";
+import { JsonFields } from "./totals/json-fields.ts";
 
 export class App {
   private static readonly USAGE: string = "Usage: npm run install:app | npm run lock:app | npm run build:app | npm run package:app | npm run package:smoke | npm start [-- <argument>...] | npm run seed:stress [-- --pairs <count>]\n";
@@ -173,8 +174,7 @@ export class App {
   private async listArchivesAsync(): Promise<readonly string[]> {
     const version = (await RootManifest.readAsync(this.root)).productVersion;
     const manifest: unknown = JSON.parse(await readFile(path.join(this.folder, App.MANIFEST_NAME), "utf8"));
-    const dependencies = Object.isObject(manifest) ? (manifest as Readonly<Record<string, unknown>>)["dependencies"] : undefined;
-    const pin = Object.isObject(dependencies) ? (dependencies as Readonly<Record<string, unknown>>)[App.MODULE_PACKAGE] : undefined;
+    const pin = JsonFields.read(JsonFields.read(manifest, "dependencies"), App.MODULE_PACKAGE);
     if (pin !== version)
       throw new PackageException(`app/package.json pins ${App.MODULE_PACKAGE} at ${String(pin)}, but this checkout builds ${version}; pin the app at the root package.json's version.`);
     const layout = new BuildLayout(this.root);

@@ -57,7 +57,8 @@ export class ProfiledApp {
   public static async startAsync(root: string, data: string, device: string, nodeProfiles: string | null, log: (text: string) => void): Promise<ProfiledApp> {
     const appFolder = path.join(root, "app");
     const electron = String(createRequire(path.join(appFolder, "package.json"))("electron"));
-    const { chromium } = createRequire(path.join(root, "package.json"))("playwright") as typeof import("playwright");
+    const playwright: typeof import("playwright") = createRequire(path.join(root, "package.json"))("playwright");
+    const { chromium } = playwright;
     const environment = Object.fromEntries(Object.entries(process.env).filter(t => t[0] !== "ELECTRON_RUN_AS_NODE"));
     if (!Object.isNull(nodeProfiles))
       environment["NODE_OPTIONS"] = `--cpu-prof --cpu-prof-dir=${nodeProfiles}`;

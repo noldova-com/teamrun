@@ -16,6 +16,8 @@ import type { CDPSession, Frame, Page } from "playwright";
 import { CpuProfile } from "./cpu-profile.ts";
 import { FrameStatistics } from "./frame-statistics.ts";
 import type { IPagePerformance } from "./interfaces/i-page-performance.ts";
+import type { ISourceMap } from "./interfaces/i-source-map.ts";
+import type { ISourceMapModule } from "./interfaces/i-source-map-module.ts";
 import type { ProfileNode } from "./profile.node.ts";
 import { ProfileSources } from "./profile-sources.ts";
 
@@ -39,7 +41,7 @@ export class ProfileRecorder {
   private readonly fromSrc: NodeJS.Require;
   private readonly log: (text: string) => void;
   private readonly scriptUrls: Map<string, string> = new Map();
-  private readonly maps: Map<string, { originalPositionFor(position: { line: number; column: number }): { source: string | null; line: number | null; name: string | null } } | null> = new Map();
+  private readonly maps: Map<string, ISourceMap | null> = new Map();
 
   private constructor(page: Page, frame: Frame, cdp: CDPSession, folder: string, root: string, log: (text: string) => void) {
     this.page = page;
@@ -53,25 +55,24 @@ export class ProfileRecorder {
 
   public static async startAsync(page: Page, frame: Frame, folder: string, root: string, log: (text: string) => void): Promise<ProfileRecorder> {
     await frame.evaluate(() => {
-      const w = window as unknown as { __perf: IPagePerformance };
-      w.__perf = { loaf: [], events: [], keys: [], frames: [], sampling: false };
+      window.__perf = { loaf: [], events: [], keys: [], frames: [], sampling: false };
       new PerformanceObserver(list => {
-        for (const entry of list.getEntries() as unknown as { duration: number; blockingDuration: number; scripts?: { invoker: string; sourceFunctionName: string; sourceURL: string; sourceCharPosition: number; duration: number }[] }[])
-          w.__perf.loaf.push({ duration: entry.duration, blocking: entry.blockingDuration,
-            scripts: (entry.scripts ?? []).map(t => ({ invoker: t.invoker, fn: t.sourceFunctionName, url: t.sourceURL, pos: t.sourceCharPosition, duration: t.duration })) });
+        for (const entry of list.getEntries().filter(t => t instanceof PerformanceLongAnimationFrameTiming))
+          window.__perf.loaf.push({ duration: entry.duration, blocking: entry.blockingDuration,
+            scripts: entry.scripts.map(t => ({ invoker: t.invoker, fn: t.sourceFunctionName, url: t.sourceURL, pos: t.sourceCharPosition, duration: t.duration })) });
       }).observe({ type: "long-animation-frame", buffered: false });
       new PerformanceObserver(list => {
         for (const entry of list.getEntries())
-          w.__perf.events.push({ duration: entry.duration });
-      }).observe({ type: "event", durationThreshold: 16, buffered: false } as PerformanceObserverInit);
+          window.__perf.events.push({ duration: entry.duration });
+      }).observe({ type: "event", durationThreshold: 16, buffered: false });
       document.addEventListener("keydown", event => {
         const start = event.timeStamp;
-        requestAnimationFrame(() => setTimeout(() => w.__perf.keys.push(performance.now() - start), 0));
+        requestAnimationFrame(() => setTimeout(() => window.__perf.keys.push(performance.now() - start), 0));
       }, true);
       let last = 0;
       const loop = (now: number): void => {
-        if (w.__perf.sampling && last > 0)
-          w.__perf.frames.push(now - last);
+        if (window.__perf.sampling && last > 0)
+          window.__perf.frames.push(now - last);
         last = now;
         requestAnimationFrame(loop);
       };
@@ -85,7 +86,7 @@ export class ProfileRecorder {
 
   public async recordAsync(name: string, work: () => Promise<void>): Promise<boolean> {
     await this.frame.evaluate(() => {
-      const perf = (window as unknown as { __perf: IPagePerformance }).__perf;
+      const perf = window.__perf;
       Object.assign(perf, { loaf: [], events: [], keys: [], frames: [], sampling: true });
     });
     await this.cdp.send("Profiler.start");
@@ -176,7 +177,7 @@ export class ProfileRecorder {
 
   private stopSamplingAsync(): Promise<Pick<IPagePerformance, "loaf" | "events" | "keys" | "frames">> {
     return this.frame.evaluate(() => {
-      const perf = (window as unknown as { __perf: IPagePerformance }).__perf;
+      const perf = window.__perf;
       perf.sampling = false;
       return { loaf: perf.loaf, events: perf.events, keys: perf.keys, frames: perf.frames };
     });
@@ -190,15 +191,15 @@ export class ProfileRecorder {
     return node.label;
   }
 
-  private mapOf(fileName: string): ReturnType<ProfileRecorder["maps"]["get"]> {
+  private mapOf(fileName: string): ISourceMap | null {
     if (fileName.length === 0)
       return null;
     if (!this.maps.has(fileName)) {
       const file = ProfileRecorder.find(this.windowBuild, `${fileName}.map`);
       let map = null;
       try {
-        const { SourceMapConsumer } = this.fromSrc("source-map-js") as { SourceMapConsumer: new (map: unknown) => NonNullable<ReturnType<ProfileRecorder["maps"]["get"]>> };
-        map = Object.isNull(file) ? null : new SourceMapConsumer(JSON.parse(readFileSync(file, "utf8")));
+        const sourceMaps: ISourceMapModule = this.fromSrc("source-map-js");
+        map = Object.isNull(file) ? null : new sourceMaps.SourceMapConsumer(JSON.parse(readFileSync(file, "utf8")));
       }
       catch (error) {
         this.log(`map failed ${fileName}: ${String(error).slice(0, 200)}`);

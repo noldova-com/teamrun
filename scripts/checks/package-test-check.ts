@@ -24,6 +24,7 @@ import type { ProcessRunner } from "../processes/process-runner.ts";
 import { ProcessTimeoutException } from "../processes/process-timeout.exception.ts";
 import { ProcessException } from "../processes/process.exception.ts";
 import type { TestOptions } from "../test-options.ts";
+import { JsonFields } from "../totals/json-fields.ts";
 import { RunnerResult } from "../totals/runner-result.ts";
 import { TotalsException } from "../totals/totals.exception.ts";
 import { CheckSelection } from "./check-selection.ts";
@@ -210,8 +211,8 @@ export class PackageTestCheck implements ISelectableCheck {
     return path.join(dir, `${name}-${index + 1}${ext}`);
   }
 
-  private static async readShardsAsync(files: readonly string[]): Promise<Record<string, unknown>[] | null> {
-    const shards: Record<string, unknown>[] = [];
+  private static async readShardsAsync(files: readonly string[]): Promise<JsonFields[] | null> {
+    const shards: JsonFields[] = [];
     for (const file of files) {
       let shard: unknown;
       try {
@@ -220,22 +221,26 @@ export class PackageTestCheck implements ISelectableCheck {
       catch {
         return null;
       }
-      if (!Object.isObject(shard))
+      if (!Object.isObject(shard) || Array.isArray(shard))
         return null;
-      shards.push(shard as Record<string, unknown>);
+      shards.push(new JsonFields(shard, file));
     }
     return shards;
+  }
+
+  private static listOf(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
   }
 
   private static async mergeResultAsync(files: readonly string[], target: string): Promise<void> {
     const shards = await PackageTestCheck.readShardsAsync(files);
     if (Object.isNull(shards))
       return;
-    const sum = (field: string): number => shards.reduce((total, t) => total + Number(t[field]), 0);
-    const list = (field: string): unknown[] => shards.flatMap(t => Array.isArray(t[field]) ? t[field] as unknown[] : []);
-    const wanted = Math.max(...shards.map(t => Number(t["wanted"])));
+    const sum = (field: string): number => shards.reduce((total, t) => total + Number(t.field(field)), 0);
+    const list = (field: string): unknown[] => shards.flatMap(t => PackageTestCheck.listOf(t.field(field)));
+    const wanted = Math.max(...shards.map(t => Number(t.field("wanted"))));
     await writeFile(target, JSON.stringify({
-      discovered: Math.max(...shards.map(t => Number(t["discovered"]))),
+      discovered: Math.max(...shards.map(t => Number(t.field("discovered")))),
       selected: wanted,
       passed: sum("passed"),
       failed: sum("failed"),
@@ -251,8 +256,8 @@ export class PackageTestCheck implements ISelectableCheck {
     if (Object.isNull(shards))
       return;
     await writeFile(target, JSON.stringify({
-      isComplete: isEveryTestRun && shards.every(t => t["isComplete"] === true),
-      failed: shards.flatMap(t => Array.isArray(t["failed"]) ? t["failed"] as unknown[] : [])
+      isComplete: isEveryTestRun && shards.every(t => t.field("isComplete") === true),
+      failed: shards.flatMap(t => PackageTestCheck.listOf(t.field("failed")))
     }));
   }
 
@@ -332,8 +337,9 @@ export class PackageTestCheck implements ISelectableCheck {
     catch {
       return null;
     }
-    const fields = Object.isObject(progress) ? progress as Record<string, unknown> : {};
-    return Object.isString(fields["test"]) && Object.isBoolean(fields["isRunning"]) ? new ShardProgress(fields["test"], fields["isRunning"]) : null;
+    const test = JsonFields.read(progress, "test");
+    const isRunning = JsonFields.read(progress, "isRunning");
+    return Object.isString(test) && Object.isBoolean(isRunning) ? new ShardProgress(test, isRunning) : null;
   }
 
   private async readResultsAsync(file: string): Promise<ShardResults | null> {
@@ -344,13 +350,10 @@ export class PackageTestCheck implements ISelectableCheck {
     catch {
       return null;
     }
-    const fields = Object.isObject(results) ? results as Record<string, unknown> : {};
-    const failed = fields["failed"];
-    if (!Object.isBoolean(fields["isComplete"]) || !Array.isArray(failed) || failed.some(t => !Object.isObject(t) || ["identity", "file", "failure"].some(u => !Object.isString((t as Record<string, unknown>)[u]))))
+    const isComplete = JsonFields.read(results, "isComplete");
+    const failed = JsonFields.read(results, "failed");
+    if (!Object.isBoolean(isComplete) || !Array.isArray(failed) || failed.some(t => ["identity", "file", "failure"].some(u => !Object.isString(JsonFields.read(t, u)))))
       return null;
-    return new ShardResults(fields["isComplete"], failed.map(t => {
-      const record = t as Record<string, unknown>;
-      return new FailedTest(String(record["identity"]), String(record["file"]), String(record["failure"]));
-    }));
+    return new ShardResults(isComplete, failed.map(t => new FailedTest(String(JsonFields.read(t, "identity")), String(JsonFields.read(t, "file")), String(JsonFields.read(t, "failure")))));
   }
 }
