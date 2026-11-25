@@ -394,6 +394,7 @@ The Version file check, among the checks that read, fails when a file that `set-
 It holds the TeamRun packages a package under `src/` names at `__VERSION__`, which the build stamps, and those `app/package.json` names at the root `package.json`'s version, which `npm run install:app` installs from the build.
 It also fails when a shipped package lists one of the packages Noldova Desktop shares with every module, its own, context's and the kit's, among its dependencies rather than its peer dependencies, since Noldova Desktop's build refuses an app whose module brings a second copy of one.
 A test imports what the package exports by the package's name, and the package's internal files by their path under `src/`; in the compiled tests that path leads to the installed package, so a test and the package share one copy of each file.
+A test of an internal file also imports by path the exported classes it hands to that file's members, since TypeScript holds the package's declaration of a class and its source as two types.
 It stamps the root `package.json`'s version into each package's manifest, and its `teamrun.protocolVersion`, which it requires, into the `__PROTOCOL_VERSION__` placeholder of a package's compiled `resources.js`.
 It copies the root `LICENSE` into each package, with the package's own `README.md` and `module.json` when it has them.
 It rebuilds only what changed since the last build, counting both versions as inputs, and says which packages it built and which it reused.
