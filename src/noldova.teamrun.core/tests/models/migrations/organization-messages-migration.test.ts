@@ -54,7 +54,7 @@ export class OrganizationMessagesMigrationTests {
     const connection = current.database.connection;
 
     Assert.isTrue(before.some(t => t instanceof OrganizationMessagesMigration));
-    Assert.areEqual(MigrationCatalog.all.length - 4, before.length);
+    Assert.areEqual(MigrationCatalog.all.length - 5, before.length);
     Assert.areEqual(MigrationCatalog.all.map(t => t.id).join(), (await current.database.getAppliedMigrationsAsync()).join());
     Assert.areEqual(oldJson, (await connection.queryAsync(new SqlQuery("SELECT json FROM projects WHERE id = 'p'")))[0]?.readString("json"));
     Assert.areEqual(0, (await connection.queryAsync(new SqlQuery("SELECT name FROM sqlite_master WHERE name = 'organizationMessages'"))).length);
