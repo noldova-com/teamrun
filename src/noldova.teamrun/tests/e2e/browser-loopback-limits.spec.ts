@@ -96,7 +96,12 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
   return navigated();
 };
 
-test("limit: a page's request reads its answer", async ({ app }) => {
+const resolvedInViewsAsync = async (app: TeamRunApp): Promise<string[]> => [...new Set(await app.electronApp.evaluate(({ webContents }, host) => Promise.all(
+  webContents.getAllWebContents()
+    .filter(t => !t.getURL().startsWith("file:"))
+    .map(async t => (await t.session.resolveHost(host)).endpoints.map(endpoint => endpoint.address).join(" "))), "app.test"))];
+
+test("a page's request to a name that resolves to this computer is refused before it reaches it", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const local = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
     + "e => { document.title = \"Failed \" + e; });");
@@ -104,9 +109,10 @@ test("limit: a page's request reads its answer", async ({ app }) => {
     const page = await app.openChatAsync();
     await app.nameLocalSitesAsync(local.origin);
 
-    await LinkedSite.openAsync(page, `${local.origin}/`, `Read ${LOCAL_DATA}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, "Failed TypeError: Failed to fetch");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect(service.hits).toEqual(["GET /data"]);
+    expect([service.hits, resolved]).toEqual([[], ["127.0.0.1"]]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
@@ -120,18 +126,16 @@ test("a navigation to an allowed name that resolves to this computer is refused 
     const page = await app.openChatAsync();
 
     const navigated = await allowByNavigationAsync(app, page, `http://${service.name}/`);
-    const resolved = await app.electronApp.evaluate(({ webContents }, host) => Promise.all(webContents.getAllWebContents()
-      .filter(t => !t.getURL().startsWith("file:"))
-      .map(async t => (await t.session.resolveHost(host)).endpoints.map(endpoint => endpoint.address).join(" "))), "app.test");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect([navigated?.endsWith(` ${CodexDouble.NAVIGATE_OPENED}`), service.hits, [...new Set(resolved)]]).toEqual([false, [], ["127.0.0.1"]]);
+    expect([navigated?.endsWith(` ${CodexDouble.NAVIGATE_OPENED}`), service.hits, resolved]).toEqual([false, [], ["127.0.0.1"]]);
   }
   finally {
     await service.closeAsync();
   }
 });
 
-test("limit: a page's WebSocket hears its message", async ({ app }) => {
+test("a page's WebSocket to an allowed name that resolves to this computer is refused before it reaches it", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const local = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
     + "socket.onmessage = e => { document.title = \"Heard \" + e.data; }; socket.onerror = () => { document.title = \"Failed\"; };");
@@ -143,9 +147,10 @@ test("limit: a page's WebSocket hears its message", async ({ app }) => {
     await page.getByRole("button", { name: "Close New tab", exact: true }).click();
     await expect(page.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(0);
 
-    await LinkedSite.openAsync(page, `${local.origin}/`, `Heard ${LOCAL_HELLO}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, "Failed");
+    const resolved = await resolvedInViewsAsync(app);
 
-    expect(service.hits).toEqual(["upgrade /socket"]);
+    expect([service.hits, resolved]).toEqual([[], ["127.0.0.1"]]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
