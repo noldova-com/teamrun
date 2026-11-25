@@ -106,6 +106,9 @@ export class Resources {
   public static readonly contextTokensField: string = "contextTokens";
   public static readonly contextWindowField: string = "contextWindowTokens";
   public static readonly planWindowsField: string = "planWindows";
+  public static readonly organizationsField: string = "organizations";
+  public static readonly departmentField: string = "department";
+  public static readonly managerField: string = "manager";
   public static readonly deletedProvider: string = "(deleted provider)";
   public static readonly noChats: string = "no chats";
   public static readonly chatsLabel: string = "chats: ";
@@ -293,6 +296,11 @@ export class Resources {
       return null;
     const chat = Object.isNull(chatTitle) ? `chat ${reply.conversationId}` : `${chatTitle} (${reply.conversationId})`;
     return `${Resources.detailIndent}last reply in ${chat}: ${parts.join(Resources.listSeparator)}`;
+  }
+
+  public static formatTeammatePlace(organization: string, department: string | null, manager: string | null): string {
+    return `${Resources.detailIndent}in ${organization}: ${Object.isNull(department) ? "no department" : `the ${department} department`}, `
+      + `reports to ${manager ?? "the person"}`;
   }
 
   public static formatPlanWindows(windows: readonly PlanWindow[]): string {

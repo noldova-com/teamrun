@@ -353,6 +353,10 @@ export class RecordingWindowPartContext implements IWindowPartContext {
     throw new Error("The fixture closes no view instances.");
   }
 
+  public returnView(_name: string, _instance: string): void {
+    throw new Error("The fixture returns no view instances.");
+  }
+
   public onViewClosed(_name: string, _listener: (instance: string) => void): () => void {
     throw new Error("The fixture closes no view instances.");
   }

@@ -1562,8 +1562,17 @@ export class Resources {
     return `you are a member of the ${department} department`;
   }
 
-  public static formatOrganizationRole(place: string, manager: string): string {
-    return `The person sent you this message from TeamRun's Organization view. In the organization, ${place}, and you report to ${manager}.`;
+  public static formatOrganizationRole(place: string, manager: string, reports: readonly string[]): string {
+    const below = reports.length === 0 ? "No one reports to you." : `Reporting to you: ${reports.join("; ")}.`;
+    return `The person sent you this message from TeamRun's Organization view. In the organization, ${place}, and you report to ${manager}. ${below}`;
+  }
+
+  public static formatOrganizationDepartmentReport(department: string, leader: string): string {
+    return `the ${department} department, led by ${leader}`;
+  }
+
+  public static formatOrganizationUnledReport(department: string, members: readonly string[]): string {
+    return `the ${department} department, which has no leader, with ${members.join(", ")}`;
   }
 
   public static formatOrganizationRolePrompt(role: string, text: string): string {
@@ -2284,7 +2293,7 @@ export class Resources {
     return [
       Resources.otherChatsHandOffNote(),
       "TeamRun's tools read the app: `teamrun_list_chats` lists each chat with its teammates and whether a reply is running, "
-        + "and `teamrun_list_teammates` lists every teammate with its provider, model, chats and usage.",
+        + "and `teamrun_list_teammates` lists every teammate with its provider, model, chats, usage, and its department and manager in each organization.",
       `\`teamrun_list_messages\` ${Resources.otherChatsMessagesNote()}`,
       "`teamrun_list_projects`, `teamrun_list_approvals`, `teamrun_list_providers` and `teamrun_check_provider` list the projects, a chat's approvals "
         + "and the providers with how much of their plans is used, and check a provider's sign-in.",
@@ -2312,7 +2321,7 @@ export class Resources {
       Resources.otherChatsHandOffNote(),
       "TeamRun's command line reaches the teammates of other chats from your shell.",
       `\`${command} list-chats\` lists each chat with its teammates and whether a reply is running, `
-        + `and \`${command} list-teammates\` lists every teammate with its provider, model, chats and usage.`,
+        + `and \`${command} list-teammates\` lists every teammate with its provider, model, chats, usage, and its department and manager in each organization.`,
       `\`${command} list-messages <chatId>\` ${Resources.otherChatsMessagesNote()}`,
       `\`${command} send <chatId> - --teammate <name>\` sends the text it reads from standard input to a teammate in another chat, `
         + "marked as from you and this chat, and doesn't wait for the answer, which comes back to this chat as a new message.",

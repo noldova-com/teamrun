@@ -106,9 +106,9 @@ export class OrganizationChatFoldersTests {
     await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(Resources.defaultOrganizationId, ada.id), "Status?");
 
     Assert.isTrue(host.adapter.requests[0]?.prompt.includes(Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Art"),
-      Resources.organizationReportsToPerson), "Status?")) ?? false);
+      Resources.organizationReportsToPerson, []), "Status?")) ?? false);
     Assert.isTrue(host.adapter.requests[1]?.prompt.includes(Resources.formatOrganizationRolePrompt(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
-      Resources.organizationReportsToPerson), "Status?")) ?? false);
+      Resources.organizationReportsToPerson, []), "Status?")) ?? false);
   }
 
   private static async teammateAsync(host: CoreHost): Promise<Teammate> {
