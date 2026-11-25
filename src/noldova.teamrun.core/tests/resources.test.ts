@@ -296,6 +296,9 @@ export class ResourcesTests {
     Assert.areEqual("Error ERR_PROVIDER", Resources.formatFailureKind(new CodedError(prompt, "ERR_PROVIDER")));
     Assert.areEqual("TypeError", Resources.formatFailureKind(new TypeError(prompt)));
     Assert.areEqual("Error", Resources.formatFailureKind(new Error(prompt)));
+    Assert.areEqual("Error", Resources.formatFailureKind(Object.assign(new Error(prompt), { code: 7 })));
+    Assert.areEqual("ERR_PROVIDER|Error|TypeError", [new CodedError(prompt, "ERR_PROVIDER"), Object.assign(new Error(prompt), { code: 7 }), new TypeError(prompt)]
+      .map(t => Resources.formatFailureReason(t)).join("|"));
     Assert.areEqual("string", Resources.formatFailureKind(prompt));
     Assert.areEqual("undefined|number|bigint|boolean|symbol|function|object|object",
       [undefined, 1, 1n, true, Symbol(prompt), () => prompt, null, { prompt }].map(t => Resources.formatFailureReason(t)).join("|"));

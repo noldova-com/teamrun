@@ -10,6 +10,7 @@ import "@noldova/context.core";
 import type { MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources.js";
+import { HandoverEnds } from "./handover-ends.js";
 import { HandoverHistory } from "./handover-history.js";
 import { HandoverRange } from "./handover-range.js";
 import type { HandoverSummary } from "./handover-summary.js";
@@ -73,9 +74,9 @@ export class Handover {
     const size = Handover.bytesOf(result);
     if (size <= Resources.handoverResultBytes)
       return result;
-    const [start, end] = Handover.endsOf(result, Resources.handoverResultBytes / 2);
-    const left = size - Handover.bytesOf(start) - Handover.bytesOf(end);
-    return [start, Resources.formatHandoverCut(left, sequence), end].join(Resources.lineSeparator);
+    const ends = Handover.endsOf(result, Resources.handoverResultBytes / 2);
+    const left = size - Handover.bytesOf(ends.start) - Handover.bytesOf(ends.end);
+    return [ends.start, Resources.formatHandoverCut(left, sequence), ends.end].join(Resources.lineSeparator);
   }
 
   public static bytesOf(text: string): number {
@@ -106,15 +107,15 @@ export class Handover {
     const half = Math.floor((bytes - Handover.bytesOf(marker) - 2 * Handover.bytesOf(Resources.lineSeparator)) / 2);
     if (half <= 0)
       return String.empty;
-    const [start, end] = Handover.endsOf(text, half);
-    return [start, Resources.formatHandoverSummaryCut(size - Handover.bytesOf(start) - Handover.bytesOf(end)), end].join(Resources.lineSeparator);
+    const ends = Handover.endsOf(text, half);
+    return [ends.start, Resources.formatHandoverSummaryCut(size - Handover.bytesOf(ends.start) - Handover.bytesOf(ends.end)), ends.end].join(Resources.lineSeparator);
   }
 
-  private static endsOf(text: string, half: number): readonly [string, string] {
+  private static endsOf(text: string, half: number): HandoverEnds {
     const characters = [...text];
     const start = characters.slice(0, Handover.countOf(characters, half)).join(String.empty);
     const end = characters.slice(characters.length - Handover.countOf(characters.toReversed(), half)).join(String.empty);
-    return [start, end];
+    return new HandoverEnds(start, end);
   }
 
   private static sizeOf(used: number, line: string): number {

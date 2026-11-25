@@ -8306,6 +8306,22 @@ export declare class HandoverTurn {
 }
 
 /**
+ * The start and the end a handover keeps of a text it cuts in the middle.
+ */
+export declare class HandoverEnds {
+  /**
+   * The text's start, up to the bytes it keeps.
+   */
+  public readonly start: string;
+  /**
+   * The text's end, up to the bytes it keeps.
+   */
+  public readonly end: string;
+
+  public constructor(start: string, end: string);
+}
+
+/**
  * A run of consecutive messages a handover names, by their sequence numbers.
  */
 export declare class HandoverRange {
@@ -8771,6 +8787,36 @@ export declare class FileSnapshot {
    * @returns Whether both agree on every field, the text only when both read it, as a read past the reads' bytes doesn't.
    */
   public isSameAs(other: FileSnapshot): boolean;
+}
+
+/**
+ * The runs of one hunk of a file's diff, close enough to share their context lines.
+ */
+export declare class DiffHunk {
+  /**
+   * The hunk's first run.
+   */
+  public readonly head: DiffRun;
+  /**
+   * The hunk's runs, from its first.
+   */
+  public get runs(): readonly DiffRun[];
+  /**
+   * The hunk's last run.
+   */
+  public get last(): DiffRun;
+
+  /**
+   * Initializes the hunk with its first run.
+   * @param head The hunk's first run.
+   */
+  public constructor(head: DiffRun);
+
+  /**
+   * Adds a run after the hunk's last.
+   * @param run The run.
+   */
+  public add(run: DiffRun): void;
 }
 
 /**

@@ -15,6 +15,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { type CommandTargets, CommandWrites, Resources, type ReplyEvidence } from "@noldova/teamrun.core";
 
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { WriteFolders } from "../../fixtures/write-folders.fixture.js";
 
 @TestClass
 export class CommandWritesTests {
@@ -245,23 +246,24 @@ export class CommandWritesTests {
   public readsNoMoreThanItsBoundOfFilesAndSaysItLeftSomeOut(): void {
     using directory = new TemporaryDataDirectory();
     const { root, outside } = CommandWritesTests.folders(directory);
-    const files = Array.from({ length: Resources.maximumEvidenceFiles + 1 }, (_, index) => join(outside, `f-${index}.txt`));
+    const late = join(outside, `f-${Resources.maximumEvidenceFiles}.txt`);
+    const files = [...Array.from({ length: Resources.maximumEvidenceFiles }, (_, index) => join(outside, `f-${index}.txt`)), late];
     const writes = new CommandWrites(root, Date.now());
 
     writes.note({ writes: files, unnamedWrites: [] });
-    writeFileSync(files.at(-1) as string, "late\n");
+    writeFileSync(late, "late\n");
     const evidence = writes.changesSince(() => false);
 
     Assert.isFalse(evidence.isComplete);
     Assert.areEqual(String.empty, CommandWritesTests.changes(evidence));
   }
 
-  private static folders(directory: TemporaryDataDirectory): { readonly root: string; readonly outside: string } {
+  private static folders(directory: TemporaryDataDirectory): WriteFolders {
     const root = join(directory.path, "repo");
     const outside = join(directory.path, "out");
     mkdirSync(root);
     mkdirSync(outside);
-    return { root, outside };
+    return new WriteFolders(root, outside);
   }
 
   private static render(targets: CommandTargets): string {

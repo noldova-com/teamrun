@@ -1275,12 +1275,16 @@ export class Resources {
   public static formatFailureKind(error: unknown): string {
     if (!(error instanceof Error))
       return Resources.typeNameOf(error);
-    const code = (error as NodeJS.ErrnoException).code;
-    return Object.isString(code) ? `${error.name} ${code}` : error.name;
+    const code = Resources.errorCodeOf(error);
+    return Object.isNull(code) ? error.name : `${error.name} ${code}`;
   }
 
   public static formatFailureReason(error: unknown): string {
-    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : Resources.typeNameOf(error);
+    return error instanceof Error ? Resources.errorCodeOf(error) ?? error.name : Resources.typeNameOf(error);
+  }
+
+  private static errorCodeOf(error: Error): string | null {
+    return "code" in error && Object.isString(error.code) ? error.code : null;
   }
 
   private static typeNameOf(value: unknown): string {

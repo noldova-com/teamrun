@@ -15,6 +15,7 @@ import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { CommandTargets } from "../../models/command-targets.js";
+import { DiffHunk } from "../../models/diff-hunk.js";
 import { DiffRun } from "../../models/diff-run.js";
 import { FileSnapshot } from "../../models/file-snapshot.js";
 import { ReplyEvidence } from "../../models/reply-evidence.js";
@@ -154,14 +155,13 @@ export class CommandWrites {
     let end = 0;
     while (end < old.length - start && end < next.length - start && old[old.length - 1 - end] === next[next.length - 1 - end])
       end += 1;
-    const hunks: DiffRun[][] = [];
+    const hunks: DiffHunk[] = [];
     for (const run of CommandWrites.runsOf(old, next, start, old.length - end, next.length - end)) {
       const hunk = hunks.at(-1);
-      const last = hunk?.at(-1);
-      if (Object.isUndefined(hunk) || Object.isUndefined(last) || run.oldAt - last.oldAt - last.removed > 2 * Resources.diffContextLines)
-        hunks.push([run]);
+      if (Object.isUndefined(hunk) || run.oldAt - hunk.last.oldAt - hunk.last.removed > 2 * Resources.diffContextLines)
+        hunks.push(new DiffHunk(run));
       else
-        hunk.push(run);
+        hunk.add(run);
     }
     return [Resources.formatDiffFiles(from, to), ...hunks.flatMap(t => CommandWrites.hunkOf(old, next, t))]
       .slice(0, Resources.maximumDiffLines).join(Resources.lineSeparator);
@@ -178,7 +178,7 @@ export class CommandWrites {
     const rows = oldEnd - start;
     const columns = newEnd - start;
     const common = new Uint32Array((rows + 1) * (columns + 1));
-    const commonAt = (row: number, column: number): number => common[row * (columns + 1) + column] as number;
+    const commonAt = (row: number, column: number): number => Number(common[row * (columns + 1) + column]);
     const matches = (row: number, column: number): boolean => row < rows && column < columns && old[start + row] === next[start + column];
     for (let row = rows - 1; row >= 0; row--)
       for (let column = columns - 1; column >= 0; column--)
@@ -222,14 +222,14 @@ export class CommandWrites {
     return runs;
   }
 
-  private static hunkOf(old: readonly string[], next: readonly string[], runs: readonly DiffRun[]): readonly string[] {
-    const head = runs[0] as DiffRun;
+  private static hunkOf(old: readonly string[], next: readonly string[], hunk: DiffHunk): readonly string[] {
+    const head = hunk.head;
     const first = Math.max(0, head.oldAt - Resources.diffContextLines);
     const lines: string[] = [];
     let index = first;
     let removed = 0;
     let added = 0;
-    for (const run of runs) {
+    for (const run of hunk.runs) {
       lines.push(...old.slice(index, run.oldAt).map(t => `${Resources.diffContextPrefix}${t}`),
         ...old.slice(run.oldAt, run.oldAt + run.removed).map(t => `${Resources.diffRemovedPrefix}${t}`),
         ...next.slice(run.newAt, run.newAt + run.added).map(t => `${Resources.diffAddedPrefix}${t}`));
@@ -261,6 +261,6 @@ export class CommandWrites {
   }
 
   private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 }
