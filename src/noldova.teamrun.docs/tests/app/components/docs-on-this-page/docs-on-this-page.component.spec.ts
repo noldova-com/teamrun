@@ -53,7 +53,7 @@ describe("DocsOnThisPageComponent", () => {
     return range.getBoundingClientRect().left;
   };
 
-  const headerBottom = (host: HTMLElement): number => DocsFixture.one(host, ".nol-docs-header").getBoundingClientRect().bottom;
+  const headerBottom = (host: HTMLElement): number => DocsFixture.one(host, "nol-site-header").getBoundingClientRect().bottom;
 
   const current = (host: HTMLElement): readonly string[] => links(host).filter(t => t.getAttribute("aria-current") === "location").map(t => t.textContent.trim());
 

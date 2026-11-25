@@ -21,7 +21,7 @@ export class DocsFixture {
   public static readonly SHORT_HEIGHT: number = 320;
   public static readonly PHONE_HEIGHT: number = 812;
   public static readonly MODE_ATTRIBUTE: string = "data-nol-theme-mode";
-  public static readonly STORAGE_KEY: string = "nol-docs-theme";
+  public static readonly STORAGE_KEY: string = "noldova-theme";
   public static readonly MODES: readonly DocsMode[] = [new DocsMode("Light", "light"), new DocsMode("Dark", "dark")];
 
   private static readonly POLL_INTERVAL: number = 1;

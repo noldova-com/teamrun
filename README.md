@@ -300,6 +300,7 @@ The answer comes back the same way, and a chain of such messages, with the hand-
 ## Documentation site
 
 TeamRun's documentation site, for people who use the app, is the private workspace `src/noldova.teamrun.docs`, served at teamrun.noldova.dev, with its staging at teamrun.staging.noldova.dev and its sandbox at teamrun.sandbox.noldova.dev.
+Its header and footer are the UI kit's site header and footer for a documentation site, the header showing the latest released version of [CHANGELOG.md](CHANGELOG.md) and the kit's theme switch, saved under `noldova-theme` as on every Noldova site; below 48rem a bar under the header opens the menu of pages, apart from the header's own menu.
 Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes add the released versions of [CHANGELOG.md](CHANGELOG.md) when the site is built.
 A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/drafts/`, outside the menu, the search and the build.
 `npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` installs Playwright's headless Chromium, as the Angular tests do, runs its tests with coverage, checks their JSON report, `_build/docs-tests.json`, so that every spec file reported and no two tests share a name, then opens every page the menu links; CI runs it in its "Docs site tests" job.

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { indexPage } from "@docs-generated/index-page";
 
 describe("The page shell", () => {
@@ -14,6 +16,23 @@ describe("The page shell", () => {
 
     expect(head.querySelectorAll("meta[name=robots]")).toHaveLength(0);
   });
+
+  it.each([["light", "Light"], ["dark", "Dark"], ["system", null], ["Dark", null], [null, null]])(
+    "applies a saved noldova-theme of %s before the page renders, as every Noldova site does", (saved, mode) => {
+      const script = new DOMParser().parseFromString(indexPage, "text/html").head.querySelector("script:not([src])")?.textContent ?? String();
+      const root = document.documentElement;
+      root.removeAttribute("data-nol-theme-mode");
+      if (Object.isNull(saved))
+        localStorage.removeItem("noldova-theme");
+      else
+        localStorage.setItem("noldova-theme", saved);
+
+      new Function(script)();
+
+      expect(root.getAttribute("data-nol-theme-mode")).toBe(mode);
+      root.removeAttribute("data-nol-theme-mode");
+      localStorage.removeItem("noldova-theme");
+    });
 
   it("keeps the site's title", () => {
     const head = new DOMParser().parseFromString(indexPage, "text/html").head;

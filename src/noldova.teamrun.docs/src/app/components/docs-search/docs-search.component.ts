@@ -18,6 +18,10 @@ import { DocsSearchIndex } from "../../models/docs-search-index";
 
 @Component({
   selector: "nol-docs-search",
+  host: {
+    "tabindex": "-1",
+    "(focus)": "focusField()"
+  },
   imports: [RouterLink, TextFieldComponent],
   templateUrl: "./docs-search.component.html",
   styleUrl: "./docs-search.component.css"
@@ -41,6 +45,10 @@ export class DocsSearchComponent {
   protected readonly field: Signal<ElementRef<HTMLInputElement>> = viewChild.required("searchInput", { read: ElementRef });
   private readonly list: Signal<ElementRef<HTMLUListElement> | undefined> = viewChild("resultsList", { read: ElementRef });
   private readonly router: Router = inject(Router);
+
+  protected focusField(): void {
+    this.field().nativeElement.focus();
+  }
 
   protected optionId(index: number): string {
     return `${DocsSearchComponent.OPTION_PREFIX}${index}`;
