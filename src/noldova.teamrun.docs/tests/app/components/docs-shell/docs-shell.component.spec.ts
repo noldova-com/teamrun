@@ -209,15 +209,17 @@ describe("DocsShellComponent", () => {
     });
   });
 
-  it("follows the header's and footer's links to the site's own pages through the router, and leaves other sites' links and modified clicks to the browser", async () => {
+  it("follows the header's and footer's links to the site's own pages through the router, and leaves other sites' links, new-tab links, the page's own anchors, handled and modified clicks and clicks off a link to the browser", async () => {
     const fixture = await renderAsync("/");
     const host = DocsFixture.host(fixture);
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, "navigateByUrl");
-    const clickOn = (link: HTMLElement, init: MouseEventInit): boolean => {
+    const clickOn = (target: EventTarget, init: MouseEventInit, isPrevented: boolean = false): boolean => {
       const event = new MouseEvent("click", { bubbles: true, cancelable: true, ...init });
-      link.addEventListener("click", t => t.preventDefault(), { once: true });
-      link.dispatchEvent(event);
+      if (isPrevented)
+        target.addEventListener("click", t => t.preventDefault(), { once: true });
+      window.addEventListener("click", t => t.preventDefault(), { once: true });
+      target.dispatchEvent(event);
       return navigate.mock.calls.length > 0;
     };
 
@@ -228,12 +230,25 @@ describe("DocsShellComponent", () => {
     await DocsFixture.routedAsync(router, "/");
     navigate.mockClear();
 
+    const notes = DocsFixture.byText(host, "nol-site-footer a", "Release notes");
+    const newTab = DocsFixture.byText(host, "nol-site-footer a", "Download");
+    newTab.setAttribute("target", "_blank");
+    const text = document.createTextNode("TeamRun");
+    DocsFixture.one(host, "nol-site-footer").append(text);
+
     expect([
       clickOn(DocsFixture.byText(host, "nol-site-header .nol-site-nav-link", "TeamRun website"), {}),
-      clickOn(DocsFixture.byText(host, "nol-site-footer a", "Release notes"), { ctrlKey: true }),
-      clickOn(DocsFixture.byText(host, "nol-site-footer a", "Release notes"), { button: 1 }),
+      clickOn(notes, { ctrlKey: true }),
+      clickOn(notes, { metaKey: true }),
+      clickOn(notes, { shiftKey: true }),
+      clickOn(notes, { altKey: true }),
+      clickOn(notes, { button: 1 }),
+      clickOn(notes, {}, true),
+      clickOn(newTab, {}),
+      clickOn(text, {}),
+      clickOn(DocsFixture.one(host, "nol-site-footer"), {}),
       clickOn(DocsFixture.one(host, "nol-site-header .nol-site-skip"), {})
-    ]).toEqual([false, false, false, false]);
+    ]).toEqual(Array(11).fill(false));
   });
 
   describe.each(DocsFixture.MODES)("on a phone in the $mode mode, the site header", ({ mode }) => {
