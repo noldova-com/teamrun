@@ -47,8 +47,8 @@ export class CopilotTestHost implements AsyncDisposable {
     return this.createAdapter(environment, this.command, null, this.patientTimings, this.terminator, timer);
   }
 
-  public createManualAdapter(environment: NodeJS.ProcessEnv, log: ILog, timings: ProviderTimings = this.timings): CopilotAdapter {
-    return this.createAdapter(environment, this.command, log, timings, this.terminator, new ManualTimer());
+  public createManualAdapter(environment: NodeJS.ProcessEnv, log: ILog, timings: ProviderTimings = this.timings, timer: ManualTimer = new ManualTimer()): CopilotAdapter {
+    return this.createAdapter(environment, this.command, log, timings, this.terminator, timer);
   }
 
   public request(prompt: string, resume: string | null = null, model: string | null = null, effort: string | null = null,

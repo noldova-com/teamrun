@@ -1505,7 +1505,7 @@ export declare class LocatedExecutable {
 }
 
 /**
- * A request awaiting the Codex app-server's response.
+ * A request awaiting the response of Codex's app-server or an ACP agent.
  */
 export declare class PendingRequest {
   /**
@@ -1517,12 +1517,12 @@ export declare class PendingRequest {
    * Initializes the request.
    * @param method The request's method.
    * @param resolvers The promise resolvers the caller awaits.
-   * @param timer The timeout timer, cleared when the request settles.
+   * @param elapsed The controller of the timeout's delay, aborted when the request settles.
    */
-  public constructor(method: string, resolvers: PromiseWithResolvers<JsonValue>, timer: NodeJS.Timeout | null);
+  public constructor(method: string, resolvers: PromiseWithResolvers<JsonValue>, elapsed: AbortController);
 
   /**
-   * Clears the timeout timer without settling the request, for a response that has arrived and settles later.
+   * Aborts the timeout's delay without settling the request, for a response that has arrived and settles later.
    */
   public stopTimer(): void;
 

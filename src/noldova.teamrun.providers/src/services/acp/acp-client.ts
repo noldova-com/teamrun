@@ -119,11 +119,13 @@ export class AcpClient {
       return Promise.reject(new AcpConnectionException(Resources.acpTooManyRequests));
     const id = ++this.nextId;
     const resolvers = Promise.withResolvers<JsonValue>();
-    const timer = Object.isNull(timeout) ? null : setTimeout(() => {
-      this.pending.get(id)?.fail(new TimeoutException(Resources.formatAcpTimeout(method)));
-      this.pending.delete(id);
-    }, timeout);
-    this.pending.set(id, new PendingRequest(method, resolvers, timer));
+    const elapsed = new AbortController();
+    this.pending.set(id, new PendingRequest(method, resolvers, elapsed));
+    if (!Object.isNull(timeout))
+      void this.timer.delayAsync(timeout, elapsed.signal).then(() => {
+        this.pending.get(id)?.fail(new TimeoutException(Resources.formatAcpTimeout(method)));
+        this.pending.delete(id);
+      }, () => undefined);
     this.startsTools ||= method === Resources.acpSessionPrompt || AcpClient.opensServers(method, params);
     this.write({ jsonrpc: Resources.acpJsonRpcVersion, id, method, params });
     return resolvers.promise;

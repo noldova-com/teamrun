@@ -6,23 +6,21 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import "@noldova/context.core";
 import type { JsonValue } from "@noldova/context.json";
 
 export class PendingRequest {
   public readonly method: string;
   private readonly resolvers: PromiseWithResolvers<JsonValue>;
-  private readonly timer: NodeJS.Timeout | null;
+  private readonly elapsed: AbortController;
 
-  public constructor(method: string, resolvers: PromiseWithResolvers<JsonValue>, timer: NodeJS.Timeout | null) {
+  public constructor(method: string, resolvers: PromiseWithResolvers<JsonValue>, elapsed: AbortController) {
     this.method = method;
     this.resolvers = resolvers;
-    this.timer = timer;
+    this.elapsed = elapsed;
   }
 
   public stopTimer(): void {
-    if (!Object.isNull(this.timer))
-      clearTimeout(this.timer);
+    this.elapsed.abort();
   }
 
   public complete(value: JsonValue): void {

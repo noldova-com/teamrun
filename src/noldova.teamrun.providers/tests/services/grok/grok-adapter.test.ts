@@ -27,6 +27,8 @@ import { ElapsedDelayTimer } from "../../fixtures/elapsed-delay-timer.fixture.js
 import { GrokModelStateRecording } from "../../fixtures/grok-model-state.recording.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
+import { HeldTurnsDelayTimer } from "../../fixtures/held-turns-delay-timer.fixture.js";
+import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { PlanToolRule } from "../../fixtures/plan-tool-rule.fixture.js";
 import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
@@ -36,6 +38,18 @@ import { TitleAsks } from "../../fixtures/title-asks.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 import { WatchingProcessStarter } from "../../fixtures/watching-process-starter.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
+
+class AccountCheckCase {
+  public readonly read: string;
+  public readonly mode: string;
+  public readonly held: readonly number[];
+
+  public constructor(read: string, mode: string, held: readonly number[]) {
+    this.read = read;
+    this.mode = mode;
+    this.held = held;
+  }
+}
 
 class BlockingOnReplyListener extends RecordingTurnListener {
   public blocked: boolean = false;
@@ -754,16 +768,18 @@ export class GrokAdapterTests {
     const provider = new Provider("a", "grok", "Dedicated", host.directory.resolve("added"), AuthStatus.Unknown, null, null, null, null, "t");
     const timings = new ProviderTimings(2000, 2000, 10_000, 10_000, 100, 100, 100, 5000, 100, 1, 10, Resources.wakeGrace, Resources.taskOutputFollowInterval, 500);
     const checked: string[] = [];
-    for (const [read, mode] of [["ACCOUNT", "hangNamespaced"], ["ACCOUNT", "hang"], ["BILLING", "hangNamespaced"], ["BILLING", "hang"]]) {
+    for (const accountCase of [new AccountCheckCase("ACCOUNT", "hangNamespaced", [2, 3]), new AccountCheckCase("ACCOUNT", "hang", [3]),
+      new AccountCheckCase("BILLING", "hangNamespaced", [1]), new AccountCheckCase("BILLING", "hang", [1])]) {
       const started = performance.now();
-      const check = await host.createAdapter({ ...host.environment, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
-        .checkSignIn(provider);
-      checked.push([check.authStatus, check.identity?.email ?? "none", check.identity?.plan ?? "none", String(performance.now() - started < timings.requestTimeout)]
-        .join(" "));
+      const timer = new HeldTurnsDelayTimer(timings.accountTimeout, ...accountCase.held);
+      const check = await host.createAdapter({ ...host.environment, [`TEAMRUN_FAKE_ACP_${accountCase.read}`]: accountCase.mode }, host.command, host.terminator, timings,
+        undefined, undefined, timer).checkSignIn(provider);
+      checked.push([check.authStatus, check.identity?.email ?? "none", check.identity?.plan ?? "none", String(performance.now() - started < timings.requestTimeout),
+        String(timer.requested.filter(t => t === timings.accountTimeout).length)].join(" "));
     }
 
-    Assert.areEqual(["LoggedIn person@example.com SuperGrok Heavy true", "LoggedIn none SuperGrok Heavy true", "LoggedIn person@example.com none true",
-      "LoggedIn person@example.com none true"].join(","), checked.join(","));
+    Assert.areEqual(["LoggedIn person@example.com SuperGrok Heavy true 3", "LoggedIn none SuperGrok Heavy true 3", "LoggedIn person@example.com none true 2",
+      "LoggedIn person@example.com none true 2"].join(","), checked.join(","));
     Assert.areEqual(["_x.ai/auth/info", "x.ai/auth/info", "_x.ai/billing", "_x.ai/auth/info", "x.ai/auth/info", "_x.ai/billing", "_x.ai/auth/info", "_x.ai/billing",
       "_x.ai/auth/info", "_x.ai/billing"].join(","), GrokAdapterTests.usageRequests(host));
     await host.programs.endedAt(host.programs.started.length);
@@ -1168,8 +1184,7 @@ export class GrokAdapterTests {
     const adapter = new GrokAdapter(host.command, { ...host.environment, TEAMRUN_FAKE_ACP_STAY_OPEN: "1" }, host.directory.resolve("profile"), host.info,
       host.programs.wrap(host.starter), host.timings, timer);
     const models = adapter.listModels(null);
-    await timer.delayed;
-    timer.advance(host.timings.stopGrace);
+    await IdleLimit.elapseAsync(timer, host.timings.stopGrace, "The stop held no wait due within the stop grace.");
     Assert.areEqual(2, (await models).models.length);
     Assert.areEqual(0, timer.pending);
     await host.programs.endedAt(host.programs.started.length);

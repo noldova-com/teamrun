@@ -13,26 +13,28 @@ import { PendingRequest } from "@noldova/teamrun.providers";
 @TestClass
 export class PendingRequestTests {
   @TestMethod
-  public async completesFailsAndStopsWhileClearingTheTimer(): Promise<void> {
-    let fired = 0;
+  public async completesFailsAndStopsWhileAbortingTheDelay(): Promise<void> {
     const completed = Promise.withResolvers<JsonValue>();
     const failed = Promise.withResolvers<JsonValue>();
-    const completing = new PendingRequest("a", completed, setTimeout(() => fired += 1, 5));
-    const failing = new PendingRequest("b", failed, setTimeout(() => fired += 1, 5));
     const stopped = Promise.withResolvers<JsonValue>();
-    const stopping = new PendingRequest("c", stopped, setTimeout(() => fired += 1, 5));
+    const completedDelay = new AbortController();
+    const failedDelay = new AbortController();
+    const stoppedDelay = new AbortController();
+    const completing = new PendingRequest("a", completed, completedDelay);
+    const failing = new PendingRequest("b", failed, failedDelay);
+    const stopping = new PendingRequest("c", stopped, stoppedDelay);
 
     const failure = Assert.throwsAsync(() => failed.promise, Error);
     completing.complete({ ok: true });
     failing.fail(new Error("no"));
     stopping.stopTimer();
-    await new Promise(resolve => setTimeout(resolve, 20));
+    const abortedBeforeSettling = [completedDelay, failedDelay, stoppedDelay].map(t => t.signal.aborted).join(",");
     stopping.complete("late");
 
+    Assert.areEqual("true,true,true", abortedBeforeSettling);
     Assert.areEqual("{\"ok\":true}", JSON.stringify(await completed.promise));
     Assert.areEqual("no", (await failure).message);
     Assert.areEqual("\"late\"", JSON.stringify(await stopped.promise));
     Assert.areEqual("a", completing.method);
-    Assert.areEqual(0, fired);
   }
 }

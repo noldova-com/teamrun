@@ -9,7 +9,7 @@
 import "@noldova/context.core";
 import { ArgumentOutOfRangeException } from "@noldova/context.exceptions";
 import { JsonReader, type JsonValue } from "@noldova/context.json";
-import { type ILog, type ITurnListener, TurnDetail } from "@noldova/teamrun.core";
+import { type ILog, type ITurnListener, NodeTimer, TurnDetail } from "@noldova/teamrun.core";
 import { DetailKind } from "@noldova/teamrun.protocol";
 
 import { AppServerException } from "../../exceptions/app-server.exception.js";
@@ -156,11 +156,12 @@ export class AppServerClient {
 
     const id = this.nextId++;
     const resolvers = Promise.withResolvers<JsonValue>();
-    const timer = setTimeout(() => {
+    const elapsed = new AbortController();
+    this.pending.set(id, new PendingRequest(method, resolvers, elapsed));
+    void new NodeTimer().delayAsync(timeoutMilliseconds, elapsed.signal).then(() => {
       this.pending.delete(id);
       resolvers.reject(new AppServerUnavailableException(Resources.formatAppServerTimedOut(method)));
-    }, timeoutMilliseconds);
-    this.pending.set(id, new PendingRequest(method, resolvers, timer));
+    }, () => undefined);
     this.write({ id, method, params });
 
     return resolvers.promise;
