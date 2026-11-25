@@ -322,7 +322,7 @@ export class CodexAdapter implements IProviderAdapter {
     try {
       const check = this.checkCurrent(request.provider);
       if (!Object.isNull(check) && !await CodexAdapter.waitUnlessAborted(check, signal))
-        return new TurnResult(TurnOutcome.Interrupted, null, new ObservedSettings(Resources.codexKindId, null, null, null), null);
+        return CodexAdapter.stoppedBeforeStart(null);
       client = await this.connect(request.provider);
     }
     catch (error) {
@@ -349,7 +349,7 @@ export class CodexAdapter implements IProviderAdapter {
       nativeSessionId = await this.useClient(request.provider, async client => {
         if (command.name === Resources.codexArchiveCommand)
           await this.closeSessions([threadId]);
-        const release = await this.lockThread(threadId, true);
+        const release = await this.lockThread(threadId, true, null);
         try {
           return await this.runOnThread(client, request, command, threadId);
         }
@@ -437,7 +437,11 @@ export class CodexAdapter implements IProviderAdapter {
     }
     const params = CodexAdapter.threadKeyOf(request, requested, servers);
     await this.reloadIfChanged(request.resumeNativeSessionId, tools, params);
-    const release = await this.lockThread(request.resumeNativeSessionId, true);
+    const release = await this.lockThread(request.resumeNativeSessionId, true, signal);
+    if (signal.aborted) {
+      release();
+      return CodexAdapter.stoppedBeforeStart(request.resumeNativeSessionId);
+    }
     const statuses = new CodexSharedServerStatuses(request.provider?.id ?? this.descriptor.id, request.provider?.label ?? this.descriptor.displayName,
       request.sharedServers.map(t => t.name), listener);
     const subscription = client.subscribe(statuses, listener);
@@ -487,6 +491,11 @@ export class CodexAdapter implements IProviderAdapter {
       await this.unholdResumed(client, request.resumeNativeSessionId, resumed);
       await listener.onDetailAsync(new TurnDetail(DetailKind.Note, CoreResources.nothingToCompact, null, null));
       return new TurnResult(TurnOutcome.Completed, null, new ObservedSettings(this.descriptor.id, null, null, client.version), null);
+    }
+    if (signal.aborted) {
+      grant.revoke();
+      await this.unholdResumed(client, request.resumeNativeSessionId, resumed);
+      return CodexAdapter.stoppedBeforeStart(started.threadId);
     }
     if (started.threadId === request.resumeNativeSessionId && !Object.isNull(kept) && !Object.isNull(endpoint) && !endpoint.adopt(kept)) {
       await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.codexToolsAwaitTasks, null, null));
@@ -843,7 +852,7 @@ export class CodexAdapter implements IProviderAdapter {
 
   private async releaseKept(threadId: string, release: () => Promise<void>,
     kept: { readonly threadId: string; readonly done: PromiseWithResolvers<void> } | undefined): Promise<void> {
-    const unlock = await this.lockThread(threadId, false);
+    const unlock = await this.lockThread(threadId, false, null);
     try {
       await release();
     }
@@ -905,7 +914,7 @@ export class CodexAdapter implements IProviderAdapter {
 
   private async runWake(client: AppServerClient, parent: CodexTurn, target: WakeTurn, held: ICodexHold, starts: number | undefined,
     signal: AbortSignal): Promise<void> {
-    const release = await this.lockThread(parent.threadId, false);
+    const release = await this.lockThread(parent.threadId, false, null);
     try {
       if (signal.aborted || this.turnStarts.get(parent.threadId) !== starts) {
         await this.endUnrun(client, parent, target, held, signal.aborted ? TurnOutcome.Interrupted : TurnOutcome.Completed,
@@ -925,7 +934,7 @@ export class CodexAdapter implements IProviderAdapter {
     }
   }
 
-  private async lockThread(threadId: string | null, logs: boolean): Promise<() => void> {
+  private async lockThread(threadId: string | null, logs: boolean, signal: AbortSignal | null): Promise<() => void> {
     if (Object.isNull(threadId))
       return () => undefined;
     const previous = this.threadLocks.get(threadId);
@@ -934,11 +943,21 @@ export class CodexAdapter implements IProviderAdapter {
     this.threadLocks.set(threadId, lock);
     if (logs && !Object.isUndefined(previous))
       this.log?.write(Resources.formatCodexTurnAwaitsThread(threadId));
-    await previous;
-    return () => {
-      ended.resolve();
+    let owned = true;
+    if (Object.isNull(signal))
+      await previous;
+    else
+      owned = await CodexAdapter.waitUnlessAborted(previous ?? Promise.resolve(), signal);
+    const forget = (): void => {
       if (this.threadLocks.get(threadId) === lock)
         this.threadLocks.delete(threadId);
+    };
+    return () => {
+      ended.resolve();
+      if (owned)
+        forget();
+      else
+        void lock.then(forget);
     };
   }
 
@@ -1070,7 +1089,13 @@ export class CodexAdapter implements IProviderAdapter {
     }
   }
 
+  private static stoppedBeforeStart(threadId: string | null): TurnResult {
+    return new TurnResult(TurnOutcome.Interrupted, threadId, new ObservedSettings(Resources.codexKindId, null, null, null), null);
+  }
+
   private static async waitUnlessAborted(work: Promise<void>, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted)
+      return false;
     const aborted = Promise.withResolvers<boolean>();
     const abort = (): void => aborted.resolve(false);
     signal.addEventListener(Resources.abortEvent, abort, { once: true });
