@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { CommandWrites, Resources, type ReplyEvidence } from "@noldova/teamrun.core";
+import { type CommandTargets, CommandWrites, Resources, type ReplyEvidence } from "@noldova/teamrun.core";
 
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 
@@ -264,7 +264,7 @@ export class CommandWritesTests {
     return { root, outside };
   }
 
-  private static render(targets: { readonly files: readonly string[]; readonly unnamedIn: readonly string[] }): string {
+  private static render(targets: CommandTargets): string {
     return [targets.files.join(","), ...targets.unnamedIn].join("|");
   }
 

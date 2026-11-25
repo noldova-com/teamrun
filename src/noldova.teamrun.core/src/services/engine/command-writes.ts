@@ -14,6 +14,7 @@ import "@noldova/context.core";
 import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
+import { CommandTargets } from "../../models/command-targets.js";
 import { DiffRun } from "../../models/diff-run.js";
 import { FileSnapshot } from "../../models/file-snapshot.js";
 import { ReplyEvidence } from "../../models/reply-evidence.js";
@@ -68,16 +69,15 @@ export class CommandWrites {
     return ReplyEvidence.compared(changes, isComplete);
   }
 
-  public static targetsOf(payload: JsonValue, root: string, platform: string = process.platform)
-    : { readonly files: readonly string[]; readonly unnamedIn: readonly string[] } {
+  public static targetsOf(payload: JsonValue, root: string, platform: string = process.platform): CommandTargets {
     if (!CommandWrites.isJsonObject(payload))
-      return { files: [], unnamedIn: [] };
+      return new CommandTargets([], []);
     const cwd = payload[Resources.cwdField];
     const folder = Object.isString(cwd) ? resolve(root, cwd) : root;
     const writes = payload[ProtocolResources.writesField];
     const unnamed = payload[ProtocolResources.unnamedWritesField];
     if (!Array.isArray(writes) || !Array.isArray(unnamed))
-      return { files: [], unnamedIn: [folder] };
+      return new CommandTargets([], [folder]);
 
     const files: string[] = [];
     const unnamedIn: string[] = [];
@@ -92,7 +92,7 @@ export class CommandWrites {
     for (const entry of unnamed)
       unnamedIn.push(!Object.isString(entry) ? folder : CommandWrites.isRootedWithoutDrive(entry, platform) ? entry : CommandWrites.resolveIn(folder, entry));
 
-    return { files, unnamedIn };
+    return new CommandTargets(files, unnamedIn);
   }
 
   public static folderKey(path: string): string {

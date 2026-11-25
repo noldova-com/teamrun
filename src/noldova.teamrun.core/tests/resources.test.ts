@@ -293,6 +293,8 @@ export class ResourcesTests {
     Assert.areEqual("TypeError ERR_PROVIDER", Resources.formatFailureKind(Object.assign(new TypeError(prompt), { code: "ERR_PROVIDER" })));
     Assert.areEqual("Error", Resources.formatFailureKind(new Error(prompt)));
     Assert.areEqual("string", Resources.formatFailureKind(prompt));
+    Assert.areEqual("undefined|number|bigint|boolean|symbol|function|object|object",
+      [undefined, 1, 1n, true, Symbol(prompt), () => prompt, null, { prompt }].map(t => Resources.formatFailureReason(t)).join("|"));
     Assert.areEqual("A reply from codex with the provider ending in \"23456789abcd\" ended in an error: Error.",
       Resources.formatReplyFailed("codex", "0192f3a4-5b6c-7d8e-9f01-23456789abcd", "Error"));
     Assert.areEqual("A reply from codex with no provider ended in an error: the provider reported a failed turn.",

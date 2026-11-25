@@ -11,6 +11,7 @@ import type { MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources.js";
 import { HandoverHistory } from "./handover-history.js";
+import { HandoverRange } from "./handover-range.js";
 import type { HandoverSummary } from "./handover-summary.js";
 import type { HandoverTurn } from "./handover-turn.js";
 
@@ -133,7 +134,7 @@ export class Handover {
   }
 
   private static summaryLineOf(turns: readonly HandoverTurn[], covered: ReadonlySet<number>, summary: HandoverSummary | null): string[] {
-    const bounds = Handover.rangesOf(turns, index => covered.has(index)).flat();
+    const bounds = Handover.rangesOf(turns, index => covered.has(index)).flatMap(t => [t.from, t.to]);
     return Object.isNull(summary) || Object.isNull(summary.author) || bounds.length === 0 ? []
       : [Resources.formatHandoverCarriedSummary(summary.author, summary.isCompaction, Math.min(...bounds), Math.max(...bounds))];
   }
@@ -144,7 +145,7 @@ export class Handover {
   }
 
   private static leftOutOf(chatId: string, turns: readonly HandoverTurn[], kept: ReadonlySet<number>): string {
-    const ranges = Handover.rangesOf(turns, index => !kept.has(index)).map(([from, to]) => from === to ? `${from}` : Resources.formatHandoverRange(from, to));
+    const ranges = Handover.rangesOf(turns, index => !kept.has(index)).map(t => t.from === t.to ? `${t.from}` : Resources.formatHandoverRange(t.from, t.to));
     return ranges.length === 0 ? String.empty : Resources.formatHandoverLeftOut(ranges, chatId);
   }
 
@@ -153,15 +154,15 @@ export class Handover {
     return Resources.formatHandoverCarriedWhole(Handover.rangesOf(turns, carried), chosen.some(t => t.tools), chosen.filter(t => t.cut).map(t => t.sequence));
   }
 
-  private static rangesOf(turns: readonly HandoverTurn[], chosen: (index: number) => boolean): (readonly [number, number])[] {
-    const ranges: (readonly [number, number])[] = [];
+  private static rangesOf(turns: readonly HandoverTurn[], chosen: (index: number) => boolean): HandoverRange[] {
+    const ranges: HandoverRange[] = [];
     let from: number | null = null;
     for (const [index, turn] of turns.entries()) {
       if (!chosen(index))
         continue;
       from ??= turn.sequence;
       if (index === turns.length - 1 || !chosen(index + 1)) {
-        ranges.push([from, turn.sequence]);
+        ranges.push(new HandoverRange(from, turn.sequence));
         from = null;
       }
     }

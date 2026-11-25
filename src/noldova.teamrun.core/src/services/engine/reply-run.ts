@@ -60,6 +60,7 @@ import { ReportedSharedMcpFailures } from "../../models/reported-shared-mcp-fail
 import type { SharedMcpFailure } from "../../models/shared-mcp-failure.js";
 import type { TaskEnd } from "../../models/task-end.js";
 import type { TaskStart } from "../../models/task-start.js";
+import type { ToolCallPermission } from "../../models/tool-call-permission.js";
 import type { ToolCallRecord } from "../../models/tool-call-record.js";
 import { TurnDetail } from "../../models/turn-detail.js";
 import type { TurnRequest } from "../../models/turn-request.js";
@@ -461,7 +462,7 @@ export class ReplyRun implements ITurnListener {
     });
   }
 
-  private permissionOf(permission: NonNullable<ToolCallRecord["permission"]>): JsonObject {
+  private permissionOf(permission: ToolCallPermission): JsonObject {
     return {
       [ProtocolResources.riskField]: permission.risk,
       [ProtocolResources.decisionField]: permission.decision,

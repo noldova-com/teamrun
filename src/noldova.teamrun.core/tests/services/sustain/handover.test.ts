@@ -8,7 +8,7 @@
 
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Handover, HandoverSummary, HandoverTurn, Resources } from "@noldova/teamrun.core";
+import { Handover, HandoverRange, HandoverSummary, HandoverTurn, Resources } from "@noldova/teamrun.core";
 import { MessageAttachment } from "@noldova/teamrun.protocol";
 
 @TestClass
@@ -83,7 +83,7 @@ export class HandoverTests {
       [[true, false], [true, true], [false, true], [false, false]].map(([asked, continued]) => String(Resources.formatHandoverCarriedAnswer(asked ?? false, continued ?? false)))
         .join("|"));
     Assert.areEqual("Codex reads what was left out with list-messages, as it reads any chat.", Resources.formatHandoverReads("Codex"));
-    Assert.areEqual("Left out: message 4", Resources.formatHandoverCarriedLeftOut([[4, 4]]));
+    Assert.areEqual("Left out: message 4", Resources.formatHandoverCarriedLeftOut([new HandoverRange(4, 4)]));
   }
 
   @TestMethod
