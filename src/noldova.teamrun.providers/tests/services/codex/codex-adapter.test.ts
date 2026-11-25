@@ -2734,6 +2734,38 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  public async startsATurnAfterOneStoppedWhileItWaitedOnlyOnceTheTurnRunningOnTheThreadEnds(): Promise<void> {
+    using host = new CodexTestHost();
+    const log = new RecordingLog();
+    const adapter = host.createAdapter(host.environment, host.command, host.timings, undefined, log);
+    const holding = new AbortController();
+    const waiting = new AbortController();
+    const listener = new RecordingTurnListener();
+    const next = new RecordingTurnListener();
+    try {
+      const threadId = String((await adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal)).nativeSessionId);
+      const awaits = (): number => log.lines.filter(t => t.includes(Resources.formatCodexTurnAwaitsThread(threadId))).length;
+      const held = adapter.runTurn(host.createRequest("hold", null, threadId), listener, holding.signal);
+      await Wait.untilOrSettled(() => listener.details.length === 1, held);
+      const stopped = adapter.runTurn(host.createRequest("echo", null, threadId), new RecordingTurnListener(), waiting.signal);
+      await Wait.until(() => awaits() === 1, "The log did not say the stopped turn awaits the thread.");
+      waiting.abort();
+      await stopped;
+      const running = adapter.runTurn(host.createRequest("echo", null, threadId), next, new AbortController().signal);
+      await Wait.until(() => awaits() === 2, "The log did not say the next turn awaits the thread.");
+      const during = next.starts.length;
+      holding.abort();
+      await held;
+      const result = await running;
+
+      Assert.areEqual(0, during);
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual(1, next.starts.length);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
   public async sendsNoTurnForATurnStoppedWhileItOpensItsThread(): Promise<void> {
     using host = new CodexTestHost();
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CODEX_RESUME: "fails" });

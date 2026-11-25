@@ -943,14 +943,21 @@ export class CodexAdapter implements IProviderAdapter {
     this.threadLocks.set(threadId, lock);
     if (logs && !Object.isUndefined(previous))
       this.log?.write(Resources.formatCodexTurnAwaitsThread(threadId));
+    let owned = true;
     if (Object.isNull(signal))
       await previous;
     else
-      await CodexAdapter.waitUnlessAborted(previous ?? Promise.resolve(), signal);
-    return () => {
-      ended.resolve();
+      owned = await CodexAdapter.waitUnlessAborted(previous ?? Promise.resolve(), signal);
+    const forget = (): void => {
       if (this.threadLocks.get(threadId) === lock)
         this.threadLocks.delete(threadId);
+    };
+    return () => {
+      ended.resolve();
+      if (owned)
+        forget();
+      else
+        void lock.then(forget);
     };
   }
 
