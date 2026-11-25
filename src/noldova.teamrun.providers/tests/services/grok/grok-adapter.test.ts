@@ -303,8 +303,8 @@ export class GrokAdapterTests {
     Assert.areEqual("imageGeneration", payload.readString("itemType"));
     Assert.areEqual("failed", payload.readString("status"));
     Assert.areEqual(JSON.stringify({ error: "tool_execution_failed", message: "Image generation failed with HTTP 422" }), JSON.stringify(payload.readObject("failure").toJson()));
-    Assert.isNull(payload["savedPath"]);
-    Assert.isNull(payload["imageData"]);
+    Assert.isNull(payload.toJson()["savedPath"]);
+    Assert.isNull(payload.toJson()["imageData"]);
   }
 
   @TestMethod
