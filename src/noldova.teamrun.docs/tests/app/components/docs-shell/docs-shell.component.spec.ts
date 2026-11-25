@@ -133,8 +133,8 @@ describe("DocsShellComponent", () => {
       expect(footer.querySelector(".nol-site-footer-line")).toBeNull();
     });
 
-    it("marks the release notes current in the header and the footer on their page", async () => {
-      const host = await renderSiteAsync("/release-notes");
+    it.each(["/release-notes", "/release-notes/"])("marks the release notes current in the header and the footer on their page at %s", async address => {
+      const host = await renderSiteAsync(address);
 
       expect(linksOf(DocsFixture.one(host, "nol-site-header"), ".nol-site-nav-link").map(t => t[2])).toEqual([null, "page"]);
       expect(linksOf(DocsFixture.one(host, "nol-site-footer"), "a.nol-site-footer-link").filter(t => t[2] === "page").map(t => t[0])).toEqual(["Release notes"]);
