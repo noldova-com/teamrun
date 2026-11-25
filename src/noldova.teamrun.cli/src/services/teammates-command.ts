@@ -23,6 +23,7 @@ import {
   TeammateUsage
 } from "@noldova/teamrun.protocol";
 
+import { TeammateChat } from "../models/teammate-chat.js";
 import { Resources } from "../resources.js";
 import type { CommandValues } from "./command-values.js";
 import type { RuntimeClient } from "./runtime-client.js";
@@ -38,13 +39,13 @@ export class TeammatesCommand extends TeamRunCommand {
   protected async runAsync(_values: CommandValues, signal: AbortSignal): Promise<CliCommandResult> {
     const teammates = await this.client.listAsync(MethodName.TeammateList, null, signal, t => Teammate.fromJson(t));
     const providers = await this.client.listAsync(MethodName.ProviderList, null, signal, t => Provider.fromJson(t));
-    const chats: { chat: Conversation; members: readonly string[] }[] = [];
+    const chats: TeammateChat[] = [];
     const projects = await this.client.listAsync(MethodName.ProjectList, null, signal, t => ProjectListing.fromJson(t).project);
     for (const projectId of [...projects.map(t => t.id), null])
       for (const chat of await this.client.listAsync(MethodName.ConversationList, new ConversationListParams(projectId).toJson(), signal, t => Conversation.fromJson(t))) {
         const members = await this.client.listAsync(MethodName.ConversationListMembers, new ConversationIdParams(chat.id).toJson(), signal,
           t => ConversationMember.fromJson(t));
-        chats.push({ chat, members: members.map(t => t.teammateId) });
+        chats.push(new TeammateChat(chat, members.map(t => t.teammateId)));
       }
     const open = await this.client.listAsync(MethodName.MessageListOpen, null, signal, t => Message.fromJson(t));
     const usage = await this.client.listAsync(MethodName.TeammateUsageList, null, signal, t => TeammateUsage.fromJson(t));

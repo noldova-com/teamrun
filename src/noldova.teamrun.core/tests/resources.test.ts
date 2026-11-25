@@ -6,8 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources } from "@noldova/teamrun.core";
+
+import { CodedError } from "./fixtures/coded-error.fixture.js";
 
 @TestClass
 export class ResourcesTests {
@@ -42,7 +45,7 @@ export class ResourcesTests {
     const values = Object.values(Resources).flatMap((t: unknown) => t instanceof Map ? [...t.values()] : [t]);
     const statements = /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA|WITH)\b/;
     const texts = [
-      ...values.filter((t): t is string => typeof t === "string" && t.includes(" ") && !statements.test(t)),
+      ...values.filter(Object.isString).filter(t => t.includes(" ") && !statements.test(t)),
       Resources.formatTranscriptPreamble("User: Hi", "Go on", true),
       Resources.formatParticipantContext("Carol", true, "User: Hi"),
       Resources.formatDraftFilesNotRemoved("c1", "busy"),
@@ -290,7 +293,8 @@ export class ResourcesTests {
   @TestMethod
   public composesTheFailureLinesFromTheFailuresKindAlone(): void {
     const prompt = "Summarize the plan in secret.md";
-    Assert.areEqual("TypeError ERR_PROVIDER", Resources.formatFailureKind(Object.assign(new TypeError(prompt), { code: "ERR_PROVIDER" })));
+    Assert.areEqual("Error ERR_PROVIDER", Resources.formatFailureKind(new CodedError(prompt, "ERR_PROVIDER")));
+    Assert.areEqual("TypeError", Resources.formatFailureKind(new TypeError(prompt)));
     Assert.areEqual("Error", Resources.formatFailureKind(new Error(prompt)));
     Assert.areEqual("string", Resources.formatFailureKind(prompt));
     Assert.areEqual("undefined|number|bigint|boolean|symbol|function|object|object",
