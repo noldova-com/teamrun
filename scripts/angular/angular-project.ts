@@ -11,6 +11,8 @@ import { glob, mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import { ProcessException } from "../processes/process.exception.ts";
 import { RetriedDownload } from "../processes/retried-download.ts";
@@ -100,21 +102,21 @@ export class AngularProject {
     const results = existsSync(report) ? await this.readResultsAsync(report) : null;
     return new AngularTestRun(
       exitCode,
-      results === null ? null : new AngularTestReport(this.describe(report), t => this.specName(path.resolve(t))).read(results),
+      Object.isNull(results) ? null : new AngularTestReport(this.describe(report), t => this.specName(path.resolve(t))).read(results),
       existsSync(coverage) ? await this.readCoverageAsync(coverage) : null,
-      results === null ? [] : results.flatMap((t, i) => this.readRetried(new JsonFields(t, this.describe(report), [`test file ${i + 1}`]))));
+      Object.isNull(results) ? [] : results.flatMap((t, i) => this.readRetried(new JsonFields(t, this.describe(report), [`test file ${i + 1}`]))));
   }
 
   public async specFilesAsync(): Promise<readonly string[]> {
     const workspace = await this.readJsonAsync(path.join(this.directory, AngularProject.WORKSPACE_FILE));
     const projects = AngularProject.field(workspace, "projects");
-    const options = (typeof projects === "object" && projects !== null ? Object.values(projects) : [])
+    const options = (Object.isObject(projects) ? Object.values(projects) : [])
       .map(t => AngularProject.OPTIONS_PATH.reduce<unknown>((value, name) => AngularProject.field(value, name), t))
-      .find(t => t !== undefined);
-    if (AngularProject.field(options, "exclude") !== undefined)
+      .find(t => !Object.isUndefined(t));
+    if (!Object.isUndefined(AngularProject.field(options, "exclude")))
       throw new ProcessException(`src/${AngularProject.WORKSPACE_FILE} excludes files from its ${AngularProject.TEST_TARGET} target, and the check of the spec files run does not apply exclusions.`);
     const include = AngularProject.field(options, "include");
-    if (!Array.isArray(include) || include.length === 0 || include.some(t => typeof t !== "string"))
+    if (!Array.isArray(include) || include.length === 0 || include.some(t => !Object.isString(t)))
       throw new ProcessException(`src/${AngularProject.WORKSPACE_FILE} names no spec files for its ${AngularProject.TEST_TARGET} target.`);
     const files: string[] = [];
     for await (const file of glob(include as string[], { cwd: this.directory }))
@@ -163,7 +165,7 @@ export class AngularProject {
   }
 
   private static field(value: unknown, name: string): unknown {
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
+    return Object.isObject(value) && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
   }
 
   public hasProject(): boolean {

@@ -8,6 +8,7 @@
 
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
 import ts from "typescript";
 
 import { PackageNaming } from "../packages/package-naming.ts";
@@ -73,7 +74,7 @@ export class ConceptFolderCheck implements ICheck {
           findings.add(`${location}: is not lowercase kebab-case; ${ConceptFolderCheck.RULE}`);
       }
       const [root, category] = ConceptFolderCheck.locate(file);
-      if (root !== null && category !== undefined && !ConceptFolderCheck.CATEGORIES.has(category)
+      if (!Object.isNull(root) && !Object.isUndefined(category) && !ConceptFolderCheck.CATEGORIES.has(category)
         && !(root.endsWith(`${ConceptFolderCheck.SEGMENT_SEPARATOR}${ConceptFolderCheck.APP_FOLDER}`) && ConceptFolderCheck.ANGULAR_FOLDERS.has(category)))
         findings.add(`${root}/${category}: is not a concept category of its source tree; ${ConceptFolderCheck.RULE}`);
     }
@@ -92,11 +93,11 @@ export class ConceptFolderCheck implements ICheck {
 
   private static inspect(file: string, source: ts.SourceFile): readonly string[] {
     const [root, category] = ConceptFolderCheck.locate(file);
-    const isScript = root === null;
+    const isScript = Object.isNull(root);
     const folders = file.split(ConceptFolderCheck.SEGMENT_SEPARATOR).slice(0, -1);
     const holder = ConceptFolderCheck.KINDS.find(t => isScript ? t === ConceptFolderCheck.INTERFACES && folders.includes(t[0]) : t[0] === category) ?? null;
     const concepts = source.statements.filter(t => ConceptFolderCheck.isConcept(t));
-    if (holder !== null && concepts.length === 0)
+    if (!Object.isNull(holder) && concepts.length === 0)
       return [`${file}: is in ${holder[0]}/ but declares no concept; ${ConceptFolderCheck.RULE}`];
 
     const findings: string[] = [];
@@ -104,9 +105,9 @@ export class ConceptFolderCheck implements ICheck {
       const kind = ConceptFolderCheck.findKind(concept, isScript);
       const location = `${file}:${source.getLineAndCharacterOfPosition(concept.getStart(source)).line + 1}`;
       const name = concept.name?.text ?? ConceptFolderCheck.ANONYMOUS;
-      if (kind !== null && kind !== holder)
+      if (!Object.isNull(kind) && kind !== holder)
         findings.push(`${location}: ${name} is ${kind[1]} outside ${kind[0]}/; ${ConceptFolderCheck.RULE}`);
-      else if (holder !== null && kind !== holder)
+      else if (!Object.isNull(holder) && kind !== holder)
         findings.push(`${location}: ${name} is in ${holder[0]}/ but is not ${holder[1]}; ${ConceptFolderCheck.RULE}`);
     }
     return findings;

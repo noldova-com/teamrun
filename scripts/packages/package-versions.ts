@@ -5,6 +5,8 @@
  * This source code is licensed under the license found in the
  * LICENSE file in the root directory of this source tree.
  */
+import "@noldova/context.core";
+
 import type { PackageManifest } from "./package-manifest.ts";
 
 export class PackageVersions {
@@ -30,7 +32,7 @@ export class PackageVersions {
       ...fields,
       [PackageVersions.VERSION_FIELD]: this.version,
       ...Object.fromEntries(stamped),
-      ...(this.commit === null ? {} : { [PackageVersions.COMMIT_FIELD]: this.commit })
+      ...(Object.isNull(this.commit) ? {} : { [PackageVersions.COMMIT_FIELD]: this.commit })
     }, null, 2);
   }
 }

@@ -10,6 +10,8 @@ import { mkdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { ProcessException } from "../processes/process.exception.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
 import { TemporaryFolder } from "../processes/temporary-folder.ts";
@@ -115,9 +117,9 @@ export class CdkCopyRules implements ICheck {
       try {
         await CdkCopyRules.installAsync(work, rule.manifest, rule.packages);
         const script = path.join(work, "npm.js");
-        if (rule.npm !== null)
+        if (!Object.isNull(rule.npm))
           await writeFile(script, rule.npm);
-        const environment = rule.npm === null ? this.environment : { ...this.environment, npm_execpath: script };
+        const environment = Object.isNull(rule.npm) ? this.environment : { ...this.environment, npm_execpath: script };
         let written = "";
         const collected = new Writable({
           write: (chunk, _encoding, done) => {

@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { PackageNaming } from "../packages/package-naming.ts";
 import { VersionRange } from "../packages/version-range.ts";
 import type { RepositoryFiles } from "../repository/repository-files.ts";
@@ -94,7 +96,7 @@ export class DependencyPinCheck implements ICheck {
     const findings: string[] = [];
     for (const section of DependencyPinCheck.SECTIONS) {
       const entries = manifest[section];
-      if (entries === undefined)
+      if (Object.isUndefined(entries))
         continue;
       if (!DependencyPinCheck.isRecord(entries)) {
         findings.push(`${file}: ${section} is not an object of names and versions.`);
@@ -118,9 +120,9 @@ export class DependencyPinCheck implements ICheck {
   private static validateDesktopCore(declaration: string, text: string, texts: ReadonlyMap<string, string>): readonly string[] {
     const named = DependencyPinCheck.parse(text);
     const field = DependencyPinCheck.isRecord(named) ? named[DependencyPinCheck.DESKTOP_CORE_FIELD] : undefined;
-    const range = typeof field === "string" ? VersionRange.parse(field) : null;
-    if (range === null || !range.isWritten)
-      return [`${declaration}: ${DependencyPinCheck.DESKTOP_CORE_FIELD} is ${field === undefined ? "missing" : JSON.stringify(field)}; it names the Noldova Desktop versions the module `
+    const range = Object.isString(field) ? VersionRange.parse(field) : null;
+    if (Object.isNull(range) || !range.isWritten)
+      return [`${declaration}: ${DependencyPinCheck.DESKTOP_CORE_FIELD} is ${Object.isUndefined(field) ? "missing" : JSON.stringify(field)}; it names the Noldova Desktop versions the module `
         + `accepts as ${DependencyPinCheck.RANGE_FORM}, from the version it builds against to the next minor below 1.0, or the next major from 1.0.`];
     const noldovaDesktop = range.toString();
     return [...texts].flatMap(([file, manifestText]) => {
@@ -140,7 +142,7 @@ export class DependencyPinCheck implements ICheck {
       const dependency = isOverride && name === DependencyPinCheck.OVERRIDE_SELF ? parent : name;
       if (isOverride && DependencyPinCheck.isRecord(value))
         findings.push(...DependencyPinCheck.validateEntries(file, `${location} ${name}`, value, true, name, ownVersion));
-      else if (typeof value !== "string")
+      else if (!Object.isString(value))
         findings.push(`${file}: ${location} ${name} has no version string.`);
       else if (PackageNaming.isOwn(dependency)) {
         if (value !== ownVersion)
@@ -173,7 +175,7 @@ export class DependencyPinCheck implements ICheck {
 
   private static parse(text: string | undefined): unknown {
     try {
-      return text === undefined ? null : JSON.parse(text);
+      return Object.isUndefined(text) ? null : JSON.parse(text);
     }
     catch {
       return null;
@@ -193,16 +195,16 @@ export class DependencyPinCheck implements ICheck {
       ? DependencyPinCheck.ANGULAR_FOLDER
       : DependencyPinCheck.ROOT_FOLDER;
     return DependencyPinCheck.SHIPPED_SECTIONS.flatMap(section => Object.entries(DependencyPinCheck.readRecord(manifest, section))
-      .filter((t): t is [string, string] => !PackageNaming.isOwn(t[0]) && typeof t[1] === "string")
+      .filter((t): t is [string, string] => !PackageNaming.isOwn(t[0]) && Object.isString(t[1]))
       .map(([name, version]) => [file, name, version, folder, section] satisfies readonly [string, string, string, string, string]));
   }
 
   private static isPackage(file: string, manifest: unknown): manifest is Readonly<Record<string, unknown>> {
-    return file !== DependencyPinCheck.MANIFEST_NAME && file !== DependencyPinCheck.ANGULAR_MANIFEST && DependencyPinCheck.isRecord(manifest) && typeof manifest["name"] === "string" && PackageNaming.isOwn(manifest["name"]);
+    return file !== DependencyPinCheck.MANIFEST_NAME && file !== DependencyPinCheck.ANGULAR_MANIFEST && DependencyPinCheck.isRecord(manifest) && Object.isString(manifest["name"]) && PackageNaming.isOwn(manifest["name"]);
   }
 
   private static isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private async validateInstallPinsAsync(files: readonly string[], texts: ReadonlyMap<string, string>): Promise<readonly [readonly string[], number]> {
@@ -221,13 +223,13 @@ export class DependencyPinCheck implements ICheck {
       findings.push(...shipped.filter(t => t[3] === folder).flatMap(([file, name, version, , section]) => {
         const pin = pins[name];
         const range = VersionRange.parse(version);
-        if (range !== null && typeof pin === "string" && !range.includes(pin))
+        if (!Object.isNull(range) && Object.isString(pin) && !range.includes(pin))
           return [`${file}: ${section} ${name} is "${version}", but ${pinning} pins "${pin}", outside it; the range must include the version the build installs and tests against.`];
-        if (range !== null && typeof pin === "string" && section === DependencyPinCheck.PEER_SECTION && PackageNaming.isShared(name) && !PackageNaming.isDesktopCore(name) && !range.startsAtOrJustBelow(pin))
+        if (!Object.isNull(range) && Object.isString(pin) && section === DependencyPinCheck.PEER_SECTION && PackageNaming.isShared(name) && !PackageNaming.isDesktopCore(name) && !range.startsAtOrJustBelow(pin))
           return [`${file}: ${section} ${name} is "${version}", but ${pinning} pins "${pin}"; a peer on context's or the kit's packages starts from the version the build installs `
             + "and tests against, or one below it, since a version further below is one no build of TeamRun has run on."];
-        if (typeof pin !== "string" || (range === null && pin !== version)) {
-          const pinned = typeof pin === "string" ? `pins "${pin}"` : "pins nothing";
+        if (!Object.isString(pin) || (Object.isNull(range) && pin !== version)) {
+          const pinned = Object.isString(pin) ? `pins "${pin}"` : "pins nothing";
           const source = !isRoot ? `the Angular project in ${folder}/, the root's workspace, installs it from ${locking}.`
             : section === DependencyPinCheck.PEER_SECTION ? "the build installs the root's copy beside the package, and its tests run against that version."
               : "packaging ships it from the root lockfile.";
@@ -236,7 +238,7 @@ export class DependencyPinCheck implements ICheck {
         const entry = locked[path.posix.join(folder, DependencyPinCheck.LOCKED_FOLDER, name)] ?? locked[`${DependencyPinCheck.LOCKED_FOLDER}${name}`];
         const lockedVersion = DependencyPinCheck.isRecord(entry) ? entry["version"] : undefined;
         return lockedVersion === pin ? [] : [`${file}: ${section} ${name} is "${version}", but ${locking} locks `
-          + `${typeof lockedVersion === "string" ? `version ${lockedVersion}` : "no version"} of it; run npm install.`];
+          + `${Object.isString(lockedVersion) ? `version ${lockedVersion}` : "no version"} of it; run npm install.`];
       }));
     }
     return [findings, shipped.length];

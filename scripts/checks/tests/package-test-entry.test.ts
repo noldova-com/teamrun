@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 
+import "@noldova/context.core";
 import * as testing from "@noldova/context.testing";
 
 import { PackageTestEntry } from "../package-test-entry.ts";
@@ -80,7 +81,7 @@ const runFilesAsync = async (environment: NodeJS.ProcessEnv, unloadable: readonl
   let files: readonly string[] = [];
   try {
     const written: unknown = JSON.parse(readFileSync(result, "utf8"));
-    if (typeof written === "object" && written !== null && "files" in written && Array.isArray(written.files))
+    if (Object.isObject(written) && "files" in written && Array.isArray(written.files))
       files = written.files.map(String).sort();
   }
   catch {

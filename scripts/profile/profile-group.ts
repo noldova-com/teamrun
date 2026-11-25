@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { ProfileException } from "./profile.exception.ts";
 import type { ProfileNode } from "./profile.node.ts";
 
@@ -28,10 +30,10 @@ export class ProfileGroup {
 
   public static parse(text: string): ProfileGroup {
     const known = ProfileGroup.KNOWN.find(t => t.name === text);
-    if (known !== undefined)
+    if (!Object.isUndefined(known))
       return known;
     const named = ProfileGroup.NAMED.exec(text);
-    if (named === null)
+    if (Object.isNull(named))
       throw new ProfileException(`"${text}" is neither a known group, ${ProfileGroup.KNOWN.map(t => t.name).join(", ")}, nor <name>=<function>+<function>.`);
     return new ProfileGroup(named[1]!, named[2]!.split(ProfileGroup.FUNCTION_SEPARATOR));
   }

@@ -9,6 +9,8 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 export class PreBundleRun {
   public static readonly FOLDER: string = "node_modules/.vite";
   public static readonly VARIABLE: string = "NOLDOVA_PRE_BUNDLE_RUN";
@@ -19,11 +21,11 @@ export class PreBundleRun {
   private readonly folder: string | null;
 
   public readonly name: string = PreBundleRun.NAME;
-  public readonly config: () => { readonly cacheDir: string } | null = () => this.folder === null ? null : { cacheDir: this.folder };
+  public readonly config: () => { readonly cacheDir: string } | null = () => Object.isNull(this.folder) ? null : { cacheDir: this.folder };
 
   public constructor(directory: string, environment: NodeJS.ProcessEnv) {
     const key = environment[PreBundleRun.VARIABLE];
-    this.folder = key !== undefined && PreBundleRun.KEY.test(key) ? path.join(directory, PreBundleRun.FOLDER, key) : null;
+    this.folder = !Object.isUndefined(key) && PreBundleRun.KEY.test(key) ? path.join(directory, PreBundleRun.FOLDER, key) : null;
   }
 
   public static environment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

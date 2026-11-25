@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import type { IPageMessage } from "./interfaces/i-page-message.ts";
 import type { IPageRequest } from "./interfaces/i-page-request.ts";
 import type { IWatchedPage } from "./interfaces/i-watched-page.ts";
@@ -83,7 +85,7 @@ export class BrowserSessionRecord {
   public report(sessionId: string): string {
     const steps = BrowserSessionRecord.STEPS.map(step => {
       const time = this.reached.get(step);
-      return time === undefined ? `${step} not reached` : `${step} at ${time} ms`;
+      return Object.isUndefined(time) ? `${step} not reached` : `${step} at ${time} ms`;
     });
     const missing = this.reached.has(BrowserSessionRecord.CONNECTED) ? BrowserSessionRecord.NOT_READY : BrowserSessionRecord.NOT_CONNECTED;
     const loading = [...this.pending].map(t => `Still loading: ${t.url()}`);

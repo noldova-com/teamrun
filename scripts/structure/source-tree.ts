@@ -9,6 +9,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { PackageNaming } from "../packages/package-naming.ts";
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import { SourceFile } from "./source-file.ts";
@@ -36,7 +38,7 @@ export class SourceTree {
     const files: SourceFile[] = [];
     for (const file of listed) {
       const area = PackageNaming.locatePackageFolder(file);
-      if (area === null || !SourceTree.SCANNED_EXTENSIONS.has(path.posix.extname(file)))
+      if (Object.isNull(area) || !SourceTree.SCANNED_EXTENSIONS.has(path.posix.extname(file)))
         continue;
 
       const isProduction = !file.split("/").some(t => SourceTree.TEST_FOLDERS.has(t));

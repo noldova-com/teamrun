@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { VersionSetter } from "../packages/version-setter.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
@@ -27,13 +29,13 @@ export class VersionFileCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     const released = await this.readVersionAsync(VersionFileCheck.VERSION_FILE, output);
-    let passed = released !== null;
+    let passed = !Object.isNull(released);
     const files = [...VersionSetter.TEXT_FILES.filter(t => t !== VersionFileCheck.VERSION_FILE), ...VersionSetter.MANIFESTS];
     for (const manifest of files) {
       const version = await this.readVersionAsync(manifest, output);
-      if (version === null)
+      if (Object.isNull(version))
         passed = false;
-      else if (released !== null && version !== released) {
+      else if (!Object.isNull(released) && version !== released) {
         output.write(`${manifest} holds the version ${version}, but ${VersionFileCheck.VERSION_FILE} holds ${released}; npm run set-version moves only the files that hold ${VersionFileCheck.VERSION_FILE}'s version, and the release compares app/package.json's with the version it builds, so each holds it.\n`);
         passed = false;
       }
@@ -60,8 +62,8 @@ export class VersionFileCheck implements ICheck {
       output.write(`${file} isn't valid JSON: ${error instanceof Error ? error.message : String(error)}\n`);
       return null;
     }
-    const version: unknown = typeof fields === "object" && fields !== null ? Object.entries(fields).find(([t]) => t === VersionFileCheck.VERSION_FIELD)?.[1] : undefined;
-    if (typeof version !== "string") {
+    const version: unknown = Object.isObject(fields) ? Object.entries(fields).find(([t]) => t === VersionFileCheck.VERSION_FIELD)?.[1] : undefined;
+    if (!Object.isString(version)) {
       output.write(`${file} holds no version string in its "${VersionFileCheck.VERSION_FIELD}" field, but ${JSON.stringify(version ?? null)}.\n`);
       return null;
     }

@@ -8,6 +8,8 @@
 
 import { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { ICheck } from "./interfaces/i-check.ts";
 import type { ISelectableCheck } from "./interfaces/i-selectable-check.ts";
 import { ReadingChecks } from "./reading-checks.ts";
@@ -33,14 +35,14 @@ export class ReadingFilterCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     const wiring = await this.findWiringAsync();
-    if (wiring !== null)
+    if (!Object.isNull(wiring))
       output.write(`A filtered run of npm test: ${wiring}\n`);
-    let passed = wiring === null;
+    let passed = Object.isNull(wiring);
     for (const expected of ReadingFilterCheck.CASES) {
       const finding = await ReadingFilterCheck.findAsync(expected);
-      if (finding !== null)
+      if (!Object.isNull(finding))
         output.write(`A filtered run of ${expected.filters.map(t => JSON.stringify(t)).join(", ")}: ${finding}\n`);
-      passed &&= finding === null;
+      passed &&= Object.isNull(finding);
     }
     output.write(`Selected checks that read by title in ${ReadingFilterCheck.CASES.length} filtered runs.\n`);
     return passed;

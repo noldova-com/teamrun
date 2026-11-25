@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
 
@@ -39,7 +41,7 @@ export class GitHubConfigurationCheck implements ICheck {
       const lines = (await readFile(path.join(this.root, file), "utf8")).split(GitHubConfigurationCheck.LINE_SEPARATOR);
       lines.forEach((line, index) => {
         const problem = GitHubConfigurationCheck.findProblem(line);
-        if (problem !== null)
+        if (!Object.isNull(problem))
           findings.push(`${file}:${index + 1}: ${problem}`);
       });
     }
@@ -52,7 +54,7 @@ export class GitHubConfigurationCheck implements ICheck {
 
   private static findProblem(line: string): string | null {
     const match = GitHubConfigurationCheck.USES_LINE.exec(line);
-    if (match === null)
+    if (Object.isNull(match))
       return null;
     const [, action = "", rest = ""] = match;
     if (action.startsWith(GitHubConfigurationCheck.LOCAL_PREFIX))

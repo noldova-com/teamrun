@@ -9,6 +9,7 @@
 import { posix } from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
 import ts from "typescript";
 
 import { SourceTree } from "../structure/source-tree.ts";
@@ -94,7 +95,7 @@ export class PagesBoundaryCheck implements ICheck {
     const findings: string[] = [];
     for (const reference of references) {
       const problem = inside ? PagesBoundaryCheck.inspectInside(file, reference) : PagesBoundaryCheck.inspectOutside(file, reference);
-      if (problem !== null)
+      if (!Object.isNull(problem))
         findings.push(`${file}:${reference.line}: ${problem}; ${PagesBoundaryCheck.RULE}`);
     }
     return findings;
@@ -119,7 +120,7 @@ export class PagesBoundaryCheck implements ICheck {
     if (specifier !== PagesBoundaryCheck.PROTOCOL)
       return `takes ${specifier}, which Pages may not use`;
     const names = reference.names;
-    if (names === null)
+    if (Object.isNull(names))
       return `takes all of ${specifier}, of which Pages may use only ${PagesBoundaryCheck.PROTOCOL_LIST}`;
     const others = names.filter(t => !PagesBoundaryCheck.PROTOCOL_NAMES.has(t));
     return others.length === 0 ? null : `takes ${others.join(", ")} from ${specifier}, of which Pages may use only ${PagesBoundaryCheck.PROTOCOL_LIST}`;
@@ -129,17 +130,17 @@ export class PagesBoundaryCheck implements ICheck {
     if (!reference.specifier.startsWith(PagesBoundaryCheck.RELATIVE))
       return null;
     const target = PagesBoundaryCheck.PAGES_PATH.exec(PagesBoundaryCheck.resolve(file, reference.specifier))?.[1];
-    if (target === undefined)
+    if (Object.isUndefined(target))
       return null;
     const entry = PagesBoundaryCheck.ENTRIES.get(target);
-    if (entry === undefined)
+    if (Object.isUndefined(entry))
       return `takes ${reference.specifier}, inside Pages, which TeamRun reaches only through its entries`;
     return reference.isLazy || reference.names?.every(t => t === entry) === true ? null : `takes more than ${entry} from ${reference.specifier}`;
   }
 
   private static isPackageBase(file: string, reference: ModuleReference): boolean {
     const base = PagesBoundaryCheck.BASES.get(PagesBoundaryCheck.resolve(file, reference.specifier).replace(PagesBoundaryCheck.SCRIPT_EXTENSION, ""));
-    return base !== undefined && reference.names?.every(t => t === base) === true;
+    return !Object.isUndefined(base) && reference.names?.every(t => t === base) === true;
   }
 
   private static resolve(file: string, specifier: string): string {
@@ -150,7 +151,7 @@ export class PagesBoundaryCheck implements ICheck {
     const references: ModuleReference[] = [];
     const visit = (node: ts.Node): void => {
       const reference = PagesBoundaryCheck.referenceOf(node);
-      if (reference !== null)
+      if (!Object.isNull(reference))
         references.push(new ModuleReference(reference[0], reference[1], source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
           ts.isCallExpression(node)));
       node.forEachChild(visit);
@@ -163,14 +164,14 @@ export class PagesBoundaryCheck implements ICheck {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const clause = node.importClause;
       const bindings = clause?.namedBindings;
-      const names = clause === undefined ? []
-        : clause.name !== undefined || bindings === undefined || !ts.isNamedImports(bindings) ? null
+      const names = Object.isUndefined(clause) ? []
+        : !Object.isUndefined(clause.name) || Object.isUndefined(bindings) || !ts.isNamedImports(bindings) ? null
           : bindings.elements.map(t => (t.propertyName ?? t.name).text);
       return [node.moduleSpecifier.text, names];
     }
-    if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined && ts.isStringLiteral(node.moduleSpecifier)) {
+    if (ts.isExportDeclaration(node) && !Object.isUndefined(node.moduleSpecifier) && ts.isStringLiteral(node.moduleSpecifier)) {
       const clause = node.exportClause;
-      return [node.moduleSpecifier.text, clause !== undefined && ts.isNamedExports(clause) ? clause.elements.map(t => (t.propertyName ?? t.name).text) : null];
+      return [node.moduleSpecifier.text, !Object.isUndefined(clause) && ts.isNamedExports(clause) ? clause.elements.map(t => (t.propertyName ?? t.name).text) : null];
     }
     if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference))
       return [PagesBoundaryCheck.textOf(node.moduleReference.expression), null];
@@ -182,6 +183,6 @@ export class PagesBoundaryCheck implements ICheck {
   }
 
   private static textOf(node: ts.Node | undefined): string {
-    return node !== undefined && ts.isStringLiteral(node) ? node.text : PagesBoundaryCheck.COMPUTED;
+    return !Object.isUndefined(node) && ts.isStringLiteral(node) ? node.text : PagesBoundaryCheck.COMPUTED;
   }
 }

@@ -12,6 +12,7 @@ import path from "node:path";
 import type { Writable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import "@noldova/context.core";
 import type { CoverageResult } from "@noldova/context.testing";
 
 import type { ICoverageCount } from "../totals/interfaces/i-coverage-count.ts";
@@ -47,7 +48,7 @@ export class PackageCoverage {
     const covered = projects.map(t => new testing.CoverageProject(t.name, PackageCoverage.locateReal(t.productionDirectory), t.sourceDirectory));
     const deadline = Date.now() + this.settleMilliseconds;
     let analyzed: CoverageResult | null = null;
-    while (analyzed === null) {
+    while (Object.isNull(analyzed)) {
       try {
         analyzed = await analyzer.analyzeAsync(coverageDirectory, covered);
       }
@@ -65,15 +66,15 @@ export class PackageCoverage {
 
   private async awaitWholeReportsAsync(coverageDirectory: string, deadline: number, error: Error, output: Writable): Promise<void> {
     const first = await PackageCoverage.findPartialReportAsync(coverageDirectory);
-    if (first === null)
+    if (Object.isNull(first))
       throw new TotalsException(error.message, { cause: error });
     const described = await PackageCoverage.describeAsync(coverageDirectory, first);
     let partial: string | null = first;
-    while (partial !== null && Date.now() < deadline) {
+    while (!Object.isNull(partial) && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, this.pollMilliseconds));
       partial = await PackageCoverage.findPartialReportAsync(coverageDirectory);
     }
-    if (partial !== null)
+    if (!Object.isNull(partial))
       throw new TotalsException(`${await PackageCoverage.describeAsync(coverageDirectory, partial)}; it is still not whole after ${this.settleMilliseconds} ms.`, { cause: error });
     output.write(`${described}; it became whole, so the coverage is measured again.\n`);
   }
@@ -93,7 +94,7 @@ export class PackageCoverage {
   private static async describeAsync(coverageDirectory: string, name: string): Promise<string> {
     const file = path.join(coverageDirectory, name);
     const [text, details] = await Promise.all([readFile(file, PackageCoverage.REPORT_ENCODING), stat(file)]);
-    const scripts = [...new Set([...text.matchAll(PackageCoverage.SCRIPT_PATTERN)].flatMap(t => t[1] === undefined ? [] : [path.relative(process.cwd(), fileURLToPath(t[1]))]))];
+    const scripts = [...new Set([...text.matchAll(PackageCoverage.SCRIPT_PATTERN)].flatMap(t => Object.isUndefined(t[1]) ? [] : [path.relative(process.cwd(), fileURLToPath(t[1]))]))];
     const named = scripts.slice(0, PackageCoverage.NAMED_SCRIPTS).join(", ");
     const more = scripts.length > PackageCoverage.NAMED_SCRIPTS ? ` and ${scripts.length - PackageCoverage.NAMED_SCRIPTS} more` : "";
     return `The coverage report ${name} is not whole JSON: ${details.size} bytes, written ${Math.round(Date.now() - details.mtimeMs)} ms ago, covering ${named.length > 0 ? `${named}${more}` : "no script"}`;

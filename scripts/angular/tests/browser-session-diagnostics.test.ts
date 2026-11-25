@@ -10,6 +10,8 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { BrowserSessionDiagnostics } from "../browser-session-diagnostics.ts";
 import type { IBrowserSession } from "../interfaces/i-browser-session.ts";
 import type { IBrowserSessions } from "../interfaces/i-browser-sessions.ts";
@@ -35,7 +37,7 @@ const fakeRun = (): IFakeRun => {
   const sessions: IBrowserSessions = {
     createSession: sessionId => {
       created.set(sessionId, { connected: () => void calls.push(`${sessionId} connected`), ready: () => void calls.push(`${sessionId} ready`) });
-      return new Promise((resolve, reject) => answers.set(sessionId, error => error === undefined ? resolve() : reject(error)));
+      return new Promise((resolve, reject) => answers.set(sessionId, error => Object.isUndefined(error) ? resolve() : reject(error)));
     },
     getSession: sessionId => created.get(sessionId)
   };
@@ -49,7 +51,7 @@ const fakeRun = (): IFakeRun => {
 };
 
 const page = (): IWatchedPage & EventEmitter => new EventEmitter();
-const request = (url: string, errorText: string | null = null): IPageRequest => ({ url: () => url, failure: () => errorText === null ? null : { errorText } });
+const request = (url: string, errorText: string | null = null): IPageRequest => ({ url: () => url, failure: () => Object.isNull(errorText) ? null : { errorText } });
 const message = (type: string, text: string): IPageMessage => ({ type: () => type, text: () => text });
 const timeless = (report: string | undefined): string[] => (report ?? "").replaceAll(/\d+ ms/gu, "N ms").split("\n");
 const listening = (watched: EventEmitter): number => ["domcontentloaded", "load", "request", "requestfinished", "requestfailed", "console", "pageerror"]

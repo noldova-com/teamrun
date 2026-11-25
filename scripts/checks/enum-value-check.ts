@@ -8,6 +8,7 @@
 
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
 import ts from "typescript";
 
 import type { RepositoryFiles } from "../repository/repository-files.ts";
@@ -53,7 +54,7 @@ export class EnumValueCheck implements ICheck {
       if (ts.isEnumDeclaration(node))
         for (const member of node.members) {
           const value = member.initializer;
-          if ((ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && value !== undefined && (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) && value.text !== member.name.text)
+          if ((ts.isIdentifier(member.name) || ts.isStringLiteral(member.name)) && !Object.isUndefined(value) && (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) && value.text !== member.name.text)
             findings.push(`${file}:${source.getLineAndCharacterOfPosition(member.getStart(source)).line + 1}: ${node.name.text}.${member.name.text} has the value "${value.text}" instead of its name; ${EnumValueCheck.RULE}`);
         }
       node.forEachChild(visit);

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class SentenceBreaker {
   private static readonly LINE_SEPARATOR: string = "\n";
   private static readonly PREFIX: RegExp = /^(?:[ \t]*>[ \t]?)*[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?/;
@@ -60,8 +62,8 @@ export class SentenceBreaker {
         isFrontMatter = index === 0 || line !== SentenceBreaker.FRONT_MATTER;
         prose.push(false);
       }
-      else if (fence !== null) {
-        if (opening !== undefined && opening[0] === fence[0] && opening.length >= fence.length && content.trim() === opening)
+      else if (!Object.isNull(fence)) {
+        if (!Object.isUndefined(opening) && opening[0] === fence[0] && opening.length >= fence.length && content.trim() === opening)
           fence = null;
         prose.push(false);
       }
@@ -86,7 +88,7 @@ export class SentenceBreaker {
         isCode = false;
         isList = SentenceBreaker.LIST_ITEM.test(body) || isList && (!isAfterBlank || SentenceBreaker.INDENTED.test(body));
         fence = opening ?? null;
-        prose.push(fence === null && !SentenceBreaker.NOT_PROSE.test(content));
+        prose.push(Object.isNull(fence) && !SentenceBreaker.NOT_PROSE.test(content));
       }
       isAfterBlank = isBlank;
     }

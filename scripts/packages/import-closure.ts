@@ -10,6 +10,8 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import { SourceScanner } from "../structure/source-scanner.ts";
 import { ContentHash } from "./content-hash.ts";
 
@@ -26,7 +28,7 @@ export class ImportClosure {
   public async listAsync(entry: string): Promise<readonly string[]> {
     const found = new Set<string>([path.resolve(entry)]);
     const pending = [...found];
-    for (let file = pending.pop(); file !== undefined; file = pending.pop())
+    for (let file = pending.pop(); !Object.isUndefined(file); file = pending.pop())
       for (const literal of new SourceScanner(await readFile(file, "utf8")).scan().imports) {
         if (!literal.value.startsWith(ImportClosure.RELATIVE_PREFIX))
           continue;

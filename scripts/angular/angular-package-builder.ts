@@ -12,6 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { PackageBuilder } from "../packages/package-builder.ts";
 import { PackageException } from "../packages/package.exception.ts";
 import type { ProcessRunner } from "../processes/process-runner.ts";
@@ -67,7 +69,7 @@ export class AngularPackageBuilder {
 
   public async runAsync(buildArguments: readonly string[]): Promise<number> {
     const [folder, ...others] = buildArguments;
-    if (folder === undefined || others.length > 0) {
+    if (Object.isUndefined(folder) || others.length > 0) {
       this.output.write(AngularPackageBuilder.USAGE);
       return AngularPackageBuilder.USAGE_EXIT_CODE;
     }
@@ -178,7 +180,7 @@ export class AngularPackageBuilder {
       }
       await writeFile(target, text.replace(AngularPackageBuilder.URL, (whole, quote: string, reference: string) => {
         const replacement = rewritten.get(reference);
-        return replacement === undefined ? whole : `url(${quote}${replacement}${quote})`;
+        return Object.isUndefined(replacement) ? whole : `url(${quote}${replacement}${quote})`;
       }), AngularPackageBuilder.ENCODING);
     }
   }
@@ -194,9 +196,9 @@ export class AngularPackageBuilder {
   private async copyFolderAsync(folder: string, output: string, copied: Map<string, string>, subject: string): Promise<string> {
     const copy = path.join(output, path.basename(folder));
     const earlier = copied.get(copy);
-    if (earlier !== undefined && earlier !== folder)
+    if (!Object.isUndefined(earlier) && earlier !== folder)
       throw new PackageException(`${subject} ${this.describe(folder)}, and the package already takes ${this.describe(earlier)} as ${path.basename(folder)}/.`);
-    if (earlier === undefined) {
+    if (Object.isUndefined(earlier)) {
       await cp(folder, copy, { recursive: true });
       copied.set(copy, folder);
     }

@@ -11,6 +11,8 @@ import { builtinModules } from "node:module";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { PackageCatalog } from "../packages/package-catalog.ts";
 import type { PackageManifest } from "../packages/package-manifest.ts";
 import { PackageException } from "../packages/package.exception.ts";
@@ -96,7 +98,7 @@ export class GlobalMockCheck implements ICheck {
   }
 
   private static isFileSystem(module: string | null): boolean {
-    return module !== null && GlobalMockCheck.FILE_SYSTEM_MODULES.has(module.replace(GlobalMockCheck.NODE_PREFIX, ""));
+    return !Object.isNull(module) && GlobalMockCheck.FILE_SYSTEM_MODULES.has(module.replace(GlobalMockCheck.NODE_PREFIX, ""));
   }
 
   private static findMocks(text: string): readonly FoundMock[] {

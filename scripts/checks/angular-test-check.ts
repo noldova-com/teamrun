@@ -8,6 +8,8 @@
 
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { AngularProject } from "../angular/angular-project.ts";
 import { ProcessException } from "../processes/process.exception.ts";
 import { TotalsException } from "../totals/totals.exception.ts";
@@ -61,7 +63,7 @@ export class AngularTestCheck implements ISelectableCheck {
   }
 
   private static formatEnded(exitCode: number | null): string {
-    return exitCode === null
+    return Object.isNull(exitCode)
       ? "The Angular tests were ended by a signal and wrote no report.\n"
       : `The Angular tests ended with exit code ${exitCode} and wrote no report.\n`;
   }
@@ -69,9 +71,9 @@ export class AngularTestCheck implements ISelectableCheck {
   private async checkAsync(output: Writable, include: readonly string[] = []): Promise<boolean> {
     try {
       await this.project.prepareAsync(output);
-      const run = await this.project.testAsync(include, this.flaky !== null);
+      const run = await this.project.testAsync(include, !Object.isNull(this.flaky));
       await this.flaky?.addAsync(run.retried.map(t => new FlakyTest(AngularTestCheck.TOTALS_TITLE, t.file, t.name, t.failure)), output);
-      if (run.result === null) {
+      if (Object.isNull(run.result)) {
         output.write(run.isSuccessful ? AngularTestCheck.NO_REPORT : AngularTestCheck.formatEnded(run.exitCode));
         return false;
       }

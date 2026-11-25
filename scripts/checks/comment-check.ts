@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import type { ICommentReader } from "../structure/interfaces/i-comment.reader.ts";
 import { MarkupCommentReader } from "../structure/markup-comment.reader.ts";
@@ -42,7 +44,7 @@ export class CommentCheck implements ICheck {
     let failures = 0;
     for (const file of await this.files.listAsync()) {
       const reader = CommentCheck.READERS.get(path.posix.extname(file));
-      if (reader === undefined || CommentCheck.API_DECLARATIONS.test(file))
+      if (Object.isUndefined(reader) || CommentCheck.API_DECLARATIONS.test(file))
         continue;
       checked++;
       for (const line of CommentCheck.readCommentLines(reader, await readFile(path.join(this.root, file), "utf8"))) {

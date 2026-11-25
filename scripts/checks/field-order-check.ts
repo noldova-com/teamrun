@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import type { RepositoryFiles } from "../repository/repository-files.ts";
 import { SourceFile } from "../structure/source-file.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
@@ -60,15 +62,15 @@ export class FieldOrderCheck implements ICheck {
     let hasEarlierField = false;
     lines.forEach((line, index) => {
       const declared = FieldOrderCheck.CLASS.exec(line)?.[1];
-      if (declared !== undefined) {
+      if (!Object.isUndefined(declared)) {
         className = declared;
         hasEarlierField = false;
         return;
       }
       if (line === FieldOrderCheck.CLASS_END)
         className = null;
-      const field = className === null ? null : FieldOrderCheck.FIELD.exec(line);
-      if (field === null || className === null)
+      const field = Object.isNull(className) ? null : FieldOrderCheck.FIELD.exec(line);
+      if (Object.isNull(field) || Object.isNull(className))
         return;
       const isPublicStatic = (field[1] ?? FieldOrderCheck.PUBLIC) === FieldOrderCheck.PUBLIC && field[2] === FieldOrderCheck.STATIC;
       if (!isPublicStatic)

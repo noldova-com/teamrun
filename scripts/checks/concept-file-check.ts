@@ -10,6 +10,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
 import ts from "typescript";
 
 import type { RepositoryFiles } from "../repository/repository-files.ts";
@@ -46,7 +47,7 @@ export class ConceptFileCheck implements ICheck {
 
   public async runAsync(output: Writable): Promise<boolean> {
     const commands = await this.readCommandsAsync();
-    if (commands === null) {
+    if (Object.isNull(commands)) {
       output.write(`${ConceptFileCheck.MANIFEST}: is not a JSON object whose scripts, if any, are an object, which name the files that keep their own names; ${ConceptFileCheck.RULE}\n`);
       return false;
     }
@@ -70,14 +71,14 @@ export class ConceptFileCheck implements ICheck {
   private static inspect(file: string, source: ts.SourceFile): readonly string[] {
     const concepts = source.statements.filter(t => ConceptFileCheck.isConcept(t));
     const [concept, ...others] = concepts;
-    if (concept === undefined)
+    if (Object.isUndefined(concept))
       return [];
     if (others.length > 0)
       return [`${file}: declares ${concepts.length} concepts, ${concepts.map(t => ConceptFileCheck.readName(t) ?? ConceptFileCheck.ANONYMOUS).join(", ")}; ${ConceptFileCheck.RULE}`];
 
     const name = ConceptFileCheck.readName(concept);
     const location = `${file}:${source.getLineAndCharacterOfPosition(concept.getStart(source)).line + 1}`;
-    if (name === null)
+    if (Object.isNull(name))
       return [`${location}: declares a class without a name to name the file for; ${ConceptFileCheck.RULE}`];
     const expected = ConceptFileCheck.formatFileName(name, path.posix.extname(file));
     return path.posix.basename(file) === expected ? [] : [`${location}: ${name} is not in its file ${expected}; ${ConceptFileCheck.RULE}`];
@@ -109,13 +110,13 @@ export class ConceptFileCheck implements ICheck {
     catch {
       return null;
     }
-    if (typeof manifest !== "object" || manifest === null || Array.isArray(manifest))
+    if (!Object.isObject(manifest) || Array.isArray(manifest))
       return null;
     if (!("scripts" in manifest))
       return [];
     const scripts = manifest.scripts;
-    if (typeof scripts !== "object" || scripts === null || Array.isArray(scripts))
+    if (!Object.isObject(scripts) || Array.isArray(scripts))
       return null;
-    return Object.values(scripts).filter(t => typeof t === "string").map(t => String(t));
+    return Object.values(scripts).filter(t => Object.isString(t)).map(t => String(t));
   }
 }

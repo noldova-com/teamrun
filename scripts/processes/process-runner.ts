@@ -10,6 +10,8 @@ import { spawn } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { ProcessEnd } from "./process-end.ts";
 import { ProcessResult } from "./process-result.ts";
 import { ProcessTimeoutException } from "./process-timeout.exception.ts";
@@ -42,7 +44,7 @@ export class ProcessRunner {
       child.on("error", t => stop(new ProcessException(`"${command}" could not start.`, { cause: t })));
       child.on("close", t => {
         clearTimeout(timer);
-        if (failure === null)
+        if (Object.isNull(failure))
           resolve(new ProcessResult(t, Buffer.concat(output).toString("utf8"), Buffer.concat(errorOutput).toString("utf8")));
         else
           reject(failure);
@@ -58,7 +60,7 @@ export class ProcessRunner {
     return new Promise<ProcessEnd>((resolve, reject) => {
       const child = spawn(command, [...commandArguments], { cwd: directory, shell: false, stdio: "inherit", env: environment ?? process.env });
       let failure: ProcessException | null = null;
-      const timer = timeout === undefined ? undefined : setTimeout(() => {
+      const timer = Object.isUndefined(timeout) ? undefined : setTimeout(() => {
         failure = new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`);
         child.kill();
       }, timeout);
@@ -68,7 +70,7 @@ export class ProcessRunner {
       });
       child.on("close", (code, signal) => {
         clearTimeout(timer);
-        if (failure === null)
+        if (Object.isNull(failure))
           resolve(new ProcessEnd(code, signal));
         else
           reject(failure);
@@ -86,7 +88,7 @@ export class ProcessRunner {
       const file = createWriteStream(log);
       const child = spawn(command, [...commandArguments], { cwd: directory, env: environment, shell: false, stdio: ["inherit", "pipe", "pipe"] });
       let failure: ProcessException | null = null;
-      const timer = timeout === undefined ? undefined : setTimeout(() => {
+      const timer = Object.isUndefined(timeout) ? undefined : setTimeout(() => {
         failure ??= new ProcessTimeoutException(`"${command}" did not finish within ${timeout} ms.`);
         child.kill();
       }, timeout);
@@ -99,7 +101,7 @@ export class ProcessRunner {
       child.on("error", t => failure = new ProcessException(`"${command}" could not start.`, { cause: t }));
       child.on("close", (code, signal) => {
         clearTimeout(timer);
-        file.end(() => failure === null ? resolve(new ProcessEnd(code, signal)) : reject(failure));
+        file.end(() => Object.isNull(failure) ? resolve(new ProcessEnd(code, signal)) : reject(failure));
       });
     });
   }

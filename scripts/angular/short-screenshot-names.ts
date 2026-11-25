@@ -9,6 +9,8 @@
 import { createHash } from "node:crypto";
 import { basename, dirname, extname, join } from "node:path";
 
+import "@noldova/context.core";
+
 import type { IScreenshotCommandContext } from "./interfaces/i-screenshot-command-context.ts";
 import type { IScreenshotOptions } from "./interfaces/i-screenshot-options.ts";
 import type { ISavedScreenshot } from "./interfaces/i-saved-screenshot.ts";
@@ -45,8 +47,8 @@ export class ShortScreenshotNames {
     const base64 = save ? options.base64 : true;
     const target = options.path ?? name;
     const short = ShortScreenshotNames.shorten(target);
-    const sent = options.path === undefined ? { ...options, save, base64 } : { ...options, save, base64, path: short };
-    const taken = await context.triggerCommand(ShortScreenshotNames.TAKE, options.path === undefined ? short : name, sent);
+    const sent = Object.isUndefined(options.path) ? { ...options, save, base64 } : { ...options, save, base64, path: short };
+    const taken = await context.triggerCommand(ShortScreenshotNames.TAKE, Object.isUndefined(options.path) ? short : name, sent);
     if (short !== target)
       context.project.vitest.logger.log(`Screenshot of "${basename(target)}": ${taken.path}`);
     if (!save)

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { MarkdownLink } from "./markdown-link.ts";
 
 export class MarkdownDocument {
@@ -40,9 +42,9 @@ export class MarkdownDocument {
     let fence: string | null = null;
     let isComment = false;
     for (const line of text.split(MarkdownDocument.LINE_SEPARATOR)) {
-      if (fence !== null) {
+      if (!Object.isNull(fence)) {
         const closing = MarkdownDocument.CLOSING_FENCE_PATTERN.exec(line)?.[1];
-        if (closing !== undefined && closing[0] === fence[0] && closing.length >= fence.length)
+        if (!Object.isUndefined(closing) && closing[0] === fence[0] && closing.length >= fence.length)
           fence = null;
         visible.push("");
         continue;
@@ -61,7 +63,7 @@ export class MarkdownDocument {
       }
 
       fence = MarkdownDocument.OPENING_FENCE_PATTERN.exec(kept)?.[1] ?? null;
-      visible.push(fence === null ? kept : "");
+      visible.push(Object.isNull(fence) ? kept : "");
     }
     return visible;
   }
@@ -71,7 +73,7 @@ export class MarkdownDocument {
     const occurrences = new Map<string, number>();
     for (const line of lines) {
       const heading = MarkdownDocument.HEADING_PATTERN.exec(line);
-      if (heading === null)
+      if (Object.isNull(heading))
         continue;
 
       const anchor = MarkdownDocument.formatAnchor(heading[1] ?? "");
@@ -95,10 +97,10 @@ export class MarkdownDocument {
     for (const [index, line] of lines.entries()) {
       const text = line.replace(MarkdownDocument.CODE_SPAN_PATTERN, "");
       const definition = MarkdownDocument.DEFINITION_PATTERN.exec(text)?.[1];
-      if (definition !== undefined)
+      if (!Object.isUndefined(definition))
         links.push(new MarkdownLink(definition, index + 1));
       for (const match of text.matchAll(MarkdownDocument.INLINE_LINK_PATTERN))
-        if (match[1] !== undefined)
+        if (!Object.isUndefined(match[1]))
           links.push(new MarkdownLink(match[1].replace(MarkdownDocument.ANGLE_BRACKETS_PATTERN, "$1"), index + 1));
     }
     return links;

@@ -9,6 +9,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { DependencySchedule } from "../dependency-schedule.ts";
 
 interface IItem {
@@ -22,7 +24,7 @@ class Gate {
 
   public constructor() {
     this.promise = new Promise<void>((resolve, reject) => {
-      this.settle = error => error === null ? resolve() : reject(error);
+      this.settle = error => Object.isNull(error) ? resolve() : reject(error);
     });
   }
 
@@ -69,7 +71,7 @@ class Tasks {
 
   private gateOf(gates: ReadonlyMap<string, Gate>, name: string): Gate {
     const gate = gates.get(name);
-    if (gate === undefined)
+    if (Object.isUndefined(gate))
       throw new Error(`No gate for ${name}.`);
     return gate;
   }

@@ -10,6 +10,8 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import type { IParseDiagnostic } from "./interfaces/i-parse-diagnostic.ts";
 import type { IPreBundleFile } from "./interfaces/i-pre-bundle-file.ts";
 import type { IVitestLogger } from "./interfaces/i-vitest-logger.ts";
@@ -54,7 +56,7 @@ export class PreBundleCheck {
   private checkAsync(id: string): Promise<void> {
     const [file = id, query = ""] = id.split(PreBundleCheck.QUERY);
     const folder = [...this.folders].find(t => path.relative(t, path.dirname(path.resolve(file))) === "");
-    if (folder === undefined)
+    if (Object.isUndefined(folder))
       return Promise.resolve();
     const key = `${folder}${PreBundleCheck.QUERY}${new URLSearchParams(query).get(PreBundleCheck.VERSION) ?? ""}`;
     const check = this.checks.get(key) ?? this.checkFolderAsync(folder);
@@ -83,7 +85,7 @@ export class PreBundleCheck {
     const scripts = files.filter(t => PreBundleCheck.SCRIPT.test(t.name));
     for (const file of scripts) {
       const error = this.parse(file.name, file.bytes.toString(PreBundleCheck.TEXT_ENCODING)).find(t => t.severity === PreBundleCheck.ERROR);
-      if (error !== undefined)
+      if (!Object.isUndefined(error))
         throw new Error(`Vite's pre-bundled ${path.join(folder, file.name)} doesn't parse: ${error.message}. Each pre-bundled file's size and SHA-256, as the browser's first request for one found them, are in ${this.record}.`);
     }
     this.logger?.log(`The pre-bundle check read ${files.length} files in ${folder}, and its ${scripts.length} scripts parse.`);

@@ -13,6 +13,8 @@ import path from "node:path";
 import { Writable } from "node:stream";
 import { afterEach, describe, it } from "node:test";
 
+import "@noldova/context.core";
+
 import { ProcessRunner } from "../../processes/process-runner.ts";
 import { Git } from "../../repository/git.ts";
 import { RepositoryFiles } from "../../repository/repository-files.ts";
@@ -51,7 +53,7 @@ const repositoryAsync = async (sample: {
   write(root, "package.json", JSON.stringify({ name: "@noldova/teamrun", version: "0.0.2", private: true, dependencies: pins }));
   write(root, "package-lock.json", JSON.stringify({ packages: Object.fromEntries([...Object.entries(locks).map(([name, version]) => [`node_modules/${name}`, { version }]),
     ...Object.entries(sample.nested ?? {}).map(([name, version]) => [`src/node_modules/${name}`, { version }])]) }));
-  if (sample.angular !== undefined) {
+  if (!Object.isUndefined(sample.angular)) {
     write(root, "src/package.json", JSON.stringify({ name: "@noldova/teamrun.angular", private: true, dependencies: { [ANGULAR]: sample.angular } }));
     write(root, WINDOW, JSON.stringify({ name: "@noldova/teamrun.window", version: "__VERSION__", peerDependencies: { [ANGULAR]: sample.angular } }));
   }
@@ -90,11 +92,11 @@ describe("DependencyPinCheck", () => {
   });
 
   for (const noldovaDesktop of [undefined, 72, ">=0.0.72 <0.2.0", ">=1.2.0 <1.3.0", "^0.0.72", ">=0.0.72", ">=0.1.0 <0.1.0", ">=0.0.72 <0.1.0 "])
-    it(`fails a noldovaDesktop of ${noldovaDesktop === undefined ? "nothing" : JSON.stringify(noldovaDesktop)}, which isn't the one range a module writes`, async () => {
+    it(`fails a noldovaDesktop of ${Object.isUndefined(noldovaDesktop) ? "nothing" : JSON.stringify(noldovaDesktop)}, which isn't the one range a module writes`, async () => {
       const { passed, text } = await runAsync({ noldovaDesktop, peers: { [RUNTIME]: "0.0.72" } });
 
       assert.equal(passed, false);
-      assert.match(text, new RegExp(`^${DECLARATION}: noldovaDesktop is ${noldovaDesktop === undefined ? "missing" : ""}`, "m"));
+      assert.match(text, new RegExp(`^${DECLARATION}: noldovaDesktop is ${Object.isUndefined(noldovaDesktop) ? "missing" : ""}`, "m"));
       assert.doesNotMatch(text, /a peer on Noldova Desktop's packages takes/);
     });
 

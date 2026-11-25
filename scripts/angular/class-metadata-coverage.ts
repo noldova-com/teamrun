@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import type { IVitestPlugin } from "./interfaces/i-vitest-plugin.ts";
 import type { IVitestPluginContext } from "./interfaces/i-vitest-plugin-context.ts";
 import { MarkedModule } from "./marked-module.ts";
@@ -35,7 +37,7 @@ export class ClassMetadataCoverage implements IVitestPlugin {
     const classes: string[] = [];
     for (let index = 1; index < lines.length; index++) {
       const name = this.classAt(lines, index);
-      if (name === null)
+      if (Object.isNull(name))
         continue;
       lines[index - 1] += ClassMetadataCoverage.HINT;
       classes.push(name);
@@ -52,7 +54,7 @@ export class ClassMetadataCoverage implements IVitestPlugin {
     if (lines[index] !== ClassMetadataCoverage.OPENING)
       return null;
     const name = ClassMetadataCoverage.CALL.exec(lines[index + 1] ?? "")?.[1];
-    if (name === undefined || !lines.slice(index + 2).includes(ClassMetadataCoverage.CLOSING))
+    if (Object.isUndefined(name) || !lines.slice(index + 2).includes(ClassMetadataCoverage.CLOSING))
       return null;
     return name;
   }

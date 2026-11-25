@@ -8,6 +8,7 @@
 
 import { writeFileSync } from "node:fs";
 
+import "@noldova/context.core";
 import {
   type DiscoveredTestClass, type DiscoveredTestMethod, type ITestProgressListener, TestClassResult, type TestMethodResult, TestTimeoutException
 } from "@noldova/context.testing";
@@ -54,7 +55,7 @@ export class PackageTestProgress implements ITestProgressListener {
   }
 
   private record(isRunning: boolean): void {
-    if (this.progressFile === null || this.running === null)
+    if (Object.isNull(this.progressFile) || Object.isNull(this.running))
       return;
     try {
       writeFileSync(this.progressFile, JSON.stringify({ test: this.running, isRunning }));
@@ -65,7 +66,7 @@ export class PackageTestProgress implements ITestProgressListener {
   }
 
   public complete(classResults: readonly TestClassResult[]): TestClassResult[] {
-    if (this.testClass === null)
+    if (Object.isNull(this.testClass))
       return [...classResults];
     const stopped = new TestClassResult(this.testClass.packageName, this.testClass.className, this.testClass.filePath, this.methodResults);
     this.onClassCompleted(stopped);

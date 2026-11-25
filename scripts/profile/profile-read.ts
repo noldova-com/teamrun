@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { CpuProfile } from "./cpu-profile.ts";
 import { ProfileException } from "./profile.exception.ts";
 import { ProfileGroup } from "./profile-group.ts";
@@ -40,14 +42,14 @@ export class ProfileRead {
     try {
       for (let index = 0; index < options.length; index += 2) {
         const [option, value] = [options[index], options[index + 1]];
-        if (option === ProfileRead.GROUPS_OPTION && value !== undefined)
+        if (option === ProfileRead.GROUPS_OPTION && !Object.isUndefined(value))
           groups = value.split(ProfileRead.GROUP_SEPARATOR).map(t => ProfileGroup.parse(t));
-        else if (option === ProfileRead.TOP_OPTION && value !== undefined && ProfileRead.COUNT.test(value))
+        else if (option === ProfileRead.TOP_OPTION && !Object.isUndefined(value) && ProfileRead.COUNT.test(value))
           top = Number(value);
         else
           return this.usage();
       }
-      if (file === undefined || file.startsWith("--"))
+      if (Object.isUndefined(file) || file.startsWith("--"))
         return this.usage();
       this.output.write(this.format(CpuProfile.parse(await readFile(file, "utf8")), path.basename(file), groups, top,
         new ProfileSources(path.join(path.dirname(file), ProfileSources.FOLDER))));

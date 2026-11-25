@@ -8,6 +8,8 @@
 
 import path from "node:path";
 
+import "@noldova/context.core";
+
 import type { MarkdownDocument } from "./markdown-document.ts";
 import type { MarkdownLink } from "./markdown-link.ts";
 
@@ -47,7 +49,7 @@ export class DocumentLinkValidator {
     const findings: string[] = [];
     for (const link of document.links) {
       const problem = this.findProblem(document, link);
-      if (problem !== null)
+      if (!Object.isNull(problem))
         findings.push(`${document.path}:${link.line}: the link "${link.target}" ${problem}.`);
     }
     return findings;
@@ -81,7 +83,7 @@ export class DocumentLinkValidator {
       return this.findLocalProblem(document.path, anchor);
 
     const decoded = DocumentLinkValidator.decode(target);
-    if (decoded === null)
+    if (Object.isNull(decoded))
       return DocumentLinkValidator.INVALID_PATH;
     const resolved = decoded.startsWith(DocumentLinkValidator.ROOT_PREFIX)
       ? path.posix.normalize(decoded.slice(DocumentLinkValidator.ROOT_PREFIX.length))
@@ -91,12 +93,12 @@ export class DocumentLinkValidator {
 
   private findRepositoryProblem(location: string): string | null {
     const file = DocumentLinkValidator.REPOSITORY_FILE_PATTERN.exec(location)?.[1];
-    if (file === undefined)
+    if (Object.isUndefined(file))
       return null;
 
     const separator = file.indexOf(DocumentLinkValidator.ANCHOR_SEPARATOR);
     const target = DocumentLinkValidator.decode(separator < 0 ? file : file.slice(0, separator));
-    if (target === null)
+    if (Object.isNull(target))
       return DocumentLinkValidator.INVALID_PATH;
     return this.findLocalProblem(path.posix.normalize(target), separator < 0 ? null : file.slice(separator + 1));
   }
@@ -107,7 +109,7 @@ export class DocumentLinkValidator {
       return DocumentLinkValidator.OUTSIDE;
     if (!this.files.has(file) && !this.folders.has(file))
       return DocumentLinkValidator.MISSING_FILE;
-    if (anchor === null || !file.endsWith(DocumentLinkValidator.MARKDOWN_EXTENSION))
+    if (Object.isNull(anchor) || !file.endsWith(DocumentLinkValidator.MARKDOWN_EXTENSION))
       return null;
     return this.documents.get(file)?.anchors.has(anchor) === true ? null : `points to a missing heading "#${anchor}"`;
   }

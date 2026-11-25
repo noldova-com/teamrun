@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class VersionRange {
   private static readonly PATTERN: RegExp = /^>=((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)) <((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/;
   private static readonly SEPARATOR: string = ".";
@@ -20,7 +22,7 @@ export class VersionRange {
 
   public static parse(text: string): VersionRange | null {
     const match = VersionRange.PATTERN.exec(text);
-    if (match === null)
+    if (Object.isNull(match))
       return null;
     const [, lowest = "", refused = ""] = match;
     return VersionRange.compare(lowest, refused) < 0 ? new VersionRange(lowest, refused) : null;
@@ -34,7 +36,7 @@ export class VersionRange {
   private static compare(left: string, right: string): number {
     const [a, b] = [left, right].map(t => t.split(VersionRange.SEPARATOR).map(Number));
     const index = [0, 1, 2].find(t => a?.[t] !== b?.[t]);
-    return index === undefined ? 0 : (a?.[index] ?? 0) - (b?.[index] ?? 0);
+    return Object.isUndefined(index) ? 0 : (a?.[index] ?? 0) - (b?.[index] ?? 0);
   }
 
   public get isWritten(): boolean {

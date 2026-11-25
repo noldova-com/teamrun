@@ -11,6 +11,8 @@ import { copyFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { InstallArguments } from "./installs/install-arguments.ts";
 import { AppLockfile } from "./packages/app-lockfile.ts";
 import { BuildLayout } from "./packages/build-layout.ts";
@@ -163,7 +165,7 @@ export class App {
 
   private runNpmAsync(npmArguments: readonly string[]): Promise<number | null> {
     const npm = this.environment[App.NPM_PATH_VARIABLE];
-    if (npm === undefined || npm.length === 0)
+    if (Object.isUndefined(npm) || npm.length === 0)
       throw new ProcessException(`${App.NPM_PATH_VARIABLE} is not set; run this through npm, such as npm run build:app or npm start.`);
     return this.runner.runAsync(process.execPath, [npm, ...npmArguments], this.folder, this.environment);
   }
@@ -171,8 +173,8 @@ export class App {
   private async listArchivesAsync(): Promise<readonly string[]> {
     const version = (await RootManifest.readAsync(this.root)).productVersion;
     const manifest: unknown = JSON.parse(await readFile(path.join(this.folder, App.MANIFEST_NAME), "utf8"));
-    const dependencies = typeof manifest === "object" && manifest !== null ? (manifest as Readonly<Record<string, unknown>>)["dependencies"] : undefined;
-    const pin = typeof dependencies === "object" && dependencies !== null ? (dependencies as Readonly<Record<string, unknown>>)[App.MODULE_PACKAGE] : undefined;
+    const dependencies = Object.isObject(manifest) ? (manifest as Readonly<Record<string, unknown>>)["dependencies"] : undefined;
+    const pin = Object.isObject(dependencies) ? (dependencies as Readonly<Record<string, unknown>>)[App.MODULE_PACKAGE] : undefined;
     if (pin !== version)
       throw new PackageException(`app/package.json pins ${App.MODULE_PACKAGE} at ${String(pin)}, but this checkout builds ${version}; pin the app at the root package.json's version.`);
     const layout = new BuildLayout(this.root);

@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { BrowserSessionRecord } from "./browser-session-record.ts";
 import type { IBrowserSession } from "./interfaces/i-browser-session.ts";
 import type { IBrowserSessions } from "./interfaces/i-browser-sessions.ts";
@@ -25,7 +27,7 @@ export class BrowserSessionDiagnostics {
 
   private follow(run: ISessionRun): void {
     const sessions = run._browserSessions;
-    if (sessions === undefined) {
+    if (Object.isUndefined(sessions)) {
       run.logger.log(BrowserSessionDiagnostics.OFF);
       return;
     }
@@ -46,7 +48,7 @@ export class BrowserSessionDiagnostics {
   }
 
   private static time(session: IBrowserSession | undefined, record: BrowserSessionRecord): void {
-    if (session === undefined)
+    if (Object.isUndefined(session))
       return;
     const { connected, ready } = session;
     session.connected = () => {
@@ -62,7 +64,7 @@ export class BrowserSessionDiagnostics {
   private static expectPage(project: ISessionProject, sessionId: string, record: BrowserSessionRecord): void {
     const provider = project.browser?.provider;
     const pages = provider?.pages;
-    if (provider === undefined || pages === undefined)
+    if (Object.isUndefined(provider) || Object.isUndefined(pages))
       return;
     const watched = pages instanceof WatchedPages ? pages : new WatchedPages(pages);
     provider.pages = watched;

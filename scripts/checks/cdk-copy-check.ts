@@ -9,6 +9,8 @@
 import path from "node:path";
 import type { Writable } from "node:stream";
 
+import "@noldova/context.core";
+
 import { ProcessException } from "../processes/process.exception.ts";
 import type { NpmCommand } from "../toolchain/npm-command.ts";
 import type { ICheck } from "./interfaces/i-check.ts";
@@ -46,7 +48,7 @@ export class CdkCopyCheck implements ICheck {
     }
     const failure = CdkCopyCheck.field(tree, CdkCopyCheck.ERROR);
     const code = CdkCopyCheck.field(failure, CdkCopyCheck.CODE);
-    if (failure !== undefined && code !== CdkCopyCheck.PROBLEMS_CODE)
+    if (!Object.isUndefined(failure) && code !== CdkCopyCheck.PROBLEMS_CODE)
       throw new ProcessException(`"npm ${CdkCopyCheck.ARGUMENTS.join(" ")}" failed (${String(code)}): ${String(CdkCopyCheck.field(failure, CdkCopyCheck.SUMMARY))}`);
     const copies = new Map<string, string>();
     CdkCopyCheck.collect(tree, copies);
@@ -67,17 +69,17 @@ export class CdkCopyCheck implements ICheck {
 
   private static collect(node: unknown, copies: Map<string, string>): void {
     const dependencies = CdkCopyCheck.field(node, CdkCopyCheck.DEPENDENCIES);
-    if (typeof dependencies !== "object" || dependencies === null)
+    if (!Object.isObject(dependencies))
       return;
     for (const [name, child] of Object.entries(dependencies)) {
       const folder = CdkCopyCheck.field(child, CdkCopyCheck.PATH);
-      if (name === CdkCopyCheck.PACKAGE && typeof folder === "string")
+      if (name === CdkCopyCheck.PACKAGE && Object.isString(folder))
         copies.set(folder, String(CdkCopyCheck.field(child, CdkCopyCheck.VERSION)));
       CdkCopyCheck.collect(child, copies);
     }
   }
 
   private static field(value: unknown, name: string): unknown {
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
+    return Object.isObject(value) && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
   }
 }

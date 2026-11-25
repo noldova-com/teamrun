@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 import { TestOptionsException } from "./test-options.exception.ts";
 
 export class TestOptions {
@@ -76,7 +78,7 @@ export class TestOptions {
         filters.push(TestOptions.readText(args[++index]));
       else if (option === TestOptions.REPEAT) {
         const value = args[++index] ?? "";
-        if (repeat !== null)
+        if (!Object.isNull(repeat))
           throw new TestOptionsException(TestOptions.REPEAT_ONCE);
         if (!TestOptions.COUNT.test(value))
           throw new TestOptionsException(TestOptions.REPEAT_VALUE);
@@ -89,7 +91,7 @@ export class TestOptions {
   }
 
   private static readText(value: string | undefined): string {
-    if (value === undefined || value.trim() === "" || value.startsWith(TestOptions.OPTION_PREFIX))
+    if (Object.isUndefined(value) || value.trim() === "" || value.startsWith(TestOptions.OPTION_PREFIX))
       throw new TestOptionsException(TestOptions.FILTER_VALUE);
     return value;
   }

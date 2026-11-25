@@ -6,6 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import "@noldova/context.core";
+
 export class ProfileOptions {
   private static readonly LABEL: RegExp = /^[\w.-]+$/;
   private static readonly COUNT: RegExp = /^\d+$/;
@@ -31,7 +33,7 @@ export class ProfileOptions {
 
   public static parse(args: readonly string[]): ProfileOptions | null {
     const [label, ...rest] = args;
-    if (label === undefined || !ProfileOptions.LABEL.test(label))
+    if (Object.isUndefined(label) || !ProfileOptions.LABEL.test(label))
       return null;
     let seed = false;
     let pairs: string | null = null;
@@ -44,17 +46,17 @@ export class ProfileOptions {
         seed = true;
       else if (option === ProfileOptions.NODE_OPTION)
         profileNode = true;
-      else if (option === ProfileOptions.PAIRS_OPTION && value !== undefined && ProfileOptions.COUNT.test(value)) {
+      else if (option === ProfileOptions.PAIRS_OPTION && !Object.isUndefined(value) && ProfileOptions.COUNT.test(value)) {
         pairs = value;
         index++;
       }
-      else if (option === ProfileOptions.SCENARIOS_OPTION && value !== undefined && !value.startsWith("--")) {
+      else if (option === ProfileOptions.SCENARIOS_OPTION && !Object.isUndefined(value) && !value.startsWith("--")) {
         scenarios = value.split(ProfileOptions.SCENARIO_SEPARATOR);
         index++;
       }
       else
         return null;
     }
-    return pairs !== null && !seed ? null : new ProfileOptions(label, seed, pairs, scenarios, profileNode);
+    return !Object.isNull(pairs) && !seed ? null : new ProfileOptions(label, seed, pairs, scenarios, profileNode);
   }
 }
