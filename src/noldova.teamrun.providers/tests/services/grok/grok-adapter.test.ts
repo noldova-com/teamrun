@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { spawn } from "node:child_process";
-import { availableParallelism } from "node:os";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import fsPromises from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
@@ -758,9 +756,6 @@ export class GrokAdapterTests {
     const checked: string[] = [];
     const probe = join(host.directory.resolve("person"), "probe.txt");
     process.env["TEAMRUN_PROBE_FILE"] = probe;
-    const load = Array.from({ length: availableParallelism() * 2 }, () => spawn(process.execPath, ["-e",
-      "const fs=require('fs');const f=require('path').join(require('os').tmpdir(),'load-'+process.pid);const b=Buffer.alloc(1<<20,1);for(;;){const d=fs.openSync(f,'w');fs.writeSync(d,b);fs.fsyncSync(d);fs.closeSync(d)}"],
-    { stdio: "ignore" }));
     for (const [read, mode] of [["ACCOUNT", "hangNamespaced"], ["ACCOUNT", "hang"], ["BILLING", "hangNamespaced"], ["BILLING", "hang"]]) {
       const started = performance.now();
       const check = await host.createAdapter({ ...host.environment, TEAMRUN_PROBE_FILE: probe, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
@@ -768,10 +763,20 @@ export class GrokAdapterTests {
       checked.push([check.authStatus, check.identity?.email ?? "none", check.identity?.plan ?? "none", String(performance.now() - started < timings.requestTimeout)]
         .join(" "));
     }
-    load.forEach(t => t.kill());
     delete process.env["TEAMRUN_PROBE_FILE"];
     const lines = readFileSync(probe, "utf8");
-    if (checked[0] !== "LoggedIn person@example.com SuperGrok Heavy true")
+    const sent = new Map<string, number>();
+    let worst = 0;
+    for (const line of lines.split("\n").map(t => t.split(" "))) {
+      if (line[0] === "send")
+        sent.set(line[1] ?? "", (line[2] ?? "").includes("x.ai/") ? Number(line[4]) : Number.NaN);
+      else if (line[0] === "reply" && !Number.isNaN(sent.get(line[1] ?? "") ?? Number.NaN))
+        worst = Math.max(worst, Number(line[3]) - (sent.get(line[1] ?? "") ?? 0));
+      else if (line[0] === "timeout")
+        worst = Math.max(worst, Number(line[6]));
+    }
+    process.stdout.write(`PROBE worst ${worst}\n`);
+    if (checked[0] !== "LoggedIn person@example.com SuperGrok Heavy true" || worst > 100)
       throw new Error(`PROBE ${checked.join(",")}\n${lines}`);
 
     Assert.areEqual(["LoggedIn person@example.com SuperGrok Heavy true", "LoggedIn none SuperGrok Heavy true", "LoggedIn person@example.com none true",
