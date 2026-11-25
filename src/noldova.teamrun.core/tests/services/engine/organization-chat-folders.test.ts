@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ChatFolders, Resources } from "@noldova/teamrun.core";
 import {
-  ChatFolderAttachParams, Conversation, DepartmentCreateParams, Harness, MessageSendParams, MethodName, OrganizationParent, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams,
-  Request, type Teammate, TeammateCreateParams, TeammatePlaceParams
+  ChatFolderAttachParams, Conversation, DepartmentCreateParams, DetailKind, Harness, Message, MessageAuthor, MessageDetail, MessageSendParams, MessageStatus, MethodName, OrganizationParent, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams,
+  Request, type Teammate, TeammateCreateParams, TeammatePlaceParams, WrittenImageReader, WrittenImageReadParams
 } from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
@@ -57,6 +57,29 @@ export class OrganizationChatFoldersTests {
     Assert.areEqual(folders.join(","), host.adapter.requests.map(t => t.workingDirectory).join(","));
     Assert.areNotEqual(folders[0], folders[1]);
     Assert.isTrue(folders.every(t => existsSync(t)));
+  }
+
+  @TestMethod
+  public async readsAnImageAReplyDrewInItsOrganizationsChatFolder(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const studioFolder = OrganizationChatFoldersTests.folder(host, "studio");
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", studioFolder));
+    const opened = await host.engine.openOrganizationChatAsync(new OrganizationChat(studio.id, ada.id));
+    const chatFolder = ChatFolders.prepareOrganization(studioFolder, studio.id);
+    const out = join(chatFolder, "out");
+    mkdirSync(out, { recursive: true });
+    const png = Buffer.concat([Buffer.from("89504e470d0a1a0a0000000d49484452000000020000000300", "hex"), Buffer.alloc(4)]);
+    writeFileSync(join(out, "chart.png"), png);
+    await host.messages.insertAsync(new Message("reply", opened.id, 0, MessageAuthor.User, null, MessageStatus.Completed,
+      [new MessageDetail(0, DetailKind.Text, "Drew ![chart](out/chart.png).", null, "t")], null, "t", null, "t"));
+
+    const path = new WrittenImageReader().markdownImagePathOf("out/chart.png", chatFolder);
+    Assert.isNotNull(path);
+    const read = await host.engine.readWrittenImageAsync(new WrittenImageReadParams(opened.id, "reply", path));
+
+    Assert.areEqual("chart.png", read.name);
+    Assert.areEqual(png.length, read.size);
   }
 
   @TestMethod
