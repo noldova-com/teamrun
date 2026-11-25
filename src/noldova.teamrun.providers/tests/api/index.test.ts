@@ -15,7 +15,7 @@ export class ProvidersApiTests {
   public exportsTheCompleteCatalog(): void {
     const expected = [
       "AbortTimer", "AgentSdkQueryFactory", "AppServerClient", "AppServerClientInfo", "AppServerException", "AppServerInitialization",
-      "AppServerUnavailableException", "BoundedOutput", "ClaudeAdapter", "ClaudeChat", "ClaudeCompactionReader", "ClaudeSessionFile", "ClaudeEnvironment", "ClaudeInput", "ClaudePlan", "ClaudePrompt", "ClaudeRun", "ClaudeSignInReader", "ClaudeSubAgents",
+      "AppServerUnavailableException", "BoundedOutput", "ClaudeAdapter", "ClaudeChat", "ClaudeCompactionReader", "ClaudeSessionFile", "ClaudeEnvironment", "ClaudeInput", "ClaudePendingRun", "ClaudePlan", "ClaudePrompt", "ClaudeRun", "ClaudeSignInReader", "ClaudeSubAgents",
       "ClaudeTasks", "ClaudeTurn", "ClaudeUsageReader", "CodexAccount", "CodexAdapter", "CodexAppServerDownload", "CodexAppServerProgram", "CodexServerChoice", "CodexServerReading", "CodexCompactionReader", "CodexSessionFile", "JsonlTail", "SessionFileCarry", "CodexEnvironment", "CodexItemReader", "CodexLogin", "CodexRateLimits", "CodexRequestRouter", "CodexSubAgents", "CodexTasks", "CodexTurn",
       "CodexUsage", "CodexActivity", "CodexSharedServerStatuses", "CommandLineTool", "CommandResult", "CommandRunner", "CommandSource", "Deadline", "DeltaStream",
       "ExecutableLocator", "ExecutableNotFoundException", "ExecutableSource", "ExecutableVersionReader", "FailureDescriber", "HandlerSubscription",
