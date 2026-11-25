@@ -6,8 +6,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { JsonReader } from "@noldova/context.json";
+import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import {
   AuthStatus,
   ContextUsage,

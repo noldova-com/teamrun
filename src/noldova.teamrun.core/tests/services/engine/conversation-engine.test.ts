@@ -573,6 +573,7 @@ export class ConversationEngineTests {
     await using host = await CoreHost.createAsync();
     const type = await host.typeAsync();
     const opusProvider = await host.createProviderAsync("fake", "Opus");
+    const bobProvider = await host.createProviderAsync("fake", "Bob");
     const otherProvider = await host.createProviderAsync("fake", "Other");
     const make = (name: string, providerId: string): Promise<Teammate> =>
       host.teammates.createAsync(new TeammateCreateParams(name, null, providerId, Harness.Provider, null, null));
@@ -581,7 +582,8 @@ export class ConversationEngineTests {
     const sam = await make("Sam", otherProvider.id);
     const uma = await make("Uma", otherProvider.id);
     const ann = await make("Ann", otherProvider.id);
-    const bob = await make("Bob", otherProvider.id);
+    const bob = await make("Bob", bobProvider.id);
+    const cal = await make("Cal", otherProvider.id);
     const fay = await make("Fay", otherProvider.id);
     const gus = await make("Gus", otherProvider.id);
     const lee = await make("Lee", otherProvider.id);
@@ -601,11 +603,15 @@ export class ConversationEngineTests {
     await add(gus, research);
     await add(tom, await create("Lab", OrganizationParent.department(research.id), lee.id));
     await host.organization.placeAsync(new TeammatePlaceParams(organizationId, eve.id, OrganizationParent.teammate(opus.id), 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(organizationId, cal.id, OrganizationParent.teammate(bob.id), 0));
     const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(organizationId, opus.id));
+    const bobChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(organizationId, bob.id));
 
     await host.engine.sendAsync(new MessageSendParams(chat.id, "@Opus ask your agents", null, null, [], [opus.id]));
+    await host.engine.sendAsync(new MessageSendParams(bobChat.id, "@Bob ask yours", null, null, [], [bob.id]));
     await host.engine.waitForIdle();
-    const prompt = host.adapter.requests.find(t => t.provider?.id === opusProvider.id)?.prompt ?? String.empty;
+    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+    const prompt = promptOf(opusProvider.id);
     const organization = await host.organization.findAsync(organizationId);
     const reports = (await host.teammates.listAsync()).filter(t => organization?.managerOf(t.id) === opus.id).map(t => t.name);
 
@@ -613,6 +619,7 @@ export class ConversationEngineTests {
       Resources.formatOrganizationDepartmentReport("Devs", "Ann"), "Eve", Resources.formatOrganizationUnledReport("Research", ["Fay", "Gus"]),
       Resources.formatOrganizationDepartmentReport("Lab", "Lee"), "Mia", Resources.formatOrganizationDepartmentReport("Ops", "Sam")])));
     Assert.areEqual("Ann Eve Fay Gus Lee Mia Sam", reports.join(" "));
+    Assert.isTrue(promptOf(bobProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Devs"), "Ann", ["Cal"])));
   }
 
   @TestMethod
