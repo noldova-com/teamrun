@@ -23,6 +23,7 @@ export class DeclaredSettings implements IModuleSettings {
   private static readonly UPDATE_CHECKS: SettingDeclaration = new SettingDeclaration("desktop.updateChecks", "Automatic", DeclaredSettings.DEVICE_LOCALITY);
 
   public readonly device: string;
+  public readonly isDeviceKnown: boolean = true;
   private readonly declarations: ReadonlyMap<string, SettingDeclaration>;
   private readonly values: Map<string, JsonValue> = new Map();
   private readonly listeners: Map<string, ((change: SettingChange) => void)[]> = new Map();
@@ -64,6 +65,10 @@ export class DeclaredSettings implements IModuleSettings {
 
   public onChanged(name: string, listener: (change: SettingChange) => void): void {
     this.listeners.set(name, [...this.listeners.get(name) ?? [], listener]);
+  }
+
+  public onDeviceKnown(_listener: () => void): void {
+    throw new Error("The fixture knows its device from the start.");
   }
 
   public setScopeParent(_scope: SettingScope, _parent: SettingScope | null): void {
