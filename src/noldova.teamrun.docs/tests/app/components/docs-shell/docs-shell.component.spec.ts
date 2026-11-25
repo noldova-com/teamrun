@@ -126,7 +126,7 @@ describe("DocsShellComponent", () => {
       const header = DocsFixture.one(host, "nol-site-header");
       const footer = DocsFixture.one(host, "nol-site-footer");
       const version = DocsFixture.one(header, ".nol-site-version");
-      const changelog = await commands.readFile("../../../../../../CHANGELOG.md");
+      const changelog = await commands.readFile("../../CHANGELOG.md");
       const released = changelog.split("\n").map(t => t.trim()).find(t => t.startsWith("## ") && t !== "## Unreleased")?.slice(3) ?? String.empty;
 
       expect([header.classList.contains("nol-site-header-wide"), footer.classList.contains("nol-site-footer-wide")]).toEqual([true, true]);
