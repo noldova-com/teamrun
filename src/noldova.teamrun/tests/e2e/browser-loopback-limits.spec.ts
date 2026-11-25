@@ -96,7 +96,7 @@ const allowByNavigationAsync = async (app: TeamRunApp, page: Page, address: stri
   return navigated();
 };
 
-test("limit: a page's request reads its answer", async ({ app }) => {
+test("a page's request to a name that resolves to this computer is refused before it reaches it", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const local = await servePageAsync(`fetch("http://${service.name}/data").then(t => t.text()).then(t => { document.title = "Read " + t; }, `
     + "e => { document.title = \"Failed \" + e; });");
@@ -104,9 +104,9 @@ test("limit: a page's request reads its answer", async ({ app }) => {
     const page = await app.openChatAsync();
     await app.nameLocalSitesAsync(local.origin);
 
-    await LinkedSite.openAsync(page, `${local.origin}/`, `Read ${LOCAL_DATA}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, "Failed TypeError: Failed to fetch");
 
-    expect(service.hits).toEqual(["GET /data"]);
+    expect(service.hits).toEqual([]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
@@ -131,7 +131,7 @@ test("a navigation to an allowed name that resolves to this computer is refused 
   }
 });
 
-test("limit: a page's WebSocket hears its message", async ({ app }) => {
+test("a page's WebSocket to an allowed name that resolves to this computer is refused before it reaches it", async ({ app }) => {
   const service = await LoopbackService.startAsync();
   const local = await servePageAsync(`const socket = new WebSocket("ws://${service.name}/socket"); `
     + "socket.onmessage = e => { document.title = \"Heard \" + e.data; }; socket.onerror = () => { document.title = \"Failed\"; };");
@@ -143,9 +143,9 @@ test("limit: a page's WebSocket hears its message", async ({ app }) => {
     await page.getByRole("button", { name: "Close New tab", exact: true }).click();
     await expect(page.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(0);
 
-    await LinkedSite.openAsync(page, `${local.origin}/`, `Heard ${LOCAL_HELLO}`);
+    await LinkedSite.openAsync(page, `${local.origin}/`, "Failed");
 
-    expect(service.hits).toEqual(["upgrade /socket"]);
+    expect(service.hits).toEqual([]);
   }
   finally {
     await LocalServer.closeAsync(local.server);
