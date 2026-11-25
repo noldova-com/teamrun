@@ -7167,6 +7167,13 @@ export declare class Resources {
   public static formatCodexTurnAwaitsThread(threadId: string): string;
 
   /**
+   * Formats the log line for a Codex app-server whose start failed and which then did not stop.
+   * @param kind The kind of the stop's failure.
+   * @returns The text.
+   */
+  public static formatCodexFailedStartStopFailed(kind: string): string;
+
+  /**
    * Formats the log line for a Codex turn whose thread its background tasks hold with a token TeamRun no longer accepts.
    * @param threadId The thread.
    * @returns The text.

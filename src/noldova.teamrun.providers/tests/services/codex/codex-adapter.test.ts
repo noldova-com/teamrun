@@ -1016,6 +1016,41 @@ export class CodexAdapterTests {
   }
 
   @TestMethod
+  @TestData("fail")
+  @TestData("hang")
+  public async stopsAnAppServerWhoseInitializeFails(initialize: string): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CODEX_INIT: initialize }, host.command,
+      new ProviderTimings(5000, 5000, 300, 60_000, 1000, 300, 500, 500, 200, 1, 20));
+    try {
+      const failure = await adapter.listModels(host.createProvider()).then(() => null, (error: unknown) => error);
+      await host.programs.endedAt(1);
+
+      Assert.isInstanceOf(failure, Error);
+      Assert.areEqual(1, host.programs.started.length);
+      Assert.areEqual(0, adapter.clientCount);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async reportsAFailedInitializeAndLogsWhenItsAppServerThenDoesNotStop(): Promise<void> {
+    using host = new CodexTestHost();
+    const log = new RecordingLog();
+    const starter = new RefusedStopStarter({ TEAMRUN_FAKE_CODEX_INIT: "fail", TEAMRUN_FAKE_CODEX_IGNORE_STDIN_END: "1" });
+    const adapter = new CodexAdapter(host.command, host.environment, host.clientInfo, host.programs.wrap(starter),
+      new ProviderTimings(5000, 5000, 60_000, 60_000, 1000, 300, 1, 500, 200, 1, 20), host.versionReader, new NodeTimer(), undefined, null, log);
+    try {
+      const failure = await adapter.listModels(host.createProvider()).then(() => null, (error: unknown) => error);
+      await host.programs.endedAt(1);
+
+      Assert.isInstanceOf(failure, AppServerException);
+      Assert.isTrue(log.lines.includes(Resources.formatCodexFailedStartStopFailed("Error")));
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
   public async stopsEveryAppServerWhenOneStopFailsAndThenReportsIt(): Promise<void> {
     using host = new CodexTestHost();
     const starter = new RefusedStopStarter({ TEAMRUN_FAKE_CODEX_INIT: "hang", TEAMRUN_FAKE_CODEX_IGNORE_STDIN_END: "1" });
