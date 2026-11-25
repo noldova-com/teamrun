@@ -1,0 +1,26 @@
+/**
+ * @license
+ * Copyright (c) Noldova.
+ *
+ * This source code is licensed under the license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+:host {
+  position: sticky;
+  z-index: 0;
+  inset-block-start: calc(var(--nol-docs-header-height, calc(var(--nol-site-header-height) * 2)) - var(--nol-site-header-height));
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--nol-site-header-height);
+  padding-inline: calc(var(--nol-site-padding-inline-phone) - var(--nol-space-2));
+  border-block: var(--nol-border-width) solid var(--nol-border);
+  background-color: var(--nol-panel);
+}
+
+@media (min-width: 48rem) {
+  :host {
+    display: none;
+  }
+}

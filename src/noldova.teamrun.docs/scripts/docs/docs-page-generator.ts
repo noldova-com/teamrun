@@ -22,14 +22,16 @@ export class DocsPageGenerator {
   private static readonly INDEX_FILE: string = "src/noldova.teamrun.docs/src/index.html";
   private static readonly PAGES_MODULE: string = "pages.ts";
   private static readonly INDEX_MODULE: string = "index-page.ts";
+  private static readonly RELEASE_MODULE: string = "release.ts";
   private static readonly PAGES_EXPORT: string = "pageFiles";
   private static readonly INDEX_EXPORT: string = "indexPage";
+  private static readonly RELEASE_EXPORT: string = "releasedVersion";
   private static readonly DOCUMENT_EXTENSION: string = ".md";
   private static readonly SITE_LINK: string = "https://teamrun.noldova.dev/";
   private static readonly HOME_FILE: string = "home";
   private static readonly RELEASE_NOTES_FILE: string = "release-notes";
   private static readonly CHANGELOG_FILE: string = "CHANGELOG.md";
-  private static readonly RELEASED_VERSION: RegExp = /^## (?!Unreleased$)/mu;
+  private static readonly RELEASED_VERSION: RegExp = /^## (?!Unreleased$)(.+)$/mu;
   private static readonly DOCUMENT_TITLE: RegExp = /^# ([^\n]*)\n+/u;
   private static readonly PAGE_LINK: RegExp = /\]\(([a-z0-9-]+)\.md(#[^)\s]*)?\)/gu;
   private static readonly TEXT_ENCODING: BufferEncoding = "utf8";
@@ -61,12 +63,22 @@ export class DocsPageGenerator {
     await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.INDEX_MODULE), DocsPageGenerator.INDEX_EXPORT, index);
   }
 
+  public async writeReleaseAsync(): Promise<void> {
+    const release = await this.findReleaseAsync();
+    await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.RELEASE_MODULE), DocsPageGenerator.RELEASE_EXPORT, String(release[1]).trim());
+  }
+
   private async readReleasesAsync(): Promise<string> {
+    const release = await this.findReleaseAsync();
+    return release.input.slice(release.index);
+  }
+
+  private async findReleaseAsync(): Promise<RegExpExecArray> {
     const changelog = await readFile(path.join(this.root, DocsPageGenerator.CHANGELOG_FILE), DocsPageGenerator.TEXT_ENCODING);
-    const start = changelog.search(DocsPageGenerator.RELEASED_VERSION);
-    if (start < 0)
+    const release = DocsPageGenerator.RELEASED_VERSION.exec(changelog);
+    if (Object.isNull(release))
       throw new ProcessException(`${DocsPageGenerator.CHANGELOG_FILE} names no released version, a "## <version>" line.`);
-    return changelog.slice(start);
+    return release;
   }
 
   private static locate(...parts: readonly string[]): string {

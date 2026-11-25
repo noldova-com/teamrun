@@ -36,6 +36,7 @@ export class DocsPreparation {
     const pages = new DocsPageGenerator(this.root);
     const count = await pages.writePagesAsync();
     await pages.writeIndexAsync();
-    output.write(`Wrote the text of ${count} pages and the page shell to ${DocsPageGenerator.GENERATED_FOLDER}.\n`);
+    await pages.writeReleaseAsync();
+    output.write(`Wrote the text of ${count} pages, the page shell and the released version to ${DocsPageGenerator.GENERATED_FOLDER}.\n`);
   }
 }

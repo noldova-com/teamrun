@@ -14,6 +14,7 @@ import { DocsPageText } from "./docs-page-text";
 
 export class DocsCatalog {
   public static readonly home: DocsPage = DocsCatalog.page(Resources.homeTitle, Resources.homePath, DocsGroup.Start, Resources.homeFile);
+  public static readonly releaseNotes: DocsPage = DocsCatalog.page(Resources.releaseNotesTitle, "release-notes", DocsGroup.Reference);
   public static readonly pages: readonly DocsPage[] = [
     DocsCatalog.home,
     DocsCatalog.page(Resources.gettingStartedTitle, "getting-started", DocsGroup.Start),
@@ -31,7 +32,7 @@ export class DocsCatalog {
     DocsCatalog.page(Resources.privacyTitle, "privacy", DocsGroup.Reference),
     DocsCatalog.page(Resources.troubleshootingTitle, "troubleshooting", DocsGroup.Reference),
     DocsCatalog.page(Resources.faqTitle, "faq", DocsGroup.Reference),
-    DocsCatalog.page(Resources.releaseNotesTitle, "release-notes", DocsGroup.Reference)
+    DocsCatalog.releaseNotes
   ];
   public static readonly menuGroups: readonly DocsMenuGroup[] = Object.values(DocsGroup)
     .map(t => new DocsMenuGroup(Resources.groupLabels[t], DocsCatalog.pages.filter(u => u.group === t)))

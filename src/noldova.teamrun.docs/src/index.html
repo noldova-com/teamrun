@@ -18,9 +18,11 @@ LICENSE file in the root directory of this source tree.
     <meta name="description" content="How to install, set up and use TeamRun, the desktop app for working with AI agents as a team." />
     <script>
       try {
-        const mode = localStorage.getItem("nol-docs-theme");
-        if (mode === "Light" || mode === "Dark")
-          document.documentElement.setAttribute("data-nol-theme-mode", mode);
+        const theme = localStorage.getItem("noldova-theme");
+        if (theme === "light")
+          document.documentElement.setAttribute("data-nol-theme-mode", "Light");
+        if (theme === "dark")
+          document.documentElement.setAttribute("data-nol-theme-mode", "Dark");
       }
       catch {
       }
