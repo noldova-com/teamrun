@@ -1336,15 +1336,26 @@ export class AcpAdapter implements IProviderAdapter {
       return null;
     this.kept.delete(kept.client);
     kept.end();
-    const endpoint = Object.isNull(kept.token) ? null : this.endpointOf(request.tools, kept.initialized);
-    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new AcpServedEndpoint(endpoint.url, kept.token);
-    if (kept.key === key && kept.client.isConnected && Object.isNull(request.tools) === Object.isNull(kept.token) && Object.isNull(sender) === Object.isNull(kept.sender)
-      && (Object.isNull(kept.sender) || request.adoptSender(kept.sender)) && (Object.isNull(kept.token) || request.tools?.adopt(kept.token) === true)
-      && JSON.stringify(await this.paramsOf(request, kept.initialized, served)) === kept.params)
-      return kept;
+    try {
+      if (await this.fits(kept, key, request, sender))
+        return kept;
+    }
+    catch (error) {
+      kept.revoke();
+      await this.closeQuietly(kept.client);
+      throw error;
+    }
     kept.revoke();
     await this.close(kept.client);
     return null;
+  }
+
+  private async fits(kept: AcpKeptSession, key: string | null, request: TurnRequest, sender: string | null): Promise<boolean> {
+    const endpoint = Object.isNull(kept.token) ? null : this.endpointOf(request.tools, kept.initialized);
+    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new AcpServedEndpoint(endpoint.url, kept.token);
+    return kept.key === key && kept.client.isConnected && Object.isNull(request.tools) === Object.isNull(kept.token) && Object.isNull(sender) === Object.isNull(kept.sender)
+      && (Object.isNull(kept.sender) || request.adoptSender(kept.sender)) && (Object.isNull(kept.token) || request.tools?.adopt(kept.token) === true)
+      && JSON.stringify(await this.paramsOf(request, kept.initialized, served)) === kept.params;
   }
 
   private async paramsOf(request: TurnRequest, initialized: JsonReader, served: AcpServedEndpoint | null): Promise<Record<string, JsonValue>> {

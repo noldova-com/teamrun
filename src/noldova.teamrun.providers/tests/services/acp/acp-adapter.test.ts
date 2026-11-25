@@ -29,6 +29,7 @@ import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { LimitWaits } from "../../fixtures/limit-waits.fixture.js";
 import { MemoryAcpModelStore } from "../../fixtures/memory-acp-model-store.fixture.js";
 import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.js";
+import { RecordingMcpEndpoint } from "../../fixtures/recording-mcp-endpoint.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { TestAcpAgent } from "../../fixtures/test-acp-agent.fixture.js";
@@ -285,6 +286,25 @@ export class AcpAdapterTests {
 
     Assert.areEqual(TurnOutcome.Completed, changed.outcome);
     Assert.areEqual(JSON.stringify([0, 1]), JSON.stringify([kept, host.programs.started.length - opened]));
+  }
+
+  @TestMethod
+  public async revokesTheKeptSessionsTokenAndClosesItsProcessWhenTakingItForTheChatsNextTurnThrows(): Promise<void> {
+    await using host = new GrokTestHost();
+    const adapter = AcpAdapterTests.adapter(host, [], { agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } } }, {}, host.idleTimer);
+    const endpoint = new RecordingMcpEndpoint();
+    const server = { listToolsAsync: () => Promise.resolve([]), callToolAsync: () => Promise.resolve({}) };
+    const request = (resume: string | null, tools: TurnTools): TurnRequest => new TurnRequest(null, host.directory.path, "methods",
+      new RequestedSettings("grok", null, null), resume, [], null, null, {}, false, tools);
+    const first = await AcpAdapterTests.run(adapter, request(null, new TurnTools(server, [], endpoint)));
+    const kept = endpoint.lastIssued;
+    const ended = host.programs.ended.length;
+    const live = endpoint.isLive(kept);
+
+    const unserved = await AcpAdapterTests.run(adapter, request(first.nativeSessionId, new TurnTools(server, [])));
+
+    AcpAdapterTests.failed(unserved, Resources.formatToolsNotServed(adapter.descriptor.displayName));
+    Assert.areEqual(JSON.stringify([true, false, ended + 1]), JSON.stringify([live, endpoint.isLive(kept), host.programs.ended.length]));
   }
 
   @TestMethod
