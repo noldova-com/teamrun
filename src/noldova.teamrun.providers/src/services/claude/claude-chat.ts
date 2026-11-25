@@ -469,11 +469,14 @@ export class ClaudeChat {
   private async startWake(query: IClaudeQuery): Promise<void> {
     if (!Object.isNull(this.pending) && Object.isNull(this.pending.held))
       this.pending.taken = true;
-    const wake = Object.isNull(this.stopping) ? await this.listener!.onWakeAsync(this.ended.length === 1 ? this.ended[0]! : new TurnWake(null, null)) : null;
+    const ended = this.ended.length === 1 ? this.ended.at(0) : undefined;
+    const wake = (Object.isNull(this.stopping) ? await this.listener?.onWakeAsync(ended ?? new TurnWake(null, null)) : null) ?? null;
     this.ended = [];
     this.notified = false;
     this.keepOpen();
-    if (Object.isNull(wake)) {
+    if (Object.isNull(wake) || !Object.isNull(this.stopping)) {
+      if (!Object.isNull(wake))
+        await this.endUnsentWakeAsync(wake);
       this.interruptQuery();
       return;
     }

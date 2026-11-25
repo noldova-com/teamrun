@@ -1970,6 +1970,40 @@ export class ClaudeChatTests {
   }
 
   @TestMethod
+  public async endsAWakeTheListenerGivesOnlyOnceTheChatHasBegunStoppingWithoutStartingIt(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-held-wake", "none", null, []),
+      SdkMessages.taskStarted("s-held-wake", "server", undefined, true, "npm start"),
+      new StampedStep(SdkMessages.assistant("11111111-1111-1111-1111-111111111111", [SdkMessages.text("Started")], "claude-opus-5")),
+      new StampedStep(SdkMessages.success("s-held-wake", "Started")),
+      SdkMessages.taskNotification("s-held-wake", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("33333333-3333-3333-3333-333333333333", [SdkMessages.text("The server stopped")], "claude-opus-5"),
+      SdkMessages.success("s-held-wake", "Noted"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const first = new RecordingTurnListener();
+    const reply = new RecordingTurnListener();
+    const held = Promise.withResolvers<WakeTurn | null>();
+    first.heldWake = held.promise;
+    const wake = new WakeTurn({});
+    const woken = wake.follow(reply, new AbortController().signal);
+
+    await adapter.runTurn(host.createRequest("Start"), first, new AbortController().signal);
+    await Wait.until(() => first.wakes.length === 1, "The chat did not ask for a wake.");
+    const stopping = adapter.shutdown();
+    await Wait.until(() => query.interruptCount === 1, "The chat did not begin stopping.");
+    held.resolve(wake);
+    const result = await woken;
+    await stopping;
+
+    Assert.areEqual(JSON.stringify([TurnOutcome.Interrupted, 0, [], 1]), JSON.stringify([result.outcome, reply.starts.length, reply.texts, query.closeCount]));
+  }
+
+  @TestMethod
   public async resumesTheSessionOnANewQueryOnceAChatClosingForSilenceHasClosed(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
