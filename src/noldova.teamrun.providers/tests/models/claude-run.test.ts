@@ -38,9 +38,10 @@ export class ClaudeRunTests {
     const stopping = run.stop();
     await Wait.until(() => abort.signal.aborted, "The stop did not abort once its wait passed.");
     await stopping;
+    const closedByStop = query.closeCount;
     run.close();
 
-    Assert.areEqual(JSON.stringify([1, 1]), JSON.stringify([query.interruptCount, query.closeCount]));
+    Assert.areEqual(JSON.stringify([1, 1, 1]), JSON.stringify([query.interruptCount, closedByStop, query.closeCount]));
   }
 
   @TestMethod

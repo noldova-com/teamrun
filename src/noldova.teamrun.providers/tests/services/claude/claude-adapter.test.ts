@@ -1764,6 +1764,28 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async stopsEveryRunningListAtOnceAtShutdownWhenOneNeverAnswersItsInterrupt(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const first = new FakeClaudeQuery([]);
+    const second = new FakeClaudeQuery([]);
+    first.modelsHang = true;
+    first.interruptHang = true;
+    second.modelsHang = true;
+    host.factory.next = first;
+    host.factory.queued.push(second);
+    const adapter = host.createAdapter(host.environment, host.command, new ProviderTimings(5000, 5000, 5000, 5000, 50, 300, 500, 500, 200, 1, 20));
+    const listings = [Assert.throwsAsync(() => adapter.listModels(null), Error), Assert.throwsAsync(() => adapter.listModels(null), Error)];
+    await Wait.until(() => adapter.activeRunCount === 2, "The adapter did not have both lists running.");
+
+    const stopping = adapter.shutdown();
+    const interrupted = [first.interruptCount, second.interruptCount];
+    await stopping;
+    await Promise.all(listings);
+
+    Assert.areEqual(JSON.stringify([1, 1, 1, 1]), JSON.stringify([...interrupted, first.closeCount, second.closeCount]));
+  }
+
+  @TestMethod
   public async readsWhetherItsAccountAnswerSaysItIsSignedIn(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();

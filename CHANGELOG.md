@@ -38,7 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
-- **Claude Code:** quitting while TeamRun reads Claude Code's models, account or plan usage waits at most the interrupt timeout for that Claude Code process to answer its stop, then ends it, rather than waiting for good (#222).
+- **Claude Code:** quitting while TeamRun reads Claude Code's models, account or plan usage stops those Claude Code processes and every Claude chat at once, waiting at most the interrupt timeout for each to answer its stop before ending it, rather than waiting for good, one after another (#222).
 - **Claude Code:** a background task that ends while a chat's query stops for other settings starts no wake turn on that query (#216).
 - **Claude Code:** a turn with other settings, such as another model, starts its new query only once the open one has stopped, waiting for its tasks' stops up to the interrupt timeout, so two Claude Code processes never hold the chat's session at once; a Claude Code process that doesn't answer the stop is closed once the interrupt timeout passes, and quitting stops every Claude chat at once rather than one after another (#44, #71).
 - **ACP agents:** when the next turn of a chat can't take the agent session it kept, because the turn's tools can't be served, the session's tools access ends and its agent process is stopped, rather than both staying until TeamRun restarts (#73).
