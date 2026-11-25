@@ -3145,6 +3145,13 @@ export declare class Resources {
   public static readonly nodeTypesMigrationId: string;
   /** Gives each organization, stored and in the change feed, its node types: the Department type when it has departments, else none; and each department that type. */
   public static readonly addDefaultNodeTypes: readonly string[];
+  /** The organization chat folders migration's fixed id: `20261127090000_OrganizationChatFolders`. */
+  public static readonly organizationChatFoldersMigrationId: string;
+  /**
+   * Attaches its organization's default folder, stored and in the change feed, to each Organization chat that has messages and runs there: one
+   * with no project and no folder of its own whose organization has a default folder, so it keeps the folder it ran in.
+   */
+  public static readonly keepOrganizationChatFolders: readonly string[];
   /** Inserts "My organization", with no folder, first in the list. */
   public static readonly insertDefaultOrganization: string;
   /** Copies the departments aside while the table is made again with its organization. */
@@ -3517,6 +3524,11 @@ export declare class Resources {
    * The data directory's folder that holds the chats' own folders: `chats`.
    */
   public static readonly chatsDirectoryName: string;
+  /**
+   * The folder an organization's default folder holds for its chats without a project or a folder of their own: `.teamrun`, with one
+   * folder in it per organization, named by its id.
+   */
+  public static readonly organizationChatsDirectoryName: string;
   public static readonly gitHeadFileName: string;
   public static readonly gitConfigFileName: string;
   public static readonly gitObjectsDirectoryName: string;
@@ -7232,6 +7244,25 @@ export declare class ChatFolders {
    * @throws {Error} When the system refuses to make it.
    */
   public prepare(conversationId: string): string;
+
+  /**
+   * The folder an organization's chats without a project or a folder of their own run in, inside its default folder, so two organizations
+   * with one default folder never share a working folder: `<folder>/.teamrun/<organization id>`.
+   * @param folder The organization's default folder.
+   * @param organizationId The organization's id.
+   * @returns The folder's path, whether or not it exists.
+   */
+  public static organizationPathOf(folder: string, organizationId: string): string;
+
+  /**
+   * Makes the organization's chat folder, `organizationPathOf`, when the default folder exists, keeping what it holds; a missing default
+   * folder is left missing, so the chat's folder check reports it.
+   * @param folder The organization's default folder.
+   * @param organizationId The organization's id.
+   * @returns The folder's path.
+   * @throws {Error} When the system refuses to make it.
+   */
+  public static prepareOrganization(folder: string, organizationId: string): string;
 
   /**
    * @returns The ids of the folders under the data directory's `chats` folder, in no set order.
@@ -11655,6 +11686,15 @@ export declare class UniqueIndexNamesMigration extends SqlMigration {
   public constructor();
 
   /** Creates each unique index under its `UX_` name and drops its `IX_` one. */
+  public override apply(builder: MigrationBuilder): void;
+}
+
+/** Attaches its organization's default folder to each Organization chat that already ran there, so it keeps that folder. */
+export declare class OrganizationChatFoldersMigration extends SqlMigration {
+  /** Uses the fixed organization chat folders migration id. */
+  public constructor();
+
+  /** Runs `Resources.keepOrganizationChatFolders`. */
   public override apply(builder: MigrationBuilder): void;
 }
 

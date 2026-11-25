@@ -46,6 +46,23 @@ export class ChatFoldersTests {
   }
 
   @TestMethod
+  public makesAnOrganizationsChatFolderInsideItsExistingDefaultFolderOnlyKeepingWhatItHolds(): void {
+    using directory = new TemporaryDataDirectory();
+    const folder = join(directory.path, "work");
+    const path = join(folder, Resources.organizationChatsDirectoryName, "o1");
+
+    Assert.areEqual(path, ChatFolders.organizationPathOf(folder, "o1"));
+    Assert.areEqual(path, ChatFolders.prepareOrganization(folder, "o1"));
+    Assert.isFalse(existsSync(folder));
+    mkdirSync(folder);
+    ChatFolders.prepareOrganization(folder, "o1");
+    writeFileSync(join(path, "notes.md"), "kept");
+    ChatFolders.prepareOrganization(folder, "o1");
+    Assert.areEqual("kept", readFileSync(join(path, "notes.md"), "utf8"));
+    Assert.areEqual(".teamrun", Resources.organizationChatsDirectoryName);
+  }
+
+  @TestMethod
   public makesTheGitRootAgainAfterAHeadWriteCutShort(): void {
     using directory = new TemporaryDataDirectory();
     const folders = new ChatFolders(directory.path);

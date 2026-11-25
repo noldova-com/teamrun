@@ -6,11 +6,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Resources } from "@noldova/teamrun.core";
+import { ChatFolders, Resources } from "@noldova/teamrun.core";
 import {
   ChatFolderAttachParams, Conversation, DepartmentCreateParams, Harness, MessageSendParams, MethodName, OrganizationParent, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationUpdateParams,
   Request, type Teammate, TeammateCreateParams, TeammatePlaceParams
@@ -21,7 +21,7 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 @TestClass
 export class OrganizationChatFoldersTests {
   @TestMethod
-  public async runsAnOrganizationChatWithNoFolderOfItsOwnInItsOrganizationsCurrentFolder(): Promise<void> {
+  public async runsAnOrganizationChatWithNoFolderOfItsOwnInItsOrganizationsFolderInsideItsCurrentDefaultFolder(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const ada = await OrganizationChatFoldersTests.teammateAsync(host);
     const first = OrganizationChatFoldersTests.folder(host, "first");
@@ -37,8 +37,26 @@ export class OrganizationChatFoldersTests {
     await host.organization.updateOrganizationAsync(new OrganizationUpdateParams(studio.id, "Studio", null));
     await OrganizationChatFoldersTests.sendAsync(host, chat, "Three");
 
-    Assert.areEqual(`${first},${second},${own.folder}`, host.adapter.requests.map(t => t.workingDirectory).join(","));
+    Assert.areEqual(`${join(first, ".teamrun", studio.id)},${join(second, ".teamrun", studio.id)},${own.folder}`,
+      host.adapter.requests.map(t => t.workingDirectory).join(","));
     Assert.isTrue(host.adapter.requests[0]?.prompt.includes(Resources.organizationNoDepartment) ?? false);
+  }
+
+  @TestMethod
+  public async runsTwoOrganizationsChatsWithOneDefaultFolderInSeparateFoldersInsideIt(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const ada = await OrganizationChatFoldersTests.teammateAsync(host);
+    const shared = OrganizationChatFoldersTests.folder(host, "shared");
+    const studio = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Studio", shared));
+    const lab = await host.organization.createOrganizationAsync(new OrganizationCreateParams("Lab", shared));
+
+    await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(studio.id, ada.id), "One");
+    await OrganizationChatFoldersTests.sendAsync(host, new OrganizationChat(lab.id, ada.id), "Two");
+    const folders = [studio, lab].map(t => ChatFolders.organizationPathOf(shared, t.id));
+
+    Assert.areEqual(folders.join(","), host.adapter.requests.map(t => t.workingDirectory).join(","));
+    Assert.areNotEqual(folders[0], folders[1]);
+    Assert.isTrue(folders.every(t => existsSync(t)));
   }
 
   @TestMethod

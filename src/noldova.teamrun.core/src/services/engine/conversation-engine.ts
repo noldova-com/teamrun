@@ -146,6 +146,7 @@ import { UsableResponder } from "../../models/usable-responder.js";
 import { WakeStart } from "../../models/wake-start.js";
 import { WrittenImageFolder } from "../../models/written-image-folder.js";
 import { Resources } from "../../resources.js";
+import { ChatFolders } from "../conversations/chat-folders.js";
 import type { DatabaseContext } from "../database-context.js";
 import type { ProviderKindRegistry } from "../provider-kinds/provider-kind-registry.js";
 import { NodeTimer } from "../node-timer.js";
@@ -2077,10 +2078,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const folders = this.context.chatFolders;
     if (!Object.isNull(conversation.attachedFolder))
       return WorkFolder.attached(conversation.attachedFolder);
-    const folder = Object.isNull(conversation.organizationChat) ? null
-      : (await this.organization.findAsync(conversation.organizationChat.organizationId, transaction))?.folder ?? null;
-    if (!Object.isNull(folder))
-      return WorkFolder.attached(folder);
+    const chat = conversation.organizationChat;
+    const folder = Object.isNull(chat) ? null : (await this.organization.findAsync(chat.organizationId, transaction))?.folder ?? null;
+    if (!Object.isNull(chat) && !Object.isNull(folder))
+      return WorkFolder.attached(prepare ? ChatFolders.prepareOrganization(folder, chat.organizationId) : ChatFolders.organizationPathOf(folder, chat.organizationId));
     return new WorkFolder(conversation.id, prepare ? folders.prepare(conversation.id) : folders.pathOf(conversation.id));
   }
 

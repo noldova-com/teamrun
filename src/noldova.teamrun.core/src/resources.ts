@@ -308,6 +308,7 @@ export class Resources {
   public static readonly parentPathPattern: RegExp = /^\.\.(?:[/\\]|$)/;
   public static readonly gitDirectoryName: string = ".git";
   public static readonly chatsDirectoryName: string = "chats";
+  public static readonly organizationChatsDirectoryName: string = ".teamrun";
   public static readonly gitHeadFileName: string = "HEAD";
   public static readonly gitConfigFileName: string = "config";
   public static readonly gitObjectsDirectoryName: string = "objects";
@@ -544,6 +545,16 @@ export class Resources {
       + "'createdAt', json_extract(payload, '$.createdAt'), 'updatedAt', json_extract(payload, '$.createdAt'))) ELSE json_array() END)) "
       + "WHERE entity = 'Organization' AND json_type(payload, '$.nodeTypes') IS NULL",
     "UPDATE __changes SET payload = json_set(payload, '$.typeId', 'department') WHERE entity = 'Department' AND json_type(payload, '$.typeId') IS NULL"];
+  public static readonly organizationChatFoldersMigrationId: string = "20261127090000_OrganizationChatFolders";
+  private static readonly startedOrganizationChats: string = "SELECT c.id FROM chats c JOIN organizations o ON o.id = json_extract(c.json, '$.organizationChat.organizationId') "
+    + "WHERE json_extract(c.json, '$.projectId') IS NULL AND json_extract(c.json, '$.attachedFolder') IS NULL AND json_extract(o.json, '$.folder') IS NOT NULL "
+    + "AND EXISTS (SELECT 1 FROM messages m WHERE m.chatId = c.id)";
+  private static readonly organizationFolderOfChat: string = "SELECT json_extract(o.json, '$.folder') FROM chats c "
+    + "JOIN organizations o ON o.id = json_extract(c.json, '$.organizationChat.organizationId') WHERE c.id = ";
+  public static readonly keepOrganizationChatFolders: readonly string[] = [
+    `UPDATE __changes SET payload = json_set(payload, '$.attachedFolder', (${Resources.organizationFolderOfChat}json_extract(__changes.payload, '$.id'))) `
+      + `WHERE entity = 'Chat' AND json_extract(payload, '$.id') IN (${Resources.startedOrganizationChats})`,
+    `UPDATE chats SET json = json_set(json, '$.attachedFolder', (${Resources.organizationFolderOfChat}chats.id)) WHERE id IN (${Resources.startedOrganizationChats})`];
   public static readonly renameUniqueIndexes: readonly string[] = [
     "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_projects_rootPath\" ON \"projects\" (\"rootPath\")", "DROP INDEX IF EXISTS IX_projects_rootPath",
     "CREATE UNIQUE INDEX IF NOT EXISTS \"UX_messages_chatId_sequence\" ON \"messages\" (\"chatId\", \"sequence\")", "DROP INDEX IF EXISTS IX_messages_chatId_sequence",

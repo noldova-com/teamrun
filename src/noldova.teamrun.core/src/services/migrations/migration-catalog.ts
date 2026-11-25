@@ -43,6 +43,7 @@ import { TeammateLastRepliesMigration } from "../../models/migrations/teammate-l
 import { TeammatePlacementsMigration } from "../../models/migrations/teammate-placements-migration.js";
 import { OrganizationsMigration } from "../../models/migrations/organizations-migration.js";
 import { UniqueIndexNamesMigration } from "../../models/migrations/unique-index-names-migration.js";
+import { OrganizationChatFoldersMigration } from "../../models/migrations/organization-chat-folders-migration.js";
 
 export class MigrationCatalog {
   public static readonly all: readonly SqlMigration[] = [new InitialMigration(), new TeammatesMigration(), new DraftsMigration(), new ApprovalScopesMigration(),
@@ -55,5 +56,6 @@ export class MigrationCatalog {
     new SustainAttemptReasonsMigration(), new HandoverSummariesMigration(), new HandoverSummaryKindsMigration(),
     new CheckpointFoldersMigration(), new DepartmentsMigration(),
     new OrganizationMessagesMigration(), new TeammateLastRepliesMigration(), new TeammatePlacementsMigration(),
-    new OrganizationMessagesDropMigration(), new OrganizationsMigration(), new UniqueIndexNamesMigration(), new NodeTypesMigration()];
+    new OrganizationMessagesDropMigration(), new OrganizationsMigration(), new UniqueIndexNamesMigration(), new NodeTypesMigration(),
+    new OrganizationChatFoldersMigration()];
 }

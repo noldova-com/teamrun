@@ -47,6 +47,17 @@ export class ChatFolders {
     return folder;
   }
 
+  public static organizationPathOf(folder: string, organizationId: string): string {
+    return join(folder, Resources.organizationChatsDirectoryName, organizationId);
+  }
+
+  public static prepareOrganization(folder: string, organizationId: string): string {
+    const path = ChatFolders.organizationPathOf(folder, organizationId);
+    if (existsSync(folder))
+      mkdirSync(path, { recursive: true });
+    return path;
+  }
+
   public list(): readonly string[] {
     if (!existsSync(this.root))
       return [];
