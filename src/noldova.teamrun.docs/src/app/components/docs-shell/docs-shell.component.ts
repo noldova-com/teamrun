@@ -9,8 +9,8 @@
 import { Component, DOCUMENT, DestroyRef, ElementRef, Injector, type Signal, type WritableSignal, afterNextRender, computed, effect, inject, signal, viewChild } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
-import { SectionHeaderComponent, SiteFooterComponent, SiteHeaderComponent, SiteLink, SiteLinkGroup, SiteSearchDirective, SiteSocialLink }
-  from "@noldova/ui.components.angular";
+import { SectionHeaderComponent } from "@noldova/ui.components.angular";
+import { SiteFooterComponent, SiteHeaderComponent, SiteLink, SiteLinkGroup, SiteSearchDirective, SiteSocialLink } from "@noldova/ui.components.angular/site";
 import { filter, map } from "rxjs";
 
 import "@noldova/context.core";
