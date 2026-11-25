@@ -32,6 +32,7 @@ export class RecordingTurnListener implements ITurnListener {
   public readonly sharedFailures: SharedMcpFailure[] = [];
   public wakeTurn: WakeTurn | null = null;
   public readonly wakeTurns: WakeTurn[] = [];
+  public heldWake: Promise<WakeTurn | null> | null = null;
   public thinking: number = 0;
   public defaultDecision: string = "accept";
   public decisionFailure: Error | null = null;
@@ -135,7 +136,7 @@ export class RecordingTurnListener implements ITurnListener {
 
   public onWakeAsync(wake: TurnWake): Promise<WakeTurn | null> {
     this.wakes.push(wake);
-    return Promise.resolve(this.wakeTurns.shift() ?? this.wakeTurn);
+    return this.heldWake ?? Promise.resolve(this.wakeTurns.shift() ?? this.wakeTurn);
   }
 
   public onSharedServerFailedAsync(failure: SharedMcpFailure): Promise<void> {
