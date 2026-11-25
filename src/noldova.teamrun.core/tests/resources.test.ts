@@ -11,6 +11,7 @@ import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { Resources } from "@noldova/teamrun.core";
 
 import { CodedError } from "./fixtures/coded-error.fixture.js";
+import { NumberCodedError } from "./fixtures/number-coded-error.fixture.js";
 
 @TestClass
 export class ResourcesTests {
@@ -296,8 +297,8 @@ export class ResourcesTests {
     Assert.areEqual("Error ERR_PROVIDER", Resources.formatFailureKind(new CodedError(prompt, "ERR_PROVIDER")));
     Assert.areEqual("TypeError", Resources.formatFailureKind(new TypeError(prompt)));
     Assert.areEqual("Error", Resources.formatFailureKind(new Error(prompt)));
-    Assert.areEqual("Error", Resources.formatFailureKind(Object.assign(new Error(prompt), { code: 7 })));
-    Assert.areEqual("ERR_PROVIDER|Error|TypeError", [new CodedError(prompt, "ERR_PROVIDER"), Object.assign(new Error(prompt), { code: 7 }), new TypeError(prompt)]
+    Assert.areEqual("Error", Resources.formatFailureKind(new NumberCodedError(prompt, 7)));
+    Assert.areEqual("ERR_PROVIDER|Error|TypeError", [new CodedError(prompt, "ERR_PROVIDER"), new NumberCodedError(prompt, 7), new TypeError(prompt)]
       .map(t => Resources.formatFailureReason(t)).join("|"));
     Assert.areEqual("string", Resources.formatFailureKind(prompt));
     Assert.areEqual("undefined|number|bigint|boolean|symbol|function|object|object",
