@@ -7,8 +7,9 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ClaudePendingRun, ClaudeTurn, DeltaStream } from "@noldova/teamrun.providers";
+import { ClaudeTurn, DeltaStream } from "@noldova/teamrun.providers";
 
+import { ClaudePendingRun } from "../../../src/services/claude/claude-pending-run.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 
 @TestClass
