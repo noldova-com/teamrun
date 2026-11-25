@@ -38,6 +38,7 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
+- **Claude Code:** a background task that ends while a chat's query stops for other settings starts no wake turn on that query (#216).
 - **Claude Code:** a turn with other settings, such as another model, starts its new query only once the open one has stopped, waiting for its tasks' stops up to the interrupt timeout, so two Claude Code processes never hold the chat's session at once (#44).
 - **ACP agents:** when the next turn of a chat can't take the agent session it kept, because the turn's tools can't be served, the session's tools access ends and its agent process is stopped, rather than both staying until TeamRun restarts (#73).
 - **Organization:** a teammate is told who reports to it: its Organization line names everyone whose manager it is: a department one of them leads, with its leader, a department with no leader with its teammates who report to it, and each other teammate by name, or says no one reports to it; and `teamrun_list_teammates` gives each teammate's department and manager in each organization (#206).

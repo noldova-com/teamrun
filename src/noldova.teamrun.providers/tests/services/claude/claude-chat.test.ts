@@ -30,6 +30,7 @@ import { Wait } from "../../fixtures/wait.fixture.js";
 import { WaitForCloseStep } from "../../fixtures/wait-for-close-step.fixture.js";
 import { WaitForInputStep } from "../../fixtures/wait-for-input-step.fixture.js";
 import { WaitForInterruptStep } from "../../fixtures/wait-for-interrupt-step.fixture.js";
+import { WaitForStopStep } from "../../fixtures/wait-for-stop-step.fixture.js";
 
 @TestClass
 export class ClaudeChatTests {
@@ -1935,6 +1936,35 @@ export class ClaudeChatTests {
       Assert.areEqual(JSON.stringify([0, 1, 0]), JSON.stringify([...kept, before]));
       Assert.areEqual(JSON.stringify([TurnOutcome.Completed, TurnOutcome.Completed]), JSON.stringify([second.outcome, third.outcome]));
       Assert.areEqual(JSON.stringify([undefined, "s-44"]), JSON.stringify(host.factory.optionsList.map(t => t.resume)));
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async startsNoWakeTurnForATaskThatEndsWhileTheChatIsStoppingForOtherSettings(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      SdkMessages.init("s-216", "none", null, []),
+      SdkMessages.taskStarted("s-216", "server", undefined, true, "npm start"),
+      SdkMessages.success("s-216", "Started"),
+      new WaitForStopStep(),
+      SdkMessages.taskNotification("s-216", "server", "completed", host.directory.resolve("missing.output")),
+      SdkMessages.assistant("21621621-6216-2162-1621-621621621621", [SdkMessages.text("The server stopped")], "claude-opus-5"),
+      SdkMessages.success("s-216", "Noted"),
+      new WaitForCloseStep()
+    ]);
+    query.stopTaskGate = new GateStep();
+    host.factory.next = query;
+    host.factory.queued.push(new FakeClaudeQuery([SdkMessages.init("s-216", "none", null, []), SdkMessages.success("s-216", "Again")]));
+    const first = new RecordingTurnListener();
+
+    try {
+      await adapter.runTurn(host.createRequest("Start"), first, new AbortController().signal);
+      const result = await adapter.runTurn(host.createRequest("Again", null, "s-216", "sonnet"), new RecordingTurnListener(), new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual(JSON.stringify(["server", 1, 0]), JSON.stringify([query.stoppedTasks.join(","), query.closeCount, first.wakes.length]));
     }
     finally { await adapter.shutdown(); }
   }
