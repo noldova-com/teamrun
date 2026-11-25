@@ -7,10 +7,12 @@
  */
 
 export class CodexSandbox {
+  public readonly mode: string;
   public readonly sandbox: string;
   public readonly approvalPolicy: string;
 
-  public constructor(sandbox: string, approvalPolicy: string) {
+  public constructor(mode: string, sandbox: string, approvalPolicy: string) {
+    this.mode = mode;
     this.sandbox = sandbox;
     this.approvalPolicy = approvalPolicy;
   }

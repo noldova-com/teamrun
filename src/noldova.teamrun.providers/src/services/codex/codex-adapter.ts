@@ -123,13 +123,12 @@ export class CodexAdapter implements IProviderAdapter {
     new ProviderMode(Resources.codexDefaultMode, Resources.codexDefaultModeName, Resources.codexDefaultModeDescription),
     new ProviderMode(Resources.codexFullAccessMode, Resources.codexFullAccessModeName, Resources.codexFullAccessModeDescription, true),
     new ProviderMode(Resources.codexPlanMode, Resources.codexPlanModeName, Resources.codexPlanModeDescription, false, true)];
-  private static readonly defaultSandbox: CodexSandbox = new CodexSandbox(Resources.workspaceWriteSandbox, Resources.onRequestApprovalPolicy);
-  private static readonly sandboxes: Readonly<Record<string, CodexSandbox>> = {
-    [Resources.codexReadOnlyMode]: new CodexSandbox(Resources.readOnlySandbox, Resources.onRequestApprovalPolicy),
-    [Resources.codexDefaultMode]: CodexAdapter.defaultSandbox,
-    [Resources.codexFullAccessMode]: new CodexSandbox(Resources.dangerFullAccessSandbox, Resources.neverApprovalPolicy),
-    [Resources.codexPlanMode]: new CodexSandbox(Resources.readOnlySandbox, Resources.onRequestApprovalPolicy)
-  };
+  private static readonly defaultSandbox: CodexSandbox = new CodexSandbox(Resources.codexDefaultMode, Resources.workspaceWriteSandbox, Resources.onRequestApprovalPolicy);
+  private static readonly sandboxes: readonly CodexSandbox[] = [
+    new CodexSandbox(Resources.codexReadOnlyMode, Resources.readOnlySandbox, Resources.onRequestApprovalPolicy),
+    CodexAdapter.defaultSandbox,
+    new CodexSandbox(Resources.codexFullAccessMode, Resources.dangerFullAccessSandbox, Resources.neverApprovalPolicy),
+    new CodexSandbox(Resources.codexPlanMode, Resources.readOnlySandbox, Resources.onRequestApprovalPolicy)];
   public readonly descriptor: ProviderKind;
   public readonly takesTeamRunTools: boolean = true;
   public readonly profileSearch: ProfileSearch;
@@ -1479,7 +1478,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private static sandboxOf(requested: string | null): CodexSandbox {
-    return CodexAdapter.sandboxes[CodexAdapter.modes.find(t => t.id === requested)?.id ?? Resources.codexDefaultMode] ?? CodexAdapter.defaultSandbox;
+    return CodexAdapter.sandboxes.find(t => t.mode === requested) ?? CodexAdapter.defaultSandbox;
   }
 
   private static changesOf(held: ICodexHold, model: string | null | undefined, effort: string | null | undefined, cwd: string): JsonObject | null {
