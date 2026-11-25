@@ -6,9 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { IEventTiming } from "./i-event-timing.ts";
+import type { ILongFrame } from "./i-long-frame.ts";
+
 export interface IPagePerformance {
-  loaf: { duration: number; blocking: number; scripts: { invoker: string; fn: string; url: string; pos: number; duration: number }[] }[];
-  events: { duration: number }[];
+  loaf: ILongFrame[];
+  events: IEventTiming[];
   keys: number[];
   frames: number[];
   sampling: boolean;
