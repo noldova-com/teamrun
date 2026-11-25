@@ -33,6 +33,7 @@ import {
   ConversationRewindParams,
   ConversationRewindResult,
   ConversationRewoundPayload,
+  type Department,
   DepartmentCreateParams,
   DepartmentMemberSetParams,
   DepartmentUpdateParams,
@@ -61,6 +62,7 @@ import {
   OrganizationParent,
   SubAgent,
   SubAgentStatus,
+  type Teammate,
   TeammateCreateParams,
   TeammatePlaceParams
 } from "@noldova/teamrun.protocol";
@@ -529,7 +531,7 @@ export class ConversationEngineTests {
     await host.engine.waitForIdle();
     const saved = (await host.messages.findAsync(result.sent.id))?.attachments[0];
     const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
-    const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson);
+    const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, []);
 
     Assert.areEqual(2, host.adapter.requests.length);
     Assert.isTrue(promptOf(grokProvider.id).includes(Resources.formatOrganizationRolePrompt(role, "@Grok @Ben look")));
@@ -562,8 +564,62 @@ export class ConversationEngineTests {
 
     Assert.areEqual(memberChat.id, reopened.id);
     Assert.isTrue(promptOf(leadProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Design"),
-      Resources.organizationReportsToPerson)));
-    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead")));
+      Resources.organizationReportsToPerson, ["Member"])));
+    Assert.isTrue(promptOf(memberProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Design"), "Lead", [])));
+  }
+
+  @TestMethod
+  public async namesEveryTeammateWhoseManagerTheTeammateIsByTheDepartmentItLeadsOrSitsIn(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const type = await host.typeAsync();
+    const opusProvider = await host.createProviderAsync("fake", "Opus");
+    const bobProvider = await host.createProviderAsync("fake", "Bob");
+    const otherProvider = await host.createProviderAsync("fake", "Other");
+    const make = (name: string, providerId: string): Promise<Teammate> =>
+      host.teammates.createAsync(new TeammateCreateParams(name, null, providerId, Harness.Provider, null, null));
+    const opus = await make("Opus", opusProvider.id);
+    const mia = await make("Mia", otherProvider.id);
+    const sam = await make("Sam", otherProvider.id);
+    const uma = await make("Uma", otherProvider.id);
+    const ann = await make("Ann", otherProvider.id);
+    const bob = await make("Bob", bobProvider.id);
+    const cal = await make("Cal", otherProvider.id);
+    const fay = await make("Fay", otherProvider.id);
+    const gus = await make("Gus", otherProvider.id);
+    const lee = await make("Lee", otherProvider.id);
+    const tom = await make("Tom", otherProvider.id);
+    const eve = await make("Eve", otherProvider.id);
+    const organizationId = Resources.defaultOrganizationId;
+    const create = (name: string, parent: OrganizationParent, leaderId?: string): Promise<Department> =>
+      host.organization.createAsync(new DepartmentCreateParams(organizationId, name, type, parent, leaderId));
+    const add = (teammate: Teammate, department: Department): Promise<void> =>
+      host.organization.setMemberAsync(new DepartmentMemberSetParams(organizationId, teammate.id, department.id));
+    const core = await create("Core", OrganizationParent.person, opus.id);
+    await add(mia, core);
+    await add(uma, await create("Ops", OrganizationParent.department(core.id), sam.id));
+    await add(bob, await create("Devs", OrganizationParent.teammate(opus.id), ann.id));
+    const research = await create("Research", OrganizationParent.teammate(opus.id));
+    await add(fay, research);
+    await add(gus, research);
+    await add(tom, await create("Lab", OrganizationParent.department(research.id), lee.id));
+    await host.organization.placeAsync(new TeammatePlaceParams(organizationId, eve.id, OrganizationParent.teammate(opus.id), 0));
+    await host.organization.placeAsync(new TeammatePlaceParams(organizationId, cal.id, OrganizationParent.teammate(bob.id), 0));
+    const chat = await host.engine.openOrganizationChatAsync(new OrganizationChat(organizationId, opus.id));
+    const bobChat = await host.engine.openOrganizationChatAsync(new OrganizationChat(organizationId, bob.id));
+
+    await host.engine.sendAsync(new MessageSendParams(chat.id, "@Opus ask your agents", null, null, [], [opus.id]));
+    await host.engine.sendAsync(new MessageSendParams(bobChat.id, "@Bob ask yours", null, null, [], [bob.id]));
+    await host.engine.waitForIdle();
+    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+    const prompt = promptOf(opusProvider.id);
+    const organization = await host.organization.findAsync(organizationId);
+    const reports = (await host.teammates.listAsync()).filter(t => organization?.managerOf(t.id) === opus.id).map(t => t.name);
+
+    Assert.isTrue(prompt.includes(Resources.formatOrganizationRole(Resources.formatOrganizationLeader("Core"), Resources.organizationReportsToPerson, [
+      Resources.formatOrganizationDepartmentReport("Devs", "Ann"), "Eve", Resources.formatOrganizationUnledReport("Research", ["Fay", "Gus"]),
+      Resources.formatOrganizationDepartmentReport("Lab", "Lee"), "Mia", Resources.formatOrganizationDepartmentReport("Ops", "Sam")])));
+    Assert.areEqual("Ann Eve Fay Gus Lee Mia Sam", reports.join(" "));
+    Assert.isTrue(promptOf(bobProvider.id).includes(Resources.formatOrganizationRole(Resources.formatOrganizationMember("Devs"), "Ann", ["Cal"])));
   }
 
   @TestMethod
@@ -577,7 +633,7 @@ export class ConversationEngineTests {
     await host.engine.waitForIdle();
 
     Assert.isFalse((host.adapter.requests[0]?.prompt ?? "missing").includes(Resources.formatOrganizationRole(Resources.organizationNoDepartment,
-      Resources.organizationReportsToPerson)));
+      Resources.organizationReportsToPerson, [])));
     Assert.isTrue((host.adapter.requests[0]?.prompt ?? String.empty).includes("look"));
     Assert.isNull((await host.messages.findAsync(result.sent.id))?.details[0]?.payload ?? null);
   }

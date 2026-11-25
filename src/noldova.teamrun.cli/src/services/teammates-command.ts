@@ -15,6 +15,7 @@ import {
   ConversationMember,
   Message,
   MethodName,
+  Organization,
   PlanUsage,
   ProjectListing,
   Provider,
@@ -22,6 +23,7 @@ import {
   TeammateUsage
 } from "@noldova/teamrun.protocol";
 
+import { TeammateChat } from "../models/teammate-chat.js";
 import { Resources } from "../resources.js";
 import type { CommandValues } from "./command-values.js";
 import type { RuntimeClient } from "./runtime-client.js";
@@ -37,17 +39,18 @@ export class TeammatesCommand extends TeamRunCommand {
   protected async runAsync(_values: CommandValues, signal: AbortSignal): Promise<CliCommandResult> {
     const teammates = await this.client.listAsync(MethodName.TeammateList, null, signal, t => Teammate.fromJson(t));
     const providers = await this.client.listAsync(MethodName.ProviderList, null, signal, t => Provider.fromJson(t));
-    const chats: { chat: Conversation; members: readonly string[] }[] = [];
+    const chats: TeammateChat[] = [];
     const projects = await this.client.listAsync(MethodName.ProjectList, null, signal, t => ProjectListing.fromJson(t).project);
     for (const projectId of [...projects.map(t => t.id), null])
       for (const chat of await this.client.listAsync(MethodName.ConversationList, new ConversationListParams(projectId).toJson(), signal, t => Conversation.fromJson(t))) {
         const members = await this.client.listAsync(MethodName.ConversationListMembers, new ConversationIdParams(chat.id).toJson(), signal,
           t => ConversationMember.fromJson(t));
-        chats.push({ chat, members: members.map(t => t.teammateId) });
+        chats.push(new TeammateChat(chat, members.map(t => t.teammateId)));
       }
     const open = await this.client.listAsync(MethodName.MessageListOpen, null, signal, t => Message.fromJson(t));
     const usage = await this.client.listAsync(MethodName.TeammateUsageList, null, signal, t => TeammateUsage.fromJson(t));
     const plans = await this.client.listAsync(MethodName.PlanUsageList, null, signal, t => PlanUsage.fromJson(t));
+    const organizations = await this.client.listAsync(MethodName.OrganizationList, null, signal, t => Organization.fromJson(t));
     const rows: JsonObject[] = [];
     const lines: string[] = [];
     for (const teammate of teammates) {
@@ -57,6 +60,7 @@ export class TeammatesCommand extends TeamRunCommand {
       const used = usage.filter(t => t.teammateId === teammate.id);
       const read = Object.isNull(provider) ? null : plans.find(t => t.providerId === provider.id && t.kind === provider.kind) ?? null;
       const windows = read?.windows ?? [];
+      const placed = organizations.filter(t => t.placements.some(u => u.teammateId === teammate.id));
       rows.push({
         [Resources.idField]: teammate.id,
         [Resources.nameField]: teammate.name,
@@ -77,7 +81,16 @@ export class TeammatesCommand extends TeamRunCommand {
           [Resources.costUsdField]: t.usage.costUsd, [Resources.contextTokensField]: t.usage.context?.usedTokens,
           [Resources.contextWindowField]: t.usage.context?.windowTokens
         })),
-        [Resources.planWindowsField]: windows.map(t => TeammatesCommand.reported(t.toJson()))
+        [Resources.planWindowsField]: windows.map(t => TeammatesCommand.reported(t.toJson())),
+        [Resources.organizationsField]: placed.map(t => {
+          const department = TeammatesCommand.departmentOf(t, teammate.id);
+          const managerId = t.managerOf(teammate.id);
+          return {
+            [Resources.idField]: t.id, [Resources.nameField]: t.name, [Resources.departmentField]: department,
+            [Resources.managerField]: Object.isNull(managerId) ? null
+              : { [Resources.idField]: managerId, [Resources.nameField]: teammates.find(u => u.id === managerId)?.name ?? null }
+          };
+        })
       });
       lines.push(Resources.formatTeammate(teammate, provider, joined, answering));
       for (const reply of used) {
@@ -87,7 +100,17 @@ export class TeammatesCommand extends TeamRunCommand {
       }
       if (windows.length > 0)
         lines.push(Resources.formatPlanWindows(windows));
+      for (const organization of placed) {
+        const managerId = organization.managerOf(teammate.id);
+        lines.push(Resources.formatTeammatePlace(organization.name, TeammatesCommand.departmentOf(organization, teammate.id),
+          Object.isNull(managerId) ? null : teammates.find(t => t.id === managerId)?.name ?? managerId));
+      }
     }
     return new CliCommandResult(rows, Resources.formatList(lines));
+  }
+
+  private static departmentOf(organization: Organization, teammateId: string): string | null {
+    const departmentId = organization.departmentOf(teammateId);
+    return organization.departments.find(t => t.id === departmentId)?.name ?? null;
   }
 }

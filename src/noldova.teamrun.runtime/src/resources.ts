@@ -269,7 +269,7 @@ export class Resources {
   public static readonly listApprovalsDescription: string = "Lists the id, status, summary and options of each of a chat's approvals and questions.";
   public static readonly listProvidersDescription: string = "Lists each provider's id, kind, name and sign-in status, and how much of its plan is used where the provider reports it.";
   public static readonly checkProviderDescription: string = "Checks a provider's sign-in and gives its status.";
-  public static readonly listTeammatesDescription: string = "Lists every teammate with its id, name, role, provider, model, effort, chats and usage.";
+  public static readonly listTeammatesDescription: string = "Lists every teammate with its id, name, role, provider, model, effort, chats, usage, and its department and manager in each organization.";
   public static readonly projectIdDescription: string = "The id of the project whose chats to list; every project's and the chats without one when left out.";
   public static readonly chatIdDescription: string = "The id of the chat.";
   public static readonly beforeDescription: string = "Lists only the messages before this sequence number.";

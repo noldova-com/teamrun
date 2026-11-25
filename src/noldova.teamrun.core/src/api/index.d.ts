@@ -4585,11 +4585,27 @@ export declare class Resources {
   public static formatOrganizationMember(department: string): string;
 
   /**
-   * The line an Organization message gives its teammate: who sent it, the teammate's place and who it reports to.
+   * The line an Organization message gives its teammate: who sent it, the teammate's place, who it reports to, and who reports to it.
    * @param place The teammate's place.
    * @param manager Who the teammate reports to.
+   * @param reports Who reports to the teammate, as `Organization.managerOf` decides it: each department one of them leads, with its leader,
+   * each department with no leader with those of them in it, and each of the others by name; none says that no one does.
    */
-  public static formatOrganizationRole(place: string, manager: string): string;
+  public static formatOrganizationRole(place: string, manager: string, reports: readonly string[]): string;
+
+  /**
+   * Names a department that reports to a teammate, with its leader.
+   * @param department The department's name.
+   * @param leader Its leader's name.
+   */
+  public static formatOrganizationDepartmentReport(department: string, leader: string): string;
+
+  /**
+   * Names a department with no leader whose teammates report to a teammate, with those teammates.
+   * @param department The department's name.
+   * @param members The names of its teammates who report to the teammate.
+   */
+  public static formatOrganizationUnledReport(department: string, members: readonly string[]): string;
 
   /**
    * Puts an Organization role line before the message's text as its teammate gets it.
