@@ -422,8 +422,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       await run.stop();
     const chats = [...this.chats];
     this.chats.clear();
-    for (const chat of chats)
-      await chat.stop();
+    await Promise.all(chats.map(t => t.stop()));
   }
 
   private async readBeforeStartAsync(shutdowns: number = this.shutdowns): Promise<NodeJS.ProcessEnv> {
@@ -542,7 +541,7 @@ export class ClaudeAdapter implements IProviderAdapter {
       if (open.isRunningTasks && JSON.stringify(this.servedTools.get(open)) !== JSON.stringify(tools))
         await listener.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeChatEndedForToolsChange, null, null));
       this.chats.delete(open);
-      void open.stop();
+      await open.stop();
     }
 
     const base = await this.readBeforeStartAsync(shutdowns);

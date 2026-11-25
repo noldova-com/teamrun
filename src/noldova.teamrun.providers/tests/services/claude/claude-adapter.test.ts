@@ -1189,6 +1189,94 @@ export class ClaudeAdapterTests {
   }
 
   @TestMethod
+  public async startsTheNewQueryForOtherSettingsOnlyOnceTheOpenQueryHasStoppedWhileItsTaskStopIsPending(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const open = new FakeClaudeQuery([
+      SdkMessages.init("s-other-model", "none", null, []),
+      SdkMessages.taskStarted("s-other-model", "server", undefined, true, "npm start"),
+      SdkMessages.success("s-other-model", "Started"),
+      new WaitForCloseStep()
+    ]);
+    open.stopTaskGate = new GateStep();
+    const next = new FakeClaudeQuery([SdkMessages.init("s-other-model", "none", null, []), SdkMessages.success("s-other-model", "Again")]);
+    const closedAtStart: number[] = [];
+    host.factory.repeat = () => {
+      if (host.factory.queries.length === 0)
+        return open;
+      closedAtStart.push(open.closeCount);
+      return next;
+    };
+
+    await adapter.runTurn(host.createRequest("Start"), new RecordingTurnListener(), new AbortController().signal);
+    const result = await adapter.runTurn(host.createRequest("Again", null, "s-other-model", "sonnet"), new RecordingTurnListener(), new AbortController().signal);
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, result.outcome);
+    Assert.areEqual(JSON.stringify([undefined, "s-other-model"]), JSON.stringify(host.factory.optionsList.map(t => t.resume)));
+    Assert.areEqual(JSON.stringify(["server", [1]]), JSON.stringify([open.stoppedTasks.join(","), closedAtStart]));
+  }
+
+  @TestMethod
+  public async startsTheNewQueryForOtherSettingsOnceTheInterruptTimeoutPassesWhenTheOpenQueryNeverAnswersItsInterrupt(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const open = new FakeClaudeQuery([
+      SdkMessages.init("s-no-interrupt", "none", null, []),
+      SdkMessages.taskStarted("s-no-interrupt", "server", undefined, true, "npm start"),
+      SdkMessages.success("s-no-interrupt", "Started"),
+      new WaitForCloseStep()
+    ]);
+    open.interruptHang = true;
+    const next = new FakeClaudeQuery([SdkMessages.init("s-no-interrupt", "none", null, []), SdkMessages.success("s-no-interrupt", "Again")]);
+    const closedAtStart: number[] = [];
+    host.factory.repeat = () => {
+      if (host.factory.queries.length === 0)
+        return open;
+      closedAtStart.push(open.closeCount);
+      return next;
+    };
+
+    await adapter.runTurn(host.createRequest("Start"), new RecordingTurnListener(), new AbortController().signal);
+    const again = adapter.runTurn(host.createRequest("Again", null, "s-no-interrupt", "sonnet"), new RecordingTurnListener(), new AbortController().signal);
+    await Wait.until(() => host.factory.queries.length === 2, "The new query did not start once the interrupt timeout passed.");
+    const result = await again;
+    await adapter.shutdown();
+
+    Assert.areEqual(TurnOutcome.Completed, result.outcome);
+    Assert.areEqual(JSON.stringify([1, [1]]), JSON.stringify([open.interruptCount, closedAtStart]));
+  }
+
+  @TestMethod
+  public async stopsEveryOpenChatAtOnceAtShutdown(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = (sessionId: string): FakeClaudeQuery => new FakeClaudeQuery([
+      SdkMessages.init(sessionId, "none", null, []),
+      SdkMessages.taskStarted(sessionId, "server", undefined, true, "npm start"),
+      SdkMessages.success(sessionId, "Started"),
+      new WaitForCloseStep()
+    ]);
+    const first = query("s-first");
+    const second = query("s-second");
+    const queries = [first, second];
+    first.stopTaskGate = new GateStep();
+    first.interruptHang = true;
+    second.stopTaskGate = new GateStep();
+    host.factory.next = first;
+    host.factory.queued.push(second);
+
+    await adapter.runTurn(host.createRequest("First"), new RecordingTurnListener(), new AbortController().signal);
+    await adapter.runTurn(host.createRequest("Second"), new RecordingTurnListener(), new AbortController().signal);
+    const stopping = adapter.shutdown();
+    await Wait.until(() => queries.every(t => t.stoppedTasks.length === 1), "Shutdown did not stop both chats' tasks.");
+    const interruptedBefore = first.interruptCount;
+    await stopping;
+
+    Assert.areEqual(JSON.stringify([0, 1, 1]), JSON.stringify([interruptedBefore, first.closeCount, second.closeCount]));
+  }
+
+  @TestMethod
   public async failsTheTurnNamingWhyWhenTeamRunsToolEndpointIsntServing(): Promise<void> {
     using host = new ClaudeTestHost();
     const adapter = host.createAdapter();
