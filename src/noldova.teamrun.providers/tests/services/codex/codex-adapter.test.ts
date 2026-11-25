@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
-import { ForkRequest, NodeTimer, SessionCarry, SessionTokens, SharedMcpFailureKind, SharedMcpValues, TitleTurn, TurnOutcome, TurnRequest, type TurnResult, TurnSteer, TurnTools } from "@noldova/teamrun.core";
+import { ForkRequest, NodeTimer, SessionCarry, SessionTokens, SharedMcpFailureKind, SharedMcpValues, TitleTurn, type TurnDetail, TurnOutcome, TurnRequest, type TurnResult, TurnSteer, TurnTools } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import { ApprovalKind, AuthStatus, DetailKind, MessageAttachment, type Provider, ProviderAbility, RequestedSettings, RoleApplication, SenderEnvironment, SharedMcpHeader,
   SharedMcpServerDefinition, SharedMcpTransport } from "@noldova/teamrun.protocol";
@@ -34,6 +34,16 @@ import { RunningProgramsStarter } from "../../fixtures/running-programs-starter.
 import { TokenRecordingTurnListener } from "../../fixtures/token-recording-turn-listener.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
 import { WatchingProcessStarter } from "../../fixtures/watching-process-starter.fixture.js";
+
+class ResumeNoteStoppingListener extends RecordingTurnListener {
+  public readonly stop: AbortController = new AbortController();
+
+  public override async onDetailAsync(detail: TurnDetail): Promise<void> {
+    if (detail.text.startsWith(Resources.formatResumeFailed(String.empty)))
+      this.stop.abort();
+    await super.onDetailAsync(detail);
+  }
+}
 
 @TestClass
 export class CodexAdapterTests {
@@ -2689,6 +2699,90 @@ export class CodexAdapterTests {
     Assert.isNull(result.error);
     Assert.areEqual("1", counted.details.find(t => t.kind === DetailKind.Text)?.text);
     Assert.areEqual(TurnOutcome.Interrupted, preAborted.outcome);
+  }
+
+  @TestMethod
+  public async sendsNoTurnForATurnStoppedWhileItWaitsForTheTurnRunningOnItsThread(): Promise<void> {
+    using host = new CodexTestHost();
+    const log = new RecordingLog();
+    const adapter = host.createAdapter(host.environment, host.command, host.timings, undefined, log);
+    const holding = new AbortController();
+    const waiting = new AbortController();
+    const listener = new RecordingTurnListener();
+    const next = new RecordingTurnListener();
+    const counted = new RecordingTurnListener();
+    try {
+      const threadId = (await adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal)).nativeSessionId;
+      const held = adapter.runTurn(host.createRequest("hold", null, threadId), listener, holding.signal);
+      await Wait.untilOrSettled(() => listener.details.length === 1, held);
+      const stopped = adapter.runTurn(host.createRequest("echo", null, threadId), next, waiting.signal);
+      await Wait.until(() => log.lines.some(t => t.includes(Resources.formatCodexTurnAwaitsThread(String(threadId)))), "The log did not say the turn awaits the thread.");
+      waiting.abort();
+      const result = await stopped;
+      const preAborted = await adapter.runTurn(host.createRequest("echo", null, threadId), new RecordingTurnListener(), AbortSignal.abort());
+      holding.abort();
+      await held;
+      await adapter.runTurn(host.createRequest("interrupts"), counted, new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Interrupted, result.outcome);
+      Assert.areEqual(threadId, result.nativeSessionId);
+      Assert.areEqual(TurnOutcome.Interrupted, preAborted.outcome);
+      Assert.areEqual(0, next.starts.length);
+      Assert.areEqual("1", counted.details.find(t => t.kind === DetailKind.Text)?.text);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async startsATurnAfterOneStoppedWhileItWaitedOnlyOnceTheTurnRunningOnTheThreadEnds(): Promise<void> {
+    using host = new CodexTestHost();
+    const log = new RecordingLog();
+    const adapter = host.createAdapter(host.environment, host.command, host.timings, undefined, log);
+    const holding = new AbortController();
+    const waiting = new AbortController();
+    const listener = new RecordingTurnListener();
+    const next = new RecordingTurnListener();
+    try {
+      const threadId = String((await adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal)).nativeSessionId);
+      const awaits = (): number => log.lines.filter(t => t.includes(Resources.formatCodexTurnAwaitsThread(threadId))).length;
+      const held = adapter.runTurn(host.createRequest("hold", null, threadId), listener, holding.signal);
+      await Wait.untilOrSettled(() => listener.details.length === 1, held);
+      const stopped = adapter.runTurn(host.createRequest("echo", null, threadId), new RecordingTurnListener(), waiting.signal);
+      await Wait.until(() => awaits() === 1, "The log did not say the stopped turn awaits the thread.");
+      waiting.abort();
+      await stopped;
+      const running = adapter.runTurn(host.createRequest("echo", null, threadId), next, new AbortController().signal);
+      await Wait.until(() => awaits() === 2, "The log did not say the next turn awaits the thread.");
+      const during = next.starts.length;
+      holding.abort();
+      await held;
+      const result = await running;
+
+      Assert.areEqual(0, during);
+      Assert.areEqual(TurnOutcome.Completed, result.outcome);
+      Assert.areEqual(1, next.starts.length);
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
+  public async sendsNoTurnForATurnStoppedWhileItOpensItsThread(): Promise<void> {
+    using host = new CodexTestHost();
+    const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_CODEX_RESUME: "fails" });
+    const listener = new ResumeNoteStoppingListener();
+    const counted = new RecordingTurnListener();
+    try {
+      const threadId = (await adapter.runTurn(host.createRequest("echo"), new RecordingTurnListener(), new AbortController().signal)).nativeSessionId;
+      const result = await adapter.runTurn(host.createRequest("echo", null, threadId), listener, listener.stop.signal);
+      await adapter.runTurn(host.createRequest("interrupts"), counted, new AbortController().signal);
+
+      Assert.areEqual(TurnOutcome.Interrupted, result.outcome);
+      Assert.isNotNull(result.nativeSessionId);
+      Assert.areNotEqual(threadId, result.nativeSessionId);
+      Assert.areEqual(0, listener.starts.length);
+      Assert.areEqual("0", counted.details.find(t => t.kind === DetailKind.Text)?.text);
+    }
+    finally { await adapter.shutdown(); }
   }
 
   @TestMethod
