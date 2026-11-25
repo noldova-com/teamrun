@@ -34,6 +34,7 @@ export class Resources {
   public static readonly versionPrefix: string = "v";
   public static readonly mainId: string = "nol-docs-main";
   public static readonly menuLabel: string = "Pages";
+  public static readonly menuGroupLevel: number = 2;
   public static readonly menuGlyph: string = "toc";
   public static readonly onThisPageLabel: string = "On this page";
   public static readonly currentLocation: string = "location";

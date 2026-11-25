@@ -11,6 +11,11 @@ import "@noldova/context.core";
 import { indexPage } from "@docs-generated/index-page";
 
 describe("The page shell", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-nol-theme-mode");
+    localStorage.removeItem("noldova-theme");
+  });
+
   it("lets search engines index the site", () => {
     const head = new DOMParser().parseFromString(indexPage, "text/html").head;
 
@@ -30,8 +35,6 @@ describe("The page shell", () => {
       new Function(script)();
 
       expect(root.getAttribute("data-nol-theme-mode")).toBe(mode);
-      root.removeAttribute("data-nol-theme-mode");
-      localStorage.removeItem("noldova-theme");
     });
 
   it("keeps the site's title", () => {

@@ -10,11 +10,9 @@ import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router, provideRouter, withComponentInputBinding } from "@angular/router";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
 import { TooltipFixture } from "@noldova/ui.components.angular/testing";
-import { userEvent } from "vitest/browser";
+import { commands, userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
-
-import { releasedVersion } from "@docs-generated/release";
 
 import { routes } from "../../../../src/app/app.routes";
 import { DocsShellComponent } from "../../../../src/app/components/docs-shell/docs-shell.component";
@@ -23,6 +21,18 @@ import { DocsFixture } from "../../../fixtures/docs.fixture";
 import { ForcedColorsFixture } from "../../../fixtures/forced-colors.fixture";
 import { SamplePageFixture } from "../../../fixtures/sample-page.fixture";
 import { ScrolledPage } from "../../../fixtures/scrolled-page";
+
+class FrameLink {
+  public readonly text: string;
+  public readonly href: string | null;
+  public readonly current: string | null;
+
+  public constructor(text: string, href: string | null, current: string | null) {
+    this.text = text;
+    this.href = href;
+    this.current = current;
+  }
+}
 
 describe("DocsShellComponent", () => {
   const renderAsync = async (url: string): Promise<ComponentFixture<DocsShellComponent>> => {
@@ -108,24 +118,27 @@ describe("DocsShellComponent", () => {
 
     const contentStart = (): number => Math.max(0, (document.documentElement.clientWidth - 108 * DocsFixture.rem()) / 2);
 
-    const linksOf = (root: HTMLElement, selector: string): readonly (readonly (string | null)[])[] =>
-      DocsFixture.all(root, selector).map(t => [t.textContent.trim(), t.getAttribute("href"), t.getAttribute("aria-current")]);
+    const linksOf = (root: HTMLElement, selector: string): readonly FrameLink[] =>
+      DocsFixture.all(root, selector).map(t => new FrameLink(t.textContent.trim(), t.getAttribute("href"), t.getAttribute("aria-current")));
 
     it("are the kit's wide header and footer, with TeamRun's lockup home, its released version, the docs site's links, GitHub, X and Download", async () => {
       const host = await renderSiteAsync("/");
       const header = DocsFixture.one(host, "nol-site-header");
       const footer = DocsFixture.one(host, "nol-site-footer");
       const version = DocsFixture.one(header, ".nol-site-version");
+      const changelog = await commands.readFile("../../../../../../CHANGELOG.md");
+      const released = changelog.split("
+").map(t => t.trim()).find(t => t.startsWith("## ") && t !== "## Unreleased")?.slice(3) ?? String.empty;
 
       expect([header.classList.contains("nol-site-header-wide"), footer.classList.contains("nol-site-footer-wide")]).toEqual([true, true]);
       expect([DocsFixture.one(header, ".nol-site-lockup-link").getAttribute("href"), DocsFixture.one(header, ".nol-site-lockup-name").textContent.trim()]).toEqual(["/", "TeamRun"]);
-      expect([version.textContent.trim(), version.getAttribute("href")]).toEqual([`v${releasedVersion}`, "/release-notes"]);
-      expect(linksOf(header, ".nol-site-nav-link")).toEqual([["TeamRun website", "https://teamrun.noldova.com/", null], ["Release notes", "/release-notes", null]]);
+      expect([version.textContent.trim(), version.getAttribute("href")]).toEqual([`v${released}`, "/release-notes"]);
+      expect(linksOf(header, ".nol-site-nav-link")).toEqual([new FrameLink("TeamRun website", "https://teamrun.noldova.com/", null), new FrameLink("Release notes", "/release-notes", null)]);
       expect(DocsFixture.all(header, ".nol-site-social").map(t => [t.getAttribute("aria-label"), t.getAttribute("href")]))
         .toEqual([["GitHub", "https://github.com/noldova-com/teamrun"], ["X", "https://x.com/noldova"]]);
       expect(DocsFixture.one(header, ".nol-site-download").getAttribute("href")).toBe("https://teamrun.noldova.com/download/");
       expect([DocsFixture.one(header, ".nol-site-skip").getAttribute("href"), DocsFixture.one(host, "main").id]).toEqual(["#nol-docs-main", "nol-docs-main"]);
-      expect(DocsFixture.all(footer, ".nol-site-footer-group").map(t => [t.getAttribute("aria-label"), ...linksOf(t, "a").map(u => `${u[0]} ${u[1]}`)])).toEqual([
+      expect(DocsFixture.all(footer, ".nol-site-footer-group").map(t => [t.getAttribute("aria-label"), ...linksOf(t, "a").map(u => `${u.text} ${u.href}`)])).toEqual([
         ["TeamRun", "Website https://teamrun.noldova.com/", "Download https://teamrun.noldova.com/download/", "Release notes /release-notes"],
         ["Help", "Feedback & support https://github.com/noldova-com/teamrun/issues", "Privacy https://teamrun.noldova.com/privacy/"],
         ["Follow", "GitHub https://github.com/noldova-com/teamrun", "X https://x.com/noldova"]
@@ -136,8 +149,8 @@ describe("DocsShellComponent", () => {
     it("marks the release notes current in the header and the footer on their page", async () => {
       const host = await renderSiteAsync("/release-notes");
 
-      expect(linksOf(DocsFixture.one(host, "nol-site-header"), ".nol-site-nav-link").map(t => t[2])).toEqual([null, "page"]);
-      expect(linksOf(DocsFixture.one(host, "nol-site-footer"), "a.nol-site-footer-link").filter(t => t[2] === "page").map(t => t[0])).toEqual(["Release notes"]);
+      expect(linksOf(DocsFixture.one(host, "nol-site-header"), ".nol-site-nav-link").map(t => t.current)).toEqual([null, "page"]);
+      expect(linksOf(DocsFixture.one(host, "nol-site-footer"), "a.nol-site-footer-link").filter(t => t.current === "page").map(t => t.text)).toEqual(["Release notes"]);
     });
 
     it("lays the header 3.5rem high across the window at its top, its wordmark at the site's inset inside 108rem and its parts centered on its line", async () => {
@@ -361,6 +374,7 @@ describe("DocsShellComponent", () => {
       const lists = DocsFixture.all(nav, ".nol-docs-menu-list");
 
       expect(DocsFixture.all(nav, "nol-section-header").map(t => t.textContent.trim())).toEqual(["Start", "Using TeamRun", "Reference"]);
+      expect(DocsFixture.all(nav, "nol-section-header").map(t => [t.getAttribute("role"), t.getAttribute("aria-level")])).toEqual(Array(3).fill(["heading", "2"]));
       expect(lists.map(t => DocsFixture.all(t, "a").map(u => u.textContent.trim()))).toEqual([
         ["TeamRun", "Getting started", "Install"],
         ["Providers and sign-in", "What each provider can do", "ACP agents", "Chats and teammates", "Following and approving the work", "Organization", "Projects and folders",

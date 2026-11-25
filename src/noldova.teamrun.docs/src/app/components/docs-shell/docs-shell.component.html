@@ -15,7 +15,7 @@ LICENSE file in the root directory of this source tree.
 <div class="nol-docs-body">
   <nav id="nol-docs-menu" class="nol-docs-menu" [class.nol-docs-menu-open]="isMenuOpen()" [attr.aria-label]="resources.menuLabel" (keydown.escape)="closeMenu()">
     @for (group of groups; track group.label) {
-      <nol-section-header [label]="group.label" />
+      <nol-section-header [label]="group.label" [level]="resources.menuGroupLevel" />
       <ul class="nol-docs-menu-list">
         @for (page of group.pages; track page.path) {
           <li><a class="nol-docs-menu-link" [routerLink]="page.link" routerLinkActive="nol-docs-menu-current" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }"
