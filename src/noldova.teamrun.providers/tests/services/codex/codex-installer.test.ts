@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { ProviderKindVersions } from "@noldova/teamrun.core";
 import {
@@ -27,12 +28,40 @@ import {
   Resources
 } from "@noldova/teamrun.providers";
 
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
+import { DownloadProgress } from "../../fixtures/download-progress.fixture.js";
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
+import { FoundAfterInstallCase } from "../../fixtures/found-after-install-case.fixture.js";
+import { InstallCancelCase } from "../../fixtures/install-cancel-case.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
 import { NoticingAppServerProgram } from "../../fixtures/noticing-app-server-program.fixture.js";
 import { RecordedDelayTimer } from "../../fixtures/recorded-delay-timer.fixture.js";
+import { ReleaseBody } from "../../fixtures/release-body.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
+import { UnpackFailureCase } from "../../fixtures/unpack-failure-case.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
+
+class ChannelsFailureCase {
+  public readonly channels: readonly string[];
+  public readonly message: string;
+
+  public constructor(channels: readonly string[], message: string) {
+    this.channels = channels;
+    this.message = message;
+  }
+}
+
+class PackageTargetCase {
+  public readonly platform: string;
+  public readonly architecture: string;
+  public readonly target: string | null;
+
+  public constructor(platform: string, architecture: string, target: string | null) {
+    this.platform = platform;
+    this.architecture = architecture;
+    this.target = target;
+  }
+}
 
 @TestClass
 export class CodexInstallerTests {
@@ -68,21 +97,23 @@ export class CodexInstallerTests {
     return CodexInstallerTests.withReleases(async (server, directory) => {
       const archive = CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
       const installer = CodexInstallerTests.installer([server.url("/c")], directory);
-      const progress: number[][] = [];
+      const progress: DownloadProgress[] = [];
       Assert.isNull(installer.unavailable);
       Assert.isNull(installer.missingTool);
       Assert.isFalse(installer.isInstalled);
       Assert.isNull(installer.foundPath);
       Assert.areEqual("null null", CodexInstallerTests.versions(await installer.readVersions(true)));
 
-      const path = await installer.install((received, total) => progress.push([received, total]), new AbortController().signal);
+      const path = await installer.install((received, total) => progress.push(new DownloadProgress(received, total)), new AbortController().signal);
 
       const root = directory.resolve("home", "packages", "standalone");
       const release = join(root, "releases", "0.164.0-x86_64-unknown-linux-musl");
+      const last = progress.at(-1);
       Assert.areEqual(process.execPath, path);
       Assert.isTrue(installer.isInstalled);
       Assert.areEqual("0.164.0 0.164.0", CodexInstallerTests.versions(await installer.readVersions(true)));
-      Assert.areEqual(JSON.stringify([archive.length, archive.length]), JSON.stringify(progress.at(-1)));
+      Assert.isDefined(last);
+      Assert.areEqual(`${archive.length} ${archive.length}`, `${last.received} ${last.total}`);
       Assert.areEqual("0.164.0-x86_64-unknown-linux-musl", readdirSync(join(root, "releases")).join(","));
       Assert.isTrue(Resources.codexPosixMembers.concat(Resources.codexLinuxMembers).every(t => existsSync(join(release, t))));
       Assert.areEqual(realpathSync(release), realpathSync(join(root, "current")));
@@ -219,7 +250,7 @@ export class CodexInstallerTests {
         }
       }
 
-      const code = String((failure.cause as NodeJS.ErrnoException).code);
+      const code = CodexInstallerTests.codeOf(failure.cause);
       Assert.areEqual(Resources.formatCodexReleaseKept("0.164.0", release, code), failure.message);
       Assert.isTrue(["EACCES", "EBUSY", "EPERM"].includes(code), code);
       Assert.areEqual("half,bin", `${readFileSync(join(release, "bin", "codex"), "utf8")},${readdirSync(release).join(",")}`);
@@ -236,7 +267,7 @@ export class CodexInstallerTests {
       CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
       const root = directory.resolve("home", "packages", "standalone");
       const release = CodexInstallerTests.broken(join(root, "releases"));
-      const refused = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const refused = new CodedError("EPERM: operation not permitted", "EPERM");
       const installer = CodexInstallerTests.installer([server.url("/c")], directory, "linux", undefined, undefined, undefined, undefined, undefined, undefined,
         undefined, (from, to) => {
           if (to === release && basename(from) === basename(release))
@@ -261,8 +292,8 @@ export class CodexInstallerTests {
       CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
       const releases = directory.resolve("home", "packages", "standalone", "releases");
       const release = CodexInstallerTests.broken(releases);
-      const busy = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
-      const denied = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const busy = new CodedError("EBUSY: resource busy or locked", "EBUSY");
+      const denied = new CodedError("EPERM: operation not permitted", "EPERM");
       const refusing = (from: string, to: string): void => {
         if (to === release)
           throw basename(from) === "previous" ? denied : busy;
@@ -299,7 +330,7 @@ export class CodexInstallerTests {
       CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
       const releases = directory.resolve("home", "packages", "standalone", "releases");
       const release = CodexInstallerTests.broken(releases);
-      const busy = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+      const busy = new CodedError("EBUSY: resource busy or locked", "EBUSY");
       let holds = 1;
       const timer = new RecordedDelayTimer();
       const settle = new InstallRename("win32", (from, to) => {
@@ -333,7 +364,7 @@ export class CodexInstallerTests {
       mkdirSync(join(releases, ".teamrun-staging-left", "bin"), { recursive: true });
       chmodSync(join(releases, ".teamrun-staging-left"), 0o555);
       const installer = CodexInstallerTests.installer([server.url("/c")], directory);
-      let failure: NodeJS.ErrnoException;
+      let failure: Error;
       try {
         failure = await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error);
       }
@@ -341,7 +372,7 @@ export class CodexInstallerTests {
         chmodSync(join(releases, ".teamrun-staging-left"), 0o755);
       }
 
-      Assert.areEqual(process.platform === "darwin" ? "ENOTEMPTY" : "EACCES", failure.code);
+      Assert.areEqual(process.platform === "darwin" ? "ENOTEMPTY" : "EACCES", CodexInstallerTests.codeOf(failure));
       Assert.areNotEqual(Resources.formatCodexFolderNotWritable(directory.resolve("home", "packages", "standalone")), failure.message);
       Assert.areEqual(".teamrun-staging-left", readdirSync(releases).join(","));
       Assert.areEqual(String.empty, CodexInstallerTests.paths(server));
@@ -368,7 +399,7 @@ export class CodexInstallerTests {
 
       const root = join(packages, "standalone");
       Assert.areEqual(Resources.formatCodexFolderNotWritable(root), failure.message);
-      Assert.areEqual("EACCES", (failure.cause as NodeJS.ErrnoException).code);
+      Assert.areEqual("EACCES", CodexInstallerTests.codeOf(failure.cause));
       Assert.areEqual(String.empty, readdirSync(packages).join(","));
       Assert.areEqual(String.empty, CodexInstallerTests.paths(server));
       Assert.isFalse(installer.isInstalled);
@@ -398,7 +429,7 @@ export class CodexInstallerTests {
       const root = directory.resolve("home", "packages", "standalone");
       const release = join(root, "releases", "0.164.0-x86_64-unknown-linux-musl");
       Assert.areEqual(Resources.formatCodexCommandNotWritable("0.164.0", root, bin), failure.message);
-      Assert.areEqual("EACCES", (failure.cause as NodeJS.ErrnoException).code);
+      Assert.areEqual("EACCES", CodexInstallerTests.codeOf(failure.cause));
       Assert.areEqual(realpathSync(release), realpathSync(join(root, "current")));
       Assert.areEqual("0.164.0-x86_64-unknown-linux-musl", readFileSync(join(root, "auto-update-version"), "utf8"));
       Assert.areEqual(String.empty, readdirSync(bin).join(","));
@@ -412,7 +443,7 @@ export class CodexInstallerTests {
     return CodexInstallerTests.withReleases(async (server, directory) => {
       CodexInstallerTests.publish(server, "/c", "0.164.0", "linux");
       const bin = directory.resolve("bin");
-      const refused = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const refused = new CodedError("EPERM: operation not permitted", "EPERM");
       const link = CodexInstallerTests.link;
       const installer = CodexInstallerTests.installer([server.url("/c")], directory, "linux", undefined, undefined, undefined, undefined, undefined, undefined,
         (target, path) => {
@@ -470,31 +501,31 @@ export class CodexInstallerTests {
       const release = (assets: unknown, tag: unknown = "rust-v0.164.0"): Buffer => Buffer.from(JSON.stringify({ tag_name: tag, assets }));
       const asset = (fields: Record<string, unknown>): unknown => ({ name, digest, browser_download_url: server.url("/archive"), ...fields });
       server.serve("/busy", Buffer.from("busy"), 503).serve("/archive", archive).serve("/wrong", Buffer.from("other")).cut("/cut-archive", archive);
-      const bodies: readonly [string, Buffer][] = [["/not-json", Buffer.from("{")], ["/null", Buffer.from("null")], ["/no-tag", release([], 164)],
-        ["/other-tag", release([], "v0.164.0")], ["/bad-version", release([], "rust-vlatest")], ["/no-assets", release({})],
-        ["/no-package", release([null, asset({ name: "codex-package_SHA256SUMS" })])], ["/no-digest", release([asset({ digest: 7 })])],
-        ["/bare-digest", release([asset({ digest: digest.slice(7) })])], ["/short-digest", release([asset({ digest: "sha256:abc" })])],
-        ["/no-url", release([asset({ browser_download_url: null })])], ["/mismatch", release([asset({ browser_download_url: server.url("/wrong") })])],
-        ["/missing", release([asset({ browser_download_url: server.url("/gone") })])], ["/oversize", release([asset({ size: archive.length - 1 })])],
-        ["/cut", release([asset({ browser_download_url: server.url("/cut-archive") })])]];
-      for (const [path, body] of bodies)
+      const bodies = [new ReleaseBody("/not-json", Buffer.from("{")), new ReleaseBody("/null", Buffer.from("null")), new ReleaseBody("/no-tag", release([], 164)),
+        new ReleaseBody("/other-tag", release([], "v0.164.0")), new ReleaseBody("/bad-version", release([], "rust-vlatest")), new ReleaseBody("/no-assets", release({})),
+        new ReleaseBody("/no-package", release([null, asset({ name: "codex-package_SHA256SUMS" })])), new ReleaseBody("/no-digest", release([asset({ digest: 7 })])),
+        new ReleaseBody("/bare-digest", release([asset({ digest: digest.slice(7) })])), new ReleaseBody("/short-digest", release([asset({ digest: "sha256:abc" })])),
+        new ReleaseBody("/no-url", release([asset({ browser_download_url: null })])), new ReleaseBody("/mismatch", release([asset({ browser_download_url: server.url("/wrong") })])),
+        new ReleaseBody("/missing", release([asset({ browser_download_url: server.url("/gone") })])), new ReleaseBody("/oversize", release([asset({ size: archive.length - 1 })])),
+        new ReleaseBody("/cut", release([asset({ browser_download_url: server.url("/cut-archive") })]))];
+      for (const { path, body } of bodies)
         server.serve(path, body);
-      const cases: readonly [readonly string[], string][] = [
-        [["/gone", "/busy"], Resources.formatReleaseChannelFailed("Codex", 404)],
-        [["/not-json"], Resources.formatReleaseChannelUnreadable("Codex")],
-        [["/null"], Resources.formatReleaseChannelUnreadable("Codex")],
-        [["/no-tag"], Resources.formatReleaseChannelUnreadable("Codex")],
-        [["/other-tag"], Resources.formatReleaseChannelUnreadable("Codex")],
-        [["/bad-version"], Resources.formatReleaseChannelUnreadable("Codex")],
-        ...["/no-assets", "/no-package", "/no-digest", "/bare-digest", "/short-digest", "/no-url"].map((t): [readonly string[], string] => [[t], Resources.formatCodexPackageMissing("0.164.0")]),
-        [["/mismatch"], Resources.formatDownloadMismatch("Codex")],
-        [["/missing"], Resources.formatDownloadFailed("Codex", 404)],
-        [["/oversize"], Resources.formatDownloadMismatch("Codex")],
-        [["http://localhost:1/c", "/busy"], Resources.formatReleasesUnreachable("Codex")],
-        [["/cut"], Resources.formatReleasesUnreachable("Codex")]
+      const cases = [
+        new ChannelsFailureCase(["/gone", "/busy"], Resources.formatReleaseChannelFailed("Codex", 404)),
+        new ChannelsFailureCase(["/not-json"], Resources.formatReleaseChannelUnreadable("Codex")),
+        new ChannelsFailureCase(["/null"], Resources.formatReleaseChannelUnreadable("Codex")),
+        new ChannelsFailureCase(["/no-tag"], Resources.formatReleaseChannelUnreadable("Codex")),
+        new ChannelsFailureCase(["/other-tag"], Resources.formatReleaseChannelUnreadable("Codex")),
+        new ChannelsFailureCase(["/bad-version"], Resources.formatReleaseChannelUnreadable("Codex")),
+        ...["/no-assets", "/no-package", "/no-digest", "/bare-digest", "/short-digest", "/no-url"].map(t => new ChannelsFailureCase([t], Resources.formatCodexPackageMissing("0.164.0"))),
+        new ChannelsFailureCase(["/mismatch"], Resources.formatDownloadMismatch("Codex")),
+        new ChannelsFailureCase(["/missing"], Resources.formatDownloadFailed("Codex", 404)),
+        new ChannelsFailureCase(["/oversize"], Resources.formatDownloadMismatch("Codex")),
+        new ChannelsFailureCase(["http://localhost:1/c", "/busy"], Resources.formatReleasesUnreachable("Codex")),
+        new ChannelsFailureCase(["/cut"], Resources.formatReleasesUnreachable("Codex"))
       ];
 
-      for (const [channels, message] of cases) {
+      for (const { channels, message } of cases) {
         const installer = CodexInstallerTests.installer(channels.map(t => t.startsWith("http") ? t : server.url(t)), directory);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channels[0]);
         Assert.isFalse(installer.isInstalled, channels[0]);
@@ -508,16 +539,16 @@ export class CodexInstallerTests {
   public saysWhyTarFailedDidntFinishOrLeftAReleaseThatIsIncomplete(): Promise<void> {
     return CodexInstallerTests.withReleases(async (server, directory) => {
       const sleepingTar = new LocatedExecutable(process.execPath, ExecutableSource.Path, ["-e", CodexInstallerTests.SLEEP, "--"]);
-      const incomplete = JSON.parse(CodexInstallerTests.package("0.164.0", "linux").toString("utf8")) as Record<string, string>;
+      const incomplete = CodexInstallerTests.packageFiles("0.164.0", "linux");
       delete incomplete["codex-resources/bwrap"];
-      const cases: readonly [string, Buffer, LocatedExecutable | null, number, string][] = [
-        ["/broken", Buffer.from("not an archive"), null, 60_000, Resources.formatCodexUnpackFailed(9)],
-        ["/hangs", CodexInstallerTests.package("0.164.0", "linux"), sleepingTar, 200, Resources.formatCodexUnpackFailed(null)],
-        ["/incomplete", FakeTar.archive(incomplete), null, 60_000, Resources.formatCodexIncomplete("0.164.0")],
-        ["/other-version", CodexInstallerTests.package("0.164.0", "linux", "codex-cli 0.150.0"), null, 60_000, Resources.formatCodexIncomplete("0.164.0")]
+      const cases = [
+        new UnpackFailureCase("/broken", Buffer.from("not an archive"), null, 60_000, Resources.formatCodexUnpackFailed(9)),
+        new UnpackFailureCase("/hangs", CodexInstallerTests.package("0.164.0", "linux"), sleepingTar, 200, Resources.formatCodexUnpackFailed(null)),
+        new UnpackFailureCase("/incomplete", FakeTar.archive(incomplete), null, 60_000, Resources.formatCodexIncomplete("0.164.0")),
+        new UnpackFailureCase("/other-version", CodexInstallerTests.package("0.164.0", "linux", "codex-cli 0.150.0"), null, 60_000, Resources.formatCodexIncomplete("0.164.0"))
       ];
 
-      for (const [channel, archive, extractor, timeout, message] of cases) {
+      for (const { channel, archive, extractor, timeout, message } of cases) {
         CodexInstallerTests.publish(server, channel, "0.164.0", "linux", archive);
         const installer = CodexInstallerTests.installer([server.url(channel)], directory.resolve(channel.slice(1)), "linux", extractor ?? undefined, timeout);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channel);
@@ -540,13 +571,13 @@ export class CodexInstallerTests {
       const silent = directory.resolve("silent.cjs");
       writeFileSync(silent, "");
       const bin = directory.resolve("bin");
-      const cases: readonly [string, (() => LocatedExecutable | null), string][] = [
-        ["other", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [other]), Resources.formatCodexShadowed("0.164.0", bin, process.execPath, "0.150.0")],
-        ["silent", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [silent]), Resources.formatCodexShadowed("0.164.0", bin, process.execPath, null)],
-        ["none", () => null, Resources.formatCodexNotFoundAfterInstall(bin)]
+      const cases = [
+        new FoundAfterInstallCase("other", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [other]), Resources.formatCodexShadowed("0.164.0", bin, process.execPath, "0.150.0")),
+        new FoundAfterInstallCase("silent", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [silent]), Resources.formatCodexShadowed("0.164.0", bin, process.execPath, null)),
+        new FoundAfterInstallCase("none", () => null, Resources.formatCodexNotFoundAfterInstall(bin))
       ];
 
-      for (const [name, locate, message] of cases) {
+      for (const { name, locate, message } of cases) {
         const installer = CodexInstallerTests.installer([server.url("/c")], directory, "win32", undefined, undefined, undefined, undefined, locate);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, name);
       }
@@ -569,15 +600,15 @@ export class CodexInstallerTests {
       const started = directory.resolve("tar-started");
       const sleepingTar = new LocatedExecutable(process.execPath, ExecutableSource.Path,
         ["-e", `require("node:fs").writeFileSync(${JSON.stringify(started)}, "");${CodexInstallerTests.SLEEP}`, "--"]);
-      const cases: readonly [string, AbortController, CodexInstaller, () => void][] = [
-        ["before", early, CodexInstallerTests.installer([server.url("/c")], directory.resolve("before"), "win32"), () => undefined],
-        ["during the download", during, CodexInstallerTests.installer([server.url("/c")], directory.resolve("during"), "win32"), () => during.abort()],
-        ["while unpacking", unpacking, CodexInstallerTests.installer([server.url("/c")], directory.resolve("unpacking"), "win32", sleepingTar), () => {
+      const cases = [
+        new InstallCancelCase("before", early, CodexInstallerTests.installer([server.url("/c")], directory.resolve("before"), "win32"), () => undefined),
+        new InstallCancelCase("during the download", during, CodexInstallerTests.installer([server.url("/c")], directory.resolve("during"), "win32"), () => during.abort()),
+        new InstallCancelCase("while unpacking", unpacking, CodexInstallerTests.installer([server.url("/c")], directory.resolve("unpacking"), "win32", sleepingTar), () => {
           void Wait.until(() => existsSync(started), "The installer did not start.").then(() => unpacking.abort());
-        }]
+        })
       ];
 
-      for (const [step, controller, installer, progress] of cases) {
+      for (const { step, controller, installer, progress } of cases) {
         Assert.areEqual(Resources.formatInstallCancelled("Codex"), (await Assert.throwsAsync(() => installer.install(progress, controller.signal), InstallCancelledException)).message, step);
         Assert.isFalse(installer.isInstalled, step);
       }
@@ -687,13 +718,14 @@ export class CodexInstallerTests {
 
   @TestMethod
   public namesThePackageTargetForEachSupportedComputer(): void {
-    const cases: readonly [string, string, string | null][] = [
-      ["darwin", "arm64", "aarch64-apple-darwin"], ["darwin", "x64", "x86_64-apple-darwin"], ["linux", "x64", "x86_64-unknown-linux-musl"],
-      ["linux", "arm64", "aarch64-unknown-linux-musl"], ["win32", "x64", "x86_64-pc-windows-msvc"], ["win32", "arm64", "aarch64-pc-windows-msvc"],
-      ["win32", "ia32", null], ["freebsd", "x64", null]
+    const cases = [
+      new PackageTargetCase("darwin", "arm64", "aarch64-apple-darwin"), new PackageTargetCase("darwin", "x64", "x86_64-apple-darwin"),
+      new PackageTargetCase("linux", "x64", "x86_64-unknown-linux-musl"), new PackageTargetCase("linux", "arm64", "aarch64-unknown-linux-musl"),
+      new PackageTargetCase("win32", "x64", "x86_64-pc-windows-msvc"), new PackageTargetCase("win32", "arm64", "aarch64-pc-windows-msvc"),
+      new PackageTargetCase("win32", "ia32", null), new PackageTargetCase("freebsd", "x64", null)
     ];
 
-    for (const [platform, architecture, target] of cases)
+    for (const { platform, architecture, target } of cases)
       Assert.areEqual(target, CodexInstaller.targetOf(platform, architecture), `${platform} ${architecture}`);
   }
 
@@ -715,19 +747,23 @@ export class CodexInstallerTests {
   }
 
   private static package(version: string, platform: string, output: string = `codex-cli ${version}`): Buffer {
+    return FakeTar.archive(CodexInstallerTests.packageFiles(version, platform, output));
+  }
+
+  private static packageFiles(version: string, platform: string, output: string = `codex-cli ${version}`): Record<string, string> {
     const members = platform === "win32" ? Resources.codexWindowsMembers
       : [...Resources.codexPosixMembers.filter(t => t !== "codex"), ...platform === "linux" ? Resources.codexLinuxMembers : []];
     const program = platform === "win32" ? "bin/codex.exe" : "bin/codex";
-    return FakeTar.archive(Object.fromEntries(members.map(t => [t, t === program ? `console.log(${JSON.stringify(output)});\n` : String.empty])));
+    return Object.fromEntries(members.map(t => [t, t === program ? `console.log(${JSON.stringify(output)});\n` : String.empty]));
   }
 
   private static installer(channels: readonly string[], directory: TemporaryDirectory | string, platform: string = "linux",
     extractor: LocatedExecutable | null | undefined = undefined, unpackTimeout: number = 60_000,
     program: (path: string) => ProcessCommand = path => new ProcessCommand(process.execPath, [path]), bin: string | undefined = undefined,
-    locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CodexInstallerTests.TARGETS[platform]!,
+    locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CodexInstallerTests.targetFor(platform),
     symlink: (target: string, path: string) => void = CodexInstallerTests.link, rename: (from: string, to: string) => void = renameSync,
     settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to), serverProgram: CodexAppServerProgram | null = null): CodexInstaller {
-    const root = typeof directory === "string" ? directory : directory.path;
+    const root = Object.isString(directory) ? directory : directory.path;
     mkdirSync(root, { recursive: true });
     const runner = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)));
     const binDirectory = bin ?? join(root, "bin");
@@ -736,6 +772,18 @@ export class CodexInstallerTests {
     return new CodexInstaller(locate ?? found, new ExecutableVersionReader(runner, 60_000), process.env, channels, join(root, "home"), binDirectory, target, platform,
       Object.isUndefined(extractor) ? FakeTar.create(root) : extractor, runner, program,
       symlink, rename, settle, unpackTimeout, 60_000, serverProgram);
+  }
+
+  private static targetFor(platform: string): string {
+    const target = CodexInstallerTests.TARGETS[platform];
+    if (Object.isUndefined(target))
+      throw new Error(`No package target is listed for ${platform}.`);
+
+    return target;
+  }
+
+  private static codeOf(error: unknown): string {
+    return error instanceof Error && "code" in error ? String(error.code) : String.empty;
   }
 
   private static broken(releases: string): string {

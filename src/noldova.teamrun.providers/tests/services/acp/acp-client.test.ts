@@ -12,9 +12,11 @@ import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testin
 import { JsonException, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { TimeoutException } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
-import { AcpClient, AcpConnectionException, AcpRequestException, GrokToolGate, type IAcpClientListener, type IProcessTree, MessageFraming, NodeProcessStarter, ProviderTimings,
+import { AcpClient, AcpConnectionException, AcpRequestException, GrokToolGate, type IProcessTree, MessageFraming, NodeProcessStarter, ProviderTimings,
   Resources, StartedProcess } from "@noldova/teamrun.providers";
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
 import { CopilotTestHost } from "../../fixtures/copilot-test-host.fixture.js";
+import { CountingAcpClientListener } from "../../fixtures/counting-acp-client-listener.fixture.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
 import { HeldAcpClientListener } from "../../fixtures/held-acp-client-listener.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
@@ -239,7 +241,7 @@ export class AcpClientTests {
   public async failsItsPendingRequestOnceTheAgentsClosedInputRefusesItsWrite(): Promise<void> {
     await using host = new CopilotTestHost();
     const started = new StartedProcess();
-    const input = new Writable({ write: (_chunk, _encoding, callback) => callback(Object.assign(new Error("write EPIPE"), { code: "EPIPE" })) });
+    const input = new Writable({ write: (_chunk, _encoding, callback) => callback(new CodedError("write EPIPE", "EPIPE")) });
     const output = new PassThrough();
     const errors = new PassThrough();
     const client = new AcpClient(host.command, host.environment, host.directory.path, host.programs.wrap({ start: () => started }), AcpClientTests.TIMINGS, host.timer);
@@ -406,19 +408,14 @@ export class AcpClientTests {
       Assert.areEqual(-32601, coded.code);
       Assert.areEqual("No code", uncoded.message);
       Assert.isNull(uncoded.code);
-      let notifications = 0;
       const reverse = Promise.withResolvers<JsonValue>();
-      const listener: IAcpClientListener = { onRequest: () => reverse.promise,
-        onNotificationAsync: () => {
-          notifications++;
-          return Promise.resolve();
-        }, onResponseAsync: () => Promise.resolve(), onExitAsync: () => Promise.resolve() };
+      const listener = new CountingAcpClientListener(reverse.promise);
       client.setListener(listener);
       await client.request("fixture/emit", { messages: [{ jsonrpc: "2.0", id: "unmatched", result: {} }, { jsonrpc: "2.0", id: 9999, result: {} },
         { jsonrpc: "2.0", method: "notice" }, { jsonrpc: "2.0", id: "repeated", method: "reverse" }, { jsonrpc: "2.0", id: "repeated", method: "reverse" }] });
-      Assert.areEqual(1, notifications);
+      Assert.areEqual(1, listener.notifications);
       reverse.reject(new Error("unsupported"));
-      listener.onNotificationAsync = () => { throw "invalid notification"; };
+      listener.notificationFailure = "invalid notification";
       await Assert.throwsAsync(() => client.request("fixture/emit", { messages: [{ jsonrpc: "2.0", method: "notice" }] }), Error);
     }
     finally { await client.stop(); }

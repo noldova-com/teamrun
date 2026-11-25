@@ -3692,7 +3692,7 @@ export declare class Resources {
   /** `formatSharedMcpUnconfirmed` in a few words, `not confirmed yet`. */
   public static readonly sharedMcpUnconfirmedShort: string;
   public static readonly antigravityExcludedEnvironment: RegExp;
-  public static readonly antigravityReleases: readonly { readonly target: string; readonly file: string; readonly sha256: string; readonly archiveBytes: number; readonly executableBytes: number; readonly harnessBytes: number }[];
+  public static readonly antigravityReleases: readonly AntigravityReleaseTarget[];
   public static readonly antigravityDownloadBase: string;
   public static readonly antigravityNoRelease: string;
   public static readonly antigravityNoUnzip: string;
@@ -4172,8 +4172,7 @@ export declare class Resources {
    * The pinned builds, by Node's platform and architecture: each gzip-compressed build's file, SHA-256 and size, and its program's name, as
    * Grok's installers name it in `~/.grok/downloads`, and size.
    */
-  public static readonly grokReleases: readonly { readonly target: string; readonly file: string; readonly sha256: string; readonly archiveBytes: number;
-    readonly program: string; readonly programBytes: number }[];
+  public static readonly grokReleases: readonly GrokReleaseTarget[];
   public static readonly grokDownloadsDirectoryName: string;
   public static readonly grokArchiveName: string;
   /**
@@ -5188,8 +5187,7 @@ export declare class Resources {
    * Each pinned build: Node's target, its folder under `cursorDownloadBase`, the archive's SHA-256 and size, and the bundled Node's and
    * `index.js`'s sizes once unpacked. Cursor publishes no hashes, so these are TeamRun's own first observation, confirmed by a second download.
    */
-  public static readonly cursorReleases: readonly { readonly target: string; readonly path: string; readonly sha256: string; readonly archiveBytes: number;
-    readonly nodeBytes: number; readonly scriptBytes: number }[];
+  public static readonly cursorReleases: readonly CursorReleaseTarget[];
   public static readonly cursorUnpackedName: string;
   public static readonly cursorPreviousName: string;
   public static readonly cursorNoBuild: string;
@@ -11400,7 +11398,7 @@ export declare class GrokPlanReader implements IAcpPlanReader {
    * The request's `planContent` as the plan text, with no steps, since Grok's checklist comes through ACP's `plan` updates; `null` when Grok
    * found no plan file, so the plan is dismissed and Grok keeps planning.
    */
-  public read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] } | null;
+  public read(params: JsonReader): AcpPlan | null;
 
   /**
    * The answer to send: `approved` for an approved plan, and `cancelled`, which Grok takes as keep planning, for a refused or dismissed one.
@@ -12111,7 +12109,7 @@ export declare class CursorPlanReader implements IAcpPlanReader {
    * pending.
    * @throws JsonException when the plan is missing or blank, or a to-do list isn't an array of objects.
    */
-  public read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] };
+  public read(params: JsonReader): AcpPlan;
 
   /**
    * The answer to send: `accepted` for an approved plan, `rejected` for a refused one, and `cancelled` for `null`.
@@ -13164,7 +13162,7 @@ export interface IAcpPlanReader {
    * person dismissed it.
    * @throws JsonException when the request doesn't read, and a turn then notes it with `Resources.formatPlanUnread` and answers as dismissed.
    */
-  read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] } | null;
+  read(params: JsonReader): AcpPlan | null;
   /**
    * The answer to send for the request `params` holds: `true` when the person approved the plan, `false` when they refused it, or `null` when
    * they dismissed it, the turn stopped or the request didn't read.
@@ -13441,6 +13439,17 @@ export declare class AcpConfigOption {
    * Returns what TeamRun logs of the option: its id, category and current value, and each value with its name, group and group name; nothing else.
    */
   public toLog(): JsonObject;
+}
+
+/**
+ * A plan an ACP agent hands over for approval: its Markdown text and its to-dos as steps.
+ */
+export declare class AcpPlan {
+  /** The plan's Markdown text. */
+  public readonly text: string;
+  /** The plan's to-dos, in order; empty when the plan names none. */
+  public readonly steps: readonly PlanStep[];
+  public constructor(text: string, steps: readonly PlanStep[]);
 }
 
 /**
@@ -14673,6 +14682,20 @@ export declare class AntigravityRelease {
 }
 
 /**
+ * One target's row in `Resources.antigravityReleases`: Node's platform and architecture, the archive's path under the release, its SHA-256 and
+ * size, and the server's and harness's sizes once unpacked.
+ */
+export declare class AntigravityReleaseTarget {
+  public readonly target: string;
+  public readonly file: string;
+  public readonly sha256: string;
+  public readonly archiveBytes: number;
+  public readonly executableBytes: number;
+  public readonly harnessBytes: number;
+  public constructor(target: string, file: string, sha256: string, archiveBytes: number, executableBytes: number, harnessBytes: number);
+}
+
+/**
  * One pinned build of Grok: its version, the gzip-compressed download with its SHA-256 and size, and the program's name and size once unpacked.
  */
 export declare class GrokRelease {
@@ -14687,6 +14710,20 @@ export declare class GrokRelease {
    * Returns the pinned build for a platform and architecture, as Node names them, or `null` when Grok ships none.
    */
   public static find(platform: string, architecture: string): GrokRelease | null;
+}
+
+/**
+ * One target's row in `Resources.grokReleases`: Node's platform and architecture, the gzip-compressed file with its SHA-256 and size, and the
+ * program's name and size once unpacked.
+ */
+export declare class GrokReleaseTarget {
+  public readonly target: string;
+  public readonly file: string;
+  public readonly sha256: string;
+  public readonly archiveBytes: number;
+  public readonly program: string;
+  public readonly programBytes: number;
+  public constructor(target: string, file: string, sha256: string, archiveBytes: number, program: string, programBytes: number);
 }
 
 /**
@@ -14724,6 +14761,20 @@ export declare class CursorRelease {
    * Returns the pinned build for a platform and architecture, as Node names them, or `null` when Cursor ships none.
    */
   public static find(platform: string, architecture: string): CursorRelease | null;
+}
+
+/**
+ * One target's row in `Resources.cursorReleases`: Node's platform and architecture, its folder under `cursorDownloadBase`, the archive's SHA-256
+ * and size, and the bundled Node's and `index.js`'s sizes once unpacked.
+ */
+export declare class CursorReleaseTarget {
+  public readonly target: string;
+  public readonly path: string;
+  public readonly sha256: string;
+  public readonly archiveBytes: number;
+  public readonly nodeBytes: number;
+  public readonly scriptBytes: number;
+  public constructor(target: string, path: string, sha256: string, archiveBytes: number, nodeBytes: number, scriptBytes: number);
 }
 
 /**

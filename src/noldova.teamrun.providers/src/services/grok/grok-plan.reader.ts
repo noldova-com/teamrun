@@ -8,9 +8,9 @@
 
 import "@noldova/context.core";
 import type { JsonObject, JsonReader } from "@noldova/context.json";
-import type { PlanStep } from "@noldova/teamrun.protocol";
 
 import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
+import { AcpPlan } from "../../models/acp-plan.js";
 import { Resources } from "../../resources.js";
 
 export class GrokPlanReader implements IAcpPlanReader {
@@ -18,9 +18,9 @@ export class GrokPlanReader implements IAcpPlanReader {
   public readonly nativeKind: string = Resources.xaiExitPlanModeTool;
   public readonly leavesPlan: boolean = true;
 
-  public read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] } | null {
+  public read(params: JsonReader): AcpPlan | null {
     const text = params.toJson()[Resources.xaiPlanContentField];
-    return Object.isString(text) && !String.isNullOrWhitespace(text) ? { text, steps: [] } : null;
+    return Object.isString(text) && !String.isNullOrWhitespace(text) ? new AcpPlan(text, []) : null;
   }
 
   public reply(_params: JsonReader, approved: boolean | null): JsonObject {

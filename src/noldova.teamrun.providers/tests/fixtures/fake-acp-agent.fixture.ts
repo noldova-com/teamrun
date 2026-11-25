@@ -10,6 +10,7 @@ import type { ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
+import "@noldova/context.core";
 import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 
 import { FakeCopilotHeadless } from "./fake-copilot-headless.fixture.js";
@@ -85,8 +86,6 @@ const QUOTA_REPLIES: Readonly<Record<string, readonly (readonly string[])[]>> = 
   quotaBeforeText: [["Error: You have exceeded your monthly quota"], ["Then I tried again, and it worked."]]
 };
 
-type TaskEnding = { exitCode?: number | null; killed?: boolean; willWake?: boolean; woken?: boolean; wakeReason?: string; exit?: boolean };
-
 export class FakeAcpAgent {
   private sessionId: string = COPILOT ? "copilot-session" : "grok-session";
   private held: number | null = null;
@@ -120,7 +119,7 @@ export class FakeAcpAgent {
   private trees: number = 0;
   private wakeHeld: string | null = null;
   private lateModeRefusal: number | null = null;
-  private options: JsonObject[] | null = (FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_OPTIONS") as JsonObject[] | null) ?? (COPILOT ? COPILOT_OPTIONS : OPENCODE ? OPENCODE_OPTIONS : FX ? FX_OPTIONS : CURSOR
+  private options: JsonObject[] | null = FakeAcpAgent.objects(process.env["TEAMRUN_FAKE_ACP_OPTIONS"]) ?? (COPILOT ? COPILOT_OPTIONS : OPENCODE ? OPENCODE_OPTIONS : FX ? FX_OPTIONS : CURSOR
     ? FakeAcpAgent.launchedWith(process.env["TEAMRUN_FAKE_CURSOR_MODELS"] === "live" ? CURSOR_LIVE_OPTIONS : CURSOR_OPTIONS) : null);
 
   public run(): void {
@@ -136,7 +135,7 @@ export class FakeAcpAgent {
   }
 
   private signIn(id: number, params: JsonReader): void {
-    const home = process.env["GROK_HOME"]!;
+    const home = FakeAcpAgent.variable("GROK_HOME");
     mkdirSync(home, { recursive: true });
     writeFileSync(join(home, `browser-${process.pid}.txt`), JSON.stringify(params.toJson()));
     if (process.env["TEAMRUN_FAKE_ACP_SIGNIN_HOLD"] === "1") return;
@@ -159,7 +158,7 @@ export class FakeAcpAgent {
   private receive(message: JsonReader): void {
     const value = message.toJson();
     if (!message.hasField("method")) {
-      if (value["id"] === "terminal" && this.terminalPrompt !== null) {
+      if (value["id"] === "terminal" && !Object.isNull(this.terminalPrompt)) {
         const waited = this.terminalReady && !JSON.stringify(value["result"] ?? null).includes("ready");
         this.terminalReady = false;
         if (waited)
@@ -167,7 +166,7 @@ export class FakeAcpAgent {
         else
           this.terminalAnswers.push(value["result"] ?? value["error"] ?? null);
         const created = message.hasField("result") && message.readNullableObject("result")?.readOptionalString("terminalId");
-        if (typeof created === "string") {
+        if (Object.isString(created)) {
           this.terminalId = created;
           this.update({ sessionUpdate: "tool_call", toolCallId: "term", kind: "execute", title: "Run fixture command", status: "in_progress",
             content: [{ type: "terminal", terminalId: created }] });
@@ -175,7 +174,7 @@ export class FakeAcpAgent {
         this.nextTerminalStep();
         return;
       }
-      if (this.planAskPrompt !== null && ["before-plan", "plan", "after-plan"].includes(String(value["id"]))) {
+      if (!Object.isNull(this.planAskPrompt) && ["before-plan", "plan", "after-plan"].includes(String(value["id"]))) {
         this.planAnswers.push(value["result"] ?? value["error"] ?? null);
         if (value["id"] === "before-plan")
           this.sendPlan("plan");
@@ -221,17 +220,17 @@ export class FakeAcpAgent {
       }
       else if (value["id"] === "grok-plan-left-ping" && !Object.isNull(this.planLeftPrompt))
         this.endPlanLeft(this.planLeftPrompt, "end_turn");
-      else if (value["id"] === "grok-plan" && this.planThenBackground !== null) {
+      else if (value["id"] === "grok-plan" && !Object.isNull(this.planThenBackground)) {
         this.update({ sessionUpdate: "current_mode_update", currentModeId: "default" });
         this.startBackground(this.planThenBackground, "background");
         this.planThenBackground = null;
       }
-      else if (value["id"] === "permission" && this.approvalPrompt !== null) {
+      else if (value["id"] === "permission" && !Object.isNull(this.approvalPrompt)) {
         this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(value["result"] ?? value["error"]) } });
         this.respond(this.approvalPrompt, { stopReason: "end_turn" });
         this.approvalPrompt = null;
       }
-      else if (value["id"] === "plan" && this.planPrompt !== null) {
+      else if (value["id"] === "plan" && !Object.isNull(this.planPrompt)) {
         this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ result: value["result"] ?? value["error"], sets: this.sets }) } });
         this.respond(this.planPrompt, { stopReason: "end_turn" });
         this.planPrompt = null;
@@ -247,7 +246,7 @@ export class FakeAcpAgent {
         this.planLeftCancelled = true;
       if (this.wakeHeld === "hold")
         this.endWake("wake cancelled", "cancelled");
-      if (this.held !== null && process.env["TEAMRUN_FAKE_ACP_IGNORE_CANCEL"] !== "1") {
+      if (!Object.isNull(this.held) && process.env["TEAMRUN_FAKE_ACP_IGNORE_CANCEL"] !== "1") {
         this.respond(this.held, { stopReason: "cancelled" });
         this.held = null;
       }
@@ -331,14 +330,15 @@ export class FakeAcpAgent {
         agentInfo: { name: "OpenCode", version: process.env["TEAMRUN_FAKE_ACP_VERSION"] ?? "1.19.4" } });
         return;
       }
-      const capabilities = process.env["TEAMRUN_FAKE_ACP_CAPABILITIES"] === undefined
+      const capabilities = Object.isUndefined(process.env["TEAMRUN_FAKE_ACP_CAPABILITIES"])
         ? { agentCapabilities: { loadSession: true, promptCapabilities: { image: mode === "images" },
           _meta: { "x.ai/hooks": { blockingEvents: ["PreToolUse", "Stop", "SubagentStop"], decisions: ["deny", "block"] } } } }
-        : FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_CAPABILITIES") as JsonObject;
+        : JsonReader.parse(FakeAcpAgent.variable("TEAMRUN_FAKE_ACP_CAPABILITIES")).toJson();
+      const methods = process.env["TEAMRUN_FAKE_ACP_AUTH_METHODS"];
       this.respond(id, FakeAcpAgent.omitting({
-        authMethods: ![undefined, "omit"].includes(process.env["TEAMRUN_FAKE_ACP_AUTH_METHODS"]) ? FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_AUTH_METHODS")
+        authMethods: !Object.isUndefined(methods) && methods !== "omit" ? FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_AUTH_METHODS")
           : mode !== "loggedOut" ? [{ id: "cached_token", name: "Grok" }]
-          : existsSync(join(process.env["GROK_HOME"]!, "auth.json")) ? [{ id: "cached_token", name: "Grok" }, { id: "grok.com", name: "Grok" }]
+          : existsSync(join(FakeAcpAgent.variable("GROK_HOME"), "auth.json")) ? [{ id: "cached_token", name: "Grok" }, { id: "grok.com", name: "Grok" }]
             : process.env["TEAMRUN_FAKE_ACP_NO_BROWSER_METHOD"] === "1" ? [] : [{ id: "grok.com", name: "Grok" }],
         _meta: { agentVersion: "1.0.30-fixture", modelState: { currentModelId: "grok-test", availableModels: process.env["TEAMRUN_FAKE_ACP_MODELS"]?.split(",")
           .map(t => ({ modelId: t, name: t })) ?? [
@@ -373,14 +373,14 @@ export class FakeAcpAgent {
         if (this.sessionId === "hold") { writeFileSync(join(process.cwd(), "load-held.txt"), ""); return; }
         if (method === "session/load") this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "replayed history" } });
         if (process.env["TEAMRUN_FAKE_ACP_KEEP_OPTIONS"] === "1" && existsSync(join(process.cwd(), "kept-options.json")))
-          this.options = JSON.parse(readFileSync(join(process.cwd(), "kept-options.json"), "utf8")) as JsonObject[];
+          this.options = FakeAcpAgent.objects(readFileSync(join(process.cwd(), "kept-options.json"), "utf8"));
       }
       else if ((COPILOT || OPENCODE) && process.env["TEAMRUN_FAKE_ACP_INIT"] === "loggedOut") { this.fail(id, "Authentication required", -32000); return; }
-      else if (CURSOR && (process.env["TEAMRUN_FAKE_ACP_INIT"] === "loggedOut" || existsSync(join(process.env["CURSOR_CONFIG_DIR"]!, "signed-out.txt")))) {
+      else if (CURSOR && (process.env["TEAMRUN_FAKE_ACP_INIT"] === "loggedOut" || existsSync(join(FakeAcpAgent.variable("CURSOR_CONFIG_DIR"), "signed-out.txt")))) {
         this.fail(id, "Authentication required", -32000);
         return;
       }
-      else if (process.env["TEAMRUN_FAKE_ACP_REQUIRE_AUTH"] === "1" && this.authenticated === null) { this.fail(id, "Authentication required", -32000); return; }
+      else if (process.env["TEAMRUN_FAKE_ACP_REQUIRE_AUTH"] === "1" && Object.isNull(this.authenticated)) { this.fail(id, "Authentication required", -32000); return; }
       else if (process.env["TEAMRUN_FAKE_ACP_NEW"] === "museLoggedOut") { this.fail(id, "Please log in to Muse before opening a session."); return; }
       else if (process.env["TEAMRUN_FAKE_ACP_NEW"] === "fail") { this.fail(id, "Session refused"); return; }
       else if (process.env["TEAMRUN_FAKE_ACP_NEW"] === "crash") process.exit(9);
@@ -388,13 +388,13 @@ export class FakeAcpAgent {
       else this.sessionId = COPILOT ? "copilot-session" : "grok-session";
       const commands = method === "session/new" || process.env["TEAMRUN_FAKE_ACP_LOAD_COMMANDS"] !== "none" ? process.env["TEAMRUN_FAKE_ACP_COMMANDS"] : undefined;
       const answer = (): void => {
-        if (commands !== undefined)
+        if (!Object.isUndefined(commands))
           this.update({ sessionUpdate: "available_commands_update", availableCommands: commands.split(",").map(t => ({ name: t, description: `Runs ${t}` })) });
-        if (this.options !== null) this.respond(id, { sessionId: this.sessionId, configOptions: this.options });
+        if (!Object.isNull(this.options)) this.respond(id, { sessionId: this.sessionId, configOptions: this.options });
         else this.respond(id, process.env["TEAMRUN_FAKE_ACP_NO_METADATA"] === "1" ? { sessionId: this.sessionId }
           : { sessionId: this.sessionId, models: { currentModelId: "grok-test" }, _meta: { reasoningEffort: "low" }, modes: FakeAcpAgent.parse("TEAMRUN_FAKE_ACP_MODES") });
       };
-      if (method === "session/new" || process.env["TEAMRUN_FAKE_ACP_LATE_COMMANDS"] === undefined) {
+      if (method === "session/new" || Object.isUndefined(process.env["TEAMRUN_FAKE_ACP_LATE_COMMANDS"])) {
         answer();
         if (process.env["TEAMRUN_FAKE_ACP_NEW"] === "exitAfter") process.stdout.write("", () => process.exit(9));
         return;
@@ -420,7 +420,8 @@ export class FakeAcpAgent {
       const configId = params.readString("configId");
       const value = params.readString("value");
       this.sets.push(`${configId}=${value}`);
-      this.options = this.options!.map(t => t["id"] === configId ? { ...t, currentValue: value } : t);
+      if (Object.isNull(this.options)) throw new Error("The session has no config options");
+      this.options = this.options.map(t => t["id"] === configId ? { ...t, currentValue: value } : t);
       if (process.env["TEAMRUN_FAKE_ACP_KEEP_OPTIONS"] === "1") writeFileSync(join(process.cwd(), "kept-options.json"), JSON.stringify(this.options));
       if (value === process.env["TEAMRUN_FAKE_ACP_EFFORTLESS_MODEL"])
         this.options = this.options.filter(t => t["category"] !== "thought_level");
@@ -433,14 +434,14 @@ export class FakeAcpAgent {
         this.fail(id, "Mode refused");
         return;
       }
-      if (process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === "late" && this.wakeHeld !== null) { this.lateModeRefusal = id; return; }
+      if (process.env["TEAMRUN_FAKE_ACP_SET_MODE"] === "late" && !Object.isNull(this.wakeHeld)) { this.lateModeRefusal = id; return; }
       this.sets.push(`mode=${params.readString("modeId")}`);
       const setsFile = process.env["TEAMRUN_FAKE_ACP_SETS"];
       if (!Object.isUndefined(setsFile))
         appendFileSync(setsFile, `mode=${params.readString("modeId")}\n`);
       this.respond(id, {});
     }
-    else if (method === "session/prompt" && this.held !== null && JSON.stringify(params.toJson()["_meta"] ?? null) === JSON.stringify({ fx: { steer: true } })) {
+    else if (method === "session/prompt" && !Object.isNull(this.held) && JSON.stringify(params.toJson()["_meta"] ?? null) === JSON.stringify({ fx: { steer: true } })) {
       this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(params.toJson()["prompt"] ?? null) } });
       this.respond(this.held, { stopReason: "end_turn" });
       this.held = null;
@@ -456,7 +457,7 @@ export class FakeAcpAgent {
       const text = parts[0]?.readString("text") ?? "";
       const prompt = text.split("\n\nTask:\n\n").at(-1) ?? text;
       const recorded = process.env["TEAMRUN_FAKE_ACP_PROMPTS"];
-      if (recorded !== undefined) appendFileSync(recorded, `${JSON.stringify({ text })}\n`);
+      if (!Object.isUndefined(recorded)) appendFileSync(recorded, `${JSON.stringify({ text })}\n`);
       if (prompt === "exit") process.exit(9);
       if (process.env["TEAMRUN_FAKE_ACP_ECHO"] === "1")
         this.update({ sessionUpdate: "user_message_chunk", content: { type: "text", text: prompt }, _meta: { modelId: "grok-test", promptIndex: this.prompts++ } });
@@ -508,7 +509,7 @@ export class FakeAcpAgent {
       if (prompt === "quotaPath") { this.fail(id, "Cannot read D:/work/quota-tracker/notes.md", -32603, { details: "File not found", quotaSnapshots: { chat: {} } }); return; }
       if (prompt === "quotaInternal") { this.fail(id, "Internal error", -32603, { details: "quota_exceeded: You have exceeded your monthly quota" }); return; }
       const runs = QUOTA_REPLIES[prompt];
-      if (runs !== undefined) {
+      if (!Object.isUndefined(runs)) {
         this.update({ sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "Error: You have exceeded your monthly quota" } });
         for (const [index, run] of runs.entries()) {
           if (index > 0)
@@ -708,13 +709,13 @@ export class FakeAcpAgent {
       if (prompt.startsWith("use tool ")) {
         this.approvalPrompt = id;
         this.write({ jsonrpc: "2.0", id: "permission", method: "session/request_permission", params: { sessionId: this.sessionId,
-          toolCall: { toolCallId: "u1", kind: "other", ...JSON.parse(prompt.slice("use tool ".length)) as JsonObject }, options: [
+          toolCall: { toolCallId: "u1", kind: "other", ...JsonReader.parse(prompt.slice("use tool ".length)).toJson() }, options: [
             { optionId: "yes", name: "Allow once", kind: "allow_once" }, { optionId: "no", name: "Deny", kind: "reject_once" }
           ] } });
         return;
       }
       if (prompt === "image") {
-        const images = join(process.env["GROK_HOME"]!, "sessions", "%2Fwork", this.sessionId, "images");
+        const images = join(FakeAcpAgent.variable("GROK_HOME"), "sessions", "%2Fwork", this.sessionId, "images");
         mkdirSync(images, { recursive: true });
         writeFileSync(join(images, "1.jpg"), Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
         this.update({ sessionUpdate: "tool_call", toolCallId: "i1", kind: "other", title: "image_gen", status: "in_progress", _meta: { "x.ai/tool": { name: "image_gen" } } });
@@ -796,7 +797,7 @@ export class FakeAcpAgent {
       this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "late after response" } });
     }
     else if (method === "_x.ai/interject" || method === "x.ai/interject") {
-      if (this.held === null) { this.fail(id, "No prompt is running"); return; }
+      if (Object.isNull(this.held)) { this.fail(id, "No prompt is running"); return; }
       this.respond(id, { status: "queued" });
       this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ text: params.toJson()["text"], content: params.toJson()["content"] }) } });
       this.respond(this.held, { stopReason: "end_turn" });
@@ -905,7 +906,9 @@ export class FakeAcpAgent {
       if (FakeTaskTree.read(tree).length !== 2) return;
       clearInterval(started);
       task.off("exit", exited);
-      this.replay(GrokBackgroundTaskRecording.turn.map(t => FakeAcpAgent.withProcess(t, task.pid!)));
+      const processId = task.pid;
+      if (Object.isUndefined(processId)) throw new Error("The background task has no process id");
+      this.replay(GrokBackgroundTaskRecording.turn.map(t => FakeAcpAgent.withProcess(t, processId)));
       if (prompt === "background-and-sub-agent") {
         this.replay(GrokSubAgentRecording.background.filter(t => t["method"] !== "session/request_permission"));
         this.subAgentRunning = true;
@@ -921,41 +924,42 @@ export class FakeAcpAgent {
   private endTaskOnSignal(task: ChildProcess): void {
     const signal = join(process.cwd(), "task-end.txt");
     let ended = false;
-    const finish = (end: TaskEnding): void => {
+    const finish = (end: JsonReader): void => {
       clearInterval(timer);
       if (ended) return;
       ended = true;
       this.endTask(end);
     };
-    task.once("exit", () => finish({ exitCode: null }));
+    task.once("exit", () => finish(JsonReader.fromValue({ exitCode: null })));
     const timer = setInterval(() => {
       if (!existsSync(signal))
         return;
-      const end = JSON.parse(readFileSync(signal, "utf8")) as TaskEnding;
-      if (end.exit === true) process.exit(9);
+      const end = JsonReader.parse(readFileSync(signal, "utf8"));
+      if (end.hasField("exit") && end.readBoolean("exit")) process.exit(9);
       finish(end);
       task.kill();
     }, 20);
   }
 
-  private endTask(end: TaskEnding): void {
-    const willWake = end.willWake !== false;
-    const woken = end.woken ?? willWake;
-    const reason = end.wakeReason ?? "end_turn";
+  private endTask(end: JsonReader): void {
+    const willWake = !end.hasField("willWake") || end.readBoolean("willWake");
+    const woken = end.hasField("woken") ? end.readBoolean("woken") : willWake;
+    const reason = end.readOptionalString("wakeReason") ?? "end_turn";
     this.wakeHeld = reason === "hold" || reason === "approve" ? reason : null;
     const waking = (message: JsonObject): boolean => JSON.stringify(message).includes("\"task-completed-TASK\"");
-    const update = (message: JsonObject): JsonObject => (message["params"] as JsonObject)["update"] as JsonObject;
+    const update = (message: JsonObject): JsonObject => FakeAcpAgent.field(FakeAcpAgent.field(message, "params"), "update");
     const changed = (message: JsonObject, changes: JsonObject): JsonObject =>
-      ({ ...message, params: { ...message["params"] as JsonObject, update: { ...update(message), ...changes } } });
+      ({ ...message, params: { ...FakeAcpAgent.field(message, "params"), update: { ...update(message), ...changes } } });
     const messages = GrokBackgroundTaskRecording.afterTurn.filter(t => woken || !waking(t)).map(t => t["method"] !== "_x.ai/task_completed" ? t
-      : changed(t, { will_wake: willWake, task_snapshot: { ...update(t)["task_snapshot"] as JsonObject, exit_code: end.exitCode === undefined ? 0 : end.exitCode,
-        explicitly_killed: end.killed === true } }));
-    const completed = messages.at(-1)!;
+      : changed(t, { will_wake: willWake, task_snapshot: { ...FakeAcpAgent.field(update(t), "task_snapshot"),
+        exit_code: end.hasField("exitCode") ? end.readNullableInteger("exitCode") : 0, explicitly_killed: end.hasField("killed") && end.readBoolean("killed") } }));
+    const completed = messages.at(-1);
+    if (Object.isUndefined(completed)) throw new Error("The recording has no messages after the turn");
     this.replay(woken ? messages.slice(0, -1) : messages);
     if (this.wakeHeld === "approve")
       this.write({ jsonrpc: "2.0", id: "permission", method: "session/request_permission", params: { sessionId: this.sessionId,
         toolCall: { toolCallId: "t2", kind: "execute", title: "Run wake command" }, options: [{ optionId: "yes", name: "Allow once", kind: "allow_once" }] } });
-    else if (woken && this.wakeHeld === null)
+    else if (woken && Object.isNull(this.wakeHeld))
       this.replay([changed(completed, { stop_reason: reason })]);
   }
 
@@ -1000,10 +1004,15 @@ export class FakeAcpAgent {
   }
 
   private static withProcess(message: JsonObject, processId: number): JsonObject {
-    const update = (message["params"] as JsonObject)["update"] as JsonObject | undefined;
-    const output = update?.["rawOutput"] as JsonObject | undefined;
-    return output?.["type"] !== "BackgroundTaskStarted" ? message
-      : { ...message, params: { ...message["params"] as JsonObject, update: { ...update, rawOutput: { ...output, pid: processId } } } };
+    const params = JsonReader.fromValue(message).readObject("params");
+    const update = params.hasField("update") ? params.readObject("update") : null;
+    const output = !Object.isNull(update) && update.hasField("rawOutput") ? update.readObject("rawOutput").toJson() : null;
+    return Object.isNull(update) || output?.["type"] !== "BackgroundTaskStarted" ? message
+      : { ...message, params: { ...params.toJson(), update: { ...update.toJson(), rawOutput: { ...output, pid: processId } } } };
+  }
+
+  private static field(message: JsonObject, name: string): JsonObject {
+    return JsonReader.fromValue(message).readObject(name).toJson();
   }
 
   private endWake(text: string, reason: string): void {
@@ -1011,7 +1020,7 @@ export class FakeAcpAgent {
     this.write({ jsonrpc: "2.0", method: "session/update", params: { sessionId: this.sessionId,
       update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text } }, _meta: { promptId: "task-completed-TASK" } } });
     this.xaiUpdate({ sessionUpdate: "turn_completed", prompt_id: "task-completed-TASK", stop_reason: reason });
-    if (this.lateModeRefusal !== null) {
+    if (!Object.isNull(this.lateModeRefusal)) {
       this.fail(this.lateModeRefusal, "Mode refused late");
       this.lateModeRefusal = null;
     }
@@ -1019,11 +1028,11 @@ export class FakeAcpAgent {
 
   private replay(messages: readonly JsonObject[]): void {
     for (const message of messages)
-      this.write({ jsonrpc: "2.0", ...message, params: { sessionId: this.sessionId, ...message["params"] as JsonObject } });
+      this.write({ jsonrpc: "2.0", ...message, params: { sessionId: this.sessionId, ...JsonReader.fromValue(message).hasField("params") ? FakeAcpAgent.field(message, "params") : {} } });
   }
 
   public static fxStatus(): void {
-    writeFileSync(join(process.env["HOME"]!, "status-call.json"), JSON.stringify({ args: process.argv.slice(2), key: process.env["AI_GATEWAY_API_KEY"] ?? null }));
+    writeFileSync(join(FakeAcpAgent.variable("HOME"), "status-call.json"), JSON.stringify({ args: process.argv.slice(2), key: process.env["AI_GATEWAY_API_KEY"] ?? null }));
     if (FX_STATUS === "unreadable") {
       process.stdout.write("not an answer");
       return;
@@ -1062,16 +1071,16 @@ export class FakeAcpAgent {
 
   private static launchedWith(options: JsonObject[]): JsonObject[] {
     const at = process.argv.indexOf("--model");
-    return at < 0 ? options : options.map(t => t["category"] === "model" ? { ...t, currentValue: process.argv[at + 1]! } : t);
+    const model = at < 0 ? undefined : process.argv[at + 1];
+    return Object.isUndefined(model) ? options : options.map(t => t["category"] === "model" ? { ...t, currentValue: model } : t);
   }
 
   public static logOut(): void {
-    const profile = process.env["CURSOR_CONFIG_DIR"]!;
     const mode = process.env["TEAMRUN_FAKE_CURSOR_LOGOUT"];
     if (mode === "hang") { setInterval(() => undefined, 1000); return; }
     if (mode === "fail") { process.stderr.write("Logout refused\n"); process.exit(1); }
     if (mode === "quiet") process.exit(1);
-    writeFileSync(join(profile, "signed-out.txt"), JSON.stringify(Object.fromEntries(CURSOR_VARIABLES.map(t => [t, process.env[t] ?? null]))));
+    writeFileSync(join(FakeAcpAgent.variable("CURSOR_CONFIG_DIR"), "signed-out.txt"), JSON.stringify(Object.fromEntries(CURSOR_VARIABLES.map(t => [t, process.env[t] ?? null]))));
     process.exit(0);
   }
 
@@ -1081,7 +1090,18 @@ export class FakeAcpAgent {
 
   private static parse(name: string): JsonValue {
     const text = process.env[name];
-    return text === undefined ? null : JSON.parse(text) as JsonValue;
+    return Object.isUndefined(text) ? null : JsonReader.parseValue(text);
+  }
+
+  private static objects(text: string | undefined): JsonObject[] | null {
+    const value = Object.isUndefined(text) ? null : JsonReader.parseValue(text);
+    return Object.isNull(value) ? null : JsonReader.fromValue({ list: value }).readObjectArray("list").map(t => t.toJson());
+  }
+
+  private static variable(name: string): string {
+    const value = process.env[name];
+    if (Object.isUndefined(value)) throw new Error(`${name} is not set`);
+    return value;
   }
 
   private xaiUpdate(update: JsonObject): void {
@@ -1091,7 +1111,7 @@ export class FakeAcpAgent {
 
   private sendLateCommands(): void {
     const late = process.env["TEAMRUN_FAKE_ACP_LATE_COMMANDS"];
-    if (late === undefined) return;
+    if (Object.isUndefined(late)) return;
     const loading = setInterval(() => {
       if (!existsSync(join(process.cwd(), "loading.txt"))) return;
       clearInterval(loading);
@@ -1138,7 +1158,7 @@ export class FakeAcpAgent {
       this.update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ answers: this.terminalAnswers }) } });
       const prompt = this.terminalPrompt;
       this.terminalPrompt = null;
-      if (prompt !== null)
+      if (!Object.isNull(prompt))
         this.respond(prompt, { stopReason: "end_turn" });
     }
     else
@@ -1161,7 +1181,7 @@ export class FakeAcpAgent {
   }
 
   private fail(id: number, message: string, code: number = -32603, data?: JsonObject): void {
-    this.write({ jsonrpc: "2.0", id, error: { code, message, ...data === undefined ? {} : { data } } });
+    this.write({ jsonrpc: "2.0", id, error: { code, message, ...Object.isUndefined(data) ? {} : { data } } });
   }
 
   private write(value: JsonObject): void {

@@ -11,6 +11,7 @@ import fsPromises from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
 import { mock } from "node:test";
+import "@noldova/context.core";
 import { JsonException, type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as CoreResources, ForkRequest, McpEndpoint, SessionTokens, SharedMcpFailureKind, SharedMcpValues, type TurnDetail, TurnOutcome, TurnRequest,
@@ -50,6 +51,26 @@ class BlockingOnReplyListener extends RecordingTurnListener {
     this.block();
     this.blocked = true;
     await super.onDetailAsync(detail);
+  }
+}
+
+class ModeCase {
+  public readonly mode: string | null;
+  public readonly planFirst: boolean;
+
+  public constructor(mode: string | null, planFirst: boolean) {
+    this.mode = mode;
+    this.planFirst = planFirst;
+  }
+}
+
+class HangCase {
+  public readonly read: string;
+  public readonly mode: string;
+
+  public constructor(read: string, mode: string) {
+    this.read = read;
+    this.mode = mode;
   }
 }
 
@@ -155,7 +176,7 @@ export class GrokAdapterTests {
         base.resumeNativeSessionId, [], role), listener, new AbortController().signal);
       const payload = listener.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join("\n");
       Assert.isTrue(payload.includes(role ?? "No additional teammate role instructions."), payload);
-      Assert.areEqual(role === null ? null : "Prompt", listener.starts[0]?.roleApplied);
+      Assert.areEqual(Object.isNull(role) ? null : "Prompt", listener.starts[0]?.roleApplied);
     }
   }
 
@@ -254,13 +275,15 @@ export class GrokAdapterTests {
     Assert.areEqual(TurnOutcome.Completed, result.outcome);
     const image = listener.details.filter(t => t.providerItemId === "grok-tool-i1");
     Assert.areEqual(2, image.length);
-    Assert.areEqual("image_gen", image[0]!.text);
-    const payload = image[1]!.payload as Record<string, unknown>;
-    Assert.areEqual(DetailKind.Note, image[1]!.kind);
-    Assert.areEqual("imageGeneration", payload["itemType"]);
-    Assert.areEqual("/9j/4A==", payload["imageData"]);
-    Assert.areEqual("image/jpeg", payload["mediaType"]);
-    Assert.areEqual(join(host.directory.resolve("person", ".grok"), "sessions", "%2Fwork", "grok-session", "images", "1.jpg"), payload["savedPath"]);
+    Assert.areEqual("image_gen", image[0]?.text);
+    const generated = image[1];
+    Assert.isDefined(generated);
+    const payload = JsonReader.fromValue(generated.payload);
+    Assert.areEqual(DetailKind.Note, generated.kind);
+    Assert.areEqual("imageGeneration", payload.readString("itemType"));
+    Assert.areEqual("/9j/4A==", payload.readString("imageData"));
+    Assert.areEqual("image/jpeg", payload.readString("mediaType"));
+    Assert.areEqual(join(host.directory.resolve("person", ".grok"), "sessions", "%2Fwork", "grok-session", "images", "1.jpg"), payload.readString("savedPath"));
   }
 
   @TestMethod
@@ -273,11 +296,13 @@ export class GrokAdapterTests {
     Assert.areEqual(TurnOutcome.Completed, result.outcome);
     const image = listener.details.filter(t => t.providerItemId === "grok-tool-i2");
     Assert.areEqual("imagine: a square", image.at(-2)?.text);
-    const payload = image.at(-1)!.payload as Record<string, unknown>;
-    Assert.areEqual(DetailKind.Note, image.at(-1)!.kind);
-    Assert.areEqual("imageGeneration", payload["itemType"]);
-    Assert.areEqual("failed", payload["status"]);
-    Assert.areEqual(JSON.stringify({ error: "tool_execution_failed", message: "Image generation failed with HTTP 422" }), JSON.stringify(payload["failure"]));
+    const failed = image.at(-1);
+    Assert.isDefined(failed);
+    const payload = JsonReader.fromValue(failed.payload);
+    Assert.areEqual(DetailKind.Note, failed.kind);
+    Assert.areEqual("imageGeneration", payload.readString("itemType"));
+    Assert.areEqual("failed", payload.readString("status"));
+    Assert.areEqual(JSON.stringify({ error: "tool_execution_failed", message: "Image generation failed with HTTP 422" }), JSON.stringify(payload.readObject("failure").toJson()));
     Assert.isNull(payload["savedPath"]);
     Assert.isNull(payload["imageData"]);
   }
@@ -331,7 +356,7 @@ export class GrokAdapterTests {
       `${adapter.profileSearch?.folders.join()} ${adapter.profileSearch?.entries.join()}`);
     Assert.areEqual(`${adapter.descriptor.displayName} can't switch on its own MCP servers here: ${Resources.grokOwnServersSwitchAbility}.`, adapter.descriptor.ownMcpServersUnavailable);
     Assert.areEqual("docs,linear", (await adapter.listOwnMcpServers(provider))?.map(t => t.name).join(","));
-    Assert.areEqual(JSON.stringify([{ methodId: "grok.com" }]), JSON.stringify(browsers().map(t => JSON.parse(t) as unknown)));
+    Assert.areEqual(JSON.stringify([{ methodId: "grok.com" }]), JSON.stringify(browsers().map(t => JsonReader.parse(t).toJson())));
     Assert.areEqual(AuthStatus.LoggedIn, (await adapter.checkSignIn(provider)).authStatus);
     await host.programs.endedAt(host.programs.started.length);
     Assert.areEqual(host.programs.started.length, host.programs.ended.length);
@@ -464,7 +489,7 @@ export class GrokAdapterTests {
 
     const answer = await TitleAsks.answerAsync(host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_MODES: JSON.stringify(modes) }), TitleAsks.isolated(request));
 
-    Assert.areEqual("mode=ask", (JSON.parse(answer) as { readonly sets: readonly string[] }).sets.filter(t => t.startsWith("mode=")).join(","));
+    Assert.areEqual("mode=ask", JsonReader.parse(answer).readStringArray("sets").filter(t => t.startsWith("mode=")).join(","));
   }
 
   @TestMethod
@@ -479,8 +504,8 @@ export class GrokAdapterTests {
       const listener = new RecordingTurnListener();
       const turn = await adapter.runTurn(host.request("methods", null, null, null, null, mode), listener, new AbortController().signal);
       Assert.areEqual(TurnOutcome.Completed, turn.outcome, String(mode));
-      const sent = JSON.parse(listener.texts.find(t => t.startsWith("{\"methods\""))!) as { readonly methods: readonly string[]; readonly sets: readonly string[] };
-      sets.push(`${sent.sets.join(",")}/${String(sent.methods.includes("session/set_mode"))}`);
+      const sent = GrokAdapterTests.echoed(listener);
+      sets.push(`${sent.readStringArray("sets").join(",")}/${String(sent.readStringArray("methods").includes("session/set_mode"))}`);
     }
 
     Assert.areEqual("default:Default:false:false,plan:Plan:false:true,ask:Ask:false:true,bypassPermissions:Always-approve:true:false",
@@ -499,11 +524,12 @@ export class GrokAdapterTests {
     await using host = new GrokTestHost();
     const adapter = host.createAdapter();
     const sets: string[] = [];
-    for (const [mode, planFirst] of [["plan", false], ["ask", false], ["default", false], ["default", true], ["bypassPermissions", false], [null, false]] as const) {
-      const asked = host.request("methods", null, null, null, null, mode);
+    for (const t of [new ModeCase("plan", false), new ModeCase("ask", false), new ModeCase("default", false), new ModeCase("default", true), new ModeCase("bypassPermissions", false),
+      new ModeCase(null, false)]) {
+      const asked = host.request("methods", null, null, null, null, t.mode);
       const listener = new RecordingTurnListener();
-      const turn = await adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(planFirst)), listener, new AbortController().signal);
-      Assert.areEqual(TurnOutcome.Completed, turn.outcome, `${String(mode)}:${String(planFirst)}`);
+      const turn = await adapter.runTurn(asked.withRequested(asked.requested.withPlanFirst(t.planFirst)), listener, new AbortController().signal);
+      Assert.areEqual(TurnOutcome.Completed, turn.outcome, `${String(t.mode)}:${String(t.planFirst)}`);
       sets.push(GrokAdapterTests.modesSet(listener));
     }
 
@@ -636,7 +662,7 @@ export class GrokAdapterTests {
     Assert.areEqual(Resources.formatModeUnavailable("Grok", "Plan"), refused.error);
     Assert.isFalse(chosen.texts.some(t => t.startsWith("{\"methods\"")));
     Assert.areEqual(TurnOutcome.Completed, kept.outcome);
-    Assert.isFalse((JSON.parse(plain.texts.find(t => t.startsWith("{\"methods\""))!) as { readonly methods: readonly string[] }).methods.includes("session/set_mode"));
+    Assert.isFalse(GrokAdapterTests.echoed(plain).readStringArray("methods").includes("session/set_mode"));
   }
 
   @TestMethod
@@ -680,7 +706,8 @@ export class GrokAdapterTests {
     const requests = (): string[] => readFileSync(join(host.directory.resolve("person"), "fork-requests.txt"), "utf8").trimEnd().split("\n");
 
     const first = await adapter.runTurn(host.request("hello"), new RecordingTurnListener(), new AbortController().signal);
-    const forked = await adapter.forkSession(request(first.nativeTurnId!));
+    Assert.isNotNull(first.nativeTurnId);
+    const forked = await adapter.forkSession(request(first.nativeTurnId));
     const resumed = await adapter.runTurn(host.request("again", forked.nativeSessionId), new RecordingTurnListener(), new AbortController().signal);
 
     Assert.isTrue(adapter.descriptor.supportsResume);
@@ -754,9 +781,9 @@ export class GrokAdapterTests {
     const provider = new Provider("a", "grok", "Dedicated", host.directory.resolve("added"), AuthStatus.Unknown, null, null, null, null, "t");
     const timings = new ProviderTimings(2000, 2000, 10_000, 10_000, 100, 100, 100, 5000, 100, 1, 10, Resources.wakeGrace, Resources.taskOutputFollowInterval, 500);
     const checked: string[] = [];
-    for (const [read, mode] of [["ACCOUNT", "hangNamespaced"], ["ACCOUNT", "hang"], ["BILLING", "hangNamespaced"], ["BILLING", "hang"]]) {
+    for (const t of [new HangCase("ACCOUNT", "hangNamespaced"), new HangCase("ACCOUNT", "hang"), new HangCase("BILLING", "hangNamespaced"), new HangCase("BILLING", "hang")]) {
       const started = performance.now();
-      const check = await host.createAdapter({ ...host.environment, [`TEAMRUN_FAKE_ACP_${read}`]: mode }, host.command, host.terminator, timings)
+      const check = await host.createAdapter({ ...host.environment, [`TEAMRUN_FAKE_ACP_${t.read}`]: t.mode }, host.command, host.terminator, timings)
         .checkSignIn(provider);
       checked.push([check.authStatus, check.identity?.email ?? "none", check.identity?.plan ?? "none", String(performance.now() - started < timings.requestTimeout)]
         .join(" "));
@@ -1256,7 +1283,9 @@ export class GrokAdapterTests {
     const running = adapter.runTurn(host.request("complete", "garble"), listener, new AbortController().signal);
     await Wait.until(() => existsSync(join(host.directory.resolve("person"), "load-closed.txt")), "The fake did not write load-closed.txt.");
     const stopping = adapter.shutdown();
-    process.kill(host.programs.started[0]!.processId);
+    const started = host.programs.started[0];
+    Assert.isDefined(started);
+    process.kill(started.processId);
     await stopping;
 
     Assert.areEqual(TurnOutcome.Failed, (await running).outcome);
@@ -1442,10 +1471,14 @@ export class GrokAdapterTests {
   }
 
   private static modesSet(listener: RecordingTurnListener): string {
+    return GrokAdapterTests.echoed(listener).readStringArray("sets").join(",");
+  }
+
+  private static echoed(listener: RecordingTurnListener): JsonReader {
     const echoed = listener.texts.find(t => t.startsWith("{\"methods\""));
     if (Object.isUndefined(echoed))
       throw new Error("Grok was sent no prompt, so it echoed no modes set.");
-    return JsonReader.parse(echoed).readStringArray("sets").join(",");
+    return JsonReader.parse(echoed);
   }
 
   private static offeringHttp(host: GrokTestHost): NodeJS.ProcessEnv {

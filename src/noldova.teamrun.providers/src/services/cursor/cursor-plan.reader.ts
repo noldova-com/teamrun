@@ -8,9 +8,10 @@
 
 import "@noldova/context.core";
 import type { JsonObject, JsonReader } from "@noldova/context.json";
-import { type PlanStep, PlanStepStatus } from "@noldova/teamrun.protocol";
+import { PlanStepStatus } from "@noldova/teamrun.protocol";
 
 import type { IAcpPlanReader } from "../../interfaces/i-acp-plan.reader.js";
+import { AcpPlan } from "../../models/acp-plan.js";
 import { Resources } from "../../resources.js";
 import { PlanDetails } from "../plan-details.js";
 
@@ -19,12 +20,12 @@ export class CursorPlanReader implements IAcpPlanReader {
   public readonly nativeKind: string = Resources.cursorCreatePlanTool;
   public readonly leavesPlan: boolean = false;
 
-  public read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] } {
+  public read(params: JsonReader): AcpPlan {
     const phases = params.hasField(Resources.cursorPhasesField) ? params.readObjectArray(Resources.cursorPhasesField) : [];
     const todos = [params, ...phases].flatMap(t => t.hasField(Resources.cursorTodosField) ? t.readObjectArray(Resources.cursorTodosField) : []);
     const steps = todos.map(t => PlanDetails.step(t.toJson()[Resources.contentField],
       PlanDetails.statusOf(Resources.acpPlanStatuses, t.toJson()[Resources.statusField], PlanStepStatus.Pending), undefined));
-    return { text: params.readNonBlankString(Resources.planField), steps: steps.filter(t => !Object.isNull(t)) };
+    return new AcpPlan(params.readNonBlankString(Resources.planField), steps.filter(t => !Object.isNull(t)));
   }
 
   public reply(_params: JsonReader, approved: boolean | null): JsonObject {

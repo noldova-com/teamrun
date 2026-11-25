@@ -137,8 +137,8 @@ export class GeneralAcpAgent implements IAcpAgent {
   public listsToolsBeforeSession(initialized: JsonReader): boolean {
     const version = GeneralAcpAgent.isGemini(initialized) ? this.readVersion(initialized)?.split(Resources.versionSeparator).map(Number) ?? [] : [];
     const [major = Number.NaN, minor = Number.NaN] = version;
-    const [leastMajor, leastMinor] = Resources.geminiCliListsToolsBeforeSession;
-    return major > leastMajor || major === leastMajor && minor >= leastMinor;
+    const leastMajor = Resources.geminiCliListsToolsBeforeSessionMajor;
+    return major > leastMajor || major === leastMajor && minor >= Resources.geminiCliListsToolsBeforeSessionMinor;
   }
 
   public readMissingTools(initialized: JsonReader): string | null {
