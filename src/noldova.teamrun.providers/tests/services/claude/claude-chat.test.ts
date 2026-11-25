@@ -983,6 +983,38 @@ export class ClaudeChatTests {
   }
 
   @TestMethod
+  public async keepsTheChatOpenWhenAFrameComesForAReplyWhoseTurnClaudeAnsweredItselfAfterTheNextTurnEndedTheSameWay(): Promise<void> {
+    using host = new ClaudeTestHost();
+    const adapter = host.createAdapter();
+    const query = new FakeClaudeQuery([
+      new WaitForInputStep(),
+      SdkMessages.init("s-220", "none", null, []),
+      SdkMessages.sessionState("s-220", "running"),
+      new StampedStep(SdkMessages.assistant("22022022-0220-2202-2022-022022022022", [SdkMessages.text("First")], "claude-opus-5")),
+      SdkMessages.sessionState("s-220", "idle"),
+      new WaitForInputStep(),
+      SdkMessages.sessionState("s-220", "running"),
+      SdkMessages.sessionState("s-220", "idle"),
+      SdkMessages.assistant("22022022-0220-2202-2022-022022022023", [SdkMessages.text("Late")], "claude-opus-5"),
+      SdkMessages.success("s-220", "Late"),
+      new WaitForCloseStep()
+    ]);
+    host.factory.next = query;
+    const first = new RecordingTurnListener();
+    const second = new RecordingTurnListener();
+
+    try {
+      await adapter.runTurn(host.createRequest("First"), first, new AbortController().signal);
+      const next = await adapter.runTurn(host.createRequest("Second", null, "s-220"), second, new AbortController().signal);
+      await Wait.until(() => first.texts.includes("Late"), "The late frame did not reach the reply it belongs to.");
+
+      Assert.areEqual(JSON.stringify([TurnOutcome.Completed, [Resources.claudeAnsweredInOwnTurn], 0, 1]),
+        JSON.stringify([next.outcome, second.texts, query.closeCount, host.factory.queries.length]));
+    }
+    finally { await adapter.shutdown(); }
+  }
+
+  @TestMethod
   public async preparesNoTurnBeforeAQueryIsAttached(): Promise<void> {
     const chat = new ClaudeChat("chat", 10, 1, 50, () => undefined);
 

@@ -25,6 +25,7 @@ import { DeltaStream } from "../delta-stream.js";
 import { FailureDescriber } from "../failure-describer.js";
 import { ClaudeInput } from "./claude-input.js";
 import { ClaudeModes } from "./claude-modes.js";
+import { ClaudePendingRun } from "./claude-pending-run.js";
 import { ClaudePlan } from "./claude-plan.js";
 import { ClaudePrompt } from "./claude-prompt.js";
 import { ClaudeSubAgents } from "./claude-sub-agents.js";
@@ -46,8 +47,7 @@ export class ClaudeChat {
   private readonly live: Set<string> = new Set();
   private query: IClaudeQuery | null = null;
   private pumping: boolean = false;
-  private pending: { turn: ClaudeTurn; uuid: string; done: PromiseWithResolvers<boolean>; environment: Readonly<Record<string, string>>;
-    interrupted: () => void; held: SDKUserMessage | null; taken: boolean; } | null = null;
+  private pending: ClaudePendingRun | null = null;
   private replying: ClaudeTurn | null = null;
   private applied: ClaudeTurn | null = null;
   private waking: boolean = false;
@@ -231,8 +231,8 @@ export class ClaudeChat {
     if (Object.isUndefined(uuid))
       throw new InvalidOperationException(Resources.claudeMessageWithoutId);
     const done = Promise.withResolvers<boolean>();
-    this.pending = { turn, uuid, done, environment, interrupted, held: null, taken: false };
-    const pending = this.pending;
+    const pending = new ClaudePendingRun(turn, uuid, done, environment, interrupted);
+    this.pending = pending;
     this.reserved = false;
     this.clearGrace();
     if (!this.pumping) {
@@ -253,7 +253,7 @@ export class ClaudeChat {
       this.rateLimit = null;
       this.input.push(message);
       if (turn.isInterrupted)
-        this.stopPending();
+        this.stopPending(pending);
     }
     if (await done.promise)
       await turn.finishAsync();
@@ -289,7 +289,7 @@ export class ClaudeChat {
     if (!Object.isNull(pending.held))
       this.settleHeld(pending);
     else if (this.replying === turn || (Object.isNull(this.replying) && !this.waking && this.applied === turn))
-      this.stopPending();
+      this.stopPending(pending);
   }
 
   public stop(): Promise<void> {
@@ -385,11 +385,11 @@ export class ClaudeChat {
       return;
     }
     const wasWaking = this.waking;
-    this.bind(message.type === Resources.userMessageType ? [] : ClaudeChat.stampsOf(message));
+    const bound = this.bind(message.type === Resources.userMessageType ? [] : ClaudeChat.stampsOf(message));
     if (this.waking && !wasWaking)
       await this.startWake(query);
-    else if (!Object.isNull(this.pending) && !Object.isNull(this.replying) && this.applied !== this.replying)
-      await this.resume(query, this.pending.turn, this.pending.environment);
+    else if (!Object.isNull(bound) && this.applied !== bound.turn)
+      await this.resume(query, bound);
     const turn = this.replying ?? this.waker?.turn ?? null;
     const rateLimit = this.rateLimit;
     this.rateLimit = null;
@@ -414,7 +414,7 @@ export class ClaudeChat {
     if (!Object.isNull(pending) && !Object.isNull(pending.held)) {
       const held = pending.held;
       pending.held = null;
-      await this.release(query, pending.turn, pending.environment, held);
+      await this.release(query, pending, held);
     }
     this.closeWhenIdle();
   }
@@ -547,21 +547,21 @@ export class ClaudeChat {
     await wake.onDetailAsync(new TurnDetail(DetailKind.Note, Resources.claudeWakeToolsRefused, null, null));
   }
 
-  private async release(query: IClaudeQuery, turn: ClaudeTurn, environment: Readonly<Record<string, string>>, message: SDKUserMessage): Promise<void> {
-    this.listener = turn.turnListener;
-    this.applied = turn;
-    await this.applySender(query, environment, turn.turnListener);
+  private async release(query: IClaudeQuery, pending: ClaudePendingRun, message: SDKUserMessage): Promise<void> {
+    this.listener = pending.turn.turnListener;
+    this.applied = pending.turn;
+    await this.applySender(query, pending.environment, pending.turn.turnListener);
     this.rateLimit = null;
     if (!this.closed)
       this.input.push(message);
   }
 
-  private async resume(query: IClaudeQuery, turn: ClaudeTurn, environment: Readonly<Record<string, string>>): Promise<void> {
-    this.applied = turn;
-    this.listener = turn.turnListener;
-    if (turn.isInterrupted)
-      this.stopPending();
-    await this.applySender(query, environment, turn.turnListener);
+  private async resume(query: IClaudeQuery, pending: ClaudePendingRun): Promise<void> {
+    this.applied = pending.turn;
+    this.listener = pending.turn.turnListener;
+    if (pending.turn.isInterrupted)
+      this.stopPending(pending);
+    await this.applySender(query, pending.environment, pending.turn.turnListener);
   }
 
   private senderOf(environment: Readonly<Record<string, string>>): Record<string, string> {
@@ -585,9 +585,9 @@ export class ClaudeChat {
     }
   }
 
-  private stopPending(): void {
+  private stopPending(pending: ClaudePendingRun): void {
     this.interruptQuery();
-    this.pending?.interrupted();
+    pending.interrupted();
   }
 
   private interruptQuery(): void {
@@ -627,17 +627,21 @@ export class ClaudeChat {
     return message.user_message_uuids ?? (Object.isUndefined(message.user_message_uuid) ? [] : [message.user_message_uuid]);
   }
 
-  private bind(stamps: readonly string[]): void {
+  private bind(stamps: readonly string[]): ClaudePendingRun | null {
     const pending = this.pending;
     if (stamps.length > 0) {
+      const bound = !Object.isNull(pending) && stamps.includes(pending.uuid) ? pending : null;
       this.stamped = true;
-      this.replying = !Object.isNull(pending) && stamps.includes(pending.uuid) ? pending.turn : null;
-      this.waking = Object.isNull(this.replying);
+      this.replying = bound?.turn ?? null;
+      this.waking = Object.isNull(bound);
+      return bound;
     }
-    else if (Object.isNull(this.replying) && !this.waking) {
-      this.waking = this.stamped || Object.isNull(pending);
-      this.replying = this.waking || Object.isNull(pending) ? null : pending.turn;
-    }
+    if (!Object.isNull(this.replying) || this.waking)
+      return null;
+    const bound = this.stamped ? null : pending;
+    this.waking = Object.isNull(bound);
+    this.replying = bound?.turn ?? null;
+    return bound;
   }
 
   private async settleAsync(failure: string | null): Promise<void> {
@@ -657,7 +661,7 @@ export class ClaudeChat {
     pending.done.resolve(false);
   }
 
-  private settleHeld(pending: { done: PromiseWithResolvers<boolean> }): void {
+  private settleHeld(pending: ClaudePendingRun): void {
     this.pending = null;
     pending.done.resolve(true);
   }
