@@ -509,10 +509,10 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     const departmentOf = (id: string): Department | undefined => organization.departments.find(t => t.id === organization.departmentOf(id));
     return reports.flatMap(t => {
       const department = departmentOf(t.id);
-      if (Object.isUndefined(department) || department.leaderId === teammateId)
-        return [t.name];
-      if (department.leaderId === t.id)
+      if (!Object.isUndefined(department) && department.leaderId === t.id)
         return [Resources.formatOrganizationDepartmentReport(department.name, t.name)];
+      if (Object.isUndefined(department) || !Object.isNull(department.leaderId))
+        return [t.name];
       const members = reports.filter(u => departmentOf(u.id)?.id === department.id);
       return members.indexOf(t) === 0 ? [Resources.formatOrganizationUnledReport(department.name, members.map(u => u.name))] : [];
     });
