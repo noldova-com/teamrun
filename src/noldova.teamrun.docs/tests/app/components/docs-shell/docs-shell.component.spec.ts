@@ -127,8 +127,7 @@ describe("DocsShellComponent", () => {
       const footer = DocsFixture.one(host, "nol-site-footer");
       const version = DocsFixture.one(header, ".nol-site-version");
       const changelog = await commands.readFile("../../../../../../CHANGELOG.md");
-      const released = changelog.split("
-").map(t => t.trim()).find(t => t.startsWith("## ") && t !== "## Unreleased")?.slice(3) ?? String.empty;
+      const released = changelog.split("\n").map(t => t.trim()).find(t => t.startsWith("## ") && t !== "## Unreleased")?.slice(3) ?? String.empty;
 
       expect([header.classList.contains("nol-site-header-wide"), footer.classList.contains("nol-site-footer-wide")]).toEqual([true, true]);
       expect([DocsFixture.one(header, ".nol-site-lockup-link").getAttribute("href"), DocsFixture.one(header, ".nol-site-lockup-name").textContent.trim()]).toEqual(["/", "TeamRun"]);
