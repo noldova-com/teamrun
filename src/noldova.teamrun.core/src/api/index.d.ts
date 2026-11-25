@@ -7,6 +7,7 @@
  */
 
 import type { Stats } from "node:fs";
+import type { FileReadResult } from "node:fs/promises";
 
 import { DbContext, type DbContextOptions } from "@noldova/context.data";
 import type { Exception } from "@noldova/context.exceptions";
@@ -1095,7 +1096,7 @@ export interface IOpenedFile {
    * @param position Where in the file to read from.
    * @returns How many bytes were read; 0 at the end of the file.
    */
-  read(buffer: Buffer, offset: number, length: number, position: number): Promise<{ bytesRead: number }>;
+  read(buffer: Buffer, offset: number, length: number, position: number): Promise<Pick<FileReadResult<Buffer>, "bytesRead">>;
 }
 
 /**
@@ -5156,12 +5157,12 @@ export declare class Resources {
   /**
    * What a handover carried: the messages kept whole, by sequence ranges, with tool calls as one line each when they hold any, and the results cut.
    */
-  public static formatHandoverCarriedWhole(ranges: readonly (readonly [number, number])[], tools: boolean, cuts: readonly number[]): string;
+  public static formatHandoverCarriedWhole(ranges: readonly HandoverRange[], tools: boolean, cuts: readonly number[]): string;
 
   /**
    * What a handover carried: the messages it left out, by sequence ranges.
    */
-  public static formatHandoverCarriedLeftOut(ranges: readonly (readonly [number, number])[]): string;
+  public static formatHandoverCarriedLeftOut(ranges: readonly HandoverRange[]): string;
   /**
    * What a handover carried: the summary, by the provider kind that wrote it, whether it is the session's last compaction summary or one written
    * for the handover, and the messages it covers.
@@ -6351,6 +6352,46 @@ export declare class TurnTools {
 }
 
 /**
+ * The image a tool call returned, which its step stores.
+ */
+export declare class ToolCallImage {
+  /**
+   * The image as base64 data.
+   */
+  public readonly data: string;
+  /**
+   * The image's media type, such as `image/png`.
+   */
+  public readonly mediaType: string;
+
+  public constructor(data: string, mediaType: string);
+}
+
+/**
+ * The permission request that decided a tool call, as Noldova Desktop's `PermissionRecord` gives it.
+ */
+export declare class ToolCallPermission {
+  /**
+   * The request's id.
+   */
+  public readonly id: string;
+  /**
+   * The request's risk, such as `Low`.
+   */
+  public readonly risk: string;
+  /**
+   * How the request was decided, such as `AllowedOnce`.
+   */
+  public readonly decision: string;
+  /**
+   * Whether the decision was remembered for later calls.
+   */
+  public readonly isRemembered: boolean;
+
+  public constructor(id: string, risk: string, decision: string, isRemembered: boolean);
+}
+
+/**
  * What one tool call kept for its step in the reply and not for the agent: fields to add to the step's payload, and an image to store
  * with it. The step is the reply's first step not yet given a record whose payload names the same `servedTool` and, when it keeps it,
  * the same `servedInput`: the tool TeamRun's MCP server served and its input, which the providers' readers add to such a call's step.
@@ -6371,12 +6412,12 @@ export declare class ToolCallRecord {
   /**
    * The image to store with the step, as base64 data and its media type, or null.
    */
-  public readonly image: { readonly data: string; readonly mediaType: string } | null;
+  public readonly image: ToolCallImage | null;
   /**
    * The permission request that decided the call, as Noldova Desktop's `PermissionRecord` gives its `id`, `risk`, `decision` and `isRemembered`,
    * or null when the call raised none. The step's payload keeps it as `permission`, with `isAsked`, whether the reply showed a card for it.
    */
-  public readonly permission: { readonly id: string; readonly risk: string; readonly decision: string; readonly isRemembered: boolean } | null;
+  public readonly permission: ToolCallPermission | null;
 
   /**
    * Initializes the record.
@@ -6387,8 +6428,8 @@ export declare class ToolCallRecord {
    * @param permission The permission request that decided the call, or null, the default.
    * @throws ArgumentException when the tool's name is blank.
    */
-  public constructor(tool: string, input: JsonObject, fields: JsonObject, image?: { readonly data: string; readonly mediaType: string } | null,
-    permission?: { readonly id: string; readonly risk: string; readonly decision: string; readonly isRemembered: boolean } | null);
+  public constructor(tool: string, input: JsonObject, fields: JsonObject, image?: ToolCallImage | null,
+    permission?: ToolCallPermission | null);
 
   /**
    * Whether a step's payload is of this call: the same tool, and the same input in any order of its keys, or no input when the
@@ -8265,6 +8306,38 @@ export declare class HandoverTurn {
 }
 
 /**
+ * The start and the end a handover keeps of a text it cuts in the middle.
+ */
+export declare class HandoverEnds {
+  /**
+   * The text's start, up to the bytes it keeps.
+   */
+  public readonly start: string;
+  /**
+   * The text's end, up to the bytes it keeps.
+   */
+  public readonly end: string;
+
+  public constructor(start: string, end: string);
+}
+
+/**
+ * A run of consecutive messages a handover names, by their sequence numbers.
+ */
+export declare class HandoverRange {
+  /**
+   * The first message's sequence number.
+   */
+  public readonly from: number;
+  /**
+   * The last message's sequence number, the same as `from` for one message.
+   */
+  public readonly to: number;
+
+  public constructor(from: number, to: number);
+}
+
+/**
  * The history a handover chose.
  */
 export declare class HandoverHistory {
@@ -8717,6 +8790,36 @@ export declare class FileSnapshot {
 }
 
 /**
+ * The runs of one hunk of a file's diff, close enough to share their context lines.
+ */
+export declare class DiffHunk {
+  /**
+   * The hunk's first run.
+   */
+  public readonly head: DiffRun;
+  /**
+   * The hunk's runs, from its first.
+   */
+  public get runs(): readonly DiffRun[];
+  /**
+   * The hunk's last run.
+   */
+  public get last(): DiffRun;
+
+  /**
+   * Initializes the hunk with its first run.
+   * @param head The hunk's first run.
+   */
+  public constructor(head: DiffRun);
+
+  /**
+   * Adds a run after the hunk's last.
+   * @param run The run.
+   */
+  public add(run: DiffRun): void;
+}
+
+/**
  * A run of lines a file's diff removes from the old text and adds from the new.
  */
 export declare class DiffRun {
@@ -9162,6 +9265,22 @@ export declare class GitIgnores {
 }
 
 /**
+ * A command step's targets, as `CommandWrites.targetsOf` reads them.
+ */
+export declare class CommandTargets {
+  /**
+   * The files the step names, at absolute paths.
+   */
+  public readonly files: readonly string[];
+  /**
+   * The folders where the step may write files it doesn't name.
+   */
+  public readonly unnamedIn: readonly string[];
+
+  public constructor(files: readonly string[], unnamedIn: readonly string[]);
+}
+
+/**
  * The files a reply's commands name as written outside the chat's folder, read when each command's step first comes and again after the
  * turn, for the reply's working-tree evidence of them.
  */
@@ -9200,7 +9319,7 @@ export declare class CommandWrites {
    * @param platform The platform the command ran on, as `process.platform` names it, which it is by default.
    * @returns The files and folders.
    */
-  public static targetsOf(payload: JsonValue, root: string, platform?: string): { readonly files: readonly string[]; readonly unnamedIn: readonly string[] };
+  public static targetsOf(payload: JsonValue, root: string, platform?: string): CommandTargets;
 
   /**
    * Returns the key two paths to one folder share: its nearest existing ancestor's real path, with the rest of the path after it.

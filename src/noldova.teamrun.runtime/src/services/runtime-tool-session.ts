@@ -19,7 +19,7 @@ import {
 } from "@noldova/desktop.runtime";
 import "@noldova/context.core";
 import type { JsonObject } from "@noldova/context.json";
-import { type ITimer, type ITurnToolSession, NodeTimer, ToolCallRecord } from "@noldova/teamrun.core";
+import { type ITimer, type ITurnToolSession, NodeTimer, ToolCallImage, ToolCallPermission, ToolCallRecord } from "@noldova/teamrun.core";
 import { McpServer, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../resources.js";
@@ -136,12 +136,12 @@ export class RuntimeToolSession implements ITurnToolSession {
   }
 
   private static recordOf(name: string, input: JsonObject, result: ToolResult | ToolFailure): ToolCallRecord {
-    const [image] = result.content.flatMap(t => Object.isNull(t.mimeType) ? [] : [{ data: t.value, mediaType: t.mimeType }]);
+    const [image] = result.content.flatMap(t => Object.isNull(t.mimeType) ? [] : [new ToolCallImage(t.value, t.mimeType)]);
     const fields = result.isFailure
       ? { [ProtocolResources.failureField]: { [ProtocolResources.failureCodeField]: result.code, [ProtocolResources.failureModuleCodeField]: result.moduleCode } }
       : result.structured ?? {};
     const decided = result.requests.find(t => !RuntimeToolSession.isAllowed(t)) ?? result.requests.at(-1);
-    const permission = Object.isUndefined(decided) ? null : { id: decided.id, risk: decided.risk, decision: decided.decision, isRemembered: decided.isRemembered };
+    const permission = Object.isUndefined(decided) ? null : new ToolCallPermission(decided.id, decided.risk, decided.decision, decided.isRemembered);
     return new ToolCallRecord(name, input, fields, image ?? null, permission);
   }
 

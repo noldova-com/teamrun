@@ -8,7 +8,7 @@
 
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Handover, HandoverSummary, HandoverTurn, Resources } from "@noldova/teamrun.core";
+import { Handover, type HandoverHistory, HandoverRange, HandoverSummary, HandoverTurn, Resources } from "@noldova/teamrun.core";
 import { MessageAttachment } from "@noldova/teamrun.protocol";
 
 @TestClass
@@ -80,10 +80,10 @@ export class HandoverTests {
   @TestMethod
   public saysWhatAHandoverAnswersAndWhatTheStoppedReplyWroteAndWhoReadsWhatWasLeftOut(): void {
     Assert.areEqual(["The message this answers", "The message this answers, and what the stopped reply wrote", "What the stopped reply wrote", "null"].join("|"),
-      [[true, false], [true, true], [false, true], [false, false]].map(([asked, continued]) => String(Resources.formatHandoverCarriedAnswer(asked ?? false, continued ?? false)))
-        .join("|"));
+      [Resources.formatHandoverCarriedAnswer(true, false), Resources.formatHandoverCarriedAnswer(true, true), Resources.formatHandoverCarriedAnswer(false, true),
+        Resources.formatHandoverCarriedAnswer(false, false)].map(t => String(t)).join("|"));
     Assert.areEqual("Codex reads what was left out with list-messages, as it reads any chat.", Resources.formatHandoverReads("Codex"));
-    Assert.areEqual("Left out: message 4", Resources.formatHandoverCarriedLeftOut([[4, 4]]));
+    Assert.areEqual("Left out: message 4", Resources.formatHandoverCarriedLeftOut([new HandoverRange(4, 4)]));
   }
 
   @TestMethod
@@ -120,6 +120,8 @@ export class HandoverTests {
     const dropped = Handover.choose("chat", turns, 202 + Handover.bytesOf(Resources.formatHandoverLeftOut([Resources.formatHandoverRange(2, 5)], "chat")) + 12,
       compaction);
     const led = Handover.choose("chat", lead, Handover.bytesOf(Resources.formatHandoverSummary("sum")) + 2 + 12 + Handover.bytesOf(line), leading);
+    const carried = (history: HandoverHistory | null, summary: HandoverSummary): string =>
+      Handover.carriedOf(turns, history?.kept ?? new Set(), "Ana", summary, history?.covered).join("|");
 
     Assert.areEqual("1,2|1,2||", [...histories, dropped].map(t => [...t?.covered ?? []].join(",")).join("|"));
     Assert.areEqual([
@@ -127,8 +129,8 @@ export class HandoverTests {
       ["Ana's first message, the original request", "Codex's handover summary, covering messages 2 to 3", "Messages 4 to 5 whole"],
       ["Ana's first message, the original request", "Messages 4 to 5 whole", "Left out: messages 2 to 3"],
       ["Ana's first message, the original request", "Left out: messages 2 to 5"]
-    ].map(t => t.join("|")).join("/"), [...[compaction, own, unnamed].map((summary, index) => [histories[index] ?? null, summary] as const), [dropped, compaction] as const]
-      .map(([history, summary]) => Handover.carriedOf(turns, history?.kept ?? new Set(), "Ana", summary, history?.covered).join("|")).join("/"));
+    ].map(t => t.join("|")).join("/"), [carried(histories[0] ?? null, compaction), carried(histories[1] ?? null, own), carried(histories[2] ?? null, unnamed),
+      carried(dropped, compaction)].join("/"));
     Assert.areEqual(["Claude's last compaction summary, covering messages 1 to 2", "Message 4 whole", "Left out: message 3"].join("|"),
       Handover.carriedOf(lead, led?.kept ?? new Set(), "Ana", leading, led?.covered).join("|"));
   }

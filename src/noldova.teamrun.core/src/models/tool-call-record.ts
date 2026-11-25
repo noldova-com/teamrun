@@ -11,15 +11,18 @@ import { ArgumentException } from "@noldova/context.exceptions";
 import type { JsonObject, JsonValue } from "@noldova/context.json";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 
+import type { ToolCallImage } from "./tool-call-image.js";
+import type { ToolCallPermission } from "./tool-call-permission.js";
+
 export class ToolCallRecord {
   public readonly tool: string;
   public readonly input: JsonObject;
   public readonly fields: JsonObject;
-  public readonly image: { readonly data: string; readonly mediaType: string } | null;
-  public readonly permission: { readonly id: string; readonly risk: string; readonly decision: string; readonly isRemembered: boolean } | null;
+  public readonly image: ToolCallImage | null;
+  public readonly permission: ToolCallPermission | null;
 
-  public constructor(tool: string, input: JsonObject, fields: JsonObject, image: { readonly data: string; readonly mediaType: string } | null = null,
-    permission: { readonly id: string; readonly risk: string; readonly decision: string; readonly isRemembered: boolean } | null = null) {
+  public constructor(tool: string, input: JsonObject, fields: JsonObject, image: ToolCallImage | null = null,
+    permission: ToolCallPermission | null = null) {
     ArgumentException.throwIfNullOrWhitespace(tool, ProtocolResources.toolField);
 
     this.tool = tool;

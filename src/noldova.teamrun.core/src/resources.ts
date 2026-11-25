@@ -18,6 +18,7 @@ import { SharedMcpFailureKind } from "./enums/shared-mcp-failure-kind.js";
 import type { CommandExit } from "./models/command-exit.js";
 import type { SharedMcpFailure } from "./models/shared-mcp-failure.js";
 import { RenamedJsonField } from "./models/renamed-json-field.js";
+import { HandoverRange } from "./services/sustain/handover-range.js";
 
 export class Resources {
   public static readonly guidByteCount: number = 16;
@@ -1103,7 +1104,7 @@ export class Resources {
     return `${Object.isNull(name) ? "The chat's" : `${name}'s`} first message, the original request`;
   }
 
-  public static formatHandoverCarriedWhole(ranges: readonly (readonly [number, number])[], tools: boolean, cuts: readonly number[]): string {
+  public static formatHandoverCarriedWhole(ranges: readonly HandoverRange[], tools: boolean, cuts: readonly number[]): string {
     const many = cuts.length > 1;
     const named = [...many ? [cuts.slice(0, -1).join(", ")] : [], ...cuts.slice(-1)].join(" and ");
     return `${Resources.formatHandoverSpans(ranges, "Message")} whole${tools ? ", with tool calls as one line each" : String.empty}`
@@ -1111,10 +1112,10 @@ export class Resources {
   }
 
   public static formatHandoverCarriedSummary(author: string, isCompaction: boolean, from: number, to: number): string {
-    return `${author}'s ${isCompaction ? "last compaction" : "handover"} summary, covering ${Resources.formatHandoverSpans([[from, to]], "message")}`;
+    return `${author}'s ${isCompaction ? "last compaction" : "handover"} summary, covering ${Resources.formatHandoverSpans([new HandoverRange(from, to)], "message")}`;
   }
 
-  public static formatHandoverCarriedLeftOut(ranges: readonly (readonly [number, number])[]): string {
+  public static formatHandoverCarriedLeftOut(ranges: readonly HandoverRange[]): string {
     return `Left out: ${Resources.formatHandoverSpans(ranges, "message")}`;
   }
 
@@ -1128,9 +1129,9 @@ export class Resources {
     return `${kind} reads what was left out with list-messages, as it reads any chat.`;
   }
 
-  private static formatHandoverSpans(ranges: readonly (readonly [number, number])[], noun: string): string {
-    const single = ranges.length === 1 && ranges[0]?.[0] === ranges[0]?.[1];
-    return `${noun}${single ? String.empty : "s"} ${ranges.map(([from, to]) => from === to ? `${from}` : `${from} to ${to}`).join(", ")}`;
+  private static formatHandoverSpans(ranges: readonly HandoverRange[], noun: string): string {
+    const single = ranges.length === 1 && ranges[0]?.from === ranges[0]?.to;
+    return `${noun}${single ? String.empty : "s"} ${ranges.map(t => t.from === t.to ? `${t.from}` : `${t.from} to ${t.to}`).join(", ")}`;
   }
 
   public static formatHandoverSummary(summary: string): string {
@@ -1273,13 +1274,21 @@ export class Resources {
 
   public static formatFailureKind(error: unknown): string {
     if (!(error instanceof Error))
-      return typeof error;
-    const code = (error as NodeJS.ErrnoException).code;
-    return Object.isString(code) ? `${error.name} ${code}` : error.name;
+      return Resources.typeNameOf(error);
+    const code = Resources.errorCodeOf(error);
+    return Object.isNull(code) ? error.name : `${error.name} ${code}`;
   }
 
   public static formatFailureReason(error: unknown): string {
-    return error instanceof Error ? (error as NodeJS.ErrnoException).code ?? error.name : typeof error;
+    return error instanceof Error ? Resources.errorCodeOf(error) ?? error.name : Resources.typeNameOf(error);
+  }
+
+  private static errorCodeOf(error: Error): string | null {
+    return "code" in error && Object.isString(error.code) ? error.code : null;
+  }
+
+  private static typeNameOf(value: unknown): string {
+    return Object.entries(Resources.typeChecks).find(([, isType]) => isType(value))?.[0] ?? "object";
   }
 
   public static formatLoggedProvider(providerId: string | null): string {
@@ -2055,6 +2064,16 @@ export class Resources {
   public static formatUnknownMethod(method: string): string {
     return `The method "${method}" is not part of the protocol.`;
   }
+
+  private static readonly typeChecks: Readonly<Record<string, (value: unknown) => boolean>> = {
+    undefined: Object.isUndefined,
+    string: Object.isString,
+    number: Object.isNumber,
+    bigint: Object.isBigInt,
+    boolean: Object.isBoolean,
+    symbol: Object.isSymbol,
+    function: Object.isFunction
+  };
 
   private static readonly replyPredicates: Readonly<Record<ReplyPanel, string>> = {
     [ReplyPanel.Activity]: Resources.activityReplyPredicate,

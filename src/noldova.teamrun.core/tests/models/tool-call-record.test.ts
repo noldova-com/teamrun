@@ -8,14 +8,14 @@
 
 import { ArgumentException } from "@noldova/context.exceptions";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ToolCallRecord } from "@noldova/teamrun.core";
+import { ToolCallImage, ToolCallPermission, ToolCallRecord } from "@noldova/teamrun.core";
 
 @TestClass
 export class ToolCallRecordTests {
   @TestMethod
   public holdsACallsFieldsImageAndPermissionForItsStep(): void {
-    const record = new ToolCallRecord("browser_screenshot", {}, { page: { url: "https://shop.test/cart", title: "Cart" } }, { data: "AA==", mediaType: "image/png" },
-      { id: "request-1", risk: "Low", decision: "AllowedOnce", isRemembered: true });
+    const record = new ToolCallRecord("browser_screenshot", {}, { page: { url: "https://shop.test/cart", title: "Cart" } }, new ToolCallImage("AA==", "image/png"),
+      new ToolCallPermission("request-1", "Low", "AllowedOnce", true));
     const plain = new ToolCallRecord("browser_console", {}, {});
 
     Assert.areEqual(JSON.stringify(["browser_screenshot", {}, { page: { url: "https://shop.test/cart", title: "Cart" } }, { data: "AA==", mediaType: "image/png" },

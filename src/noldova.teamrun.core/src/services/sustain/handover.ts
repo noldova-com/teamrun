@@ -10,7 +10,9 @@ import "@noldova/context.core";
 import type { MessageAttachment } from "@noldova/teamrun.protocol";
 
 import { Resources } from "../../resources.js";
+import { HandoverEnds } from "./handover-ends.js";
 import { HandoverHistory } from "./handover-history.js";
+import { HandoverRange } from "./handover-range.js";
 import type { HandoverSummary } from "./handover-summary.js";
 import type { HandoverTurn } from "./handover-turn.js";
 
@@ -72,9 +74,9 @@ export class Handover {
     const size = Handover.bytesOf(result);
     if (size <= Resources.handoverResultBytes)
       return result;
-    const [start, end] = Handover.endsOf(result, Resources.handoverResultBytes / 2);
-    const left = size - Handover.bytesOf(start) - Handover.bytesOf(end);
-    return [start, Resources.formatHandoverCut(left, sequence), end].join(Resources.lineSeparator);
+    const ends = Handover.endsOf(result, Resources.handoverResultBytes / 2);
+    const left = size - Handover.bytesOf(ends.start) - Handover.bytesOf(ends.end);
+    return [ends.start, Resources.formatHandoverCut(left, sequence), ends.end].join(Resources.lineSeparator);
   }
 
   public static bytesOf(text: string): number {
@@ -105,15 +107,15 @@ export class Handover {
     const half = Math.floor((bytes - Handover.bytesOf(marker) - 2 * Handover.bytesOf(Resources.lineSeparator)) / 2);
     if (half <= 0)
       return String.empty;
-    const [start, end] = Handover.endsOf(text, half);
-    return [start, Resources.formatHandoverSummaryCut(size - Handover.bytesOf(start) - Handover.bytesOf(end)), end].join(Resources.lineSeparator);
+    const ends = Handover.endsOf(text, half);
+    return [ends.start, Resources.formatHandoverSummaryCut(size - Handover.bytesOf(ends.start) - Handover.bytesOf(ends.end)), ends.end].join(Resources.lineSeparator);
   }
 
-  private static endsOf(text: string, half: number): readonly [string, string] {
+  private static endsOf(text: string, half: number): HandoverEnds {
     const characters = [...text];
     const start = characters.slice(0, Handover.countOf(characters, half)).join(String.empty);
     const end = characters.slice(characters.length - Handover.countOf(characters.toReversed(), half)).join(String.empty);
-    return [start, end];
+    return new HandoverEnds(start, end);
   }
 
   private static sizeOf(used: number, line: string): number {
@@ -133,7 +135,7 @@ export class Handover {
   }
 
   private static summaryLineOf(turns: readonly HandoverTurn[], covered: ReadonlySet<number>, summary: HandoverSummary | null): string[] {
-    const bounds = Handover.rangesOf(turns, index => covered.has(index)).flat();
+    const bounds = Handover.rangesOf(turns, index => covered.has(index)).flatMap(t => [t.from, t.to]);
     return Object.isNull(summary) || Object.isNull(summary.author) || bounds.length === 0 ? []
       : [Resources.formatHandoverCarriedSummary(summary.author, summary.isCompaction, Math.min(...bounds), Math.max(...bounds))];
   }
@@ -144,7 +146,7 @@ export class Handover {
   }
 
   private static leftOutOf(chatId: string, turns: readonly HandoverTurn[], kept: ReadonlySet<number>): string {
-    const ranges = Handover.rangesOf(turns, index => !kept.has(index)).map(([from, to]) => from === to ? `${from}` : Resources.formatHandoverRange(from, to));
+    const ranges = Handover.rangesOf(turns, index => !kept.has(index)).map(t => t.from === t.to ? `${t.from}` : Resources.formatHandoverRange(t.from, t.to));
     return ranges.length === 0 ? String.empty : Resources.formatHandoverLeftOut(ranges, chatId);
   }
 
@@ -153,15 +155,15 @@ export class Handover {
     return Resources.formatHandoverCarriedWhole(Handover.rangesOf(turns, carried), chosen.some(t => t.tools), chosen.filter(t => t.cut).map(t => t.sequence));
   }
 
-  private static rangesOf(turns: readonly HandoverTurn[], chosen: (index: number) => boolean): (readonly [number, number])[] {
-    const ranges: (readonly [number, number])[] = [];
+  private static rangesOf(turns: readonly HandoverTurn[], chosen: (index: number) => boolean): HandoverRange[] {
+    const ranges: HandoverRange[] = [];
     let from: number | null = null;
     for (const [index, turn] of turns.entries()) {
       if (!chosen(index))
         continue;
       from ??= turn.sequence;
       if (index === turns.length - 1 || !chosen(index + 1)) {
-        ranges.push([from, turn.sequence]);
+        ranges.push(new HandoverRange(from, turn.sequence));
         from = null;
       }
     }

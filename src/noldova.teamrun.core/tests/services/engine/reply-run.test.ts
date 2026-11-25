@@ -14,7 +14,7 @@ import { ServiceException } from "@noldova/teamrun.services";
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ActiveRun, ApprovalAsk, ConversationEngine, HandoverNote, type ITurnListener, PermissionAsk, QuestionAsk, ReplyCheckpoints, ReplyRun, Resources,
-  SharedMcpFailure, SharedMcpFailureKind, TaskEnd, TaskStart, ToolCallRecord, TurnDetail, TurnOutcome, TurnRequest, TurnStart, TurnSteer,
+  SharedMcpFailure, SharedMcpFailureKind, TaskEnd, TaskStart, ToolCallPermission, ToolCallRecord, TurnDetail, TurnOutcome, TurnRequest, TurnStart, TurnSteer,
   TurnWake, WakeTurn, WorkFolder } from "@noldova/teamrun.core";
 import { Approval, ApprovalDecideParams, ApprovalKind, ApprovalOption, ApprovalOutcome, ApprovalQuestion, ApprovalScope, ApprovalStatus, BackgroundTaskStatus,
   ContextUsage, ConversationIdParams, DetailKind, ErrorCode, EventName, Harness, Message, MessageAuthor, MessageDetail, MessageIdParams, MessageSendParams,
@@ -1241,7 +1241,7 @@ export class ReplyRunTests {
     return ReplyRunTests.runAsync(async (host, tools, alice) => {
       const click = (element: string): { servedTool: string; servedInput: { element: string } } => ({ servedTool: "browser_click", servedInput: { element } });
       const record = (element: string, id: string): ToolCallRecord =>
-        new ToolCallRecord("browser_click", { element }, {}, null, { id, risk: "Low", decision: "AllowedOnce", isRemembered: false });
+        new ToolCallRecord("browser_click", { element }, {}, null, new ToolCallPermission(id, "Low", "AllowedOnce", false));
       host.adapter.steps = [
         new TurnDetail(DetailKind.Note, "Click Search", click("Search"), "c1"),
         new TurnDetail(DetailKind.Note, "Click Next", click("Next"), "c2"),
