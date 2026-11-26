@@ -7,7 +7,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, appendFileSync, writeFileSync, openSync, writeSync, fsyncSync, closeSync, unlinkSync } from "node:fs";
+import { readFileSync, mkdirSync, appendFileSync, writeFileSync, openSync, writeSync, fsyncSync, closeSync, unlinkSync } from "node:fs";
 import { cpus, freemem, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -101,5 +101,6 @@ test.on("exit", async code => {
   await sampling;
   session?.stdin.end();
   appendFileSync(log, `end ${new Date().toISOString()} code=${code}\n`);
+  process.stdout.write("PROBE-SAMPLES" + String.fromCharCode(10) + readFileSync(log, "utf8"));
   process.exit(code ?? 1);
 });
