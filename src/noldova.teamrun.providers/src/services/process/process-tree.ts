@@ -24,6 +24,7 @@ import { Resources } from "../../resources.js";
 import type { CommandRunner } from "./command-runner.js";
 import { ContextProcessTree } from "./context-process-tree.js";
 import { StopSession } from "./stop-session.js";
+import { ProbeLog } from "./probe-log.js";
 
 export class ProcessTree implements IProcessTree, IOrphanSweep {
   private readonly platform: string;
@@ -55,7 +56,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     this.contextTree = contextTree;
   }
 
-  public async endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
+  public endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
+    return ProbeLog.timed(`endTree ${String(processId)}`, () => this.endTreeCore(processId, startedBy, ancestorId));
+  }
+
+  private async endTreeCore(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
     const windows = this.platform === Resources.windowsPlatform;
     const stop = new StopSession(this.session);
     const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
@@ -70,7 +75,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     return true;
   }
 
-  public async endOwnTree(processId: number, startedBy: number): Promise<boolean> {
+  public endOwnTree(processId: number, startedBy: number): Promise<boolean> {
+    return ProbeLog.timed(`endOwnTree ${String(processId)}`, () => this.endOwnTreeCore(processId, startedBy));
+  }
+
+  private async endOwnTreeCore(processId: number, startedBy: number): Promise<boolean> {
     const root = await this.rootOf(processId);
     if (Object.isUndefined(root) || !(root.startTime <= startedBy))
       return false;
@@ -85,7 +94,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
       await this.contextTree.endDescendantsAsync(root, this.endOptions()).catch((error: Error) => this.endFailed(processId, error));
   }
 
-  public async endLeftovers(processId: number, launched: number, exited: number): Promise<void> {
+  public endLeftovers(processId: number, launched: number, exited: number): Promise<void> {
+    return ProbeLog.timed(`endLeftovers ${String(processId)}`, () => this.endLeftoversCore(processId, launched, exited));
+  }
+
+  private async endLeftoversCore(processId: number, launched: number, exited: number): Promise<void> {
     if (this.platform === Resources.windowsPlatform) {
       const stop = new StopSession(this.session);
       const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
@@ -240,10 +253,11 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     };
     const session = stop.session;
     const limit = Math.min(Resources.powershellSessionAnswerLimit, Math.floor(this.timeout / 2));
-    const stdout = windows && !Object.isNull(session) ? await session.run(script, limit).catch(async () => {
+    const kind = endScript === null ? "list" : "end";
+    const stdout = windows && !Object.isNull(session) ? await ProbeLog.timed(`session ${kind} limit=${String(limit)}`, () => session.run(script, limit)).catch(async () => {
       stop.leave();
-      return fresh(this.timeout - limit);
-    }) : await fresh(this.timeout);
+      return ProbeLog.timed(`fresh-after-session ${kind} limit=${String(this.timeout - limit)}`, () => fresh(this.timeout - limit));
+    }) : await ProbeLog.timed(`fresh ${kind} limit=${String(this.timeout)}`, () => fresh(this.timeout));
     return new Map([...stdout.matchAll(Resources.processParentPattern)]
       .map(t => [Number(t[1]), new ProcessListRow(Number(t[2]), windows ? Number(t[3]) : Date.parse(String(t[3])))]));
   }
