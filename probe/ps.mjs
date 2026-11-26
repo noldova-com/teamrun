@@ -12,7 +12,7 @@ const list = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f 
 const full = process.env["PSModulePath"] ?? "";
 const ci = full.split(";").filter(t => !/[\\/]PowerShell[\\/]/i.test(t)).join(";");
 const system = `${process.env["SystemRoot"] ?? "C:\\Windows"}\\system32\\WindowsPowerShell\\v1.0\\Modules`;
-const mmi = "$session = [Microsoft.Management.Infrastructure.CimSession]::Create($null); try { foreach ($p in $session.QueryInstances('root/cimv2', 'WQL', 'SELECT ProcessId, ParentProcessId, CreationDate FROM Win32_Process')) { $c = $p.CimInstanceProperties['CreationDate'].Value; '{0} {1} {2}' -f $p.CimInstanceProperties['ProcessId'].Value, $p.CimInstanceProperties['ParentProcessId'].Value, $(if ($c) { ([DateTimeOffset]$c).ToUnixTimeMilliseconds() } else { 'unknown' }) } } finally { $session.Dispose() }";
+const mmi = "$session = [Microsoft.Management.Infrastructure.CimSession]::Create([NullString]::Value); try { foreach ($p in $session.QueryInstances('root/cimv2', 'WQL', 'SELECT ProcessId, ParentProcessId, CreationDate FROM Win32_Process')) { $c = $p.CimInstanceProperties['CreationDate'].Value; '{0} {1} {2}' -f $p.CimInstanceProperties['ProcessId'].Value, $p.CimInstanceProperties['ParentProcessId'].Value, $(if ($c) { ([DateTimeOffset]$c).ToUnixTimeMilliseconds() } else { 'unknown' }) } } finally { $session.Dispose() }";
 const variants = [
   ["exit-ci", ci, "exit"],
   ["list-ci", ci, list],
