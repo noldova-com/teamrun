@@ -101,21 +101,31 @@ export class ProcessTreeTests {
       JSON.stringify(runner.commands.slice(1).map(t => t.arguments.at(-1)!.slice(0, t.arguments.at(-1)!.indexOf("for (")))));
   }
 
+  @Category("ProcessListing")
   @TestMethod
-  public async endsATreeItStartedUnderAnyParentButNotAProcessThatStartedLaterOrIsGone(): Promise<void> {
-    const start = Date.now() - 60_000;
-    const [own, child] = [1001, 1002];
-    const listing = [[ProcessTreeTests.ANCESTOR, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]];
-    const cases: readonly (readonly [number, number])[] = [[own, start + 30_000], [own, start + 5_000], [ProcessTreeTests.GONE, start + 30_000]];
-    const results: [boolean, boolean][] = [];
-    for (const [processId, startedBy] of cases) {
-      const runner = new ListingCommandRunner([ProcessTreeTests.listing("win32", listing), ProcessTreeTests.listing("win32", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
-      const ended = await ProcessTreeTests.tree("win32", runner).endOwnTree(processId, startedBy);
-      results.push([ended, runner.commands.slice(1).some(t => t.arguments.at(-1)?.startsWith(`$ids = @(${String(own)}, ${String(child)}); `) === true)]);
-    }
+  @TestData("linux")
+  @TestData("win32")
+  public async endsATreeItStartedButNotAProcessThatStartedLaterIsGoneOrHasNoId(platform: string): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    FakeTaskTree.start(path, 2);
+    try {
+      await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get both processes.");
+      const [root = 0, child = 0] = FakeTaskTree.read(path);
+      const tree = ProcessTreeTests.contextTree(platform, Resources.processListTimeout, 100, null);
 
-    Assert.areEqual(JSON.stringify([[true, true], [false, false], [false, false]]), JSON.stringify(results));
+      const refused = [await tree.endOwnTree(root, Date.now() - 60_000), await tree.endOwnTree(ProcessTreeTests.GONE, Date.now()), await tree.endOwnTree(0, Date.now())];
+      const kept = FakeTaskTree.runs(root);
+      const ended = await tree.endOwnTree(root, Date.now());
+      await Wait.until(() => !FakeTaskTree.runs(root) && !FakeTaskTree.runs(child), "The tree still ran.");
+
+      Assert.areEqual(JSON.stringify([[false, false, false], true, true]), JSON.stringify([refused, kept, ended]));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
+
 
   @TestMethod
   public async stopsEndingTheTreeOnWindowsWhenARoundCannotRun(): Promise<void> {
@@ -253,50 +263,74 @@ export class ProcessTreeTests {
     Assert.areEqual(JSON.stringify([`${String(root)} SIGSTOP`, `${String(root)} SIGTERM`, `${String(root)} SIGCONT`]), JSON.stringify(signals.sent));
   }
 
+  @Category("ProcessListing")
   @TestMethod
-  public async endsEveryProcessUnderARunningProcessOutsideWindowsButThatProcessItself(): Promise<void> {
-    const [root, child, grandchild] = [2001, 2002, 2003];
-    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const listing = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000], [child, root, start + 20_000],
-      [grandchild, child, start + 30_000]]);
-    const runner = new ListingCommandRunner([listing, listing,
-      ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [root, ProcessTreeTests.ANCESTOR, start + 10_000]])]);
-    const signals = ProcessTreeTests.signals([root, child, grandchild]);
+  public async endsEveryProcessUnderARunningProcessButThatProcessItself(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    FakeTaskTree.start(path, 3);
+    try {
+      await Wait.until(() => FakeTaskTree.read(path).length === 3, "The task tree did not get its three processes.");
+      const [root = 0, child = 0, grandchild = 0] = FakeTaskTree.read(path);
 
-    await ProcessTreeTests.tree("linux", runner, signals.kill).endDescendants(root);
+      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, null).endDescendants(root);
+      await Wait.until(() => !FakeTaskTree.runs(child) && !FakeTaskTree.runs(grandchild), "A descendant still ran.");
 
-    Assert.areEqual(JSON.stringify([`${String(child)} SIGSTOP`, `${String(grandchild)} SIGSTOP`, `${String(child)} SIGTERM`, `${String(grandchild)} SIGTERM`,
-      `${String(child)} SIGCONT`, `${String(grandchild)} SIGCONT`]), JSON.stringify(signals.sent));
+      Assert.isTrue(FakeTaskTree.runs(root));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
 
+  @Category("ProcessListing")
   @TestMethod
-  public async endsATreeItStartedUnderAnyParentOutsideWindows(): Promise<void> {
-    const [own, child] = [2001, 2002];
-    const start = Math.floor(Date.now() / 1000) * 1000 - 60_000;
-    const listing = ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start], [own, ProcessTreeTests.GONE, start + 10_000], [child, own, start + 20_000]]);
-    const runner = new ListingCommandRunner([listing, listing, ProcessTreeTests.listing("linux", [[ProcessTreeTests.ANCESTOR, 1, start]])]);
-    const signals = ProcessTreeTests.signals([own, child]);
+  public async endsNothingUnderAProcessThatIsNotRunningOrThatRunsOnWindows(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    FakeTaskTree.start(path, 2);
+    try {
+      await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get both processes.");
+      const [root = 0, child = 0] = FakeTaskTree.read(path);
+      const log = new RecordingLog();
 
-    const ended = await ProcessTreeTests.tree("linux", runner, signals.kill).endOwnTree(own, start + 30_000);
-    const unlisted = await ProcessTreeTests.tree("linux", new ListingCommandRunner([null]), signals.kill).endOwnTree(own, start + 30_000);
+      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, log).endDescendants(ProcessTreeTests.GONE);
+      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, log).endDescendants(0);
+      await ProcessTreeTests.contextTree("win32", Resources.processListTimeout, 100, log).endDescendants(root);
 
-    Assert.areEqual(JSON.stringify([true, true, true, false]), JSON.stringify([ended, signals.sent.includes(`${String(own)} SIGTERM`),
-      signals.sent.includes(`${String(child)} SIGTERM`), unlisted]));
+      Assert.areEqual(JSON.stringify([true, true, 0]), JSON.stringify([FakeTaskTree.runs(root), FakeTaskTree.runs(child), log.lines.length]));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
 
+  @Category("ProcessListing")
   @TestMethod
-  @TestData("linux", true)
-  @TestData("linux", false)
-  @TestData("win32", true)
-  public async endsNothingUnderAProcessThatIsNotListedWhoseProcessesCannotBeListedOrThatRunsOnWindows(platform: string, listed: boolean): Promise<void> {
-    const runner = new ListingCommandRunner([listed ? "" : null]);
-    const signals = ProcessTreeTests.signals([]);
+  public async logsAnEndThatOutlastsItsLimitReportsItAndStillEndsTheTree(): Promise<void> {
+    using directory = new TemporaryDirectory();
+    const path = directory.resolve("tree.txt");
+    FakeTaskTree.start(path, 3);
+    try {
+      await Wait.until(() => FakeTaskTree.read(path).length === 3, "The task tree did not get its three processes.");
+      const [root = 0, child = 0, grandchild = 0] = FakeTaskTree.read(path);
+      const log = new RecordingLog();
+      const tree = ProcessTreeTests.contextTree("linux", 0, 0, log);
 
-    await ProcessTreeTests.tree(platform, runner, signals.kill).endDescendants(2001);
+      await tree.endDescendants(root);
+      await Wait.until(() => !FakeTaskTree.runs(child) && !FakeTaskTree.runs(grandchild), "A descendant still ran.");
+      const kept = FakeTaskTree.runs(root);
+      const ended = await tree.endOwnTree(root, Date.now());
+      await Wait.until(() => !FakeTaskTree.runs(root), "The root still ran.");
 
-    Assert.areEqual(platform === "win32" ? 0 : 1, runner.calls);
-    Assert.areEqual(0, signals.sent.length);
+      Assert.areEqual(JSON.stringify([true, false, [Resources.formatTreeEndFailed(root, "ProcessTreeEndException"),
+        Resources.formatTreeEndFailed(root, "ProcessTreeEndException")]]), JSON.stringify([kept, ended, log.lines]));
+    }
+    finally {
+      FakeTaskTree.endAll(path);
+    }
   }
+
 
   @TestMethod
   public async killsWhatAnExitedProcessLeftInItsGroupOutsideWindowsWhenItMayHaveStartedSinceThatProcessThoughPsTellsItUpToTwoSecondsEarlyEvenAfterItExited()
@@ -704,6 +738,10 @@ export class ProcessTreeTests {
       const thread = threads[Number(path.split("/")[2])];
       return `PATH=/usr/bin\0${Object.isUndefined(thread) ? "" : `CODEX_THREAD_ID=${thread}\0`}HOME=/home/person`;
     });
+  }
+
+  private static contextTree(platform: string, timeout: number, grace: number, log: RecordingLog | null): ProcessTree {
+    return new ProcessTree(platform, new ListingCommandRunner([null]), process.env, timeout, new NodeTimer(), grace, undefined, null, undefined, log);
   }
 
   private static signals(running: readonly number[]): { kill: (processId: number, signal: NodeJS.Signals | 0) => void; sent: string[] } {

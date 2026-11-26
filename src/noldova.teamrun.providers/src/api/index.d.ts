@@ -1091,19 +1091,21 @@ export interface IProcessTree {
   endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean>;
 
   /**
-   * Ends a process TeamRun started and has not seen exit, and every process under it, as {@link endTree} ends a tree, confirming only that the
-   * process started no later than `startedBy`, since a process TeamRun still holds keeps its id.
+   * Ends a process TeamRun started and has not seen exit, and every process under it, through context's `ProcessTree.endAsync`, confirming only
+   * that the process started no later than `startedBy`, since a process TeamRun still holds keeps its id. Outside Windows the tree has the
+   * grace to end after its `SIGTERM`; on Windows, which has no polite request, it ends at once.
    * @param processId The process.
    * @param startedBy The time, in milliseconds since the epoch, by which the process had started.
-   * @returns `true` once it has ended the tree, as {@link endTree} returns it; `false`, ending nothing, when the process isn't listed or the processes
-   * can't be listed.
+   * @returns `true` once the tree is gone; `false`, ending nothing, when the process isn't running, started later or can't be read, and `false`
+   * when context's end fails, which it logs, so the caller stops the process itself.
    */
   endOwnTree(processId: number, startedBy: number): Promise<boolean>;
 
   /**
-   * Ends every process under a running process, as {@link endTree} ends a tree, but leaves that process itself running. On Windows it does
-   * nothing, since {@link endLeftovers} finds those processes through their parent ids once the process has exited, so a stop lists once there.
-   * @param processId The running process whose descendants end; nothing ends when it isn't listed or the listing fails.
+   * Ends every process under a running process, through context's `ProcessTree.endDescendantsAsync`, but leaves that process itself running. On
+   * Windows it does nothing, since {@link endLeftovers} finds those processes through their parent ids once the process has exited, so a stop
+   * lists once there.
+   * @param processId The running process whose descendants end; nothing ends when it isn't running or can't be read, and a failed end is logged.
    */
   endDescendants(processId: number): Promise<void>;
 
@@ -6320,6 +6322,13 @@ export declare class Resources {
   public static formatTreeEndRoundFailed(round: number, failure: string): string;
 
   /**
+   * The line a tree's end through context's process tree writes to its log when that end fails, so the tree may still run.
+   * @param processId The tree's root.
+   * @param failure The failure's type.
+   */
+  public static formatTreeEndFailed(processId: number, failure: string): string;
+
+  /**
    * The line a Windows tree's end writes to its log when a process of the tree still shows after its last round.
    * @param processes Each process still listed.
    */
@@ -10986,9 +10995,10 @@ export declare class ProcessTree implements IProcessTree, IOrphanSweep {
    * @param platform The platform, as `process.platform`.
    * @param runner Runs the listing.
    * @param environment The listing's environment.
-   * @param timeout How long a listing may take, in milliseconds.
+   * @param timeout How long a listing may take, and how long context's end of a tree may take once its lister is ready, in milliseconds.
    * @param timer Waits out the grace.
-   * @param grace How long the tree has to end after its `SIGTERM`, and what an exited process left after its `SIGKILL`, outside Windows, in milliseconds.
+   * @param grace How long the tree has to end after its `SIGTERM`, and what an exited process left after its `SIGKILL`, outside Windows, in milliseconds;
+   * context's end has the same grace outside Windows.
    * @param kill Sends a signal to a process outside Windows, or `0` to see whether it still runs, throwing when it can't; `process.kill` by default.
    * @param session Runs the listings and the ends on Windows instead of a new PowerShell for each through the runner; none by default.
    * @param read Reads a process's environment file for `endOrphaned`, throwing when it can't; the file system by default.
