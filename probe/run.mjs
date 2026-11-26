@@ -75,7 +75,18 @@ function busy(previous) {
 }
 
 const sampling_on = !process.argv.includes("--no-sampler");
-const passed = process.argv.slice(2).filter(t => t !== "--no-sampler");
+const ciEnvironment = process.argv.includes("--ci-env");
+const passed = process.argv.slice(2).filter(t => t !== "--no-sampler" && t !== "--ci-env");
+const modulePath = process.env["PSModulePath"] ?? "";
+const testEnvironment = { ...process.env, NOLDOVA_SEPARATE_TEST: "angular" };
+if (ciEnvironment) {
+  testEnvironment["PSModulePath"] = modulePath.split(";").filter(t => !/[\\/]PowerShell[\\/]/i.test(t)).join(";");
+  testEnvironment["npm_config_ignore_scripts"] = "true";
+}
+appendFileSync(log, `env PSModulePath=${modulePath}
+env test PSModulePath=${testEnvironment["PSModulePath"] ?? ""}
+env names=${Object.keys(process.env).sort().join(",")}
+`);
 let stopped = !sampling_on;
 async function sample() {
   if (stopped) return;
@@ -100,7 +111,7 @@ async function sample() {
 const sampling = sample();
 const treeLog = join(folder, "tree.log");
 writeFileSync(treeLog, "");
-const test = spawn(process.execPath, ["scripts/test.ts", ...passed], { stdio: "inherit", env: { ...process.env, NOLDOVA_SEPARATE_TEST: "angular", TEAMRUN_PROBE_TREE: treeLog } });
+const test = spawn(process.execPath, ["scripts/test.ts", ...passed], { stdio: "inherit", env: { ...testEnvironment, TEAMRUN_PROBE_TREE: treeLog } });
 test.on("exit", async code => {
   stopped = true;
   await sampling;
