@@ -7,7 +7,7 @@
  */
 
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AcpClient, CurrentAcpClient, InvalidOperationException, NodeProcessStarter, ProcessCommand, ProviderTimings, Resources } from "@noldova/teamrun.providers";
+import { AcpClient, CurrentAcpClient, InvalidOperationException, NodeProcessStarter, ProcessCommand, ProcessTerminator, ProviderTimings, Resources } from "@noldova/teamrun.providers";
 
 @TestClass
 export class CurrentAcpClientTests {
@@ -25,6 +25,7 @@ export class CurrentAcpClientTests {
   }
 
   private static clientOf(): AcpClient {
-    return new AcpClient(new ProcessCommand(process.execPath, []), {}, process.cwd(), new NodeProcessStarter(), new ProviderTimings(5000, 5000, 5000, 5000, 1000, 300, 500, 500, 200, 1, 20));
+    return new AcpClient(new ProcessCommand(process.execPath, []), {}, process.cwd(), new NodeProcessStarter(new ProcessTerminator(process.platform)),
+      new ProviderTimings(5000, 5000, 5000, 5000, 1000, 300, 500, 500, 200, 1, 20));
   }
 }
