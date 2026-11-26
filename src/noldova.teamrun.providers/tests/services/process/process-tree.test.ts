@@ -10,6 +10,7 @@ import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/cont
 import { type ITimer, NodeTimer, TimeoutException } from "@noldova/teamrun.core";
 import { CommandRunner, type IPowershellSession, ListedProcess, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
+import { FailingContextProcessTree } from "../../fixtures/failing-context-process-tree.fixture.js";
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
 import { ListingCommandRunner } from "../../fixtures/listing-command-runner.fixture.js";
@@ -24,6 +25,7 @@ export class ProcessTreeTests {
   private static readonly MONTHS: readonly string[] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   private static readonly GONE: number = 2_147_483_644;
   private static readonly ANCESTOR: number = 999;
+  private static readonly CONTEXT_LIMIT: number = 10_000;
 
   @Category("ProcessListing")
   @TestMethod
@@ -108,11 +110,11 @@ export class ProcessTreeTests {
   public async endsATreeItStartedButNotAProcessThatStartedLaterIsGoneOrHasNoId(platform: string): Promise<void> {
     using directory = new TemporaryDirectory();
     const path = directory.resolve("tree.txt");
-    FakeTaskTree.start(path, 2);
+    FakeTaskTree.start(path, 1, "sequence");
     try {
-      await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get both processes.");
+      await Wait.until(() => FakeTaskTree.read(path).length === 2, "The task tree did not get its process and that one's child.");
       const [root = 0, child = 0] = FakeTaskTree.read(path);
-      const tree = ProcessTreeTests.contextTree(platform, Resources.processListTimeout, 100, null);
+      const tree = ProcessTreeTests.contextTree(platform, null);
 
       const refused = [await tree.endOwnTree(root, Date.now() - 60_000), await tree.endOwnTree(ProcessTreeTests.GONE, Date.now()), await tree.endOwnTree(0, Date.now())];
       const kept = FakeTaskTree.runs(root);
@@ -273,7 +275,7 @@ export class ProcessTreeTests {
       await Wait.until(() => FakeTaskTree.read(path).length === 3, "The task tree did not get its three processes.");
       const [root = 0, child = 0, grandchild = 0] = FakeTaskTree.read(path);
 
-      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, null).endDescendants(root);
+      await ProcessTreeTests.contextTree("linux", null).endDescendants(root);
       await Wait.until(() => !FakeTaskTree.runs(child) && !FakeTaskTree.runs(grandchild), "A descendant still ran.");
 
       Assert.isTrue(FakeTaskTree.runs(root));
@@ -294,9 +296,9 @@ export class ProcessTreeTests {
       const [root = 0, child = 0] = FakeTaskTree.read(path);
       const log = new RecordingLog();
 
-      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, log).endDescendants(ProcessTreeTests.GONE);
-      await ProcessTreeTests.contextTree("linux", Resources.processListTimeout, 100, log).endDescendants(0);
-      await ProcessTreeTests.contextTree("win32", Resources.processListTimeout, 100, log).endDescendants(root);
+      await ProcessTreeTests.contextTree("linux", log).endDescendants(ProcessTreeTests.GONE);
+      await ProcessTreeTests.contextTree("linux", log).endDescendants(0);
+      await ProcessTreeTests.contextTree("win32", log).endDescendants(root);
 
       Assert.areEqual(JSON.stringify([true, true, 0]), JSON.stringify([FakeTaskTree.runs(root), FakeTaskTree.runs(child), log.lines.length]));
     }
@@ -305,30 +307,26 @@ export class ProcessTreeTests {
     }
   }
 
-  @Category("ProcessListing")
   @TestMethod
-  public async logsAnEndThatOutlastsItsLimitReportsItAndStillEndsTheTree(): Promise<void> {
-    using directory = new TemporaryDirectory();
-    const path = directory.resolve("tree.txt");
-    FakeTaskTree.start(path, 3);
-    try {
-      await Wait.until(() => FakeTaskTree.read(path).length === 3, "The task tree did not get its three processes.");
-      const [root = 0, child = 0, grandchild = 0] = FakeTaskTree.read(path);
-      const log = new RecordingLog();
-      const tree = ProcessTreeTests.contextTree("linux", 0, 0, log);
+  @TestData("linux", 100)
+  @TestData("win32", 0)
+  public async logsAReadOrAnEndThroughContextThatFailsAndReadsNoProcessWithoutAnId(platform: string, grace: number): Promise<void> {
+    const log = new RecordingLog();
+    const context = new FailingContextProcessTree(1001);
+    const tree = new ProcessTree(platform, new ListingCommandRunner([null]), process.env, 10_000, new NodeTimer(), 100, undefined, null, undefined, log, context);
 
-      await tree.endDescendants(root);
-      await Wait.until(() => !FakeTaskTree.runs(child) && !FakeTaskTree.runs(grandchild), "A descendant still ran.");
-      const kept = FakeTaskTree.runs(root);
-      const ended = await tree.endOwnTree(root, Date.now());
-      await Wait.until(() => !FakeTaskTree.runs(root), "The root still ran.");
+    const ended = [await tree.endOwnTree(1001, Date.now()), await tree.endOwnTree(1002, Date.now()), await tree.endOwnTree(0, Date.now())];
+    await tree.endDescendants(1001);
+    await tree.endDescendants(1002);
+    await tree.endDescendants(0);
 
-      Assert.areEqual(JSON.stringify([true, false, [Resources.formatTreeEndFailed(root, "ProcessTreeEndException"),
-        Resources.formatTreeEndFailed(root, "ProcessTreeEndException")]]), JSON.stringify([kept, ended, log.lines]));
-    }
-    finally {
-      FakeTaskTree.endAll(path);
-    }
+    const windows = platform === "win32";
+    Assert.areEqual(JSON.stringify([false, false, false]), JSON.stringify(ended));
+    Assert.areEqual(JSON.stringify(windows ? [1001, 1002] : [1001, 1002, 1001, 1002]), JSON.stringify(context.reads));
+    Assert.areEqual(JSON.stringify([`tree 1002 ${String(grace)} 10000`, ...windows ? [] : [`descendants 1002 ${String(grace)} 10000`]]), JSON.stringify(context.ends));
+    Assert.areEqual(JSON.stringify([Resources.formatTreeEndFailed(1001, "ProcessesException"), Resources.formatTreeEndFailed(1002, "ProcessTreeEndException"),
+      ...windows ? [] : [Resources.formatTreeEndFailed(1001, "ProcessesException"), Resources.formatTreeEndFailed(1002, "ProcessTreeEndException")]]),
+      JSON.stringify(log.lines));
   }
 
 
@@ -740,8 +738,8 @@ export class ProcessTreeTests {
     });
   }
 
-  private static contextTree(platform: string, timeout: number, grace: number, log: RecordingLog | null): ProcessTree {
-    return new ProcessTree(platform, new ListingCommandRunner([null]), process.env, timeout, new NodeTimer(), grace, undefined, null, undefined, log);
+  private static contextTree(platform: string, log: RecordingLog | null): ProcessTree {
+    return new ProcessTree(platform, new ListingCommandRunner([null]), process.env, ProcessTreeTests.CONTEXT_LIMIT, new NodeTimer(), 100, undefined, null, undefined, log);
   }
 
   private static signals(running: readonly number[]): { kill: (processId: number, signal: NodeJS.Signals | 0) => void; sent: string[] } {
