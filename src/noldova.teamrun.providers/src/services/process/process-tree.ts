@@ -9,8 +9,10 @@
 import { readFileSync } from "node:fs";
 
 import "@noldova/context.core";
+import { type ProcessIdentity, ProcessTreeEndOptions } from "@noldova/context.processes";
 import type { ILog, ITimer } from "@noldova/teamrun.core";
 
+import type { IContextProcessTree } from "../../interfaces/i-context-process-tree.js";
 import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IPowershellSession } from "../../interfaces/i-powershell-session.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
@@ -20,6 +22,7 @@ import { ProcessCommand } from "../../models/process-command.js";
 import { ProcessListRow } from "../../models/process-list-row.js";
 import { Resources } from "../../resources.js";
 import type { CommandRunner } from "./command-runner.js";
+import { ContextProcessTree } from "./context-process-tree.js";
 import { StopSession } from "./stop-session.js";
 
 export class ProcessTree implements IProcessTree, IOrphanSweep {
@@ -33,10 +36,12 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   private readonly session: IPowershellSession | null;
   private readonly read: (path: string) => string;
   private readonly log: ILog | null;
+  private readonly contextTree: IContextProcessTree;
 
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
     kill: (processId: number, signal: NodeJS.Signals | 0) => void = (processId, signal) => { process.kill(processId, signal); },
-    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding), log: ILog | null = null) {
+    session: IPowershellSession | null = null, read: (path: string) => string = path => readFileSync(path, Resources.utf8Encoding), log: ILog | null = null,
+    contextTree: IContextProcessTree = new ContextProcessTree()) {
     this.platform = platform;
     this.runner = runner;
     this.environment = environment;
@@ -47,6 +52,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     this.session = session;
     this.read = read;
     this.log = log;
+    this.contextTree = contextTree;
   }
 
   public async endTree(processId: number, startedBy: number, ancestorId: number): Promise<boolean> {
@@ -65,26 +71,18 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   }
 
   public async endOwnTree(processId: number, startedBy: number): Promise<boolean> {
-    const stop = new StopSession(this.session);
-    const listing = await this.run(null, Resources.psProcessListArguments, stop).catch(() => null);
-    const start = listing?.get(processId)?.start;
-    if (Object.isNullOrUndefined(listing) || Object.isUndefined(start) || !(start <= startedBy))
+    const root = await this.rootOf(processId);
+    if (Object.isUndefined(root) || !(root.startTime <= startedBy))
       return false;
-    if (this.platform === Resources.windowsPlatform) {
-      await this.endOnWindows(listing, new Map([[processId, start]]), stop);
-      return true;
-    }
-    await this.end(await this.freeze(listing, new Map([[processId, start]])));
-    return true;
+    return this.contextTree.endAsync(root, this.endOptions()).then(() => true, (error: Error) => this.endFailed(processId, error));
   }
 
   public async endDescendants(processId: number): Promise<void> {
     if (this.platform === Resources.windowsPlatform)
       return;
-    const listing = await this.run().catch(() => null);
-    const start = listing?.get(processId)?.start;
-    if (!Object.isNullOrUndefined(listing) && !Object.isUndefined(start))
-      await this.end(await this.freeze(listing, new Map([[processId, start]]), processId));
+    const root = await this.rootOf(processId);
+    if (!Object.isUndefined(root))
+      await this.contextTree.endDescendantsAsync(root, this.endOptions()).catch((error: Error) => this.endFailed(processId, error));
   }
 
   public async endLeftovers(processId: number, launched: number, exited: number): Promise<void> {
@@ -130,6 +128,24 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     return [...found.orphans.keys()];
   }
 
+  private async rootOf(processId: number): Promise<ProcessIdentity | undefined> {
+    if (!(processId > 0))
+      return undefined;
+    return this.contextTree.readAsync(processId).catch((error: Error) => {
+      this.endFailed(processId, error);
+      return undefined;
+    });
+  }
+
+  private endOptions(): ProcessTreeEndOptions {
+    return new ProcessTreeEndOptions(this.platform === Resources.windowsPlatform ? 0 : this.grace, this.timeout);
+  }
+
+  private endFailed(processId: number, error: Error): boolean {
+    this.log?.write(Resources.formatTreeEndFailed(processId, error.name));
+    return false;
+  }
+
   private threadOf(processId: number): string | null {
     try {
       return this.read(Resources.formatProcessEnvironmentPath(processId)).split(Resources.processEnvironmentSeparator)
@@ -171,15 +187,14 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
       await this.timer.delayAsync(Resources.processTreeGracePoll, new AbortController().signal);
   }
 
-  private async freeze(listing: ReadonlyMap<number, ProcessListRow>,
-    known: ReadonlyMap<number, number>, spared: number | null = null): Promise<Map<number, number>> {
+  private async freeze(listing: ReadonlyMap<number, ProcessListRow>, known: ReadonlyMap<number, number>): Promise<Map<number, number>> {
     const frozen = new Map<number, number>();
     const tried = new Map<number, number>();
     let tree = new Map(known);
     let current: ReadonlyMap<number, ProcessListRow> | null = listing;
     for (let round = 0; !Object.isNull(current) && round < Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found = ProcessTree.listed(current, tree).filter(t => t.id !== spared && tried.get(t.id) !== t.start);
+      const found = ProcessTree.listed(current, tree).filter(t => tried.get(t.id) !== t.start);
       if (found.length === 0)
         break;
       for (const listed of found) {

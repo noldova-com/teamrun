@@ -414,7 +414,7 @@ Its Package tests and coverage check fails when a package's build is missing or 
 Each process takes the next test file not yet taken, those with the most tests first, by creating its marker in `_build/test-claims/`, so every file runs once, in one process.
 A file its package lists in `noldova.isolatedTests` instead runs alone, in a process of its own, as [Global mocks](#global-mocks) says: before it takes test files, each of those processes' places runs the next listed file not yet run, until none is left, and the processes skip the listed files, so the listed files share the places' time rather than adding a place of their own; the check then merges the processes' totals, skipped tests and failed tests into `_build/`.
 Such a process loads its one file alone, not every package's test files, so it spends no time finding tests it won't run.
-The tests of a file run one at a time, each within 30 seconds, or 75 seconds for a test in the `ProcessListing` category, which waits on real process listings: two listings of up to 30 seconds each, as a stop on Windows runs, and its setup and grace.
+The tests of a file run one at a time, each within 30 seconds, or 75 seconds for a test in the `ProcessListing` category, which waits on real process listings: two listings of up to 30 seconds each, as a stop on Windows runs, and its setup and grace, or, for a tree ended through context's process tree, its lister's start, which context 0.0.14 waits up to 60 seconds for, and the end, which those tests limit to 10 seconds.
 When one exceeds its limit, its process stops there, counts the tests it took and didn't start as unreached and fails.
 The entry gives a running test its limit in `NOLDOVA_TEST_BUDGET`, and a providers spec checks that the longer limit still covers two listings and the stop grace, so raising the listing timeout alone fails.
 The run fails too when its process doesn't exit within a second of the last test, naming the resources the tests left open, and the check stops a run that doesn't end within 10 minutes, such as one a test blocks without awaiting.
@@ -636,6 +636,14 @@ Only tests set these variables; unset, or set to anything but a positive whole n
 | Variable | What it sets |
 |---|---|
 | `TEAMRUN_GIT_TIMEOUT_MS` | Milliseconds a reply's Git check of the ignored changes may run, 30,000 otherwise; `git-ignores.test.ts` sets it to show that a Git that never answers ignores nothing. |
+
+### Timing parameters
+
+These parameters take the operation that sets a timing no product boundary controls, defaulting to the real one, so a test reaches each of its paths without waiting it out; no production caller passes them.
+
+| Parameter | Why no product boundary controls it |
+|---|---|
+| `ProcessTree`'s `contextTree`, in `src/noldova.teamrun.providers/src/services/process/process-tree.ts` | Whether context's process lister is ready in time, and whether a tree outlasts the end's limit, depend on how fast the machine starts and lists processes. context offers no way to make a read or an end fail, so `process-tree.test.ts` passes one whose read and ends throw, to show that each failure is logged and the kill falls back. |
 
 ### Global mocks
 

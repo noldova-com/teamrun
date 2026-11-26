@@ -63,6 +63,7 @@ export type { IClaudePlanStep } from "../interfaces/i-claude-plan-step.js";
 export type { IClaudeQueryFactory } from "../interfaces/i-claude-query-factory.js";
 export type { IClaudeQuery } from "../interfaces/i-claude-query.js";
 export type { IClaudeSubAgent } from "../interfaces/i-claude-sub-agent.js";
+export type { IContextProcessTree } from "../interfaces/i-context-process-tree.js";
 export type { IExitHandler } from "../interfaces/i-exit-handler.js";
 export type { INotificationHandler } from "../interfaces/i-notification-handler.js";
 export type { IOrphanSweep } from "../interfaces/i-orphan-sweep.js";

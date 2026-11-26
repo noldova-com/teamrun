@@ -3611,6 +3611,10 @@ export class Resources {
     return `Ending a process tree on Windows stopped at round ${String(round)}, whose script failed (${failure}); the tree may still run.`;
   }
 
+  public static formatTreeEndFailed(processId: number, failure: string): string {
+    return `Ending the process tree of ${String(processId)} failed (${failure}); the tree may still run.`;
+  }
+
   public static formatTreeLeftListed(processes: readonly ListedProcess[]): string {
     return `Ending a process tree on Windows ran its ${String(Resources.processTreeFreezeRounds)} rounds and still listed ` +
       `${processes.map(t => `${String(t.id)} (started ${new Date(t.start).toISOString()})`).join(", ")}.`;

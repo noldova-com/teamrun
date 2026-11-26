@@ -33,9 +33,11 @@
     "@noldova/teamrun.protocol": "__VERSION__"
   },
   "peerDependencies": {
-    "@noldova/context.core": ">=0.0.12 <0.1.0",
-    "@noldova/context.exceptions": ">=0.0.12 <0.1.0",
-    "@noldova/context.json": ">=0.0.12 <0.1.0"
+    "@noldova/context.collections": ">=0.0.14 <0.1.0",
+    "@noldova/context.core": ">=0.0.14 <0.1.0",
+    "@noldova/context.exceptions": ">=0.0.14 <0.1.0",
+    "@noldova/context.json": ">=0.0.14 <0.1.0",
+    "@noldova/context.processes": ">=0.0.14 <0.1.0"
   },
   "noldova": {
     "isolatedTests": [
