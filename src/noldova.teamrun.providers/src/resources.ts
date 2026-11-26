@@ -7,7 +7,7 @@
  */
 
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
-import type { JsonObject, JsonValue } from "@noldova/context.json";
+import type { JsonObject } from "@noldova/context.json";
 import { Resources as CoreResources } from "@noldova/teamrun.core";
 import { BackgroundTaskStatus, PlanStepStatus, Resources as ProtocolResources, SubAgentStatus } from "@noldova/teamrun.protocol";
 
