@@ -34,6 +34,7 @@
     "start": "node scripts/app.ts start",
     "test": "node scripts/test.ts",
     "probe:test": "node probe/run.mjs",
+    "probe:db": "node probe/db.mjs",
     "test:angular": "node scripts/test.ts angular",
     "test:docs": "npm run docs:test --workspace src/noldova.teamrun.docs",
     "test:e2e": "node node_modules/playwright/cli.js test --config src/noldova.teamrun/tests/e2e/playwright.config.ts"
