@@ -76,6 +76,22 @@ jobs:
           node-version: '26.13.1'
           package-manager-cache: false
 
+      - name: Move the checkout to a Dev Drive on Windows arm64
+        if: matrix.target == 'Windows arm64'
+        timeout-minutes: 5
+        env:
+          MSYS_NO_PATHCONV: '1'
+        run: |
+          vhd="$RUNNER_TEMP\dev-drive.vhdx"
+          script="$RUNNER_TEMP\dev-drive.txt"
+          printf '%s\r\n' "create vdisk file=\"$vhd\" maximum=40960 type=expandable" "select vdisk file=\"$vhd\"" 'attach vdisk' 'convert gpt' 'create partition primary' 'assign letter=R' > "$script"
+          diskpart /s "$script"
+          echo Y | format.com R: /DevDrv /Q /V:DevDrive /Y
+          fsutil devdrv query R:
+          cp -a "$GITHUB_WORKSPACE" /r/teamrun
+          mkdir -p /r/tmp /r/npm-cache
+          printf '%s\n' 'APP_ROOT=R:\teamrun' 'TEMP=R:\tmp' 'TMP=R:\tmp' 'npm_config_cache=R:\npm-cache' >> "$GITHUB_ENV"
+
       - name: Verify the toolchain
         run: |
           node --version
@@ -84,14 +100,17 @@ jobs:
           test "$(npm --version)" = 11.20.0
 
       - name: Install the dependencies
+        working-directory: ${{ env.APP_ROOT || github.workspace }}
         timeout-minutes: 8
         run: npm run install:root
 
       - name: Build
+        working-directory: ${{ env.APP_ROOT || github.workspace }}
         timeout-minutes: 6
         run: npm run build
 
       - name: Test
+        working-directory: ${{ env.APP_ROOT || github.workspace }}
         id: test
         timeout-minutes: 12
         run: npm run test:angular
@@ -103,20 +122,22 @@ jobs:
         with:
           name: angular-pre-bundle-${{ matrix.target }}-${{ github.run_attempt }}
           path: |
-            node_modules/.vite
-            _build/angular-tests.log
-            _build/angular-pre-bundle.json
-            _build/angular-spec-transforms
-            src/.vitest/attachments
+            ${{ env.APP_ROOT || github.workspace }}/node_modules/.vite
+            ${{ env.APP_ROOT || github.workspace }}/_build/angular-tests.log
+            ${{ env.APP_ROOT || github.workspace }}/_build/angular-pre-bundle.json
+            ${{ env.APP_ROOT || github.workspace }}/_build/angular-spec-transforms
+            ${{ env.APP_ROOT || github.workspace }}/src/.vitest/attachments
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
 
       - name: Install the app
+        working-directory: ${{ env.APP_ROOT || github.workspace }}
         timeout-minutes: 10
         run: npm run install:app
 
       - name: Build the app
+        working-directory: ${{ env.APP_ROOT || github.workspace }}
         timeout-minutes: 10
         run: npm run build:app
 
