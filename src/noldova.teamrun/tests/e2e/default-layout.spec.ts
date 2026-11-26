@@ -44,8 +44,10 @@ interface IRowPlace {
   readonly rowLeft: number;
   readonly rowRight: number;
   readonly overflowLeft: number | null;
+  readonly backgroundRight: number;
   readonly pagesLeft: number;
   readonly pagesRight: number;
+  readonly pagesWidth: number;
   readonly pages: string;
   readonly git: string;
 }
@@ -55,17 +57,20 @@ async function rightRowAsync(page: Page): Promise<IRowPlace> {
     const row = group.querySelector(".nol-tab-group-scroller")?.getBoundingClientRect();
     const overflow = group.querySelector("button[aria-label='Show all tabs']");
     const tab = (key: string): Element | null => group.querySelector(`nol-tab[data-tab-key='${key}']`);
+    const background = tab("view/teamrun.backgroundTasks");
     const pages = tab("view/teamrun.pages");
     const git = tab("view/git.view");
-    if (Object.isUndefined(row) || Object.isNull(pages) || Object.isNull(git))
-      throw new Error("The right dock's upper tab row, Pages or Git isn't there.");
+    if (Object.isUndefined(row) || Object.isNull(background) || Object.isNull(pages) || Object.isNull(git))
+      throw new Error("The right dock's upper tab row, Background tasks, Pages or Git isn't there.");
     const box = pages.getBoundingClientRect();
     return {
       rowLeft: row.left,
       rowRight: row.right,
       overflowLeft: Object.isNull(overflow) || getComputedStyle(overflow).visibility === "hidden" ? null : overflow.getBoundingClientRect().left,
+      backgroundRight: background.getBoundingClientRect().right,
       pagesLeft: box.left,
       pagesRight: box.right,
+      pagesWidth: box.width,
       pages: getComputedStyle(pages).visibility,
       git: getComputedStyle(git).visibility
     };
@@ -127,8 +132,10 @@ test("a fresh install opens Explorer on the left, Background tasks, Pages and Gi
     bottom.top > height / 2, bottom.top >= explorer.bottom, bottom.top >= lower.bottom, bottom.left < explorer.right, bottom.right > upper.left])
     .toEqual([true, true, true, true, true, true, true, true, true, true, true]);
   const row = await rightRowAsync(page);
-  expect([width, height, row.pages, row.git, !Object.isNull(row.overflowLeft), row.pagesLeft >= row.rowLeft, row.pagesRight <= (row.overflowLeft ?? row.rowRight)],
-    "at 1280×800 Pages' tab lies whole in the right dock's tab row, before Show all tabs, which holds Git").toEqual([1280, 800, "visible", "hidden", true, true, true]);
+  const end = row.overflowLeft ?? row.rowRight;
+  expect([row.pages === "visible", row.git, !Object.isNull(row.overflowLeft), row.pagesLeft >= row.rowLeft, row.pagesRight <= end],
+    `at ${String(width)}×${String(height)} Pages' tab shows, whole, exactly when it fits after Background tasks and before Show all tabs, which holds Git`)
+    .toEqual([row.backgroundRight + row.pagesWidth <= end, "hidden", true, true, true]);
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
     await testInfo.attach(`fresh-install-${scheme}.png`, { body: await page.screenshot(), contentType: "image/png" });
