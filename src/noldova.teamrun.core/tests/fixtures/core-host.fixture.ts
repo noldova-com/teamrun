@@ -69,6 +69,7 @@ import { HeldFolderStat } from "./held-folder-stat.fixture.js";
 import { RecordingEventListener } from "./recording-event-listener.fixture.js";
 import { RecordingLog } from "./recording-log.fixture.js";
 import { TemporaryDataDirectory } from "./temporary-data-directory.fixture.js";
+import { TestDatabase } from "./test-database.fixture.js";
 
 export class CoreHost implements AsyncDisposable {
 
@@ -160,7 +161,7 @@ export class CoreHost implements AsyncDisposable {
     readIdleCompaction?: () => boolean): Promise<CoreHost> {
     const directory = new TemporaryDataDirectory();
     try {
-      const context = await DatabaseContext.openAsync(directory.path);
+      const context = await TestDatabase.openAsync(directory.path);
       return new CoreHost(directory, context, supportsFork, supportsSignIn, signInTimeout, readHopLimit, readCommand, tools, runsCommands, readTitleModel,
         readIdleCompaction);
     }

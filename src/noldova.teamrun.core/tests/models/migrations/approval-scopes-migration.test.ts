@@ -9,10 +9,11 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ApprovalScopesMigration, DatabaseContext, MigrationCatalog, Resources } from "@noldova/teamrun.core";
+import { ApprovalScopesMigration, MigrationCatalog, Resources } from "@noldova/teamrun.core";
 import { Approval, ApprovalScope } from "@noldova/teamrun.protocol";
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ApprovalScopesMigrationTests {
@@ -42,7 +43,7 @@ export class ApprovalScopesMigrationTests {
   public async givesEachStoredOptionAScopeInItsOrder(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     {
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path);
       const insert = async (statement: string, parameters: readonly string[] = []): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await insert("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('p1', 'fixture', '{}', 't', 't')");
       await insert("INSERT INTO conversations (id, projectId, json, createdAt, updatedAt) VALUES ('c1', 'p1', '{}', 't', 't')");
@@ -50,7 +51,7 @@ export class ApprovalScopesMigrationTests {
       await insert("INSERT INTO approvals (id, messageId, status, json, createdAt, updatedAt) VALUES ('ap1', 'm1', 'Approved', ?, 't', 't')",
         [ApprovalScopesMigrationTests.legacyApproval]);
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
 
     const json = (await current.database.connection.queryAsync(new SqlQuery("SELECT json FROM approvals WHERE id = 'ap1'")))[0]?.readString("json") ?? "";
     const approval = Approval.fromJson(JSON.parse(json));

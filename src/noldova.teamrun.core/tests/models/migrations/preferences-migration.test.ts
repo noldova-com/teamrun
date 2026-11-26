@@ -9,8 +9,9 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, PreferencesMigration } from "@noldova/teamrun.core";
+import { PreferencesMigration } from "@noldova/teamrun.core";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class PreferencesMigrationTests {
@@ -25,7 +26,7 @@ export class PreferencesMigrationTests {
     Assert.isTrue(statements[0]?.includes("PRIMARY KEY (\"name\")") ?? false);
     Assert.isTrue(statements[0]?.includes("\"json\" TEXT NOT NULL") ?? false);
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     await context.database.connection.executeAsync(new SqlQuery("INSERT INTO preferences (name, json, updatedAt) VALUES ('a', '{}', 't')"));
     await Assert.throwsAsync(() => context.database.connection.executeAsync(new SqlQuery("INSERT INTO preferences (name, json, updatedAt) VALUES ('a', '{}', 't')")), Error);
   }

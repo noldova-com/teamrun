@@ -25,6 +25,7 @@ import { TemporaryDataDirectory } from "../fixtures/temporary-data-directory.fix
 export class DatabaseContextTests {
   private static readonly EARLIER: string = "2026-11-01T00:00:00.000Z";
   private static readonly KEPT: string = "{\"kept\":true}";
+  private static readonly SYNCHRONOUS_FULL: number = 2;
   private static readonly SELECT_SCHEMA: string =
     "SELECT sql FROM sqlite_master AS t WHERE sql IS NOT NULL AND tbl_name NOT IN ('__migrations', '__changes', 'sqlite_sequence') "
     + "AND NOT EXISTS (SELECT 1 FROM sqlite_master AS v WHERE v.sql LIKE 'CREATE VIRTUAL TABLE %' AND substr(t.name, 1, length(v.name) + 1) = v.name || '_') "
@@ -95,6 +96,16 @@ export class DatabaseContextTests {
     Assert.areEqual(0, (await context.database.getPendingMigrationsAsync()).length);
     Assert.isInstanceOf(context.database.changeFeed, SqlChangeFeed);
     Assert.areEqual(1, (await context.database.changeFeed.appendAsync(ChangeEntity.Project, "prj-1", ChangeOperation.Insert, "{}")).sequence);
+  }
+
+  @TestMethod
+  public async flushesEveryCommitToDiskBeforeItReturns(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    await using context = await DatabaseContext.openAsync(directory.path);
+
+    const rows = await context.database.connection.queryAsync(new SqlQuery("PRAGMA synchronous"));
+
+    Assert.areEqual(DatabaseContextTests.SYNCHRONOUS_FULL, rows[0]?.readInteger("synchronous"));
   }
 
   @TestMethod

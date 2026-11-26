@@ -24,13 +24,14 @@ import { HeldFolderStat } from "../../fixtures/held-folder-stat.fixture.js";
 import { RecordingEventListener } from "../../fixtures/recording-event-listener.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ProjectsServiceTests {
   @TestMethod
   public async listsNoProjectsAtFirst(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
 
     Assert.areEqual(0, (await service.listProjectsAsync()).length);
@@ -39,7 +40,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async opensAFolderCreatingTheProjectOnce(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const rootPath = join(directory.path, "workspace", "alpha");
 
@@ -64,7 +65,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async findsAProjectById(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const project = await service.openAsync(new ProjectOpenParams(join(directory.path, "alpha")));
 
@@ -75,7 +76,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async listsEachProjectWithWhetherItsFolderIsMissingCheckedAtOnce(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const open = (name: string): Promise<Project> => service.openAsync(new ProjectOpenParams(join(directory.path, name)));
     const here = await open("here");
@@ -97,7 +98,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async publishesEachChangeOfAFolderWhoeverChecksIt(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const service = ProjectsServiceTests.publishing(context, listener);
     const root = join(directory.path, "alpha");
@@ -120,7 +121,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async checksTheFolderOfAProjectAsItOpensKeepingTheMarkOfAPathStillMissing(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const service = ProjectsServiceTests.publishing(context, listener);
     const root = join(directory.path, "alpha");
@@ -141,7 +142,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async keepsWhatACheckFoundOverALaterResultOfACheckThatBeganBeforeIt(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const stat = new HeldFolderStat();
     const service = ProjectsServiceTests.publishing(context, listener, stat);
@@ -165,7 +166,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async answersAListingWithTheLastKnownStateOnceItsWaitPassesAndPublishesWhatTheCheckFindsLater(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const stat = new HeldFolderStat();
     const timer = new ManualTimer();
@@ -191,7 +192,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async marksAFolderWhoseCheckNeverAnswersOnceItsDeadlinePasses(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const stat = new HeldFolderStat();
     const timer = new ManualTimer();
@@ -215,7 +216,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async logsACheckBegunAsAProjectOpensThatFails(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const log = new RecordingLog();
     const stat = new HeldFolderStat();
     const failing: IEventSink = { publish: () => { throw new Error("listener failed"); } };
@@ -233,7 +234,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async forgetsTheFolderStateOfAProjectItForgetsAndIgnoresACheckStillRunning(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const listener = new RecordingEventListener();
     const stat = new HeldFolderStat();
     const service = ProjectsServiceTests.publishing(context, listener, stat);
@@ -254,7 +255,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async listsProjectsInCreationOrder(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const first = await service.openAsync(new ProjectOpenParams(join(directory.path, "first")));
     const second = await service.openAsync(new ProjectOpenParams(join(directory.path, "second")));
@@ -265,7 +266,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async preservesInsertionOrderWhenCreationTimesTie(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const timestamp = "2026-09-14T00:00:00.000Z";
     const first = new Project("00000000-0000-7000-8000-000000000002", "first", join(directory.path, "first"), timestamp);
@@ -280,7 +281,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async namesARootFolderByItsPath(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const root = resolveRoot(directory.path);
 
     const project = await ProjectsServiceTests.create(context).openAsync(new ProjectOpenParams(root));
@@ -291,7 +292,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async rejectsARelativeRootPath(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
 
     const service = ProjectsServiceTests.create(context);
     const failure = await Assert.throwsAsync(() => service.openAsync(new ProjectOpenParams("relative/folder")), ServiceException);
@@ -306,7 +307,7 @@ export class ProjectsServiceTests {
     const first = { pinnedChats: ["c1"], chatOrder: { p1: ["c2", "c1"] } };
     const second = { pinnedChats: [], collapsedProjects: ["p1"] };
     {
-      await using context = await DatabaseContext.openAsync(directory.path);
+      await using context = await TestDatabase.openAsync(directory.path);
       const service = ProjectsServiceTests.create(context);
 
       Assert.isNull(await service.readLayoutAsync());
@@ -317,7 +318,7 @@ export class ProjectsServiceTests {
       Assert.areEqual([`${ChangeOperation.Insert} ${JSON.stringify(first)}`, `${ChangeOperation.Update} ${JSON.stringify(second)}`].join(","),
         changes.map(t => `${t.operation} ${t.payload}`).join(","));
     }
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
 
     Assert.areEqual(JSON.stringify(second), JSON.stringify(await ProjectsServiceTests.create(context).readLayoutAsync()));
   }
@@ -325,7 +326,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async savesALayoutOnlyIfNoneIsKeptWhenAskedAndAnswersTheKeptOne(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const moved = { pinnedChats: ["c9"] };
     const pinned = { pinnedChats: ["c9", "c1"] };
@@ -341,7 +342,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async forgetsAProjectAndLogsTheDeletion(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const service = ProjectsServiceTests.create(context);
     const project = await service.openAsync(new ProjectOpenParams(join(directory.path, "alpha")));
 
@@ -358,7 +359,7 @@ export class ProjectsServiceTests {
   @TestMethod
   public async forgetsAProjectWithItsConversations(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const conversations = new ConversationsService(context);
     const service = ProjectsServiceTests.create(context, conversations);
     const project = await service.openAsync(new ProjectOpenParams(join(directory.path, "alpha")));

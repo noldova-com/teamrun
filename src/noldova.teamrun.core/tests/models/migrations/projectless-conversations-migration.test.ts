@@ -9,10 +9,11 @@
 import { MigrationBuilder, type SqlConnection, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, ProjectlessConversationsMigration, Resources } from "@noldova/teamrun.core";
+import { MigrationCatalog, ProjectlessConversationsMigration, Resources } from "@noldova/teamrun.core";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ProjectlessConversationsMigrationTests {
@@ -46,7 +47,7 @@ export class ProjectlessConversationsMigrationTests {
     let before = "";
     {
       const earlier = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ProjectlessConversationsMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, earlier);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, earlier);
       const connection = legacy.database.connection;
       const execute = async (statement: string): Promise<number> => connection.executeAsync(new SqlQuery(statement));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('pr1', '/work', '{\"id\":\"pr1\"}', 't', 't')");
@@ -62,7 +63,7 @@ export class ProjectlessConversationsMigrationTests {
       before = await ProjectlessConversationsMigrationTests.countsAsync(connection, true);
     }
 
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
     const names = async (statement: string): Promise<string> => (await connection.queryAsync(new SqlQuery(statement))).map(t => t.readString("name")).join(",");
 

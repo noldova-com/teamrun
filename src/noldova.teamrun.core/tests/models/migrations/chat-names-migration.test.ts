@@ -11,7 +11,7 @@ import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { type JsonObject, JsonReader, type JsonValue } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChatNamesMigration, ConversationsService, DatabaseContext, MigrationCatalog, ReadingPositionsService, Resources } from "@noldova/teamrun.core";
+import { ChatNamesMigration, ConversationsService, MigrationCatalog, ReadingPositionsService, Resources } from "@noldova/teamrun.core";
 import {
   Chat,
   ChatMember,
@@ -33,6 +33,7 @@ import {
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 interface IStoredModel {
   toJson(): JsonObject;
@@ -103,7 +104,7 @@ export class ChatNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatNamesMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
       await execute("INSERT INTO teammates (id, name, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [teammate.id, "alice", JSON.stringify(teammate.toJson())]);
@@ -120,7 +121,7 @@ export class ChatNamesMigrationTests {
       await legacy.database.changeFeed.appendAsync("Message", sent.id, ChangeOperation.Update, JSON.stringify(ChatNamesMigrationTests.oldMessage(sent)));
       await legacy.database.changeFeed.appendAsync("Approval", "a1", ChangeOperation.Insert, JSON.stringify(ChatNamesMigrationTests.approvalPayload));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
     const names = async (statement: string): Promise<string> => (await connection.queryAsync(new SqlQuery(statement))).map(t => t.readString("name")).join(",");
     const json = async (statement: string): Promise<string> => (await connection.queryAsync(new SqlQuery(statement))).map(t => t.readString("json")).join("\n");
@@ -158,11 +159,11 @@ export class ChatNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatNamesMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       await legacy.database.connection.executeAsync(new SqlQuery("DROP INDEX UX_messages_conversationId_sequence"));
       await legacy.database.connection.executeAsync(new SqlQuery("CREATE UNIQUE INDEX IX_messages_conversationId_sequence ON messages (conversationId, sequence)"));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const indexes = await current.database.connection.queryAsync(new SqlQuery("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'messages' AND name LIKE '%sequence' ORDER BY name"));
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);

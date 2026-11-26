@@ -9,10 +9,11 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, OrganizationMessagesDropMigration, OrganizationMessagesMigration } from "@noldova/teamrun.core";
+import { MigrationCatalog, OrganizationMessagesDropMigration, OrganizationMessagesMigration } from "@noldova/teamrun.core";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class OrganizationMessagesMigrationTests {
@@ -45,12 +46,12 @@ export class OrganizationMessagesMigrationTests {
     const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof OrganizationMessagesDropMigration));
     const oldJson = '{"id":"p","name":"Legacy","rootPath":"fixture","createdAt":"t"}';
     {
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       await legacy.database.connection.executeAsync(new SqlQuery(
         "INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('p', 'fixture', ?, 't', 't')", [oldJson]));
       await legacy.database.connection.executeAsync(new SqlQuery("INSERT INTO organizationMessages (id, json, createdAt) VALUES ('m', '{}', 't')"));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
 
     Assert.isTrue(before.some(t => t instanceof OrganizationMessagesMigration));

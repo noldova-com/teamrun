@@ -11,11 +11,12 @@ import { ChangeOperation } from "@noldova/context.data";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity, DatabaseContext, MigrationCatalog, NodeTypesMigration, OrganizationService, Resources } from "@noldova/teamrun.core";
+import { ChangeEntity, MigrationCatalog, NodeTypesMigration, OrganizationService, Resources } from "@noldova/teamrun.core";
 import { Department, NodeType, Organization, OrganizationParent } from "@noldova/teamrun.protocol";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class NodeTypesMigrationTests {
@@ -41,7 +42,7 @@ export class NodeTypesMigrationTests {
     const renamed = '{"id":"my-organization","name":"Mine","folder":null,"order":0,"createdAt":"c1","updatedAt":"u1","departments":[],"placements":[]}';
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof NodeTypesMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[]): Promise<number> =>
         await legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('studio', ?, 'c', 'u')", [studio]);
@@ -55,7 +56,7 @@ export class NodeTypesMigrationTests {
       await legacy.database.changeFeed.appendAsync(ChangeEntity.Department, "d1", ChangeOperation.Insert, NodeTypesMigrationTests.untyped);
       await legacy.database.changeFeed.appendAsync(ChangeEntity.Department, "d2", ChangeOperation.Insert, art);
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const [mine, other, empty] = await new OrganizationService(current).listAsync();
     const changes = (await current.database.changeFeed.readAfterAsync(0)).filter(t => t.entity === ChangeEntity.Organization || t.entity === ChangeEntity.Department);
 

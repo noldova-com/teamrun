@@ -9,8 +9,9 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, WaitingMessagesMigration } from "@noldova/teamrun.core";
+import { WaitingMessagesMigration } from "@noldova/teamrun.core";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class WaitingMessagesMigrationTests {
@@ -26,7 +27,7 @@ export class WaitingMessagesMigrationTests {
     Assert.isTrue(statements[0]?.includes("FOREIGN KEY (\"chatId\") REFERENCES \"chats\" (\"id\")") ?? false);
     Assert.isTrue(statements[1]?.includes("\"IX_waitingMessages_chatId\" ON \"waitingMessages\" (\"chatId\")") ?? false);
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     await Assert.throwsAsync(() => context.database.connection.executeAsync(
       new SqlQuery("INSERT INTO waitingMessages (id, chatId, json, updatedAt) VALUES ('w', 'none', '{}', 't')")), Error);
   }

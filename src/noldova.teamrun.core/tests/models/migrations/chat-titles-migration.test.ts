@@ -10,7 +10,7 @@ import { ChangeOperation } from "@noldova/context.data";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChatTitlesMigration, ConversationsService, DatabaseContext, MigrationCatalog, Resources } from "@noldova/teamrun.core";
+import { ChatTitlesMigration, ConversationsService, MigrationCatalog, Resources } from "@noldova/teamrun.core";
 import {
   Conversation,
   ConversationMemberParams,
@@ -24,6 +24,7 @@ import {
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -54,7 +55,7 @@ export class ChatTitlesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatTitlesMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
       for (const chat of [unnamed, named, titled, older])
@@ -65,7 +66,7 @@ export class ChatTitlesMigrationTests {
       await legacy.database.changeFeed.appendAsync("Conversation", "c4", ChangeOperation.Delete, JSON.stringify(older));
       await legacy.database.changeFeed.appendAsync("Message", "m1", ChangeOperation.Insert, JSON.stringify({ title: "New conversation" }));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const rows = await current.database.connection.queryAsync(new SqlQuery("SELECT id, json, updatedAt FROM chats ORDER BY id"));
     const chats = rows.map(t => Conversation.fromJson(JSON.parse(t.readString("json"))));
     const changes = await current.database.changeFeed.readAfterAsync(0);
@@ -86,7 +87,7 @@ export class ChatTitlesMigrationTests {
     using edits = new TemporaryDataDirectory();
     using directory = new TemporaryDataDirectory();
     {
-      await using earlier = await DatabaseContext.openAsync(edits.path);
+      await using earlier = await TestDatabase.openAsync(edits.path);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => earlier.database.connection.executeAsync(new SqlQuery(statement, parameters));
       for (const project of projects)
         await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
@@ -103,7 +104,7 @@ export class ChatTitlesMigrationTests {
       const rows = await earlier.database.connection.queryAsync(new SqlQuery("SELECT id, projectId, json FROM chats ORDER BY id"));
       const edited = (await earlier.database.changeFeed.readAfterAsync(0)).filter(t => t.entity === "Chat");
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatTitlesMigration));
-      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
       const insert = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       for (const project of projects)
         await insert("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
@@ -113,7 +114,7 @@ export class ChatTitlesMigrationTests {
       for (const change of edited)
         await legacy.database.changeFeed.appendAsync("Conversation", change.entityId, change.operation, change.payload);
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const titles = (await current.database.connection.queryAsync(new SqlQuery("SELECT json FROM chats ORDER BY id")))
       .map(t => Conversation.fromJson(JSON.parse(t.readString("json"))).title);
     const changes = (await current.database.changeFeed.readAfterAsync(0)).filter(t => t.entity === "Chat");

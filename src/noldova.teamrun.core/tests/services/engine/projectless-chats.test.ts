@@ -15,7 +15,7 @@ import { JsonReader } from "@noldova/context.json";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, Resources, TurnDetail } from "@noldova/teamrun.core";
+import { Resources, TurnDetail } from "@noldova/teamrun.core";
 import {
   AttachmentContent,
   Conversation,
@@ -47,6 +47,7 @@ import { BusyFileError } from "../../fixtures/busy-file-error.fixture.js";
 import { CodedError } from "../../fixtures/coded-error.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { HeldCopy } from "../../fixtures/held-copy.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ProjectlessChatsTests {
@@ -75,7 +76,7 @@ export class ProjectlessChatsTests {
     const chat = await host.conversations.createAsync(new ConversationCreateParams(null, null));
     await host.context[Symbol.asyncDispose]();
 
-    await using reopened = await DatabaseContext.openAsync(host.directory.path);
+    await using reopened = await TestDatabase.openAsync(host.directory.path);
     const record = (await reopened.database.connection.queryAsync(new SqlQuery("SELECT projectId, json FROM chats")))[0];
 
     Assert.isNull(record?.readNullableString("projectId"));
