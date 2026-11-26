@@ -360,11 +360,10 @@ The jobs run side by side, so the run takes about the longest of them, not their
 `NOLDOVA_SEPARATE_TEST` takes `angular` or nothing, and `npm test` refuses any other value before it runs a check.
 Each job runs on the GitHub-hosted runner its target's `runs-on-*` output names, from the organization's shared `versions.yml` workflow, which the `.github` repository's README explains under "Shared settings".
 
-Every pull request run, a draft's too, runs Linux x64, Windows x64 and macOS arm64, and every push to `main` adds macOS x64.
+Every pull request run, a draft's too, runs Linux x64, Windows x64 and macOS arm64, and every push to `main` adds Linux arm64, Windows arm64 and macOS x64, on GitHub's hosted ARM runners for the ARM64 targets.
 Each run's concurrency group is the workflow and the pull request's number or the ref, and a pull request's newer run cancels an older one.
 Each long step of the Angular tests and app job has its own time limit, about twice its slowest time, so a step that runs out fails with its name, and the job's limit only backs them up; each of the shared workflow's jobs has one limit, 55 minutes, which its `timeout-minutes` input sets.
 The unsigned package job never signs and gets no secret; only an official build signs.
-The other ARM64 targets have no CI job yet.
 
 A target's job in the shared workflow builds the packages with `npm run build`, which first installs the dependencies, the Angular project's among them, with `npm ci`, and runs every check but the Angular tests with `npm test`.
 With the organization's `pipelines` tool, `@noldova/tools.pipelines.github` 0.0.21, it checks that the toolchain is the Node.js and npm `versions.yml` names, 26.13.1 with 11.20.0, that `.gitattributes` holds `* text=auto eol=lf`, that every tracked text file uses LF line endings and ends with exactly one newline, and, after the tests, that they left every tracked file unchanged.
@@ -466,7 +465,7 @@ A common word selects checks that read too: `names`, `files` or `values` runs Bu
 
 ### End-to-end test
 
-The shared workflow runs the end-to-end test in a job of its own on each target the targets' jobs run, named such as "End-to-end test (Windows x64)", beside them, so a pull request's checks take no longer: Linux x64, Windows x64 and macOS arm64 for a pull request, and macOS x64 too for a push to `main`.
+The shared workflow runs the end-to-end test in a job of its own on each target the targets' jobs run, named such as "End-to-end test (Windows x64)", beside them, so a pull request's checks take no longer: Linux x64, Windows x64 and macOS arm64 for a pull request, and Linux arm64, Windows arm64 and macOS x64 too for a push to `main`.
 `end-to-end-targets` takes the same list as `targets` through the YAML anchor `targets`, so a target added there is tested end to end too.
 It builds the packages as a target's job does, then runs `npm run install:app && npm run build:app`, which the `end-to-end-prepare` input names; `build:app` downloads Electron's binary.
 It then runs `npm run test:e2e`, on Linux under Xvfb with a session bus of its own and an unlocked keyring, and on Windows and macOS in the runner's own desktop session, and stops the test three minutes before the job's 55 minutes run out, so its report is still kept.
