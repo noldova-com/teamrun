@@ -171,6 +171,23 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     globalThis.nolViewCalls = calls;
   }, VIEW);
 
+  const clock = await app.electronApp.evaluate(async ({ webContents }, address) => {
+    const window = webContents.getAllWebContents().find(t => t.getURL() === address);
+    if (Object.isUndefined(window))
+      throw new Error(`No web contents shows ${address}.`);
+    let low = Number.NEGATIVE_INFINITY;
+    let high = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < 50; index++) {
+      const before = performance.timeOrigin + performance.now();
+      const at = Number(await window.executeJavaScript("performance.timeOrigin + performance.now()"));
+      const after = performance.timeOrigin + performance.now();
+      low = Math.max(low, at - after);
+      high = Math.min(high, at - before);
+    }
+    return { low, high };
+  }, page.url());
+  expect(clock.low, "the window's clock less the main process's, measured from both sides").toBeLessThanOrEqual(clock.high);
+
   const placeholder = page.locator("nol-teamrun-page-document .nol-teamrun-page-view");
   const lastCallShown = (): Promise<boolean | null> => page.evaluate(() => globalThis.nolViewCalls?.at(-1)?.isVisible ?? null);
   const viewShown = (): Promise<boolean | null> => page.evaluate(selector => {
@@ -290,7 +307,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   } finally {
     const kept = await readRecordAsync().catch((error: unknown) => String(error));
     const summary = Object.isString(kept) ? kept : { calls: kept.calls, frames: kept.frames, differences: kept.differences };
-    await testInfo.attach("switch-record.json", { body: JSON.stringify({ area, marks, record: summary }, null, 2), contentType: "application/json" });
+    await testInfo.attach("switch-record.json", { body: JSON.stringify({ area, clock, marks, record: summary }, null, 2), contentType: "application/json" });
     if (!Object.isString(kept)) {
       if (kept.differences.length > 0)
         await testInfo.attach("unmatched-frames.txt", { body: kept.differences.map((t, index) => `${String(index + 1)}. ${t}`).join("\n"), contentType: "text/plain" });
@@ -305,7 +322,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   const bounds = area;
   expect(bounds, "the placeholder's measured area").not.toBeNull();
   const switches = marks.map(({ start, end }) => {
-    const calls = record.calls.filter(t => t.at >= start && t.at <= end);
+    const calls = record.calls.map(t => ({ ...t, at: t.at - clock.low })).filter(t => t.at >= start && t.at <= end);
     const shown = calls.find(t => t.isVisible);
     const firstOfPage = record.frames.find(t => t.at >= start && t.at <= end && t.kind !== "chat");
     return {
