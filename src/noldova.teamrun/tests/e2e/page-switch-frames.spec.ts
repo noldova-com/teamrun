@@ -75,6 +75,18 @@ class SwitchMark {
   }
 }
 
+class SwitchResult {
+  public readonly hides: number;
+  public readonly isShownFirst: boolean;
+  public readonly bounds: IRegion | null;
+
+  public constructor(hides: number, isShownFirst: boolean, bounds: IRegion | null) {
+    this.hides = hides;
+    this.isShownFirst = isShownFirst;
+    this.bounds = bounds;
+  }
+}
+
 declare global {
   var nolSwitchRecorder: ISwitchRecorder | undefined;
   var nolViewCalls: ICall[] | undefined;
@@ -318,17 +330,14 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   const bounds = area;
   expect(bounds, "the placeholder's measured area").not.toBeNull();
   const switches = marks.map(({ start, end }) => {
-    const calls = record.calls.map(t => ({ ...t, at: t.at - clock.low })).filter(t => t.at >= start && t.at <= end);
+    const calls = record.calls.filter(t => t.at - clock.low >= start && t.at - clock.low <= end);
     const shown = calls.find(t => t.isVisible);
     const firstOfPage = record.frames.find(t => t.at >= start && t.at <= end && t.kind !== "chat");
-    return {
-      hides: calls.filter(t => !t.isVisible).length,
-      isShownFirst: !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at < firstOfPage.at,
-      bounds: shown?.bounds ?? null
-    };
+    return new SwitchResult(calls.filter(t => !t.isVisible).length,
+      !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at - clock.low < firstOfPage.at, shown?.bounds ?? null);
   });
 
   expect(record.frames.filter(t => t.kind === "other").length, "frames that match neither the page's tab nor the chat's at rest").toBe(0);
-  expect(switches).toEqual(Array.from({ length: SWITCHES }, () => ({ hides: 0, isShownFirst: true, bounds })));
+  expect(switches).toEqual(Array.from({ length: SWITCHES }, () => new SwitchResult(0, true, bounds)));
   expect(app.unexpectedFailures).toEqual([]);
 });

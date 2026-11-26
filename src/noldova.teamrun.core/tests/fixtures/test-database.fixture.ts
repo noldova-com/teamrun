@@ -7,9 +7,11 @@
  */
 
 import { join } from "node:path";
+
 import { DataSource, DbContextOptionsBuilder, type DbContextOptions } from "@noldova/context.data";
 import type { SqlConnection, SqlMigration } from "@noldova/context.data.sql";
 import { DatabaseContext } from "@noldova/teamrun.core";
+
 import { NormalSQLiteProvider } from "./normal-sqlite-provider.fixture.js";
 
 export class TestDatabase {
@@ -23,6 +25,7 @@ export class TestDatabase {
     const context = DatabaseContext.attach(TestDatabase.options(join(directory, TestDatabase.FILE_NAME)), directory);
     try {
       await context.database.migrateAsync();
+
       return context;
     }
     catch (error) {

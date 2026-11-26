@@ -7,9 +7,11 @@
  */
 
 import { join } from "node:path";
+
 import { DbContext } from "@noldova/context.data";
 import type { SqlConnection, SqlMigration } from "@noldova/context.data.sql";
 import { InitialMigration } from "@noldova/teamrun.core";
+
 import { TestDatabase } from "./test-database.fixture.js";
 
 export class LegacyDatabaseContext extends DbContext<SqlConnection, SqlMigration> {
@@ -21,6 +23,7 @@ export class LegacyDatabaseContext extends DbContext<SqlConnection, SqlMigration
     const context = new LegacyDatabaseContext(directory, migrations);
     try {
       await context.database.migrateAsync();
+
       return context;
     }
     catch (error) {

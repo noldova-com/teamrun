@@ -16,6 +16,7 @@ export class NormalSQLiteProvider extends SQLiteProvider {
   public override openConnection(dataSource: DataSource): SQLiteConnection {
     const connection = super.openConnection(dataSource);
     void connection.executeAsync(new SqlQuery(NormalSQLiteProvider.SYNCHRONOUS_PRAGMA));
+
     return connection;
   }
 }

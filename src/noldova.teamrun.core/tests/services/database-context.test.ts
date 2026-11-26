@@ -19,6 +19,7 @@ import { ChangeEntity, DatabaseContext, MigrationCatalog, Resources } from "@nol
 import { ErrorCode } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
+import { LegacyDatabaseContext } from "../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../fixtures/temporary-data-directory.fixture.js";
 
 @TestClass
@@ -124,6 +125,21 @@ export class DatabaseContextTests {
 
     Assert.areEqual(1, (await reopened.database.changeFeed.readAfterAsync(0)).length);
     Assert.areEqual(MigrationCatalog.all.length, (await reopened.database.getAppliedMigrationsAsync()).length);
+  }
+
+  @TestMethod
+  public async opensADatabaseAtAnEarlierPrefixOfItsMigrationsAndAppliesTheRest(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    const earlier = MigrationCatalog.all.slice(0, Math.floor(MigrationCatalog.all.length / 2));
+    {
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, earlier);
+      Assert.areEqual(earlier.length, (await legacy.database.getAppliedMigrationsAsync()).length);
+    }
+
+    await using context = await DatabaseContext.openAsync(directory.path);
+
+    Assert.areEqual(MigrationCatalog.all.map(t => t.id).join(","), (await context.database.getAppliedMigrationsAsync()).join(","));
+    Assert.areEqual(0, (await context.database.getPendingMigrationsAsync()).length);
   }
 
   @TestMethod
