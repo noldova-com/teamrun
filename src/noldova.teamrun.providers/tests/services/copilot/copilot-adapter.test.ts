@@ -20,6 +20,7 @@ import { TurnAbilityProbes } from "../../fixtures/ability-checks/turn-ability-pr
 import { AcpCommandCheck } from "../../fixtures/acp-command-check.fixture.js";
 import { ControlledProcessTerminator } from "../../fixtures/controlled-process-terminator.fixture.js";
 import { CopilotTestHost } from "../../fixtures/copilot-test-host.fixture.js";
+import { CountingManualTimer } from "../../fixtures/counting-manual-timer.fixture.js";
 import { IdleLimit } from "../../fixtures/idle-limit.fixture.js";
 import { PlanToolRule } from "../../fixtures/plan-tool-rule.fixture.js";
 import { RecordedMcpServers } from "../../fixtures/recorded-mcp-servers.fixture.js";
@@ -548,7 +549,7 @@ export class CopilotAdapterTests {
       let ended = false;
       void Promise.allSettled([checking]).then(() => { ended = true; });
       await Wait.until(() => existsSync(methods) && readFileSync(methods, "utf8") === held, "Copilot did not get the held requests.");
-      await Wait.until(() => timer.pending === 1, "The timer did not hold just one wait.");
+      await Wait.until(() => timer.pendingWithin(timings.accountTimeout) === 1, "The timer did not hold just one wait within the account timeout.");
       await Wait.delay(timings.accountTimeout * 3);
       const waited = ended;
       timer.advance(timings.accountTimeout);
@@ -619,9 +620,13 @@ export class CopilotAdapterTests {
     await using host = new CopilotTestHost();
     const log = new RecordingLog();
     const timings = new ProviderTimings(2000, 2000, 60_000, 100, 100, 100, 100, 5000, 100, 1, 10);
-    const adapter = host.createManualAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "hold" }, log, timings);
+    const timer = new ManualTimer();
+    const adapter = host.createManualAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "hold" }, log, timings, timer);
 
-    const failed = await Assert.throwsAsync(() => adapter.listModels(null), ModelListException);
+    const listing = Assert.throwsAsync(() => adapter.listModels(null), ModelListException);
+    await Wait.until(() => existsSync(host.directory.resolve("work", "headless-held.txt")), "Copilot did not hold the listing.");
+    timer.advance(timings.requestTimeout);
+    const failed = await listing;
 
     Assert.areEqual(Resources.formatCopilotModelsNotListed(Resources.copilotListingTimedOut), failed.message);
     Assert.areEqual(Resources.formatCopilotListingFailedAndAcpListsNone(null, Resources.copilotListingTimedOut), log.lines.join("\n"));
@@ -705,9 +710,13 @@ export class CopilotAdapterTests {
     await using host = new CopilotTestHost();
     const log = new RecordingLog();
     const timings = new ProviderTimings(2000, 2000, 60_000, 100, 100, 100, 100, 5000, 100, 1, 10);
-    const adapter = host.createManualAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "hold", TEAMRUN_FAKE_ACP_OPTIONS: CopilotAdapterTests.modelOptions }, log, timings);
+    const timer = new ManualTimer();
+    const adapter = host.createManualAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "hold", TEAMRUN_FAKE_ACP_OPTIONS: CopilotAdapterTests.modelOptions }, log, timings, timer);
 
-    const listed = await adapter.listModels(null);
+    const listing = adapter.listModels(null);
+    await Wait.until(() => existsSync(host.directory.resolve("work", "headless-held.txt")), "Copilot did not hold the listing.");
+    timer.advance(timings.requestTimeout);
+    const listed = await listing;
 
     Assert.isTrue(existsSync(host.directory.resolve("work", "headless-held.txt")));
     Assert.areEqual("gpt-a,gpt-b", listed.models.map(t => t.id).join(","));
@@ -772,16 +781,14 @@ export class CopilotAdapterTests {
   @TestMethod
   public async keepsARefreshRunningWhenAnOlderListingEndsFirstSoTheNextRequestJoinsIt(): Promise<void> {
     await using host = new CopilotTestHost();
-    const timer = new ManualTimer();
+    const timer = new CountingManualTimer(host.timings.stopGrace);
     const adapter = host.createAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "stay" }, host.command, null, host.timings, host.terminator, timer);
 
     const older = adapter.listModels(host.provider);
-    await Wait.until(() => timer.begun === 2, "The timer did not begin 2 waits.");
-    await Wait.until(() => timer.pending === 1, "The timer did not hold just one wait.");
+    await Wait.until(() => timer.begunOfCounted === 2 && timer.pendingWithin(host.timings.stopGrace) === 1, "The timer did not begin 2 stop-grace waits and hold 1.");
     timer.advance(1);
     const refreshed = adapter.listModels(host.provider, true);
-    await Wait.until(() => timer.begun === 4, "The timer did not begin 4 waits.");
-    await Wait.until(() => timer.pending === 2, "The timer did not hold 2 waits.");
+    await Wait.until(() => timer.begunOfCounted === 4 && timer.pendingWithin(host.timings.stopGrace) === 2, "The timer did not begin 4 stop-grace waits and hold 2.");
     timer.advance(host.timings.stopGrace - 1);
     await older;
     const joined = adapter.listModels(host.provider);
@@ -797,12 +804,11 @@ export class CopilotAdapterTests {
   @TestMethod
   public async keepsNoAnswerFromAListingThatEndsAfterARefreshBegan(): Promise<void> {
     await using host = new CopilotTestHost();
-    const timer = new ManualTimer();
+    const timer = new CountingManualTimer(host.timings.stopGrace);
     const adapter = host.createAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "stay>signedOut" }, host.command, null, host.timings, host.terminator, timer);
 
     const older = adapter.listModels(host.provider);
-    await Wait.until(() => timer.begun === 2, "The timer did not begin 2 waits.");
-    await Wait.until(() => timer.pending === 1, "The timer did not hold just one wait.");
+    await Wait.until(() => timer.begunOfCounted === 2 && timer.pendingWithin(host.timings.stopGrace) === 1, "The timer did not begin 2 stop-grace waits and hold 1.");
     const refreshed = await adapter.listModels(host.provider, true);
     timer.advance(host.timings.stopGrace);
     const stale = await older;
@@ -879,13 +885,12 @@ export class CopilotAdapterTests {
     const log = new RecordingLog();
     const terminator = new ControlledProcessTerminator(process.platform);
     terminator.failures = 1;
-    const timer = new ManualTimer();
+    const timer = new CountingManualTimer(host.timings.stopGrace);
     const adapter = host.createAdapter({ TEAMRUN_FAKE_COPILOT_HEADLESS: "stay" }, host.command, log, host.timings, terminator, timer);
 
     try {
       const listing = adapter.listModels(host.provider);
-      await Wait.until(() => timer.begun === 2, "The timer did not begin 2 waits.");
-      await Wait.until(() => timer.pending === 1, "The timer did not hold just one wait.");
+      await Wait.until(() => timer.begunOfCounted === 2 && timer.pendingWithin(host.timings.stopGrace) === 1, "The timer did not begin 2 stop-grace waits and hold 1.");
       timer.advance(host.timings.stopGrace);
       const listed = await listing;
       await adapter.shutdown();
@@ -1123,7 +1128,7 @@ export class CopilotAdapterTests {
     await adapter.listModels(host.provider);
     const run = adapter.runTurn(host.request("launch", null, "gpt-5.4", null, host.provider), new RecordingTurnListener(), new AbortController().signal);
     await Wait.until(() => existsSync(host.directory.resolve("work", "headless-held.txt")), "The fake did not write headless-held.txt.");
-    await Wait.until(() => wait === "held" || timer.pending > 0, "The timer held no wait.");
+    await Wait.until(() => wait === "held" || timer.pendingWithin(Resources.modelCheckWait) > 0, "The timer held no wait within the model check wait.");
     if (wait === "held")
       writeFileSync(host.directory.resolve("work", "headless-released.txt"), "");
     else
@@ -1181,7 +1186,7 @@ export class CopilotAdapterTests {
 
     await adapter.listModels(host.provider);
     const run = adapter.runTurn(host.request("launch", null, "kimi-k3", null, host.provider), new RecordingTurnListener(), controller.signal);
-    await Wait.until(() => timer.pending > 0, "The timer held no wait.");
+    await Wait.until(() => timer.pendingWithin(Resources.modelCheckWait) > 0, "The timer held no wait within the model check wait.");
     await Wait.until(() => existsSync(host.directory.resolve("work", "headless-held.txt")), "The fake did not write headless-held.txt.");
     if (ending === "stop")
       controller.abort();
