@@ -350,11 +350,11 @@ Every pull request into `main` must pass both checks before it merges.
 | Check | What it verifies |
 |---|---|
 | Check / Linked issue | The organization's shared check, which `.github/workflows/require-linked-issue.yml` calls from its `check` job, named "Check": the PR description has a standalone `Issue: #N`, `Issue #N` or closing reference, such as `Closes #N`, that names an issue in this repository. |
-| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test, the Angular tests and app on every other target, the docs site's tests, and the unsigned package passed. |
+| All targets | The shared build and test, with every target's job, the Linux x64 Angular tests and the end-to-end test on each target, the Angular tests and app on every other target, the docs site's tests, and the unsigned package passed. |
 
 The "Build and test" job calls the organization's shared `build-and-test.yml` workflow at the `.github` repository's v2.51.0, the version its `uses:` lines pin and a pin PR moves here too, which runs each target in a job of its own, such as "Build and test / Windows x64": it builds and runs `npm test -- --skip-test-details --skip-coverage-details` with `NOLDOVA_SEPARATE_TEST=angular`, which leaves the Angular tests and coverage out.
-Its "Separate test" job runs `npm run test:angular`, the Angular tests and coverage alone, on Linux x64, and its "End-to-end test" job runs the [end-to-end test](#end-to-end-test).
-On every other target, "<target>, Angular tests and app" installs and builds, runs `npm run test:angular`, and then installs and builds the app; the end-to-end test and the unsigned package install and build the app on Linux x64.
+Its "Separate test" job runs `npm run test:angular`, the Angular tests and coverage alone, on Linux x64, and its end-to-end jobs, one per target, such as "End-to-end test (Windows x64)", run the [end-to-end test](#end-to-end-test).
+On every other target, "<target>, Angular tests and app" installs and builds, runs `npm run test:angular`, and then installs and builds the app; the unsigned package installs and builds the app on Linux x64.
 "Docs site tests" installs and builds on Linux x64, then runs `npm run test:docs`, which builds the [documentation site](#documentation-site) and runs its tests, their report check and the built-site check; the site is static and the same on every system, so it runs on Linux only, and when its tests fail it keeps their report, `_build/docs-tests.json`, and the failed specs' screenshots as its artifact `docs-tests-<attempt>` for 14 days.
 The jobs run side by side, so the run takes about the longest of them, not their sum.
 `NOLDOVA_SEPARATE_TEST` takes `angular` or nothing, and `npm test` refuses any other value before it runs a check.
@@ -466,10 +466,11 @@ A common word selects checks that read too: `names`, `files` or `values` runs Bu
 
 ### End-to-end test
 
-The shared workflow's "End-to-end test" job runs on Linux x64 beside the targets' jobs, so a pull request's checks take no longer.
+The shared workflow runs the end-to-end test in a job of its own on each target the targets' jobs run, named such as "End-to-end test (Windows x64)", beside them, so a pull request's checks take no longer: Linux x64, Windows x64 and macOS arm64 for a pull request, and macOS x64 too for a push to `main`.
+`end-to-end-targets` takes the same list as `targets` through the YAML anchor `targets`, so a target added there is tested end to end too.
 It builds the packages as a target's job does, then runs `npm run install:app && npm run build:app`, which the `end-to-end-prepare` input names; `build:app` downloads Electron's binary.
-It then runs `npm run test:e2e` under Xvfb with a session bus of its own and an unlocked keyring, and stops the test three minutes before the job's 55 minutes run out, so its report is still kept.
-`npm run test:e2e` runs the specs in `src/noldova.teamrun/tests/e2e/` with Playwright's test runner, from the Angular project's `playwright`, and writes its report to `_build/e2e/`, which a failed job keeps as the artifact `end-to-end-report-<attempt>`, for the days `versions.yml` keeps a run's artifacts.
+It then runs `npm run test:e2e`, on Linux under Xvfb with a session bus of its own and an unlocked keyring, and on Windows and macOS in the runner's own desktop session, and stops the test three minutes before the job's 55 minutes run out, so its report is still kept.
+`npm run test:e2e` runs the specs in `src/noldova.teamrun/tests/e2e/` with Playwright's test runner, from the Angular project's `playwright`, and writes its report to `_build/e2e/`, which a failed job keeps as the artifact `end-to-end-report-<target>-<attempt>`, such as `end-to-end-report-windows-x64-1`, for the days `versions.yml` keeps a run's artifacts.
 Each spec starts the built app from `app/` with Electron, with a data folder, a device folder and a home folder of its own, and quits it through the app's command line.
 Each start maps every `.test` name to `127.0.0.1` with Chromium's `--host-resolver-rules`, so a spec can use a `.test` name that resolves to this computer; no other spec uses one.
 In a spec that sets `test.use({ isAppTraced: true })`, now `computer-use.spec.ts`, the fixture records a Playwright trace of each start of the app, with screenshots and DOM snapshots; after a failed test it keeps the running app's trace as `trace.zip` in the test's folder under `_build/e2e/results/`, so the artifact holds it, and after a passed test it drops it.

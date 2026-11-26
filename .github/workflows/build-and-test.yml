@@ -39,7 +39,7 @@ jobs:
       contents: read
       packages: read
     with:
-      targets: ${{ github.event_name == 'push' && 'linux-x64 windows-x64 macos-x64 macos-arm64' || 'linux-x64 windows-x64 macos-arm64' }}
+      targets: &targets ${{ github.event_name == 'push' && 'linux-x64 windows-x64 macos-x64 macos-arm64' || 'linux-x64 windows-x64 macos-arm64' }}
       separate-test: angular
       separate-test-report: |
         node_modules/.vite
@@ -48,6 +48,7 @@ jobs:
         _build/angular-spec-transforms
         src/.vitest/attachments
       end-to-end: e2e
+      end-to-end-targets: *targets
       end-to-end-prepare: npm run install:app && npm run build:app
       end-to-end-report: _build/e2e
       timeout-minutes: 55
