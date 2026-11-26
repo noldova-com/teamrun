@@ -74,8 +74,11 @@ function busy(previous) {
   return { now, percent: total > 0 ? Math.round(100 * used / total) : 0 };
 }
 
-let stopped = false;
+const sampling_on = !process.argv.includes("--no-sampler");
+const passed = process.argv.slice(2).filter(t => t !== "--no-sampler");
+let stopped = !sampling_on;
 async function sample() {
+  if (stopped) return;
   if (windows) startSession();
   let previous = cpus().map(cpu => cpu.times);
   while (!stopped) {
@@ -97,7 +100,7 @@ async function sample() {
 const sampling = sample();
 const treeLog = join(folder, "tree.log");
 writeFileSync(treeLog, "");
-const test = spawn(process.execPath, ["scripts/test.ts", ...process.argv.slice(2)], { stdio: "inherit", env: { ...process.env, TEAMRUN_PROBE_TREE: treeLog } });
+const test = spawn(process.execPath, ["scripts/test.ts", ...passed], { stdio: "inherit", env: { ...process.env, NOLDOVA_SEPARATE_TEST: "angular", TEAMRUN_PROBE_TREE: treeLog } });
 test.on("exit", async code => {
   stopped = true;
   await sampling;
