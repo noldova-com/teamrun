@@ -8,15 +8,17 @@
 
 import { type ITimer, NodeTimer } from "@noldova/teamrun.core";
 
-export class HeldTurnsDelayTimer implements ITimer {
+export class ElapsedTurnsDelayTimer implements ITimer {
   public readonly requested: number[] = [];
   private readonly milliseconds: number;
   private readonly held: readonly number[];
+  private readonly elapsed: readonly number[];
   private readonly timer: ITimer = new NodeTimer();
 
-  public constructor(milliseconds: number, ...held: number[]) {
+  public constructor(milliseconds: number, held: readonly number[], ...elapsed: number[]) {
     this.milliseconds = milliseconds;
     this.held = held;
+    this.elapsed = elapsed;
   }
 
   public now(): number {
@@ -26,7 +28,9 @@ export class HeldTurnsDelayTimer implements ITimer {
   public delayAsync(milliseconds: number, signal: AbortSignal): Promise<void> {
     this.requested.push(milliseconds);
     const turn = this.requested.filter(t => t === this.milliseconds).length;
-    if (milliseconds !== this.milliseconds || !this.held.includes(turn))
+    if (milliseconds === this.milliseconds && this.elapsed.includes(turn))
+      return Promise.resolve();
+    if (milliseconds !== this.milliseconds && !this.held.includes(milliseconds))
       return this.timer.delayAsync(milliseconds, signal);
     const held = Promise.withResolvers<void>();
     signal.addEventListener("abort", () => held.reject(signal.reason), { once: true });
