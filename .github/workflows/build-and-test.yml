@@ -30,7 +30,7 @@ jobs:
     uses: noldova-com/.github/.github/workflows/versions.yml@43df1a5296a892a1ed162a02ca2af77902d19bb8 # v2.51.2
     permissions: {}
     with:
-      targets: linux-x64 windows-x64 macos-x64 macos-arm64
+      targets: linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64
 
   build-and-test:
     name: Build and test
@@ -39,7 +39,7 @@ jobs:
       contents: read
       packages: read
     with:
-      targets: ${{ github.event_name == 'push' && 'linux-x64 windows-x64 macos-x64 macos-arm64' || 'linux-x64 windows-x64 macos-arm64' }}
+      targets: &targets ${{ github.event_name == 'push' && 'linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64' || 'linux-x64 windows-x64 macos-arm64' }}
       separate-test: angular
       separate-test-report: |
         node_modules/.vite
@@ -48,6 +48,7 @@ jobs:
         _build/angular-spec-transforms
         src/.vitest/attachments
       end-to-end: e2e
+      end-to-end-targets: *targets
       end-to-end-prepare: npm run install:app && npm run build:app
       end-to-end-report: _build/e2e
       timeout-minutes: 55
@@ -58,8 +59,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(github.event_name == 'push' && '["Windows x64", "macOS x64", "macOS arm64"]' || '["Windows x64", "macOS arm64"]') }}
-    runs-on: ${{ fromJSON(matrix.target == 'Windows x64' && needs.versions.outputs.runs-on-windows-x64 || matrix.target == 'macOS x64' && needs.versions.outputs.runs-on-macos-x64 || needs.versions.outputs.runs-on-macos-arm64) }}
+        target: ${{ fromJSON(github.event_name == 'push' && '["Linux arm64", "Windows x64", "Windows arm64", "macOS x64", "macOS arm64"]' || '["Windows x64", "macOS arm64"]') }}
+    runs-on: ${{ fromJSON(matrix.target == 'Linux arm64' && needs.versions.outputs.runs-on-linux-arm64 || matrix.target == 'Windows x64' && needs.versions.outputs.runs-on-windows-x64 || matrix.target == 'Windows arm64' && needs.versions.outputs.runs-on-windows-arm64 || matrix.target == 'macOS x64' && needs.versions.outputs.runs-on-macos-x64 || needs.versions.outputs.runs-on-macos-arm64) }}
     timeout-minutes: 55
     env:
       npm_config_ignore_scripts: 'true'
