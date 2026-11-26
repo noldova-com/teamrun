@@ -12,15 +12,17 @@ const list = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f 
 const full = process.env["PSModulePath"] ?? "";
 const ci = full.split(";").filter(t => !/[\\/]PowerShell[\\/]/i.test(t)).join(";");
 const system = `${process.env["SystemRoot"] ?? "C:\\Windows"}\\system32\\WindowsPowerShell\\v1.0\\Modules`;
+const mmi = "$session = [Microsoft.Management.Infrastructure.CimSession]::Create($null); try { foreach ($p in $session.QueryInstances('root/cimv2', 'WQL', 'SELECT ProcessId, ParentProcessId, CreationDate FROM Win32_Process')) { $c = $p.CimInstanceProperties['CreationDate'].Value; '{0} {1} {2}' -f $p.CimInstanceProperties['ProcessId'].Value, $p.CimInstanceProperties['ParentProcessId'].Value, $(if ($c) { ([DateTimeOffset]$c).ToUnixTimeMilliseconds() } else { 'unknown' }) } } finally { $session.Dispose() }";
 const variants = [
   ["exit-ci", ci, "exit"],
-  ["list-full", full, list],
   ["list-ci", ci, list],
-  ["list-ci-import", ci, "Import-Module (Join-Path $PSHOME 'Modules\\CimCmdlets'); " + list],
-  ["list-system", system, list],
-  ["newobject-ci", ci, "New-Object Reflection.AssemblyName 'x' | Out-Null"],
-  ["newobject-system", system, "New-Object Reflection.AssemblyName 'x' | Out-Null"],
-  ["dotnet-ci", ci, "[Reflection.AssemblyName]::new('x') | Out-Null; [Diagnostics.Process]::GetProcesses().Count"]
+  ["mmi-ci", ci, "& { " + mmi + " } | ForEach-Object { $_ } | Where-Object { $_ } | Out-Null; 'done'"],
+  ["mmi-count-ci", ci, "@(" + mmi + ").Count"],
+  ["mmi-sample-ci", ci, "@(" + mmi + ")[0..2] -join '; '"],
+  ["core-ci", ci, "@(1..5 | ForEach-Object { [pscustomobject]@{ A = $_ } } | Where-Object { $_.A -gt 2 }).Count"],
+  ["stringbuilder-ci", ci, "[Text.StringBuilder]::new().Append('x').ToString(); [byte[]]::new(4).Length"],
+  ["write-output-ci", ci, "Write-Output 'x'"],
+  ["stop-process-ci", ci, "Stop-Process -Id 999999 -Force -ErrorAction SilentlyContinue; 'done'"]
 ];
 
 function timed(name, modulePath, script) {
