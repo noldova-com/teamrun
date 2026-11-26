@@ -8,7 +8,8 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { JsonObject } from "@noldova/context.json";
+import "@noldova/context.core";
+import { type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ForkRequest, Resources as CoreResources, SharedMcpValues, TurnOutcome, TurnRequest } from "@noldova/teamrun.core";
 import { AuthStatus, Provider, ProviderAbility, ProviderModel, RequestedSettings, SharedMcpServerDefinition, SharedMcpTransport } from "@noldova/teamrun.protocol";
@@ -34,6 +35,16 @@ const model = { id: "model", name: "Model", category: "model", type: "select", c
 ] };
 const platforms = [Resources.windowsPlatform, Resources.linuxPlatform, Resources.macPlatform];
 const [, mode] = AntigravitySessionModesRecording.sessionNew.configOptions;
+
+class ServerOnPath {
+  public readonly version: string;
+  public readonly installed: boolean;
+
+  public constructor(version: string, installed: boolean) {
+    this.version = version;
+    this.installed = installed;
+  }
+}
 
 @TestClass
 export class AntigravityAdapterTests {
@@ -187,9 +198,9 @@ export class AntigravityAdapterTests {
       Assert.areEqual("partner-large", result.observed.model);
       Assert.isNull(result.observed.effort);
       Assert.areEqual("1.3.0", result.observed.harnessVersion);
-      const sent = JSON.parse(listener.texts.find(t => t.startsWith("{\"methods\""))!) as { methods: string[]; authenticated: unknown };
-      Assert.areEqual("initialize,authenticate,session/new,session/set_config_option,session/prompt", sent.methods.join(","));
-      Assert.areEqual(JSON.stringify({ methodId: "oauth-personal" }), JSON.stringify(sent.authenticated));
+      const sent = AntigravityAdapterTests.echoed(listener);
+      Assert.areEqual("initialize,authenticate,session/new,session/set_config_option,session/prompt", sent.readStringArray("methods").join(","));
+      Assert.areEqual(JSON.stringify({ methodId: "oauth-personal" }), JSON.stringify(sent.readObject("authenticated").toJson()));
       const again = new RecordingTurnListener();
       const resumed = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "methods", "old-session"), again, new AbortController().signal);
       Assert.areEqual("old-session", resumed.nativeSessionId);
@@ -225,7 +236,7 @@ export class AntigravityAdapterTests {
         const turn = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "methods", null, null, null, false, chosen), listener,
           new AbortController().signal);
         Assert.areEqual(TurnOutcome.Completed, turn.outcome, String(chosen));
-        sets.push((JSON.parse(listener.texts.find(t => t.startsWith("{\"methods\""))!) as { readonly sets: readonly string[] }).sets.join(","));
+        sets.push(AntigravityAdapterTests.echoed(listener).readStringArray("sets").join(","));
       }
 
       Assert.areEqual("default:Default:false,auto_edit:Auto Edit:false,yolo:YOLO:true", listed.modes.map(t => [t.id, t.name, t.unrestricted].join(":")).join(","));
@@ -244,7 +255,7 @@ export class AntigravityAdapterTests {
       const turn = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "methods"), listener, new AbortController().signal);
 
       Assert.areEqual(TurnOutcome.Completed, turn.outcome);
-      Assert.areEqual("mode=default", (JSON.parse(listener.texts.find(t => t.startsWith("{\"methods\""))!) as { readonly sets: readonly string[] }).sets.join(","));
+      Assert.areEqual("mode=default", AntigravityAdapterTests.echoed(listener).readStringArray("sets").join(","));
     }, { TEAMRUN_FAKE_ACP_OPTIONS: JSON.stringify([model, { ...mode, currentValue: "yolo" }]) });
   }
 
@@ -317,13 +328,13 @@ export class AntigravityAdapterTests {
       const running = adapter.runTurn(AntigravityAdapterTests.request(host, provider, "cancel"), listener, new AbortController().signal);
       await Wait.until(() => listener.texts.includes("working"), "The listener did not see 'working'.");
       await adapter.signOut(provider);
-      const received = JSON.parse(readFileSync(join(provider.profileDir!, "logout.txt"), "utf8")) as { readonly methods: readonly string[] };
+      const received = JsonReader.parse(readFileSync(join(provider.profileDir, "logout.txt"), "utf8"));
       const result = await running;
 
       Assert.areEqual(`${TurnOutcome.Failed} ${Resources.formatTurnStoppedForSignOut("Antigravity")}`, `${result.outcome} ${result.error}`);
-      Assert.isFalse(existsSync(join(provider.profileDir!, ...Resources.antigravityTokenSegments)));
-      Assert.isTrue(existsSync(join(provider.profileDir!, Resources.profileMarker)));
-      Assert.areEqual("initialize,logout", received.methods.join(","));
+      Assert.isFalse(existsSync(join(provider.profileDir, ...Resources.antigravityTokenSegments)));
+      Assert.isTrue(existsSync(join(provider.profileDir, Resources.profileMarker)));
+      Assert.areEqual("initialize,logout", received.readStringArray("methods").join(","));
       await host.programs.endedAt(host.programs.started.length);
       Assert.areEqual(host.programs.started.length, host.programs.ended.length);
     }, { TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities) });
@@ -335,8 +346,8 @@ export class AntigravityAdapterTests {
       const refused = await Assert.throwsAsync(() => adapter.signOut(provider), Error);
 
       Assert.areEqual("Antigravity 1.3.0 doesn't support signing out: its ACP server doesn't offer ACP's logout.", refused.message);
-      Assert.isFalse(existsSync(join(provider.profileDir!, "logout.txt")));
-      Assert.isTrue(existsSync(join(provider.profileDir!, ...Resources.antigravityTokenSegments)));
+      Assert.isFalse(existsSync(join(provider.profileDir, "logout.txt")));
+      Assert.isTrue(existsSync(join(provider.profileDir, ...Resources.antigravityTokenSegments)));
     });
   }
 
@@ -465,7 +476,7 @@ export class AntigravityAdapterTests {
   @TestMethod
   public completesATurnWhoseModelsCantBeKeptAndStillAwaitsOne(): Promise<void> {
     return AntigravityAdapterTests.withAdapter("1.3.0", async (adapter, host, provider) => {
-      mkdirSync(join(provider.profileDir!, ".teamrun-models.json"));
+      mkdirSync(join(provider.profileDir, ".teamrun-models.json"));
 
       const result = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "complete"), new RecordingTurnListener(), new AbortController().signal);
       const listed = await adapter.listModels(provider);
@@ -481,7 +492,8 @@ export class AntigravityAdapterTests {
     return AntigravityAdapterTests.withAdapter("1.3.0", async (adapter, host, provider) => {
       await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "complete"), new RecordingTurnListener(), new AbortController().signal);
       const listed = await adapter.listModels(provider);
-      const chosen = listed.models.find(t => t.id === "gemini-pro")!;
+      const chosen = listed.models.find(t => t.id === "gemini-pro");
+      Assert.isDefined(chosen);
 
       const result = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "complete", null, chosen.id), new RecordingTurnListener(),
         new AbortController().signal);
@@ -497,7 +509,7 @@ export class AntigravityAdapterTests {
   public async listsWithoutStartingTheServerOnAnyPlatformAndChecksTheSignInWithNoAuthenticateWhenASignInWouldHang(): Promise<void> {
     for (const platform of platforms) {
       await AntigravityAdapterTests.withAdapter("1.3.0", async (adapter, host, provider) => {
-        new AntigravityProfile(provider.profileDir!, host.directory.resolve("tmp")).keepModels([new ProviderModel("gemini-pro", "Gemini Pro", "", [], true, null, true)]);
+        new AntigravityProfile(provider.profileDir, host.directory.resolve("tmp")).keepModels([new ProviderModel("gemini-pro", "Gemini Pro", "", [], true, null, true)]);
 
         const listed = await adapter.listModels(provider);
 
@@ -512,7 +524,7 @@ export class AntigravityAdapterTests {
       Assert.areEqual(AuthStatus.LoggedIn, checked.authStatus);
       Assert.isNull(checked.error);
       Assert.areEqual("1.3.0", checked.harnessVersion);
-      Assert.isFalse(existsSync(join(provider.profileDir!, "auth-browser.txt")));
+      Assert.isFalse(existsSync(join(provider.profileDir, "auth-browser.txt")));
       Assert.isTrue(host.programs.started.length > 0);
       await host.programs.endedAt(host.programs.started.length);
       Assert.areEqual(host.programs.started.length, host.programs.ended.length);
@@ -525,7 +537,7 @@ export class AntigravityAdapterTests {
       const result = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "complete"), new RecordingTurnListener(), new AbortController().signal);
 
       Assert.areEqual(TurnOutcome.Completed, result.outcome);
-      Assert.areEqual("", readFileSync(join(provider.profileDir!, "auth-browser.txt"), "utf8"));
+      Assert.areEqual("", readFileSync(join(provider.profileDir, "auth-browser.txt"), "utf8"));
     }, { TEAMRUN_FAKE_ACP_RECORD_BROWSER: "1", BROWSER: "firefox" }, Resources.macPlatform);
   }
 
@@ -549,7 +561,7 @@ export class AntigravityAdapterTests {
       const result = await adapter.runTurn(AntigravityAdapterTests.request(host, provider, "complete"), new RecordingTurnListener(), new AbortController().signal);
 
       Assert.areEqual(TurnOutcome.Failed, result.outcome);
-      Assert.areEqual("", readFileSync(join(provider.profileDir!, "auth-browser.txt"), "utf8"));
+      Assert.areEqual("", readFileSync(join(provider.profileDir, "auth-browser.txt"), "utf8"));
       Assert.isTrue(host.programs.started.length > 0);
       await host.programs.endedAt(host.programs.started.length);
       Assert.areEqual(host.programs.started.length, host.programs.ended.length);
@@ -654,14 +666,11 @@ export class AntigravityAdapterTests {
     effort: string | null = null, compacts: boolean = false, mode: string | null = null): TurnRequest {
     return new TurnRequest(provider, host.directory.path, prompt, new RequestedSettings("antigravity", model, effort, null, mode), resume, [], null, null, {}, compacts);
   }
-}
 
-class ServerOnPath {
-  public readonly version: string;
-  public readonly installed: boolean;
-
-  public constructor(version: string, installed: boolean) {
-    this.version = version;
-    this.installed = installed;
+  private static echoed(listener: RecordingTurnListener): JsonReader {
+    const echoed = listener.texts.find(t => t.startsWith("{\"methods\""));
+    if (Object.isUndefined(echoed))
+      throw new Error("Antigravity was sent no prompt, so it echoed no methods.");
+    return JsonReader.parse(echoed);
   }
 }

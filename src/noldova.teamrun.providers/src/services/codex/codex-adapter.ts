@@ -20,7 +20,6 @@ import {
   type ISignInListener,
   type ITimer,
   type ITurnListener,
-  type McpEndpoint,
   NodeTimer,
   PlanReading,
   ProfileSearch,
@@ -68,12 +67,20 @@ import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
 import { CodexAccount } from "../../models/codex-account.js";
+import { CodexCatalog } from "../../models/codex-catalog.js";
+import { CodexIdleKeeping } from "../../models/codex-idle-keeping.js";
+import { CodexKeptThread } from "../../models/codex-kept-thread.js";
+import { CodexSandbox } from "../../models/codex-sandbox.js";
 import { CodexServerChoice } from "../../models/codex-server-choice.js";
+import { CodexThreadRelease } from "../../models/codex-thread-release.js";
+import { CodexToolGrant } from "../../models/codex-tool-grant.js";
+import { CodexVersionCheck } from "../../models/codex-version-check.js";
 import { CommandSource } from "../../models/command-source.js";
 import type { ProcessCommand } from "../../models/process-command.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
 import { ProviderAbilityTable } from "../../models/provider-ability-table.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
+import type { ServedEndpoint } from "../../models/served-endpoint.js";
 import { ThreadStartResult } from "../../models/thread-start-result.js";
 import { Resources } from "../../resources.js";
 import { CommandRefusal } from "../command-refusal.js";
@@ -116,12 +123,12 @@ export class CodexAdapter implements IProviderAdapter {
     new ProviderMode(Resources.codexDefaultMode, Resources.codexDefaultModeName, Resources.codexDefaultModeDescription),
     new ProviderMode(Resources.codexFullAccessMode, Resources.codexFullAccessModeName, Resources.codexFullAccessModeDescription, true),
     new ProviderMode(Resources.codexPlanMode, Resources.codexPlanModeName, Resources.codexPlanModeDescription, false, true)];
-  private static readonly sandboxes: Readonly<Record<string, readonly [string, string]>> = {
-    [Resources.codexReadOnlyMode]: [Resources.readOnlySandbox, Resources.onRequestApprovalPolicy],
-    [Resources.codexDefaultMode]: [Resources.workspaceWriteSandbox, Resources.onRequestApprovalPolicy],
-    [Resources.codexFullAccessMode]: [Resources.dangerFullAccessSandbox, Resources.neverApprovalPolicy],
-    [Resources.codexPlanMode]: [Resources.readOnlySandbox, Resources.onRequestApprovalPolicy]
-  };
+  private static readonly defaultSandbox: CodexSandbox = new CodexSandbox(Resources.codexDefaultMode, Resources.workspaceWriteSandbox, Resources.onRequestApprovalPolicy);
+  private static readonly sandboxes: readonly CodexSandbox[] = [
+    new CodexSandbox(Resources.codexReadOnlyMode, Resources.readOnlySandbox, Resources.onRequestApprovalPolicy),
+    CodexAdapter.defaultSandbox,
+    new CodexSandbox(Resources.codexFullAccessMode, Resources.dangerFullAccessSandbox, Resources.neverApprovalPolicy),
+    new CodexSandbox(Resources.codexPlanMode, Resources.readOnlySandbox, Resources.onRequestApprovalPolicy)];
   public readonly descriptor: ProviderKind;
   public readonly takesTeamRunTools: boolean = true;
   public readonly profileSearch: ProfileSearch;
@@ -157,15 +164,15 @@ export class CodexAdapter implements IProviderAdapter {
   private readonly turnEnds: Map<CodexTurn, (() => Promise<void>)[]> = new Map();
   private readonly leased: AppServerClient[] = [];
   private readonly retired: Set<AppServerClient> = new Set();
-  private readonly checks: WeakMap<AppServerClient, { stamp: string | null; done: Promise<void>; retryAt: number }> = new WeakMap();
+  private readonly checks: WeakMap<AppServerClient, CodexVersionCheck> = new WeakMap();
   private readonly reading: Set<Promise<void>> = new Set();
   private readonly stopping: AbortController = new AbortController();
   private readonly timer: ITimer;
   private readonly idleTimer: ITimer;
   private readonly idle: Map<AppServerClient, Deadline> = new Map();
   private readonly silences: Map<Deadline, string> = new Map();
-  private readonly kept: Map<Deadline, { readonly threadId: string; readonly held: ICodexHold; readonly resolve: () => void }> = new Map();
-  private readonly releases: Set<{ readonly threadId: string; readonly done: PromiseWithResolvers<void> }> = new Set();
+  private readonly kept: Map<Deadline, CodexKeptThread> = new Map();
+  private readonly releases: Set<CodexThreadRelease> = new Set();
   private readonly closing: Set<string> = new Set();
   private stopped: boolean = false;
 
@@ -240,18 +247,18 @@ export class CodexAdapter implements IProviderAdapter {
 
   public async listModels(provider: Provider | null, _refresh: boolean = false, workingDirectory: string | null = null): Promise<ProviderModelList> {
     return this.useClient(provider, async client => {
-      const [models, defaults] = await this.readCatalog(client, workingDirectory,
+      const catalog = await this.readCatalog(client, workingDirectory,
         t => CodexAdapter.withWindows(t, this.reportedWindows.get(CodexAdapter.windowKey(provider, t.id)) ?? null));
-      return new ProviderModelList(models, await this.readSignedIn(client), false, null, false, CodexAdapter.modes, Resources.codexDefaultMode,
-        false, null, Object.isNull(defaults));
+      return new ProviderModelList(catalog.models, await this.readSignedIn(client), false, null, false, CodexAdapter.modes, Resources.codexDefaultMode,
+        false, null, Object.isNull(catalog.defaults));
     });
   }
 
   private async readCatalog(client: AppServerClient, workingDirectory: string | null,
-    map: (model: ProviderModel) => ProviderModel = t => t): Promise<readonly [readonly ProviderModel[], CodexModelDefaults | null]> {
+    map: (model: ProviderModel) => ProviderModel = t => t): Promise<CodexCatalog> {
     const models = (await this.readModels(client)).map(map);
     const defaults = await this.readModelDefaults(client, workingDirectory);
-    return [defaults?.applyTo(models) ?? models, defaults];
+    return new CodexCatalog(defaults?.applyTo(models) ?? models, defaults);
   }
 
   public async signIn(provider: Provider, signal: AbortSignal, listener: ISignInListener): Promise<void> {
@@ -460,23 +467,18 @@ export class CodexAdapter implements IProviderAdapter {
     const endpoint = request.tools?.endpoint ?? null;
     const resumed = this.holdHeld(client, request.resumeNativeSessionId);
     const kept = resumed?.token ?? null;
-    const grant: { connection: { url: string; token: string } | null; revoke: () => void } = { connection: null, revoke: () => undefined };
-    const issue = (target: McpEndpoint): void => {
-      const token = target.issueKept();
-      grant.connection = { url: target.url, token };
-      grant.revoke = () => target.revoke(token);
-    };
+    const grant = new CodexToolGrant();
     if (!Object.isNull(endpoint)) {
       if (Object.isNull(kept))
-        issue(endpoint);
+        grant.issue(endpoint);
       else
-        grant.connection = { url: endpoint.url, token: kept };
+        grant.keep(endpoint.url, kept);
     }
     let started: ThreadStartResult | null;
     try {
       started = await this.openThread(client, request, requested, servers, listener, grant.connection, () => {
         if (!Object.isNull(endpoint) && !Object.isNull(kept))
-          issue(endpoint);
+          grant.issue(endpoint);
         return grant.connection;
       });
     }
@@ -522,7 +524,7 @@ export class CodexAdapter implements IProviderAdapter {
     const review = CodexCommand.of(request)?.reviewTarget ?? null;
     const held = resumes ? resumed : null;
     const changes = Object.isNull(held) || Object.isNull(input) || !Object.isNull(review) ? null : await this.changesFor(client, held, requested, request.workingDirectory);
-    return this.runTurnOnThread(client, turn, listener, input, before, signal, grant.revoke, grant.connection?.token ?? null,
+    return this.runTurnOnThread(client, turn, listener, input, before, signal, () => grant.revoke(), grant.connection?.token ?? null,
       SenderEnvironment.read(request.environment), tools, held, this.collaborationOf(requested, started),
       !resumes && Object.isNull(requested.contextWindow) && !Object.isNull(started.model) ? CodexAdapter.windowKey(request.provider, started.model) : null,
       CodexAdapter.modeOf(requested), requested.model, requested.effort, request.workingDirectory, params, changes, review);
@@ -533,7 +535,7 @@ export class CodexAdapter implements IProviderAdapter {
     const effort = requested.effort;
     if (!(Object.isNull(model) && !Object.isNull(held.model) || Object.isNull(effort) && !Object.isNull(held.effort)))
       return CodexAdapter.changesOf(held, model, effort, workingDirectory);
-    const [models] = await this.readCatalog(client, workingDirectory);
+    const { models } = await this.readCatalog(client, workingDirectory);
     const resolved = model ?? models.find(t => t.isDefault)?.id;
     const chosen = models.find(t => t.id === resolved);
     return CodexAdapter.changesOf(held, resolved, effort ?? chosen?.configuredEffort ?? chosen?.defaultEffort, workingDirectory);
@@ -811,15 +813,14 @@ export class CodexAdapter implements IProviderAdapter {
     });
   }
 
-  private keepIdle(threadId: string, held: ICodexHold): { readonly ended: Promise<void>;
-    readonly release: { readonly threadId: string; readonly done: PromiseWithResolvers<void> }; } {
+  private keepIdle(threadId: string, held: ICodexHold): CodexIdleKeeping {
     const kept = Promise.withResolvers<void>();
     const idle = new Deadline(this.idleTimer, this.timings.idleLimit, () => this.endKept(idle));
-    const release = { threadId, done: Promise.withResolvers<void>() };
+    const release = new CodexThreadRelease(threadId);
     this.releases.add(release);
-    this.kept.set(idle, { threadId, held, resolve: () => kept.resolve() });
+    this.kept.set(idle, new CodexKeptThread(threadId, held, () => kept.resolve()));
     idle.start();
-    return { ended: kept.promise, release };
+    return new CodexIdleKeeping(kept.promise, release);
   }
 
   private endKept(idle: Deadline): void {
@@ -851,7 +852,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private async releaseKept(threadId: string, release: () => Promise<void>,
-    kept: { readonly threadId: string; readonly done: PromiseWithResolvers<void> } | undefined): Promise<void> {
+    kept: CodexThreadRelease | undefined): Promise<void> {
     const unlock = await this.lockThread(threadId, false, null);
     try {
       await release();
@@ -1067,7 +1068,7 @@ export class CodexAdapter implements IProviderAdapter {
     const stamp = this.versionReader.readStamp(executable);
     let check = this.checks.get(client);
     if (Object.isUndefined(check) || check.stamp !== stamp || this.timer.now() >= check.retryAt) {
-      const started = { stamp, done: Promise.resolve(), retryAt: Number.POSITIVE_INFINITY };
+      const started = new CodexVersionCheck(stamp);
       started.done = this.checkVersion(key, existing, client, executable.withOrigin(this.originOf(provider)), started);
       const done = started.done;
       this.reading.add(done);
@@ -1079,7 +1080,7 @@ export class CodexAdapter implements IProviderAdapter {
     await check.done;
   }
 
-  private async checkVersion(key: string, existing: Promise<AppServerClient>, client: AppServerClient, command: ProcessCommand, check: { retryAt: number }): Promise<void> {
+  private async checkVersion(key: string, existing: Promise<AppServerClient>, client: AppServerClient, command: ProcessCommand, check: CodexVersionCheck): Promise<void> {
     const installed = await this.versionReader.read(command, this.baseEnvironment, this.stopping.signal);
     if (Object.isNull(installed))
       check.retryAt = this.timer.now() + this.timings.versionTimeout;
@@ -1190,7 +1191,7 @@ export class CodexAdapter implements IProviderAdapter {
     const client = new AppServerClient(
       (keepsOwnServers ? server : server.withArguments(Resources.codexConfigArgument, Resources.codexAppsOffArgument)).withOrigin(origin), environment, this.clientInfo,
       this.starter, this.timings, this.log);
-    this.checks.set(client, { stamp: this.versionReader.readStamp(command), done: Promise.resolve(), retryAt: Number.POSITIVE_INFINITY });
+    this.checks.set(client, new CodexVersionCheck(this.versionReader.readStamp(command)));
     client.setServerRequestHandler(this.router);
     const started = client.start();
     this.starting.add(client);
@@ -1234,8 +1235,8 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private async openThread(client: AppServerClient, request: TurnRequest, requested: RequestedSettings, servers: readonly string[] | null, listener: ITurnListener,
-    served: { url: string; token: string } | null, reissue: () => { url: string; token: string } | null): Promise<ThreadStartResult | null> {
-    const paramsOf = (connection: { url: string; token: string } | null): JsonObject => CodexAdapter.createThreadParams(request.workingDirectory, requested, servers,
+    served: ServedEndpoint | null, reissue: () => ServedEndpoint | null): Promise<ThreadStartResult | null> {
+    const paramsOf = (connection: ServedEndpoint | null): JsonObject => CodexAdapter.createThreadParams(request.workingDirectory, requested, servers,
       request.instructions, request.environment, CodexAdapter.teamRunServerOf(request.tools ?? null, connection), request.sharedServers, request.isolated);
     const params = paramsOf(served);
     const resumeId = request.resumeNativeSessionId;
@@ -1335,8 +1336,8 @@ export class CodexAdapter implements IProviderAdapter {
     return {
       cwd: workingDirectory,
       model: requested.model,
-      sandbox: isolated ? Resources.readOnlySandbox : CodexAdapter.sandboxOf(CodexAdapter.modeOf(requested))[0],
-      approvalPolicy: isolated ? Resources.neverApprovalPolicy : CodexAdapter.sandboxOf(CodexAdapter.modeOf(requested))[1],
+      sandbox: isolated ? Resources.readOnlySandbox : CodexAdapter.sandboxOf(CodexAdapter.modeOf(requested)).sandbox,
+      approvalPolicy: isolated ? Resources.neverApprovalPolicy : CodexAdapter.sandboxOf(CodexAdapter.modeOf(requested)).approvalPolicy,
       ephemeral: isolated,
       developerInstructions: instructions ?? String.empty,
       config,
@@ -1361,7 +1362,7 @@ export class CodexAdapter implements IProviderAdapter {
     return JSON.stringify([provider?.id ?? null, model]);
   }
 
-  private static teamRunServerOf(tools: TurnTools | null, served: { url: string; token: string } | null): JsonObject | null {
+  private static teamRunServerOf(tools: TurnTools | null, served: ServedEndpoint | null): JsonObject | null {
     if (Object.isNull(tools) || Object.isNull(served))
       return null;
     return {
@@ -1377,7 +1378,7 @@ export class CodexAdapter implements IProviderAdapter {
     if (!Object.isNull(command))
       return { command: CodexAdapter.launch.program, args: CodexAdapter.launch.argumentsOf(command, server.arguments, server.variables),
         env: CodexAdapter.launch.environmentOf({}), [Resources.codexEnvironmentVariablesSetting]: [...server.variables] };
-    const http: Record<string, JsonValue> = { url: server.url!, [Resources.codexHttpHeaderVariablesSetting]: Object.fromEntries(server.headers.map(t => [t.name, t.variable])) };
+    const http: Record<string, JsonValue> = { url: String(server.url), [Resources.codexHttpHeaderVariablesSetting]: Object.fromEntries(server.headers.map(t => [t.name, t.variable])) };
     if (!Object.isNull(server.bearerVariable))
       http[Resources.codexBearerVariableSetting] = server.bearerVariable;
     return http;
@@ -1476,8 +1477,8 @@ export class CodexAdapter implements IProviderAdapter {
     };
   }
 
-  private static sandboxOf(requested: string | null): readonly [string, string] {
-    return CodexAdapter.sandboxes[CodexAdapter.modes.find(t => t.id === requested)?.id ?? Resources.codexDefaultMode]!;
+  private static sandboxOf(requested: string | null): CodexSandbox {
+    return CodexAdapter.sandboxes.find(t => t.mode === requested) ?? CodexAdapter.defaultSandbox;
   }
 
   private static changesOf(held: ICodexHold, model: string | null | undefined, effort: string | null | undefined, cwd: string): JsonObject | null {
@@ -1488,7 +1489,7 @@ export class CodexAdapter implements IProviderAdapter {
   }
 
   private static policyOf(mode: string | null): JsonObject {
-    const [sandbox, approval] = CodexAdapter.sandboxOf(mode);
+    const { sandbox, approvalPolicy: approval } = CodexAdapter.sandboxOf(mode);
     const policy = sandbox === Resources.dangerFullAccessSandbox ? { type: Resources.dangerFullAccessPolicy }
       : sandbox === Resources.readOnlySandbox ? { type: Resources.readOnlyPolicy, networkAccess: false }
         : { type: Resources.workspaceWritePolicy, writableRoots: [], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: false };

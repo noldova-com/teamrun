@@ -119,7 +119,7 @@ export class AngularProject {
     if (!Array.isArray(include) || include.length === 0 || include.some(t => !Object.isString(t)))
       throw new ProcessException(`src/${AngularProject.WORKSPACE_FILE} names no spec files for its ${AngularProject.TEST_TARGET} target.`);
     const files: string[] = [];
-    for await (const file of glob(include as string[], { cwd: this.directory }))
+    for await (const file of glob(include.filter((t): t is string => Object.isString(t)), { cwd: this.directory }))
       files.push(this.specName(path.resolve(this.directory, file)));
     return files.sort();
   }
@@ -165,7 +165,7 @@ export class AngularProject {
   }
 
   private static field(value: unknown, name: string): unknown {
-    return Object.isObject(value) && !Array.isArray(value) ? (value as Record<string, unknown>)[name] : undefined;
+    return JsonFields.read(value, name);
   }
 
   public hasProject(): boolean {

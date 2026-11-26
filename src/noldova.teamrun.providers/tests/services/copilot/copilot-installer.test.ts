@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import type { ProviderKindVersions } from "@noldova/teamrun.core";
 import {
@@ -27,12 +28,54 @@ import {
   Resources
 } from "@noldova/teamrun.providers";
 
+import { CodedError } from "../../fixtures/coded-error.fixture.js";
+import { DownloadProgress } from "../../fixtures/download-progress.fixture.js";
 import { FakeTar } from "../../fixtures/fake-tar.fixture.js";
+import { FoundAfterInstallCase } from "../../fixtures/found-after-install-case.fixture.js";
+import { InstallCancelCase } from "../../fixtures/install-cancel-case.fixture.js";
 import { LocalHttpServer } from "../../fixtures/local-http-server.fixture.js";
 import { RecordedDelayTimer } from "../../fixtures/recorded-delay-timer.fixture.js";
 import { RecordingCommandRunner } from "../../fixtures/recording-command-runner.fixture.js";
+import { ReleaseBody } from "../../fixtures/release-body.fixture.js";
 import { TemporaryDirectory } from "../../fixtures/temporary-directory.fixture.js";
+import { UnpackFailureCase } from "../../fixtures/unpack-failure-case.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
+
+class FoundCopilot {
+  public readonly platform: string;
+  public readonly source: ExecutableSource;
+  public readonly versions: string;
+
+  public constructor(platform: string, source: ExecutableSource, versions: string) {
+    this.platform = platform;
+    this.source = source;
+    this.versions = versions;
+  }
+}
+
+class ChannelFailureCase {
+  public readonly channel: string;
+  public readonly message: string;
+
+  public constructor(channel: string, message: string) {
+    this.channel = channel;
+    this.message = message;
+  }
+}
+
+class BuildTargetCase {
+  public readonly platform: string;
+  public readonly architecture: string;
+  public readonly isMusl: boolean;
+  public readonly target: string | null;
+
+  public constructor(platform: string, architecture: string, isMusl: boolean, target: string | null) {
+    this.platform = platform;
+    this.architecture = architecture;
+    this.isMusl = isMusl;
+    this.target = target;
+  }
+}
 
 @TestClass
 export class CopilotInstallerTests {
@@ -44,20 +87,22 @@ export class CopilotInstallerTests {
     return CopilotInstallerTests.withReleases(async (server, directory) => {
       const archive = CopilotInstallerTests.publish(server, "/c", "1.0.103", "linux");
       const installer = CopilotInstallerTests.installer(server.url("/c"), directory);
-      const progress: number[][] = [];
+      const progress: DownloadProgress[] = [];
       Assert.isNull(installer.unavailable);
       Assert.isNull(installer.missingTool);
       Assert.isFalse(installer.isInstalled);
       Assert.isNull(installer.foundPath);
       Assert.areEqual("null null", CopilotInstallerTests.versions(await installer.readVersions(true)));
 
-      const path = await installer.install((received, total) => progress.push([received, total]), new AbortController().signal);
+      const path = await installer.install((received, total) => progress.push(new DownloadProgress(received, total)), new AbortController().signal);
 
       const bin = directory.resolve("home", ".local", "bin");
+      const last = progress.at(-1);
       Assert.areEqual(process.execPath, path);
       Assert.isTrue(installer.isInstalled);
       Assert.areEqual("1.0.103 1.0.103", CopilotInstallerTests.versions(await installer.readVersions(true)));
-      Assert.areEqual(JSON.stringify([archive.length, archive.length]), JSON.stringify(progress.at(-1)));
+      Assert.isDefined(last);
+      Assert.areEqual(`${archive.length} ${archive.length}`, `${last.received} ${last.total}`);
       Assert.areEqual("copilot", readdirSync(bin).join(","));
       if (process.platform !== "win32")
         Assert.isTrue((statSync(join(bin, "copilot")).mode & 0o111) !== 0);
@@ -117,10 +162,12 @@ export class CopilotInstallerTests {
     Assert.areEqual(3, result.exitCode);
     Assert.areEqual(2, runner.runs.length);
     Assert.areEqual("", leaked.join(), runner.runs.join("\n"));
-    Assert.isTrue(ran!.startsWith("<node> <temp>"), ran);
-    Assert.isTrue(ran!.includes(": exit 3, signal null, timed out false, stdout \"<temp>"), ran);
-    Assert.isTrue(ran!.endsWith(", stderr \"<home>|<node>|C:/Users/<user>/x|/home/<user>/x\""), ran);
-    Assert.isTrue(threw!.startsWith("<temp>") && threw!.includes(": threw Error:"), threw);
+    Assert.isDefined(ran);
+    Assert.isDefined(threw);
+    Assert.isTrue(ran.startsWith("<node> <temp>"), ran);
+    Assert.isTrue(ran.includes(": exit 3, signal null, timed out false, stdout \"<temp>"), ran);
+    Assert.isTrue(ran.endsWith(", stderr \"<home>|<node>|C:/Users/<user>/x|/home/<user>/x\""), ran);
+    Assert.isTrue(threw.startsWith("<temp>") && threw.includes(": threw Error:"), threw);
   }
 
   @TestMethod
@@ -154,7 +201,7 @@ export class CopilotInstallerTests {
       const settle = new InstallRename("win32", (from, to) => {
         if (whileRefused.length < 2) {
           whileRefused.push(readFileSync(join(folder, "copilot.exe"), "utf8"));
-          throw Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+          throw new CodedError("EPERM: operation not permitted", "EPERM");
         }
         renameSync(from, to);
       }, new RecordedDelayTimer());
@@ -177,7 +224,7 @@ export class CopilotInstallerTests {
     return CopilotInstallerTests.withReleases(async (server, directory) => {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "win32");
       const folder = CopilotInstallerTests.installedVersion(directory);
-      const refused = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const refused = new CodedError("EPERM: operation not permitted", "EPERM");
       const swaps: string[] = [];
       const settle = new InstallRename("win32", () => {
         throw refused;
@@ -203,7 +250,7 @@ export class CopilotInstallerTests {
     return CopilotInstallerTests.withReleases(async (server, directory) => {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "win32");
       const folder = CopilotInstallerTests.installedVersion(directory);
-      const refused = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+      const refused = new CodedError("EBUSY: resource busy or locked", "EBUSY");
       const installer = CopilotInstallerTests.installer(server.url("/c"), directory, "win32", undefined, undefined, undefined, undefined, undefined, (from, to) => {
         if (from === folder)
           throw refused;
@@ -225,7 +272,7 @@ export class CopilotInstallerTests {
     return CopilotInstallerTests.withReleases(async (server, directory) => {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "win32");
       const folder = CopilotInstallerTests.installedVersion(directory);
-      const refused = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const refused = new CodedError("EPERM: operation not permitted", "EPERM");
       const installer = CopilotInstallerTests.installer(server.url("/c"), directory, "win32", undefined, undefined, undefined, undefined, undefined, (from, to) => {
         if (to === folder && basename(from) === "ready")
           throw refused;
@@ -248,8 +295,8 @@ export class CopilotInstallerTests {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "win32");
       const installs = directory.resolve("data", "providers", "copilot");
       const folder = CopilotInstallerTests.installedVersion(directory);
-      const busy = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
-      const denied = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+      const busy = new CodedError("EBUSY: resource busy or locked", "EBUSY");
+      const denied = new CodedError("EPERM: operation not permitted", "EPERM");
       const refusing = (from: string, to: string): void => {
         if (to === folder)
           throw basename(from) === "previous" ? denied : busy;
@@ -286,7 +333,7 @@ export class CopilotInstallerTests {
       CopilotInstallerTests.publish(server, "/c", "1.0.103", "win32");
       const installs = directory.resolve("data", "providers", "copilot");
       const folder = CopilotInstallerTests.installedVersion(directory);
-      const busy = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+      const busy = new CodedError("EBUSY: resource busy or locked", "EBUSY");
       let holds = 1;
       const timer = new RecordedDelayTimer();
       const settle = new InstallRename("win32", (from, to) => {
@@ -329,7 +376,7 @@ export class CopilotInstallerTests {
       }
 
       const bin = join(local, "bin");
-      Assert.areEqual("EACCES", (failure.cause as NodeJS.ErrnoException).code);
+      Assert.areEqual("EACCES", CopilotInstallerTests.codeOf(failure.cause));
       Assert.areEqual(String.empty, readdirSync(local).join(","));
       Assert.areEqual(String.empty, CopilotInstallerTests.paths(server));
       Assert.areEqual(`TeamRun can't write to ${bin}, where GitHub Copilot goes. Nothing was installed.`, failure.message);
@@ -345,27 +392,27 @@ export class CopilotInstallerTests {
       const release = (assets: unknown, tag: unknown = "v1.0.103"): Buffer => Buffer.from(JSON.stringify({ tag_name: tag, assets }));
       const asset = (fields: Record<string, unknown>): unknown => ({ name, digest, browser_download_url: server.url("/archive"), ...fields });
       server.serve("/archive", archive).serve("/wrong", Buffer.from("other")).cut("/cut-archive", archive);
-      const bodies: readonly [string, Buffer][] = [["/not-json", Buffer.from("{")], ["/null", Buffer.from("null")], ["/no-tag", release([], 103)],
-        ["/other-tag", release([], "1.0.103")], ["/bad-version", release([], "vlatest")], ["/no-assets", release({})],
-        ["/no-build", release([null, asset({ name: "SHA256SUMS.txt" })])], ["/no-digest", release([asset({ digest: 7 })])],
-        ["/bare-digest", release([asset({ digest: digest.slice(7) })])], ["/short-digest", release([asset({ digest: "sha256:abc" })])],
-        ["/no-url", release([asset({ browser_download_url: null })])], ["/mismatch", release([asset({ browser_download_url: server.url("/wrong") })])],
-        ["/missing", release([asset({ browser_download_url: server.url("/gone") })])], ["/oversize", release([asset({ size: archive.length - 1 })])],
-        ["/cut", release([asset({ browser_download_url: server.url("/cut-archive") })])]];
-      for (const [path, body] of bodies)
+      const bodies = [new ReleaseBody("/not-json", Buffer.from("{")), new ReleaseBody("/null", Buffer.from("null")), new ReleaseBody("/no-tag", release([], 103)),
+        new ReleaseBody("/other-tag", release([], "1.0.103")), new ReleaseBody("/bad-version", release([], "vlatest")), new ReleaseBody("/no-assets", release({})),
+        new ReleaseBody("/no-build", release([null, asset({ name: "SHA256SUMS.txt" })])), new ReleaseBody("/no-digest", release([asset({ digest: 7 })])),
+        new ReleaseBody("/bare-digest", release([asset({ digest: digest.slice(7) })])), new ReleaseBody("/short-digest", release([asset({ digest: "sha256:abc" })])),
+        new ReleaseBody("/no-url", release([asset({ browser_download_url: null })])), new ReleaseBody("/mismatch", release([asset({ browser_download_url: server.url("/wrong") })])),
+        new ReleaseBody("/missing", release([asset({ browser_download_url: server.url("/gone") })])), new ReleaseBody("/oversize", release([asset({ size: archive.length - 1 })])),
+        new ReleaseBody("/cut", release([asset({ browser_download_url: server.url("/cut-archive") })]))];
+      for (const { path, body } of bodies)
         server.serve(path, body);
-      const cases: readonly [string, string][] = [
-        ["/gone", Resources.formatReleaseChannelFailed("GitHub Copilot", 404)],
-        ...["/not-json", "/null", "/no-tag", "/other-tag", "/bad-version"].map((t): [string, string] => [t, Resources.formatReleaseChannelUnreadable("GitHub Copilot")]),
-        ...["/no-assets", "/no-build", "/no-digest", "/bare-digest", "/short-digest", "/no-url"].map((t): [string, string] => [t, Resources.formatCopilotArchiveMissing("1.0.103")]),
-        ["/mismatch", Resources.formatDownloadMismatch("GitHub Copilot")],
-        ["/missing", Resources.formatDownloadFailed("GitHub Copilot", 404)],
-        ["/oversize", Resources.formatDownloadMismatch("GitHub Copilot")],
-        ["http://localhost:1/c", Resources.formatReleasesUnreachable("GitHub Copilot")],
-        ["/cut", Resources.formatReleasesUnreachable("GitHub Copilot")]
+      const cases = [
+        new ChannelFailureCase("/gone", Resources.formatReleaseChannelFailed("GitHub Copilot", 404)),
+        ...["/not-json", "/null", "/no-tag", "/other-tag", "/bad-version"].map(t => new ChannelFailureCase(t, Resources.formatReleaseChannelUnreadable("GitHub Copilot"))),
+        ...["/no-assets", "/no-build", "/no-digest", "/bare-digest", "/short-digest", "/no-url"].map(t => new ChannelFailureCase(t, Resources.formatCopilotArchiveMissing("1.0.103"))),
+        new ChannelFailureCase("/mismatch", Resources.formatDownloadMismatch("GitHub Copilot")),
+        new ChannelFailureCase("/missing", Resources.formatDownloadFailed("GitHub Copilot", 404)),
+        new ChannelFailureCase("/oversize", Resources.formatDownloadMismatch("GitHub Copilot")),
+        new ChannelFailureCase("http://localhost:1/c", Resources.formatReleasesUnreachable("GitHub Copilot")),
+        new ChannelFailureCase("/cut", Resources.formatReleasesUnreachable("GitHub Copilot"))
       ];
 
-      for (const [channel, message] of cases) {
+      for (const { channel, message } of cases) {
         const installer = CopilotInstallerTests.installer(channel.startsWith("http") ? channel : server.url(channel), directory);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, channel);
         Assert.isFalse(installer.isInstalled, channel);
@@ -379,14 +426,14 @@ export class CopilotInstallerTests {
   public saysWhyTarFailedDidntFinishOrLeftNoCopilotThatReportsTheVersion(): Promise<void> {
     return CopilotInstallerTests.withReleases(async (server, directory) => {
       const sleepingTar = new LocatedExecutable(process.execPath, ExecutableSource.Path, ["-e", CopilotInstallerTests.SLEEP, "--"]);
-      const cases: readonly [string, Buffer, LocatedExecutable | null, number, string][] = [
-        ["/broken", Buffer.from("not an archive"), null, 60_000, Resources.formatCopilotUnpackFailed(9)],
-        ["/hangs", CopilotInstallerTests.build("1.0.103", "linux"), sleepingTar, 200, Resources.formatCopilotUnpackFailed(null)],
-        ["/empty", FakeTar.archive({ "README.md": String.empty }), null, 60_000, Resources.formatCopilotIncomplete("1.0.103")],
-        ["/other-version", CopilotInstallerTests.build("1.0.103", "linux", "GitHub Copilot CLI 1.0.90"), null, 60_000, Resources.formatCopilotIncomplete("1.0.103")]
+      const cases = [
+        new UnpackFailureCase("/broken", Buffer.from("not an archive"), null, 60_000, Resources.formatCopilotUnpackFailed(9)),
+        new UnpackFailureCase("/hangs", CopilotInstallerTests.build("1.0.103", "linux"), sleepingTar, 200, Resources.formatCopilotUnpackFailed(null)),
+        new UnpackFailureCase("/empty", FakeTar.archive({ "README.md": String.empty }), null, 60_000, Resources.formatCopilotIncomplete("1.0.103")),
+        new UnpackFailureCase("/other-version", CopilotInstallerTests.build("1.0.103", "linux", "GitHub Copilot CLI 1.0.90"), null, 60_000, Resources.formatCopilotIncomplete("1.0.103"))
       ];
 
-      for (const [channel, archive, extractor, timeout, message] of cases) {
+      for (const { channel, archive, extractor, timeout, message } of cases) {
         CopilotInstallerTests.publish(server, channel, "1.0.103", "linux", archive);
         const root = directory.resolve(channel.slice(1));
         const installer = CopilotInstallerTests.installer(server.url(channel), root, "linux", extractor ?? undefined, timeout);
@@ -409,13 +456,13 @@ export class CopilotInstallerTests {
       const silent = directory.resolve("silent.cjs");
       writeFileSync(silent, String.empty);
       const installs = directory.resolve("data", "providers", "copilot");
-      const cases: readonly [string, (() => LocatedExecutable | null), string][] = [
-        ["other", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [other]), Resources.formatCopilotShadowed("1.0.103", installs, process.execPath, "1.0.90")],
-        ["silent", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [silent]), Resources.formatCopilotShadowed("1.0.103", installs, process.execPath, null)],
-        ["none", () => null, Resources.formatCopilotNotFoundAfterInstall(installs)]
+      const cases = [
+        new FoundAfterInstallCase("other", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [other]), Resources.formatCopilotShadowed("1.0.103", installs, process.execPath, "1.0.90")),
+        new FoundAfterInstallCase("silent", () => new LocatedExecutable(process.execPath, ExecutableSource.Path, [silent]), Resources.formatCopilotShadowed("1.0.103", installs, process.execPath, null)),
+        new FoundAfterInstallCase("none", () => null, Resources.formatCopilotNotFoundAfterInstall(installs))
       ];
 
-      for (const [name, locate, message] of cases) {
+      for (const { name, locate, message } of cases) {
         const installer = CopilotInstallerTests.installer(server.url("/c"), directory, "win32", undefined, undefined, undefined, locate);
         Assert.areEqual(message, (await Assert.throwsAsync(() => installer.install(() => undefined, new AbortController().signal), Error)).message, name);
       }
@@ -440,19 +487,19 @@ export class CopilotInstallerTests {
       const started = directory.resolve("tar-started");
       const sleepingTar = new LocatedExecutable(process.execPath, ExecutableSource.Path,
         ["-e", `require("node:fs").writeFileSync(${JSON.stringify(started)}, "");${CopilotInstallerTests.SLEEP}`, "--"]);
-      const cases: readonly [string, AbortController, CopilotInstaller, () => void][] = [
-        ["before", early, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("before"), "win32"), () => undefined],
-        ["during the download", during, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("during"), "win32"), () => during.abort()],
-        ["while unpacking", unpacking, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("unpacking"), "win32", sleepingTar), () => {
+      const cases = [
+        new InstallCancelCase("before", early, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("before"), "win32"), () => undefined),
+        new InstallCancelCase("during the download", during, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("during"), "win32"), () => during.abort()),
+        new InstallCancelCase("while unpacking", unpacking, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("unpacking"), "win32", sleepingTar), () => {
           void Wait.until(() => existsSync(started), "The installer did not start.").then(() => unpacking.abort());
-        }],
-        ["while checking", checking, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("checking"), "win32", undefined, undefined, path => {
+        }),
+        new InstallCancelCase("while checking", checking, CopilotInstallerTests.installer(server.url("/c"), directory.resolve("checking"), "win32", undefined, undefined, path => {
           checking.abort();
           return new ProcessCommand(process.execPath, [path]);
-        }), () => undefined]
+        }), () => undefined)
       ];
 
-      for (const [step, controller, installer, progress] of cases) {
+      for (const { step, controller, installer, progress } of cases) {
         Assert.areEqual(Resources.formatInstallCancelled("GitHub Copilot"), (await Assert.throwsAsync(() => installer.install(progress, controller.signal), InstallCancelledException)).message, step);
         Assert.isFalse(installer.isInstalled, step);
       }
@@ -566,13 +613,14 @@ export class CopilotInstallerTests {
 
   @TestMethod
   public namesTheBuildForEachSupportedComputerWithMuslLinuxApart(): void {
-    const cases: readonly [string, string, boolean, string | null][] = [
-      ["darwin", "arm64", false, "darwin-arm64"], ["darwin", "x64", true, "darwin-x64"], ["linux", "x64", false, "linux-x64"], ["linux", "arm64", false, "linux-arm64"],
-      ["linux", "x64", true, "linuxmusl-x64"], ["linux", "arm64", true, "linuxmusl-arm64"], ["win32", "x64", false, "win32-x64"], ["win32", "arm64", false, "win32-arm64"],
-      ["win32", "ia32", false, null], ["freebsd", "x64", false, null]
+    const cases = [
+      new BuildTargetCase("darwin", "arm64", false, "darwin-arm64"), new BuildTargetCase("darwin", "x64", true, "darwin-x64"), new BuildTargetCase("linux", "x64", false, "linux-x64"),
+      new BuildTargetCase("linux", "arm64", false, "linux-arm64"), new BuildTargetCase("linux", "x64", true, "linuxmusl-x64"), new BuildTargetCase("linux", "arm64", true, "linuxmusl-arm64"),
+      new BuildTargetCase("win32", "x64", false, "win32-x64"), new BuildTargetCase("win32", "arm64", false, "win32-arm64"), new BuildTargetCase("win32", "ia32", false, null),
+      new BuildTargetCase("freebsd", "x64", false, null)
     ];
 
-    for (const [platform, architecture, isMusl, target] of cases)
+    for (const { platform, architecture, isMusl, target } of cases)
       Assert.areEqual(target, CopilotInstaller.targetOf(platform, architecture, isMusl), `${platform} ${architecture} ${isMusl}`);
   }
 
@@ -600,10 +648,10 @@ export class CopilotInstallerTests {
   private static installer(channel: string, directory: TemporaryDirectory | string, platform: string = "linux",
     extractor: LocatedExecutable | null | undefined = undefined, unpackTimeout: number = 60_000,
     program: (path: string) => ProcessCommand = path => new ProcessCommand(process.execPath, [path]),
-    locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CopilotInstallerTests.TARGETS[platform]!,
+    locate: (() => LocatedExecutable | null) | undefined = undefined, target: string | null = CopilotInstallerTests.targetFor(platform),
     rename: (from: string, to: string) => void = renameSync, settle: (from: string, to: string) => Promise<void> = async (from, to) => rename(from, to),
     runner: CommandRunner = new CommandRunner(new NodeProcessStarter(new ProcessTerminator(process.platform)))): CopilotInstaller {
-    const root = typeof directory === "string" ? directory : directory.path;
+    const root = Object.isString(directory) ? directory : directory.path;
     mkdirSync(root, { recursive: true });
     const installs = CopilotInstallerTests.installs(root, platform);
     const locator = new ExecutableLocator(platform, "x64", [], join(root, "home"), join(root, "local"));
@@ -613,6 +661,18 @@ export class CopilotInstallerTests {
     };
     return new CopilotInstaller(locate ?? found, new ExecutableVersionReader(runner, 60_000), process.env, channel, installs, target, platform,
       Object.isUndefined(extractor) ? FakeTar.create(root) : extractor, runner, program, rename, settle, unpackTimeout, 60_000);
+  }
+
+  private static targetFor(platform: string): string {
+    const target = CopilotInstallerTests.TARGETS[platform];
+    if (Object.isUndefined(target))
+      throw new Error(`No build target is listed for ${platform}.`);
+
+    return target;
+  }
+
+  private static codeOf(error: unknown): string {
+    return error instanceof Error && "code" in error ? String(error.code) : String.empty;
   }
 
   private static installs(root: string, platform: string): string {
@@ -638,17 +698,5 @@ export class CopilotInstallerTests {
 
   private static versions(versions: ProviderKindVersions): string {
     return `${versions.installed} ${versions.latest}`;
-  }
-}
-
-class FoundCopilot {
-  public readonly platform: string;
-  public readonly source: ExecutableSource;
-  public readonly versions: string;
-
-  public constructor(platform: string, source: ExecutableSource, versions: string) {
-    this.platform = platform;
-    this.source = source;
-    this.versions = versions;
   }
 }

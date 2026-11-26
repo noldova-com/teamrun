@@ -13,6 +13,7 @@ import type { Writable } from "node:stream";
 
 import "@noldova/context.core";
 
+import { JsonFields } from "../totals/json-fields.ts";
 import { FlakyRecordException } from "./flaky-record.exception.ts";
 import { FlakyTest } from "./flaky-test.ts";
 
@@ -47,10 +48,9 @@ export class FlakyRecord {
     if (!Array.isArray(value))
       throw new FlakyRecordException(FlakyRecord.MALFORMED);
     return value.map(t => {
-      if (!Object.isObject(t) || FlakyRecord.FIELDS.some(u => !Object.isString((t as Record<string, unknown>)[u])))
+      if (FlakyRecord.FIELDS.some(u => !Object.isString(JsonFields.read(t, u))))
         throw new FlakyRecordException(FlakyRecord.MALFORMED);
-      const fields = t as Record<string, string>;
-      return new FlakyTest(String(fields["runner"]), String(fields["file"]), String(fields["name"]), String(fields["failure"]));
+      return new FlakyTest(String(JsonFields.read(t, "runner")), String(JsonFields.read(t, "file")), String(JsonFields.read(t, "name")), String(JsonFields.read(t, "failure")));
     });
   }
 

@@ -7,15 +7,21 @@
  */
 
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
-import type { JsonObject, JsonValue } from "@noldova/context.json";
+import type { JsonObject } from "@noldova/context.json";
 import { Resources as CoreResources } from "@noldova/teamrun.core";
 import { BackgroundTaskStatus, PlanStepStatus, Resources as ProtocolResources, SubAgentStatus } from "@noldova/teamrun.protocol";
 
 import { CommandKind } from "./enums/command-kind.js";
 import { ShellDialect } from "./enums/shell-dialect.js";
 import { WriteKind } from "./enums/write-kind.js";
+import { AntigravityReleaseTarget } from "./models/antigravity-release-target.js";
 import { CmdletParameters } from "./models/cmdlet-parameters.js";
+import { CodexChildAnswer } from "./models/codex-child-answer.js";
 import { CommandFlags } from "./models/command-flags.js";
+import { CursorReleaseTarget } from "./models/cursor-release-target.js";
+import { GrokReleaseTarget } from "./models/grok-release-target.js";
+import type { ListedProcess } from "./models/listed-process.js";
+import { NameGroup } from "./models/name-group.js";
 
 export class Resources {
   public static readonly acpBase64Encoding: BufferEncoding = "base64";
@@ -838,14 +844,13 @@ export class Resources {
   public static readonly savedSecretsFromEnvironmentOnlyShort: string = "reads values only from its environment";
   public static readonly sharedMcpUnconfirmedShort: string = "not confirmed yet";
   public static readonly antigravityExcludedEnvironment: RegExp = /(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)|^(?:GEMINI|GOOGLE|GCLOUD|CLOUDSDK|AGY|ANTIGRAVITY)_|^(?:BROWSER|PYTHONUNBUFFERED|ELECTRON_RUN_AS_NODE|TEMP|TMP|TMPDIR)$/i;
-  public static readonly antigravityReleases: readonly { readonly target: string; readonly file: string; readonly sha256: string; readonly archiveBytes: number;
-    readonly executableBytes: number; readonly harnessBytes: number }[] = [
-    { target: "darwin-arm64", file: "macos/agy-acp-server-1.3.0-darwin-arm64.zip", sha256: "7cd97045f7b4fe81175a107cdf16f9c51484e3c78a5162cae415338bb6aa5b88", archiveBytes: 111_456_962, executableBytes: 278_535_456, harnessBytes: 118_611_392 },
-    { target: "darwin-x64", file: "macos/agy-acp-server-1.3.0-darwin-x86_64.zip", sha256: "bb23956b89984bf5d354af2c3725e6c57f0cc1b7228e77a0e91c9c2bc1d47646", archiveBytes: 117_245_544, executableBytes: 282_840_688, harnessBytes: 124_175_392 },
-    { target: "linux-x64", file: "linux/agy-acp-server-1.3.0-linux-x86_64.zip", sha256: "9fb60956af0a9d76220a4db91ca9ac88e2a2372ad68f985ab5fceace6b825b96", archiveBytes: 333_727_150, executableBytes: 926_533_965, harnessBytes: 130_388_040 },
-    { target: "linux-arm64", file: "linux/agy-acp-server-1.3.0-linux-arm64.zip", sha256: "500b0bc0fb858e88f4df404d4cedf80bf9298c178291e39e383d6c50b111cbdf", archiveBytes: 321_690_363, executableBytes: 930_848_992, harnessBytes: 123_224_968 },
-    { target: "win32-x64", file: "windows/agy-acp-server-1.3.0-windows-x86_64.zip", sha256: "65215e0688681fa3116e048a9eab27ef53af1bbd6f3da3f1c52bd4911d8b17f9", archiveBytes: 124_509_787, executableBytes: 81_437_336, harnessBytes: 145_548_952 },
-    { target: "win32-arm64", file: "windows/agy-acp-server-1.3.0-windows-arm64.zip", sha256: "4a0f469720e9beb9438a979f543fdbfad5022ebe0992c052c590bd78b3144ca3", archiveBytes: 124_654_803, executableBytes: 85_893_472, harnessBytes: 135_640_216 }
+  public static readonly antigravityReleases: readonly AntigravityReleaseTarget[] = [
+    new AntigravityReleaseTarget("darwin-arm64", "macos/agy-acp-server-1.3.0-darwin-arm64.zip", "7cd97045f7b4fe81175a107cdf16f9c51484e3c78a5162cae415338bb6aa5b88", 111_456_962, 278_535_456, 118_611_392),
+    new AntigravityReleaseTarget("darwin-x64", "macos/agy-acp-server-1.3.0-darwin-x86_64.zip", "bb23956b89984bf5d354af2c3725e6c57f0cc1b7228e77a0e91c9c2bc1d47646", 117_245_544, 282_840_688, 124_175_392),
+    new AntigravityReleaseTarget("linux-x64", "linux/agy-acp-server-1.3.0-linux-x86_64.zip", "9fb60956af0a9d76220a4db91ca9ac88e2a2372ad68f985ab5fceace6b825b96", 333_727_150, 926_533_965, 130_388_040),
+    new AntigravityReleaseTarget("linux-arm64", "linux/agy-acp-server-1.3.0-linux-arm64.zip", "500b0bc0fb858e88f4df404d4cedf80bf9298c178291e39e383d6c50b111cbdf", 321_690_363, 930_848_992, 123_224_968),
+    new AntigravityReleaseTarget("win32-x64", "windows/agy-acp-server-1.3.0-windows-x86_64.zip", "65215e0688681fa3116e048a9eab27ef53af1bbd6f3da3f1c52bd4911d8b17f9", 124_509_787, 81_437_336, 145_548_952),
+    new AntigravityReleaseTarget("win32-arm64", "windows/agy-acp-server-1.3.0-windows-arm64.zip", "4a0f469720e9beb9438a979f543fdbfad5022ebe0992c052c590bd78b3144ca3", 124_654_803, 85_893_472, 135_640_216)
   ];
   public static readonly antigravityDownloadBase: string = "https://dl.google.com/agy-extensions/releases/";
   public static readonly antigravityNoRelease: string = "Antigravity's ACP server has no build for this computer.";
@@ -1057,7 +1062,8 @@ export class Resources {
   public static readonly geminiTrueValue: string = "true";
   public static readonly geminiFalseValue: string = "false";
   public static readonly geminiCliSkipTrustArgument: string = "--skip-trust";
-  public static readonly geminiCliListsToolsBeforeSession: readonly [number, number] = [0, 67];
+  public static readonly geminiCliListsToolsBeforeSessionMajor: number = 0;
+  public static readonly geminiCliListsToolsBeforeSessionMinor: number = 67;
   public static readonly versionSeparator: string = ".";
   public static readonly geminiMacSystemSettings: string = "/Library/Application Support/GeminiCli/settings.json";
   public static readonly geminiWindowsSystemSettings: string = "C:\\ProgramData\\gemini-cli\\settings.json";
@@ -1183,14 +1189,13 @@ export class Resources {
   public static readonly opencodeSubscribeUrl: string = "https://opencode.ai";
   public static readonly grokVersion: string = "1.0.70";
   public static readonly grokDownloadBase: string = "https://x.ai/cli/";
-  public static readonly grokReleases: readonly { readonly target: string; readonly file: string; readonly sha256: string; readonly archiveBytes: number;
-    readonly program: string; readonly programBytes: number }[] = [
-    { target: "darwin-arm64", file: "grok-1.0.70-macos-aarch64.gz", sha256: "9c83a2b8b28064574b65e1fa50e8342dd5d797d81c5c724c1d60bb0ad35e3199", archiveBytes: 72_479_908, program: "grok-macos-aarch64", programBytes: 179_063_008 },
-    { target: "darwin-x64", file: "grok-1.0.70-macos-x86_64.gz", sha256: "0d2a0916d64a553cd889ad0753257c8d5aeb76085f0661be1630f8cbcf0bf171", archiveBytes: 78_096_674, program: "grok-macos-x86_64", programBytes: 193_578_304 },
-    { target: "linux-x64", file: "grok-1.0.70-linux-x86_64.gz", sha256: "11d27a30adfb75c4b9b180072ab27412a1916f054ff5497ab70fb9a77d304bcc", archiveBytes: 76_760_282, program: "grok-linux-x86_64", programBytes: 195_700_192 },
-    { target: "linux-arm64", file: "grok-1.0.70-linux-aarch64.gz", sha256: "0d9e47fc2cb14db2f52f99e9289c41b3723b64de05c284a9f18c2e8df52550cf", archiveBytes: 71_629_408, program: "grok-linux-aarch64", programBytes: 166_639_048 },
-    { target: "win32-x64", file: "grok-1.0.70-windows-x86_64.exe.gz", sha256: "211f1cc44ecebfb8032dd2ee1b00ebe285175c3d319da59d14b47d11577c4391", archiveBytes: 69_748_695, program: "grok-windows-x86_64.exe", programBytes: 176_011_920 },
-    { target: "win32-arm64", file: "grok-1.0.70-windows-aarch64.exe.gz", sha256: "6081ab4f7c8a0044283c2242a8b8d3d62d3ab66613ff981520b474629e49532d", archiveBytes: 65_758_265, program: "grok-windows-aarch64.exe", programBytes: 149_485_200 }
+  public static readonly grokReleases: readonly GrokReleaseTarget[] = [
+    new GrokReleaseTarget("darwin-arm64", "grok-1.0.70-macos-aarch64.gz", "9c83a2b8b28064574b65e1fa50e8342dd5d797d81c5c724c1d60bb0ad35e3199", 72_479_908, "grok-macos-aarch64", 179_063_008),
+    new GrokReleaseTarget("darwin-x64", "grok-1.0.70-macos-x86_64.gz", "0d2a0916d64a553cd889ad0753257c8d5aeb76085f0661be1630f8cbcf0bf171", 78_096_674, "grok-macos-x86_64", 193_578_304),
+    new GrokReleaseTarget("linux-x64", "grok-1.0.70-linux-x86_64.gz", "11d27a30adfb75c4b9b180072ab27412a1916f054ff5497ab70fb9a77d304bcc", 76_760_282, "grok-linux-x86_64", 195_700_192),
+    new GrokReleaseTarget("linux-arm64", "grok-1.0.70-linux-aarch64.gz", "0d9e47fc2cb14db2f52f99e9289c41b3723b64de05c284a9f18c2e8df52550cf", 71_629_408, "grok-linux-aarch64", 166_639_048),
+    new GrokReleaseTarget("win32-x64", "grok-1.0.70-windows-x86_64.exe.gz", "211f1cc44ecebfb8032dd2ee1b00ebe285175c3d319da59d14b47d11577c4391", 69_748_695, "grok-windows-x86_64.exe", 176_011_920),
+    new GrokReleaseTarget("win32-arm64", "grok-1.0.70-windows-aarch64.exe.gz", "6081ab4f7c8a0044283c2242a8b8d3d62d3ab66613ff981520b474629e49532d", 65_758_265, "grok-windows-aarch64.exe", 149_485_200)
   ];
   public static readonly grokDownloadsDirectoryName: string = "downloads";
   public static readonly grokArchiveName: string = "grok.gz";
@@ -1663,40 +1668,55 @@ export class Resources {
   public static readonly currentFolder: string = ".";
   public static readonly folderSeparator: string = "/";
   public static readonly writeKinds: Readonly<Record<ShellDialect, ReadonlyMap<string, WriteKind>>> = {
-    [ShellDialect.Posix]: new Map<string, WriteKind>([
-      ...["echo", "printf", "cat", "ls", "dir", "grep", "egrep", "fgrep", "rg", "head", "tail", "wc", "pwd", "true", "false", "test", "[", "[[", "]]",
+    [ShellDialect.Posix]: Resources.mapOfNames([
+      new NameGroup(["echo", "printf", "cat", "ls", "dir", "grep", "egrep", "fgrep", "rg", "head", "tail", "wc", "pwd", "true", "false", "test", "[", "[[", "]]",
         "which", "type", "date", "sleep", "stat", "file", "diff", "cmp", "cut", "tr", "basename", "dirname", "realpath", "readlink", "du", "df", "jq",
         "nl", "od", "column", "fold", "seq", "sha256sum", "sha1sum", "md5sum", "cksum", "mkdir", "chmod", "chown", "export", "set", "unset", "local",
         "declare", "shopt", ":", "exit", "return", "wait", "uname", "whoami", "hostname", "fi", "done", "}", "for", "select", "in"
-      ].map(t => [t, WriteKind.Quiet] as const),
-      ["cd", WriteKind.ChangeFolder], ["pushd", WriteKind.PushFolder], ["popd", WriteKind.PopFolder], ["git", WriteKind.Git],
-      ["touch", WriteKind.Files], ["tee", WriteKind.Files], ["truncate", WriteKind.Files], ["cp", WriteKind.Copy], ["install", WriteKind.Copy],
-      ["ln", WriteKind.Copy], ["mv", WriteKind.Move], ["rm", WriteKind.Remove], ["unlink", WriteKind.Remove], ["sed", WriteKind.StreamEdit],
-      ["dd", WriteKind.DiskDump], ["sort", WriteKind.Sort], ["curl", WriteKind.Download], ["wget", WriteKind.Fetch], ["find", WriteKind.Find]
+      ], WriteKind.Quiet),
+      new NameGroup(["cd"], WriteKind.ChangeFolder),
+      new NameGroup(["pushd"], WriteKind.PushFolder),
+      new NameGroup(["popd"], WriteKind.PopFolder),
+      new NameGroup(["git"], WriteKind.Git),
+      new NameGroup(["touch", "tee", "truncate"], WriteKind.Files),
+      new NameGroup(["cp", "install", "ln"], WriteKind.Copy),
+      new NameGroup(["mv"], WriteKind.Move),
+      new NameGroup(["rm", "unlink"], WriteKind.Remove),
+      new NameGroup(["sed"], WriteKind.StreamEdit),
+      new NameGroup(["dd"], WriteKind.DiskDump),
+      new NameGroup(["sort"], WriteKind.Sort),
+      new NameGroup(["curl"], WriteKind.Download),
+      new NameGroup(["wget"], WriteKind.Fetch),
+      new NameGroup(["find"], WriteKind.Find)
     ]),
-    [ShellDialect.PowerShell]: new Map<string, WriteKind>([
-      ...["get-content", "gc", "cat", "type", "get-childitem", "gci", "ls", "dir", "select-string", "sls", "write-output", "echo", "write", "write-host",
+    [ShellDialect.PowerShell]: Resources.mapOfNames([
+      new NameGroup(["get-content", "gc", "cat", "type", "get-childitem", "gci", "ls", "dir", "select-string", "sls", "write-output", "echo", "write", "write-host",
         "get-location", "gl", "pwd", "test-path", "get-item", "gi", "get-itemproperty", "gp", "measure-object", "measure", "select-object", "select",
         "sort-object", "sort", "format-table", "ft", "format-list", "fl", "out-string", "out-null", "out-host", "oh", "get-date", "start-sleep", "sleep",
         "resolve-path", "rvpa", "split-path", "join-path", "get-command", "gcm", "get-process", "gps", "ps", "get-filehash", "convertto-json",
         "convertfrom-json", "rg", "findstr", "mkdir", "md", "exit", "return"
-      ].map(t => [t, WriteKind.Quiet] as const),
-      ...["set-location", "sl", "cd", "chdir"].map(t => [t, WriteKind.ChangeFolder] as const),
-      ...["push-location", "pushd"].map(t => [t, WriteKind.PushFolder] as const),
-      ...["pop-location", "popd"].map(t => [t, WriteKind.PopFolder] as const),
-      ...["out-file", "set-content", "sc", "add-content", "ac", "clear-content", "clc", "tee-object", "tee"].map(t => [t, WriteKind.Files] as const),
-      ...["new-item", "ni"].map(t => [t, WriteKind.NewItem] as const),
-      ...["copy-item", "cp", "copy", "cpi"].map(t => [t, WriteKind.Copy] as const),
-      ...["move-item", "mv", "move", "mi"].map(t => [t, WriteKind.Move] as const),
-      ...["remove-item", "rm", "del", "erase", "ri", "rd", "rmdir"].map(t => [t, WriteKind.Remove] as const),
-      ...["rename-item", "ren", "rni"].map(t => [t, WriteKind.Rename] as const),
-      ["git", WriteKind.Git]
+      ], WriteKind.Quiet),
+      new NameGroup(["set-location", "sl", "cd", "chdir"], WriteKind.ChangeFolder),
+      new NameGroup(["push-location", "pushd"], WriteKind.PushFolder),
+      new NameGroup(["pop-location", "popd"], WriteKind.PopFolder),
+      new NameGroup(["out-file", "set-content", "sc", "add-content", "ac", "clear-content", "clc", "tee-object", "tee"], WriteKind.Files),
+      new NameGroup(["new-item", "ni"], WriteKind.NewItem),
+      new NameGroup(["copy-item", "cp", "copy", "cpi"], WriteKind.Copy),
+      new NameGroup(["move-item", "mv", "move", "mi"], WriteKind.Move),
+      new NameGroup(["remove-item", "rm", "del", "erase", "ri", "rd", "rmdir"], WriteKind.Remove),
+      new NameGroup(["rename-item", "ren", "rni"], WriteKind.Rename),
+      new NameGroup(["git"], WriteKind.Git)
     ]),
-    [ShellDialect.Cmd]: new Map<string, WriteKind>([
-      ...["echo", "type", "dir", "findstr", "rg", "mkdir", "md", "rem", "::", "cls", "ver", "exit"].map(t => [t, WriteKind.Quiet] as const),
-      ["cd", WriteKind.ChangeFolder], ["chdir", WriteKind.ChangeFolder], ["pushd", WriteKind.PushFolder], ["popd", WriteKind.PopFolder],
-      ["git", WriteKind.Git], ["copy", WriteKind.Copy], ["move", WriteKind.Move], ["del", WriteKind.Remove], ["erase", WriteKind.Remove],
-      ["ren", WriteKind.Rename], ["rename", WriteKind.Rename]
+    [ShellDialect.Cmd]: Resources.mapOfNames([
+      new NameGroup(["echo", "type", "dir", "findstr", "rg", "mkdir", "md", "rem", "::", "cls", "ver", "exit"], WriteKind.Quiet),
+      new NameGroup(["cd", "chdir"], WriteKind.ChangeFolder),
+      new NameGroup(["pushd"], WriteKind.PushFolder),
+      new NameGroup(["popd"], WriteKind.PopFolder),
+      new NameGroup(["git"], WriteKind.Git),
+      new NameGroup(["copy"], WriteKind.Copy),
+      new NameGroup(["move"], WriteKind.Move),
+      new NameGroup(["del", "erase"], WriteKind.Remove),
+      new NameGroup(["ren", "rename"], WriteKind.Rename)
     ])
   };
   public static readonly writeFlags: ReadonlyMap<string, CommandFlags> = new Map([
@@ -1728,24 +1748,24 @@ export class Resources {
   public static readonly outputDocumentFlags: readonly string[] = ["-O", "--output-document"];
   public static readonly diskDumpOutputPrefix: string = "of=";
   public static readonly findWritingActions: readonly string[] = ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"];
-  public static readonly cmdletWriteParameters: ReadonlyMap<string, CmdletParameters> = new Map(([
-    [["set-location", "sl", "cd", "chdir", "push-location", "pushd"], Resources.setLocationParameters],
-    [["pop-location", "popd"], new CmdletParameters([], [])],
-    [["out-file"], new CmdletParameters(["-append", "-force", "-noclobber", "-nonewline"], ["-filepath", "-path", "-literalpath", "-encoding", "-width",
-      "-inputobject"])],
-    [["set-content", "sc", "add-content", "ac"], new CmdletParameters(["-force", "-nonewline", "-passthru", "-asbytestream"], ["-path", "-literalpath",
-      "-value", "-encoding", "-filter", "-include", "-exclude", "-stream"])],
-    [["clear-content", "clc"], new CmdletParameters(["-force"], ["-path", "-literalpath", "-filter", "-include", "-exclude", "-stream"])],
-    [["tee-object", "tee"], new CmdletParameters(["-append"], ["-filepath", "-literalpath", "-variable", "-inputobject", "-encoding"])],
-    [["new-item", "ni"], new CmdletParameters(["-force"], ["-path", "-name", "-itemtype", "-type", "-value"])],
-    [["copy-item", "cp", "copy", "cpi"], new CmdletParameters(["-force", "-recurse", "-passthru", "-container"], ["-path", "-literalpath", "-destination",
-      "-filter", "-include", "-exclude"])],
-    [["move-item", "mv", "move", "mi"], new CmdletParameters(["-force", "-passthru"], ["-path", "-literalpath", "-destination", "-filter", "-include",
-      "-exclude"])],
-    [["remove-item", "rm", "del", "erase", "ri", "rd", "rmdir"], new CmdletParameters(["-force", "-recurse"], ["-path", "-literalpath", "-filter",
-      "-include", "-exclude"])],
-    [["rename-item", "ren", "rni"], new CmdletParameters(["-force", "-passthru"], ["-path", "-literalpath", "-newname"])]
-  ] as [readonly string[], CmdletParameters][]).flatMap(([names, parameters]) => names.map(t => [t, parameters] as const)));
+  public static readonly cmdletWriteParameters: ReadonlyMap<string, CmdletParameters> = Resources.mapOfNames([
+    new NameGroup(["set-location", "sl", "cd", "chdir", "push-location", "pushd"], Resources.setLocationParameters),
+    new NameGroup(["pop-location", "popd"], new CmdletParameters([], [])),
+    new NameGroup(["out-file"], new CmdletParameters(["-append", "-force", "-noclobber", "-nonewline"], ["-filepath", "-path", "-literalpath", "-encoding", "-width",
+      "-inputobject"])),
+    new NameGroup(["set-content", "sc", "add-content", "ac"], new CmdletParameters(["-force", "-nonewline", "-passthru", "-asbytestream"], ["-path", "-literalpath",
+      "-value", "-encoding", "-filter", "-include", "-exclude", "-stream"])),
+    new NameGroup(["clear-content", "clc"], new CmdletParameters(["-force"], ["-path", "-literalpath", "-filter", "-include", "-exclude", "-stream"])),
+    new NameGroup(["tee-object", "tee"], new CmdletParameters(["-append"], ["-filepath", "-literalpath", "-variable", "-inputobject", "-encoding"])),
+    new NameGroup(["new-item", "ni"], new CmdletParameters(["-force"], ["-path", "-name", "-itemtype", "-type", "-value"])),
+    new NameGroup(["copy-item", "cp", "copy", "cpi"], new CmdletParameters(["-force", "-recurse", "-passthru", "-container"], ["-path", "-literalpath", "-destination",
+      "-filter", "-include", "-exclude"])),
+    new NameGroup(["move-item", "mv", "move", "mi"], new CmdletParameters(["-force", "-passthru"], ["-path", "-literalpath", "-destination", "-filter", "-include",
+      "-exclude"])),
+    new NameGroup(["remove-item", "rm", "del", "erase", "ri", "rd", "rmdir"], new CmdletParameters(["-force", "-recurse"], ["-path", "-literalpath", "-filter",
+      "-include", "-exclude"])),
+    new NameGroup(["rename-item", "ren", "rni"], new CmdletParameters(["-force", "-passthru"], ["-path", "-literalpath", "-newname"]))
+  ]);
   public static readonly fileParameters: readonly string[] = ["-filepath", "-path", "-literalpath"];
   public static readonly destinationParameter: string = "-destination";
   public static readonly nameParameter: string = "-name";
@@ -1995,14 +2015,13 @@ export class Resources {
   public static readonly cursorWindowsArchiveName: string = "agent-cli-package.zip";
   public static readonly cursorPackageDirectoryName: string = "dist-package";
   public static readonly cursorNodeName: string = "node";
-  public static readonly cursorReleases: readonly { readonly target: string; readonly path: string; readonly sha256: string; readonly archiveBytes: number;
-    readonly nodeBytes: number; readonly scriptBytes: number }[] = [
-    { target: "darwin-arm64", path: "darwin/arm64/", sha256: "2f5b0a3dd5fb951cecffac813867d8a08d810e59837d59fd5f12d69b922398d7", archiveBytes: 180_412_627, nodeBytes: 147_346_352, scriptBytes: 8_087_090 },
-    { target: "darwin-x64", path: "darwin/x64/", sha256: "7a3cfbf0fcfb979b6213feb5f9fd10fbc7cd4e51ab28c3b572bb935e0b114961", archiveBytes: 188_039_979, nodeBytes: 150_084_144, scriptBytes: 8_080_090 },
-    { target: "linux-x64", path: "linux/x64/", sha256: "85296944e4600a83c4b764f578d1502bf9c416db200d33a593e8f3ecabfdc294", archiveBytes: 184_859_176, nodeBytes: 126_879_696, scriptBytes: 7_520_482 },
-    { target: "linux-arm64", path: "linux/arm64/", sha256: "22a36df9720830668ccd4d707e5190204ab9c8a0efb2f068cc914895f804d3ec", archiveBytes: 182_799_294, nodeBytes: 123_377_224, scriptBytes: 7_520_490 },
-    { target: "win32-x64", path: "windows/x64/", sha256: "864a8f6a22f8c5ebedef8e0ceba529eae9a59b3d7f6fccb75e43e0f5efc3c147", archiveBytes: 80_207_693, nodeBytes: 93_915_464, scriptBytes: 7_695_101 },
-    { target: "win32-arm64", path: "windows/arm64/", sha256: "91028414a667646437dafb5e0c579db39b71f1a42d0ed057688cb530570db014", archiveBytes: 77_626_713, nodeBytes: 82_150_728, scriptBytes: 7_702_096 }
+  public static readonly cursorReleases: readonly CursorReleaseTarget[] = [
+    new CursorReleaseTarget("darwin-arm64", "darwin/arm64/", "2f5b0a3dd5fb951cecffac813867d8a08d810e59837d59fd5f12d69b922398d7", 180_412_627, 147_346_352, 8_087_090),
+    new CursorReleaseTarget("darwin-x64", "darwin/x64/", "7a3cfbf0fcfb979b6213feb5f9fd10fbc7cd4e51ab28c3b572bb935e0b114961", 188_039_979, 150_084_144, 8_080_090),
+    new CursorReleaseTarget("linux-x64", "linux/x64/", "85296944e4600a83c4b764f578d1502bf9c416db200d33a593e8f3ecabfdc294", 184_859_176, 126_879_696, 7_520_482),
+    new CursorReleaseTarget("linux-arm64", "linux/arm64/", "22a36df9720830668ccd4d707e5190204ab9c8a0efb2f068cc914895f804d3ec", 182_799_294, 123_377_224, 7_520_490),
+    new CursorReleaseTarget("win32-x64", "windows/x64/", "864a8f6a22f8c5ebedef8e0ceba529eae9a59b3d7f6fccb75e43e0f5efc3c147", 80_207_693, 93_915_464, 7_695_101),
+    new CursorReleaseTarget("win32-arm64", "windows/arm64/", "91028414a667646437dafb5e0c579db39b71f1a42d0ed057688cb530570db014", 77_626_713, 82_150_728, 7_702_096)
   ];
   public static readonly cursorUnpackedName: string = "unpacked";
   public static readonly cursorPreviousName: string = "previous";
@@ -2193,16 +2212,16 @@ export class Resources {
   public static readonly allowForSessionLabel: string = "Allow for this session";
   public static readonly denyLabel: string = "Deny";
   public static readonly cancelDecision: string = "cancel";
-  public static readonly codexChildRequestAnswers: ReadonlyMap<string, { readonly cancel: JsonValue; readonly decline: JsonValue; readonly note: string }> = new Map([
-    [Resources.commandApprovalRequest, { cancel: { decision: Resources.cancelDecision }, decline: { decision: Resources.declineDecision },
-      note: "TeamRun declined its command without asking, since the reply had ended." }],
-    [Resources.fileChangeApprovalRequest, { cancel: { decision: Resources.cancelDecision }, decline: { decision: Resources.declineDecision },
-      note: "TeamRun declined its file change without asking, since the reply had ended." }],
-    [Resources.userInputRequest, { cancel: { [Resources.answersField]: {} }, decline: { [Resources.answersField]: {} },
-      note: "TeamRun skipped its question without asking, since the reply had ended." }],
-    [Resources.mcpElicitationRequest, { cancel: { [Resources.acpActionField]: Resources.acpCancelAction },
-      decline: { [Resources.acpActionField]: Resources.acpDeclineAction },
-      note: "TeamRun declined its MCP tool call without asking, since the reply had ended." }]
+  public static readonly codexChildRequestAnswers: ReadonlyMap<string, CodexChildAnswer> = new Map([
+    [Resources.commandApprovalRequest, new CodexChildAnswer({ decision: Resources.cancelDecision }, { decision: Resources.declineDecision },
+      "TeamRun declined its command without asking, since the reply had ended.")],
+    [Resources.fileChangeApprovalRequest, new CodexChildAnswer({ decision: Resources.cancelDecision }, { decision: Resources.declineDecision },
+      "TeamRun declined its file change without asking, since the reply had ended.")],
+    [Resources.userInputRequest, new CodexChildAnswer({ [Resources.answersField]: {} }, { [Resources.answersField]: {} },
+      "TeamRun skipped its question without asking, since the reply had ended.")],
+    [Resources.mcpElicitationRequest, new CodexChildAnswer({ [Resources.acpActionField]: Resources.acpCancelAction },
+      { [Resources.acpActionField]: Resources.acpDeclineAction },
+      "TeamRun declined its MCP tool call without asking, since the reply had ended.")]
   ]);
   public static readonly unsupportedServerRequestCode: number = -32601;
   public static readonly serverRequestFailedCode: number = -32000;
@@ -2559,6 +2578,7 @@ export class Resources {
   public static readonly codexSignInUnreadable: string = "Codex reported the end of the sign-in in a form TeamRun can't read.";
   public static readonly claudeNoResult: string = "Claude Code ended without a result message.";
   public static readonly claudeChatNotStarted: string = "The Claude chat has no Claude Code query yet, so it can't run a turn.";
+  public static readonly acpClientNotStarted: string = "The ACP turn has no agent client yet, so it can't answer its agent.";
   public static readonly claudeMessageWithoutId: string = "A message sent to Claude Code needs an id, which its turn's replies are matched by.";
   public static readonly claudeAnsweredInOwnTurn: string = "Claude Code answered this message inside a turn of its own, the one it started when a background task ended.";
   public static readonly turnNotSettled: string = "The turn has not ended yet, so it has no result.";
@@ -3461,17 +3481,17 @@ export class Resources {
   }
 
   public static opencodeAskRules(server: string, approvedTools: readonly string[], plans: boolean): Readonly<Record<string, string | Readonly<Record<string, string>>>> {
-    return Object.fromEntries([...Resources.opencodeReadOnlyRules("ask"), [Resources.opencodeTodoTool, "allow"], ...Resources.opencodeAskedTools.map(t => [t, "ask"]),
-      ...plans ? [["edit", "deny"]] : [], [`${server}_*`, "ask"], ...approvedTools.map(t => [`${server}_${t}`, "allow"]),
-      [Resources.opencodeTaskTool, Object.fromEntries([["*", "ask"], ...Resources.opencodeSubAgents.map(t => [t, "allow"])])]]);
+    return { ...Resources.opencodeReadOnlyRules("ask"), [Resources.opencodeTodoTool]: "allow", ...Resources.opencodeRulesOf(Resources.opencodeAskedTools, "ask"),
+      ...plans ? { edit: "deny" } : {}, [`${server}_*`]: "ask", ...Resources.opencodeRulesOf(approvedTools.map(t => `${server}_${t}`), "allow"),
+      [Resources.opencodeTaskTool]: { "*": "ask", ...Resources.opencodeRulesOf(Resources.opencodeSubAgents, "allow") } };
   }
 
   public static opencodeSubAgentRules(server: string, approvedTools: readonly string[]): Readonly<Record<string, string | Readonly<Record<string, string>>>> {
-    return Object.fromEntries([["*", "deny"], ...Resources.opencodeRefusedRules(server, approvedTools, "deny")]);
+    return { "*": "deny", ...Resources.opencodeRefusedRules(server, approvedTools, "deny") };
   }
 
   public static opencodeRefuseRules(server: string, approvedTools: readonly string[], ownTools: boolean): Readonly<Record<string, string | Readonly<Record<string, string>>>> {
-    return Object.fromEntries([["*", ownTools ? "ask" : "deny"], ...Resources.opencodeRefusedRules(server, approvedTools, "allow")]);
+    return { "*": ownTools ? "ask" : "deny", ...Resources.opencodeRefusedRules(server, approvedTools, "allow") };
   }
 
   public static opencodeAllowAllRules(server: string, ownTools: boolean, under: boolean): Readonly<Record<string, string>> {
@@ -3480,13 +3500,25 @@ export class Resources {
     return Object.fromEntries(ownTools ? [...allowed, ["*", "allow"]] : [...under ? [["*", "deny"]] : [], ...allowed]);
   }
 
-  private static opencodeRefusedRules(server: string, approvedTools: readonly string[], todo: string): readonly (readonly [string, string | Readonly<Record<string, string>>])[] {
-    return [...Resources.opencodeReadOnlyRules("deny"), [Resources.opencodeTodoTool, todo], ...Resources.opencodeAskedTools.map(t => [t, "deny"] as const),
-      [`${server}_*`, "deny"], ...approvedTools.map(t => [`${server}_${t}`, "allow"] as const)];
+  private static opencodeRefusedRules(server: string, approvedTools: readonly string[], todo: string): Readonly<Record<string, string | Readonly<Record<string, string>>>> {
+    return { ...Resources.opencodeReadOnlyRules("deny"), [Resources.opencodeTodoTool]: todo, ...Resources.opencodeRulesOf(Resources.opencodeAskedTools, "deny"),
+      [`${server}_*`]: "deny", ...Resources.opencodeRulesOf(approvedTools.map(t => `${server}_${t}`), "allow") };
   }
 
-  private static opencodeReadOnlyRules(envFiles: string): readonly (readonly [string, string | Readonly<Record<string, string>>])[] {
-    return [[Resources.opencodeReadTool, { "*": "allow", ...Resources.opencodeEnvReadRules(envFiles) }], ...Resources.opencodeReadOnlyTools.map(t => [t, "allow"] as const)];
+  private static opencodeReadOnlyRules(envFiles: string): Readonly<Record<string, string | Readonly<Record<string, string>>>> {
+    return { [Resources.opencodeReadTool]: { "*": "allow", ...Resources.opencodeEnvReadRules(envFiles) }, ...Resources.opencodeRulesOf(Resources.opencodeReadOnlyTools, "allow") };
+  }
+
+  private static opencodeRulesOf(tools: readonly string[], rule: string): Readonly<Record<string, string>> {
+    return Object.fromEntries(tools.map(t => [t, rule]));
+  }
+
+  private static mapOfNames<T>(groups: readonly NameGroup<T>[]): ReadonlyMap<string, T> {
+    const values = new Map<string, T>();
+    for (const group of groups)
+      for (const name of group.names)
+        values.set(name, group.value);
+    return values;
   }
 
   private static opencodeEnvReadRules(envFiles: string): Readonly<Record<string, string>> {
@@ -3579,9 +3611,9 @@ export class Resources {
     return `Ending a process tree on Windows stopped at round ${String(round)}, whose script failed (${failure}); the tree may still run.`;
   }
 
-  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string {
+  public static formatTreeLeftListed(processes: readonly ListedProcess[]): string {
     return `Ending a process tree on Windows ran its ${String(Resources.processTreeFreezeRounds)} rounds and still listed ` +
-      `${processes.map(([id, start]) => `${String(id)} (started ${new Date(start).toISOString()})`).join(", ")}.`;
+      `${processes.map(t => `${String(t.id)} (started ${new Date(t.start).toISOString()})`).join(", ")}.`;
   }
 
   public static formatTaskProcessGone(providerName: string): string {

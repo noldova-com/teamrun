@@ -12,6 +12,8 @@ import path from "node:path";
 
 import "@noldova/context.core";
 
+import { JsonFields } from "../totals/json-fields.ts";
+
 export class AppLockfile {
   private static readonly PACKAGES_FIELD: string = "packages";
   private static readonly ROOT_ENTRY: string = "";
@@ -110,6 +112,6 @@ export class AppLockfile {
   }
 
   private static asRecord(value: unknown): Readonly<Record<string, unknown>> {
-    return Object.isObject(value) && !Array.isArray(value) ? value as Readonly<Record<string, unknown>> : {};
+    return JsonFields.record(value);
   }
 }

@@ -7,12 +7,13 @@
  */
 
 import type { JsonObject, JsonReader } from "@noldova/context.json";
-import type { PlanStep } from "@noldova/teamrun.protocol";
+
+import type { AcpPlan } from "../models/acp-plan.js";
 
 export interface IAcpPlanReader {
   readonly methods: readonly string[];
   readonly nativeKind: string;
   readonly leavesPlan: boolean;
-  read(params: JsonReader): { readonly text: string; readonly steps: readonly PlanStep[] } | null;
+  read(params: JsonReader): AcpPlan | null;
   reply(params: JsonReader, approved: boolean | null): JsonObject;
 }

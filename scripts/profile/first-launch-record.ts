@@ -12,6 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import "@noldova/context.core";
 
+import { JsonFields } from "../totals/json-fields.ts";
 import { ModuleDatabases } from "./module-databases.ts";
 
 export class FirstLaunchRecord {
@@ -31,8 +32,9 @@ export class FirstLaunchRecord {
         return false;
       if (!ModuleDatabases.hasTable(database, FirstLaunchRecord.PREFERENCES_TABLE))
         return true;
-      const [preference] = database.prepare(FirstLaunchRecord.PREFERENCE_QUERY).all() as { json: string }[];
-      return Object.isUndefined(preference) || Object.isNull((JSON.parse(preference.json) as { finishedAt: string | null }).finishedAt);
+      const [preference] = database.prepare(FirstLaunchRecord.PREFERENCE_QUERY).all();
+      const json = preference?.["json"];
+      return !Object.isString(json) || Object.isNull(JsonFields.read(JSON.parse(json), "finishedAt"));
     }
     finally {
       database.close();

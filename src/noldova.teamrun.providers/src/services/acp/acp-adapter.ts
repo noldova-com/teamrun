@@ -37,14 +37,17 @@ import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { ISavedImageReader } from "../../interfaces/i-saved-image.reader.js";
 import { AcpConfigOption } from "../../models/acp-config-option.js";
+import { AcpConfiguredSettings } from "../../models/acp-configured-settings.js";
 import { AcpHeldSteer } from "../../models/acp-held-steer.js";
 import { AcpModelChoices } from "../../models/acp-model-choices.js";
-import { AcpServedEndpoint } from "../../models/acp-served-endpoint.js";
 import { AcpSession } from "../../models/acp-session.js";
+import { AcpSpeedSelection } from "../../models/acp-speed-selection.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
+import { CurrentAcpClient } from "../../models/current-acp-client.js";
 import { LaunchedAcpClient } from "../../models/launched-acp-client.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
+import { ServedEndpoint } from "../../models/served-endpoint.js";
 import { Resources } from "../../resources.js";
 import { FailureDescriber } from "../failure-describer.js";
 import { ReadOnlyMcpTools } from "../mcp/read-only-mcp-tools.js";
@@ -294,7 +297,7 @@ export class AcpAdapter implements IProviderAdapter {
           throw error;
         });
         const refusal = Object.isUndefined(answer) ? undefined : signOut.read(answer);
-        if (typeof refusal === "string")
+        if (Object.isString(refusal))
           throw new SignOutException(refusal);
         if (Object.isNull(refusal))
           return;
@@ -310,6 +313,7 @@ export class AcpAdapter implements IProviderAdapter {
     const request = this.plannedOf(asked);
     const kindId = this.descriptor.id;
     let client: AcpClient | null = null;
+    const turnClient = new CurrentAcpClient();
     let launchEnvironment: NodeJS.ProcessEnv = this.agent.baseEnvironment;
     let sessionId: string | null = null;
     let observed = new ObservedSettings(kindId, null, null, null);
@@ -367,7 +371,7 @@ export class AcpAdapter implements IProviderAdapter {
       return woken;
     },
       t => client?.notify(Resources.acpSessionCancel, { sessionId: t }), (reason, session, seen) => this.wakeResult(reason, session, seen), this.descriptor.displayName,
-      (t, u) => this.endTaskTree(client!, t, u), t => this.cancelSubAgent(client!, t), commands, terminals);
+      (t, u) => this.endTaskTree(turnClient.client, t, u), t => this.cancelSubAgent(turnClient.client, t), commands, terminals);
     const cancel = (): void => {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
@@ -390,7 +394,7 @@ export class AcpAdapter implements IProviderAdapter {
       const taken = await this.take(key, request, sender);
       const launched = taken ?? await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
         titleArguments, !request.isolated, request.isolated);
-      client = launched.client;
+      client = turnClient.set(launched.client);
       launchEnvironment = launched.environment;
       const initialized = taken?.initialized ?? await this.initialize(client);
       observed = new ObservedSettings(kindId, null, null, this.agent.readVersion(initialized));
@@ -414,23 +418,24 @@ export class AcpAdapter implements IProviderAdapter {
       client.setListener(channel);
       this.channels.set(client, channel);
       const endpoint = this.endpointOf(request.tools, initialized);
-      let served: AcpServedEndpoint | null = null;
+      let served: ServedEndpoint | null = null;
       if (!Object.isNull(endpoint)) {
         const token = taken?.token ?? endpoint.issueKept();
         revoke = () => endpoint.revoke(token);
         adopt = tools => tools.adopt(token);
-        served = new AcpServedEndpoint(endpoint.url, token);
+        served = new ServedEndpoint(endpoint.url, token);
       }
       const params = await this.paramsOf(request, initialized, served);
       const reopen = async (failure: unknown): Promise<AcpClient> => {
-        if (shutdowns !== this.shutdowns || this.stoppedForSignOut.has(client!))
+        const current = client;
+        if (Object.isNull(current) || shutdowns !== this.shutdowns || this.stoppedForSignOut.has(current))
           throw failure;
-        await this.close(client!);
+        await this.close(current);
         if (shutdowns !== this.shutdowns)
           throw failure;
         const relaunched = await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
           titleArguments, !request.isolated, request.isolated);
-        client = relaunched.client;
+        client = turnClient.set(relaunched.client);
         launchEnvironment = relaunched.environment;
         await this.initialize(client);
         await this.authenticate(client);
@@ -477,8 +482,11 @@ export class AcpAdapter implements IProviderAdapter {
         observed = await this.selectModel(client, sessionId, started, resumed, request.requested, observed);
         await this.selectMode(client, sessionId, started, [], resumed, request.requested);
       }
-      else
-        [observed, confirming] = await this.configure(client, sessionId, started, options, resumed, request.provider, request.requested, observed);
+      else {
+        const configured = await this.configure(client, sessionId, started, options, resumed, request.provider, request.requested, observed);
+        observed = configured.observed;
+        confirming = configured.confirming;
+      }
       await turn.beginAsync(sessionId, resumed, observed, Object.isNull(request.instructions) || !Object.isNull(command) ? null : RoleApplication.Prompt);
       channel.follow(sessionId, observed);
       const unlistedAtStart = !Object.isNull(awaited) && (listsFirst ? !awaited.isListed : taken?.toolsUnlisted === true);
@@ -896,7 +904,7 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async configure(client: AcpClient, sessionId: string, started: JsonReader, options: readonly AcpConfigOption[], resumed: boolean, provider: Provider | null,
-    requested: RequestedSettings, observed: ObservedSettings): Promise<[ObservedSettings, Promise<boolean> | null]> {
+    requested: RequestedSettings, observed: ObservedSettings): Promise<AcpConfiguredSettings> {
     let current = options;
     const model = this.modelOf(current);
     const choices = Object.isUndefined(model) ? null : this.choicesOf(model);
@@ -915,8 +923,8 @@ export class AcpAdapter implements IProviderAdapter {
       throw new SettingUnavailableException(Resources.formatUnknownEffort(level, modelName));
     if (!Object.isUndefined(effort) && !Object.isNull(level) && level !== effort.currentValue)
       current = await this.setOption(client, sessionId, current, effort, level);
-    const [speeded, speed] = await this.selectSpeed(client, sessionId, current, requested.speed);
-    current = speeded;
+    const speeded = await this.selectSpeed(client, sessionId, current, requested.speed);
+    current = speeded.options;
     current = await this.selectMode(client, sessionId, started, current, resumed, requested);
     const launched = this.agent.effortAtLaunch ? level : null;
     const check = Object.isNull(requested.model) ? null : this.checkUnavailableModel(provider, requested.model);
@@ -924,20 +932,20 @@ export class AcpAdapter implements IProviderAdapter {
     const unavailable = !Object.isNull(confirming);
     const served = this.modelOf(current)?.currentValue ?? null;
     const family = Object.isNull(served) || Object.isNull(choices) ? null : choices.familyOf(served);
-    return [new ObservedSettings(observed.kind, family ?? served ?? (unavailable ? null : this.launchedModel(requested)),
+    return new AcpConfiguredSettings(new ObservedSettings(observed.kind, family ?? served ?? (unavailable ? null : this.launchedModel(requested)),
       Object.isNull(family) ? current.find(t => t.category === Resources.acpThoughtLevelCategory)?.currentValue ?? launched : served, observed.harnessVersion,
-      unavailable, speed), confirming];
+      unavailable, speeded.served), confirming);
   }
 
   private async selectSpeed(client: AcpClient, sessionId: string, options: readonly AcpConfigOption[],
-    speed: string | null): Promise<[options: readonly AcpConfigOption[], served: string | null]> {
+    speed: string | null): Promise<AcpSpeedSelection> {
     const speeds = this.agent.speedOption ?? null;
     const option = speeds?.find(options);
     if (Object.isNull(speeds) || Object.isUndefined(option))
-      return [options, null];
+      return new AcpSpeedSelection(options, null);
     const value = Object.isNull(speed) ? null : speeds.valueOf(speed);
     const current = Object.isNull(value) || value === option.currentValue ? options : await this.setOption(client, sessionId, options, option, value);
-    return [current, speeds.servedIn(current)];
+    return new AcpSpeedSelection(current, speeds.servedIn(current));
   }
 
   private shownLevelOf(provider: Provider | null, model: string | null): string | null {
@@ -996,7 +1004,8 @@ export class AcpAdapter implements IProviderAdapter {
     const permission = this.agent.permissionSwitch;
     const defaultMode = this.agent.modes.find(t => t.id === this.agent.defaultMode);
     const wanted = this.agent.modes.find(t => t.id === requested.mode) ?? defaultMode;
-    const switching = !Object.isNull(permission) && !Object.isUndefined(wanted) && wanted.id === permission.mode;
+    const switchedTo = !Object.isNull(permission) && wanted?.id === permission.mode ? wanted : null;
+    const switching = !Object.isNull(switchedTo);
     const session = !Object.isUndefined(wanted) && this.runsInDefault(wanted.id) ? defaultMode : wanted;
     const chosenUnrestricted = wanted?.unrestricted === true;
     let current = options;
@@ -1018,7 +1027,7 @@ export class AcpAdapter implements IProviderAdapter {
     }
     else if (!Object.isUndefined(session) && session.id !== this.agent.defaultMode)
       throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, session.name));
-    current = chosenUnrestricted && !switching ? current : await this.setSwitch(client, sessionId, current, switching, wanted);
+    current = chosenUnrestricted && !switching ? current : await this.setSwitch(client, sessionId, current, switchedTo);
     const switched = !Object.isNull(permission) && current.some(t => t.id === permission.optionId && t.currentValue === permission.onValue) ? permission.mode : null;
     const unrestricted = chosenUnrestricted ? undefined : this.agent.modes.find(t => t.unrestricted && (t.id === mode || t.id === switched));
     if (!Object.isUndefined(unrestricted))
@@ -1030,15 +1039,15 @@ export class AcpAdapter implements IProviderAdapter {
     return mode === this.agent.launchMode || mode === this.agent.permissionSwitch?.mode || mode === this.agent.allowAllMode;
   }
 
-  private async setSwitch(client: AcpClient, sessionId: string, options: readonly AcpConfigOption[], on: boolean,
-    wanted: ProviderMode | undefined): Promise<readonly AcpConfigOption[]> {
+  private async setSwitch(client: AcpClient, sessionId: string, options: readonly AcpConfigOption[],
+    switchedTo: ProviderMode | null): Promise<readonly AcpConfigOption[]> {
     const permission = this.agent.permissionSwitch;
     if (Object.isNull(permission))
       return options;
-    const value = on ? permission.onValue : permission.offValue;
+    const value = Object.isNull(switchedTo) ? permission.offValue : permission.onValue;
     const option = options.find(t => t.id === permission.optionId);
-    if (on && (Object.isUndefined(option) || !option.values.includes(value)))
-      throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, wanted!.name));
+    if (!Object.isNull(switchedTo) && (Object.isUndefined(option) || !option.values.includes(value)))
+      throw new SettingUnavailableException(Resources.formatModeUnavailable(this.descriptor.displayName, switchedTo.name));
     return Object.isUndefined(option) || option.currentValue === value || !option.values.includes(value) ? options
       : await this.setOption(client, sessionId, options, option, value);
   }
@@ -1106,7 +1115,7 @@ export class AcpAdapter implements IProviderAdapter {
     }));
   }
 
-  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: AcpServedEndpoint | null,
+  private serversOf(request: TurnRequest, initialized: JsonReader, endpoint: ServedEndpoint | null,
     environment: NodeJS.ProcessEnv): JsonValue[] {
     const shared = request.sharedServers.map(t => this.sharedServerOf(t, initialized,
       (variable: string) => request.sharedValues.valueOf(t.name, variable) ?? environment[variable] ?? String.empty));
@@ -1143,7 +1152,7 @@ export class AcpAdapter implements IProviderAdapter {
     return {
       type: Resources.acpHttpServerType,
       name: server.name,
-      url: server.url!,
+      url: String(server.url),
       headers: Object.isNull(server.bearerVariable) ? headers
         : [...headers, { name: Resources.authorizationHeader, value: Resources.formatBearerValue(valueOf(server.bearerVariable)) }]
     };
@@ -1352,13 +1361,13 @@ export class AcpAdapter implements IProviderAdapter {
 
   private async fits(kept: AcpKeptSession, key: string | null, request: TurnRequest, sender: string | null): Promise<boolean> {
     const endpoint = Object.isNull(kept.token) ? null : this.endpointOf(request.tools, kept.initialized);
-    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new AcpServedEndpoint(endpoint.url, kept.token);
+    const served = Object.isNull(endpoint) || Object.isNull(kept.token) ? null : new ServedEndpoint(endpoint.url, kept.token);
     return kept.key === key && kept.client.isConnected && Object.isNull(request.tools) === Object.isNull(kept.token) && Object.isNull(sender) === Object.isNull(kept.sender)
       && (Object.isNull(kept.sender) || request.adoptSender(kept.sender)) && (Object.isNull(kept.token) || request.tools?.adopt(kept.token) === true)
       && JSON.stringify(await this.paramsOf(request, kept.initialized, served)) === kept.params;
   }
 
-  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: AcpServedEndpoint | null): Promise<Record<string, JsonValue>> {
+  private async paramsOf(request: TurnRequest, initialized: JsonReader, served: ServedEndpoint | null): Promise<Record<string, JsonValue>> {
     const params: Record<string, JsonValue> = { cwd: request.workingDirectory, mcpServers: this.serversOf(request, initialized, served,
       await this.starter.readEnvironmentAsync(this.agent.baseEnvironment)) };
     const meta = { ...this.agent.sessionMeta(request.requested) ?? {}, ...this.agent.toolGate?.metaOf(initialized) ?? {} };
