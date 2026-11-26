@@ -43,7 +43,7 @@ export class ApprovalScopesMigrationTests {
   public async givesEachStoredOptionAScopeInItsOrder(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     {
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path);
       const insert = async (statement: string, parameters: readonly string[] = []): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await insert("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('p1', 'fixture', '{}', 't', 't')");
       await insert("INSERT INTO conversations (id, projectId, json, createdAt, updatedAt) VALUES ('c1', 'p1', '{}', 't', 't')");

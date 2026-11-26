@@ -48,7 +48,7 @@ export class ReplyIdentityMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ReplyIdentityMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('pr1', '/work', '{}', 't', 't')", []);
       await execute("INSERT INTO chats (id, projectId, json, createdAt, updatedAt) VALUES ('c1', 'pr1', '{}', 't', 't')", []);

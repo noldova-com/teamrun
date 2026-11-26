@@ -32,7 +32,7 @@ export class ForgottenSessionsMigrationTests {
   public async keepsAStoredProviderWithNoForgottenSessions(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     {
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path);
       await legacy.database.connection.executeAsync(new SqlQuery("INSERT INTO providerAccounts (id, provider, json, createdAt, updatedAt) VALUES ('a1', 'fake', '{}', 't', 't')"));
     }
     await using current = await TestDatabase.openAsync(directory.path);

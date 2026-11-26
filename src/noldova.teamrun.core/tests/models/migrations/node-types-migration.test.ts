@@ -42,7 +42,7 @@ export class NodeTypesMigrationTests {
     const renamed = '{"id":"my-organization","name":"Mine","folder":null,"order":0,"createdAt":"c1","updatedAt":"u1","departments":[],"placements":[]}';
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof NodeTypesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[]): Promise<number> =>
         await legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('studio', ?, 'c', 'u')", [studio]);

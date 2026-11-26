@@ -38,7 +38,7 @@ export class TeammatePlacementsMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof TeammatePlacementsMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[] = []): Promise<number> =>
         await legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       for (const id of ["t1", "t2", "t3", "t5", "t4"])

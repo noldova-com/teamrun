@@ -104,7 +104,7 @@ export class ChatNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatNamesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
       await execute("INSERT INTO teammates (id, name, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [teammate.id, "alice", JSON.stringify(teammate.toJson())]);
@@ -159,7 +159,7 @@ export class ChatNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatNamesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       await legacy.database.connection.executeAsync(new SqlQuery("DROP INDEX UX_messages_conversationId_sequence"));
       await legacy.database.connection.executeAsync(new SqlQuery("CREATE UNIQUE INDEX IX_messages_conversationId_sequence ON messages (conversationId, sequence)"));
     }

@@ -84,7 +84,7 @@ export class ProviderNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ProviderNamesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly (string | number)[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", [project.id, project.rootPath, JSON.stringify(project.toJson())]);
       await execute("INSERT INTO providerAccounts (id, provider, json, createdAt, updatedAt) VALUES (?, ?, ?, 't', 't')", ["p1", "claude", JSON.stringify(old.provider)]);

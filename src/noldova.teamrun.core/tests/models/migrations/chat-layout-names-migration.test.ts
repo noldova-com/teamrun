@@ -46,7 +46,7 @@ export class ChatLayoutNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatLayoutNamesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[]): Promise<number> => legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       await execute("INSERT INTO preferences (name, json, updatedAt) VALUES (?, ?, 't')", [Resources.projectsLayoutPreference, JSON.stringify(ChatLayoutNamesMigrationTests.earlier)]);
       await execute("INSERT INTO preferences (name, json, updatedAt) VALUES (?, ?, 't')", ["other", JSON.stringify(ChatLayoutNamesMigrationTests.other)]);
@@ -88,7 +88,7 @@ export class ChatLayoutNamesMigrationTests {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ChatLayoutNamesMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       await legacy.database.connection.executeAsync(new SqlQuery("INSERT INTO preferences (name, json, updatedAt) VALUES (?, ?, 't')",
         [Resources.projectsLayoutPreference, JSON.stringify(layout)]));
       await legacy.database.changeFeed.appendAsync("Preference", Resources.projectsLayoutPreference, ChangeOperation.Update, JSON.stringify(layout));

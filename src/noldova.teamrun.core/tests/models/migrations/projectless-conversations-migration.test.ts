@@ -47,7 +47,7 @@ export class ProjectlessConversationsMigrationTests {
     let before = "";
     {
       const earlier = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof ProjectlessConversationsMigration));
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, earlier);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, earlier);
       const connection = legacy.database.connection;
       const execute = async (statement: string): Promise<number> => connection.executeAsync(new SqlQuery(statement));
       await execute("INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('pr1', '/work', '{\"id\":\"pr1\"}', 't', 't')");

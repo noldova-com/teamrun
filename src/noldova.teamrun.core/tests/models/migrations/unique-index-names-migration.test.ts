@@ -56,7 +56,7 @@ export class UniqueIndexNamesMigrationTests {
     const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof UniqueIndexNamesMigration));
     const json = '{"id":"p","name":"Legacy","rootPath":"fixture","createdAt":"t"}';
     {
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[] = []): Promise<number> =>
         legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
       for (const statement of UniqueIndexNamesMigrationTests.MADE_AS_IX)

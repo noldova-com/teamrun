@@ -39,7 +39,7 @@ export class TeammatesMigrationTests {
     using directory = new TemporaryDataDirectory();
     const oldJson = '{"id":"p","name":"Legacy","rootPath":"fixture","createdAt":"t"}';
     {
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path);
       Assert.areEqual(1, (await legacy.database.getAppliedMigrationsAsync()).length);
       await legacy.database.connection.executeAsync(new SqlQuery(
         "INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('p', 'fixture', ?, 't', 't')", [oldJson]));

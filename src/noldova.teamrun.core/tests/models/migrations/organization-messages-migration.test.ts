@@ -46,7 +46,7 @@ export class OrganizationMessagesMigrationTests {
     const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof OrganizationMessagesDropMigration));
     const oldJson = '{"id":"p","name":"Legacy","rootPath":"fixture","createdAt":"t"}';
     {
-      await using legacy = await LegacyTestDatabase.openAsync(directory.path, before);
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       await legacy.database.connection.executeAsync(new SqlQuery(
         "INSERT INTO projects (id, rootPath, json, createdAt, updatedAt) VALUES ('p', 'fixture', ?, 't', 't')", [oldJson]));
       await legacy.database.connection.executeAsync(new SqlQuery("INSERT INTO organizationMessages (id, json, createdAt) VALUES ('m', '{}', 't')"));
