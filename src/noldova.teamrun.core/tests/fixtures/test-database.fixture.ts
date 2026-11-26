@@ -10,12 +10,12 @@ import { join } from "node:path";
 
 import { DataSource, DbContextOptionsBuilder, type DbContextOptions } from "@noldova/context.data";
 import type { SqlConnection, SqlMigration } from "@noldova/context.data.sql";
-import { DatabaseContext } from "@noldova/teamrun.core";
+import { DatabaseContext, Resources } from "@noldova/teamrun.core";
 
 import { NormalSQLiteProvider } from "./normal-sqlite-provider.fixture.js";
 
 export class TestDatabase {
-  public static readonly FILE_NAME: string = "teamrun.db";
+  public static readonly FILE_NAME: string = Resources.databaseFileName;
 
   public static options(location: string): DbContextOptions<SqlConnection, SqlMigration> {
     return new DbContextOptionsBuilder().use(new NormalSQLiteProvider(), new DataSource("teamrun", location));

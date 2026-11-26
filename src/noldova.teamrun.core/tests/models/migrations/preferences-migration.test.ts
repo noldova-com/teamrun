@@ -10,6 +10,7 @@ import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { PreferencesMigration } from "@noldova/teamrun.core";
+
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 

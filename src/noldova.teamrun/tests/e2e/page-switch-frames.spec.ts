@@ -193,6 +193,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
       const after = performance.timeOrigin + performance.now();
       low = Math.max(low, at - after);
     }
+
     return { low };
   }, page.url());
 
@@ -333,6 +334,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     const calls = record.calls.filter(t => t.at - clock.low >= start && t.at - clock.low <= end);
     const shown = calls.find(t => t.isVisible);
     const firstOfPage = record.frames.find(t => t.at >= start && t.at <= end && t.kind !== "chat");
+
     return new SwitchResult(calls.filter(t => !t.isVisible).length,
       !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at - clock.low < firstOfPage.at, shown?.bounds ?? null);
   });

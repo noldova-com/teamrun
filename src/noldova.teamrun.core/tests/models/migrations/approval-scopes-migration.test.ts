@@ -11,6 +11,7 @@ import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
 import { ApprovalScopesMigration, MigrationCatalog, Resources } from "@noldova/teamrun.core";
 import { Approval, ApprovalScope } from "@noldova/teamrun.protocol";
+
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
 import { TestDatabase } from "../../fixtures/test-database.fixture.js";
