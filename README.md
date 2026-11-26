@@ -637,6 +637,14 @@ Only tests set these variables; unset, or set to anything but a positive whole n
 |---|---|
 | `TEAMRUN_GIT_TIMEOUT_MS` | Milliseconds a reply's Git check of the ignored changes may run, 30,000 otherwise; `git-ignores.test.ts` sets it to show that a Git that never answers ignores nothing. |
 
+### Timing parameters
+
+These parameters take the operation that sets a timing no product boundary controls, defaulting to the real one, so a test reaches each of its paths without waiting it out; no production caller passes them.
+
+| Parameter | Why no product boundary controls it |
+|---|---|
+| `ProcessTree`'s `contextTree`, in `src/noldova.teamrun.providers/src/services/process/process-tree.ts` | Whether context's process lister is ready in time, and whether a tree outlasts the end's limit, depend on how fast the machine starts and lists processes. context offers no way to make a read or an end fail, so `process-tree.test.ts` passes one whose read and ends throw, to show that each failure is logged and the kill falls back. |
+
 ### Global mocks
 
 The package tests run at the same time in one process, so a test that mocks a global mocks it for every test running alongside it: a mocked `setTimeout` stops their timers, and the runner's own per-test timeout with them.

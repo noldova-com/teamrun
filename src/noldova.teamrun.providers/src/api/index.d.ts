@@ -11022,20 +11022,6 @@ export declare class ProcessTerminator {
  * the grace, it holds what is left still the same way, new children included, and sends `SIGKILL` to each. A process whose signal fails, such as
  * one that has already ended, is skipped.
  */
-/**
- * Reads identities and ends trees through context's `ProcessIdentity.readAsync`, `ProcessTree.endAsync` and `ProcessTree.endDescendantsAsync`.
- */
-export declare class ContextProcessTree implements IContextProcessTree {
-  /** @inheritdoc */
-  public readAsync(processId: number): Promise<ProcessIdentity | undefined>;
-
-  /** @inheritdoc */
-  public endAsync(root: ProcessIdentity, options: ProcessTreeEndOptions): Promise<IReadOnlyList<ProcessIdentity>>;
-
-  /** @inheritdoc */
-  public endDescendantsAsync(root: ProcessIdentity, options: ProcessTreeEndOptions): Promise<IReadOnlyList<ProcessIdentity>>;
-}
-
 export declare class ProcessTree implements IProcessTree, IOrphanSweep {
   /**
    * @param platform The platform, as `process.platform`.
@@ -11050,7 +11036,7 @@ export declare class ProcessTree implements IProcessTree, IOrphanSweep {
    * @param read Reads a process's environment file for `endOrphaned`, throwing when it can't; the file system by default.
    * @param log Where a Windows end's leftovers, a failed round and a failed end through context are written; nowhere by default.
    * @param contextTree Reads a process's identity and ends its tree for `endOwnTree` and `endDescendants`; context's `ProcessIdentity` and `ProcessTree`
-   * by default.
+   * by default. No production caller passes it; README.md's Timing parameters say why.
    */
   public constructor(platform: string, runner: CommandRunner, environment: NodeJS.ProcessEnv, timeout: number, timer: ITimer, grace: number,
     kill?: (processId: number, signal: NodeJS.Signals | 0) => void, session?: IPowershellSession | null, read?: (path: string) => string, log?: ILog | null,

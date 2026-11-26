@@ -276,7 +276,6 @@ export { ImageDataReader } from "../services/image-data.reader.js";
 export { SavedImageFile } from "../services/saved-image-file.js";
 export { AbortTimer } from "../services/process/abort-timer.js";
 export { CommandRunner } from "../services/process/command-runner.js";
-export { ContextProcessTree } from "../services/process/context-process-tree.js";
 export { NodeProcessStarter } from "../services/process/node-process-starter.js";
 export { PowershellSession } from "../services/process/powershell-session.js";
 export { ProcessTerminator } from "../services/process/process-terminator.js";
