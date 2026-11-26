@@ -9,11 +9,12 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, OrganizationService, Resources, TeammatePlacementsMigration } from "@noldova/teamrun.core";
+import { MigrationCatalog, OrganizationService, Resources, TeammatePlacementsMigration } from "@noldova/teamrun.core";
 import { OrganizationNodeKind, OrganizationParent } from "@noldova/teamrun.protocol";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class TeammatePlacementsMigrationTests {
@@ -50,7 +51,7 @@ export class TeammatePlacementsMigrationTests {
       await execute("INSERT INTO departmentMembers (teammateId, departmentId) VALUES ('t1', 'd2')");
       await execute("INSERT INTO departmentMembers (teammateId, departmentId) VALUES ('t2', 'd1')");
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
     const [organization] = await new OrganizationService(current).listAsync();
     const tables = await connection.queryAsync(new SqlQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'departmentMembers'"));

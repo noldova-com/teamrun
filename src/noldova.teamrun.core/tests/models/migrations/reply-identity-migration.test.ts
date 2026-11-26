@@ -11,10 +11,11 @@ import { ChangeOperation } from "@noldova/context.data";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, ReplyIdentityMigration, Resources } from "@noldova/teamrun.core";
+import { MigrationCatalog, ReplyIdentityMigration, Resources } from "@noldova/teamrun.core";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ReplyIdentityMigrationTests {
@@ -57,7 +58,7 @@ export class ReplyIdentityMigrationTests {
       await legacy.database.changeFeed.appendAsync("Message", "m2", ChangeOperation.Update, JSON.stringify(kept));
       await legacy.database.changeFeed.appendAsync("Provider", "a1", ChangeOperation.Update, JSON.stringify(provider));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const stored = (await current.database.connection.queryAsync(new SqlQuery("SELECT json FROM messages ORDER BY sequence"))).map(t => JSON.parse(t.readString(Resources.jsonColumn)));
     const changes = (await current.database.changeFeed.readAfterAsync(0)).map(t => JSON.parse(t.payload));
 

@@ -9,9 +9,10 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { InitialMigration, Resources, DatabaseContext } from "@noldova/teamrun.core";
+import { InitialMigration, Resources } from "@noldova/teamrun.core";
 
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class InitialMigrationTests {
@@ -41,7 +42,7 @@ export class InitialMigrationTests {
   @TestMethod
   public async createsTheSchemaInTheContext(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
 
     const names = async (type: string): Promise<readonly string[]> =>
       (await context.database.connection.queryAsync(new SqlQuery(InitialMigrationTests.SELECT_NAMES, [type]))).map(t => t.readString("name"));

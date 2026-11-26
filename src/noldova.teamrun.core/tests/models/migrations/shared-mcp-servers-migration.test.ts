@@ -9,8 +9,10 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, SharedMcpServersMigration } from "@noldova/teamrun.core";
+import { SharedMcpServersMigration } from "@noldova/teamrun.core";
+
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class SharedMcpServersMigrationTests {
@@ -25,7 +27,7 @@ export class SharedMcpServersMigrationTests {
     Assert.isTrue(statements[0]?.includes("PRIMARY KEY (\"id\")") ?? false);
     Assert.isTrue(statements[1]?.includes("UNIQUE") ?? false);
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const insert = async (id: string): Promise<void> => {
       await context.database.connection.executeAsync(
         new SqlQuery("INSERT INTO sharedMcpServers (id, name, json, createdAt, updatedAt) VALUES (?, 'search', '{}', 't', 't')", [id]));

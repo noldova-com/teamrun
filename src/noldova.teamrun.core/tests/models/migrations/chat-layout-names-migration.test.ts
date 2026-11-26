@@ -9,10 +9,11 @@ import { ChangeOperation } from "@noldova/context.data";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChatLayoutNamesMigration, DatabaseContext, MigrationCatalog, Resources } from "@noldova/teamrun.core";
+import { ChatLayoutNamesMigration, MigrationCatalog, Resources } from "@noldova/teamrun.core";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ChatLayoutNamesMigrationTests {
@@ -52,7 +53,7 @@ export class ChatLayoutNamesMigrationTests {
       await legacy.database.changeFeed.appendAsync("Preference", Resources.projectsLayoutPreference, ChangeOperation.Update, JSON.stringify(ChatLayoutNamesMigrationTests.earlier));
       await legacy.database.changeFeed.appendAsync("Preference", "other", ChangeOperation.Update, JSON.stringify(ChatLayoutNamesMigrationTests.other));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const json = async (name: string): Promise<unknown> =>
       JSON.parse((await current.database.connection.queryAsync(new SqlQuery(Resources.selectPreference, [name])))[0]?.readString(Resources.jsonColumn) ?? "null");
     const changes = await current.database.changeFeed.readAfterAsync(0);
@@ -92,7 +93,7 @@ export class ChatLayoutNamesMigrationTests {
         [Resources.projectsLayoutPreference, JSON.stringify(layout)]));
       await legacy.database.changeFeed.appendAsync("Preference", Resources.projectsLayoutPreference, ChangeOperation.Update, JSON.stringify(layout));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const json = (await current.database.connection.queryAsync(new SqlQuery(Resources.selectPreference, [Resources.projectsLayoutPreference])))[0]?.readString(Resources.jsonColumn);
     return [JSON.stringify(JSON.parse(json ?? "null")), (await current.database.changeFeed.readAfterAsync(0))[0]?.payload];
   }

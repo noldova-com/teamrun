@@ -9,8 +9,10 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AcpAgentsMigration, DatabaseContext } from "@noldova/teamrun.core";
+import { AcpAgentsMigration } from "@noldova/teamrun.core";
+
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class AcpAgentsMigrationTests {
@@ -24,7 +26,7 @@ export class AcpAgentsMigrationTests {
     Assert.areEqual(1, statements.length);
     Assert.isTrue(statements[0]?.includes("PRIMARY KEY (\"kind\")") ?? false);
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     const insert = new SqlQuery("INSERT INTO acpAgents (kind, name, json, createdAt, updatedAt) VALUES ('droid', 'Droid', '{}', 't', 't')");
     await context.database.connection.executeAsync(insert);
     await Assert.throwsAsync(() => context.database.connection.executeAsync(insert), Error);

@@ -10,7 +10,7 @@ import { ChangeOperation } from "@noldova/context.data";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, ProviderNamesMigration, Resources } from "@noldova/teamrun.core";
+import { MigrationCatalog, ProviderNamesMigration, Resources } from "@noldova/teamrun.core";
 import {
   AuthStatus,
   Conversation,
@@ -33,6 +33,7 @@ import {
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -97,7 +98,7 @@ export class ProviderNamesMigrationTests {
       await legacy.database.changeFeed.appendAsync("Preference", Resources.defaultTeammatePreference, ChangeOperation.Update, JSON.stringify(old.defaultTeammate));
       await legacy.database.changeFeed.appendAsync("Approval", "a1", ChangeOperation.Insert, JSON.stringify({ input: { provider: "theirs" }, provider: "theirs" }));
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const json = async (statement: string): Promise<string> => (await current.database.connection.queryAsync(new SqlQuery(statement)))[0]?.readString("json") ?? "";
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);

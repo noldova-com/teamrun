@@ -9,10 +9,12 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ApprovalScopesMigration, DatabaseContext, MigrationCatalog, Resources } from "@noldova/teamrun.core";
+import { ApprovalScopesMigration, MigrationCatalog, Resources } from "@noldova/teamrun.core";
 import { Approval, ApprovalScope } from "@noldova/teamrun.protocol";
+
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class ApprovalScopesMigrationTests {
@@ -50,7 +52,7 @@ export class ApprovalScopesMigrationTests {
       await insert("INSERT INTO approvals (id, messageId, status, json, createdAt, updatedAt) VALUES ('ap1', 'm1', 'Approved', ?, 't', 't')",
         [ApprovalScopesMigrationTests.legacyApproval]);
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
 
     const json = (await current.database.connection.queryAsync(new SqlQuery("SELECT json FROM approvals WHERE id = 'ap1'")))[0]?.readString("json") ?? "";
     const approval = Approval.fromJson(JSON.parse(json));

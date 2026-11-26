@@ -9,8 +9,10 @@
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, DraftsMigration } from "@noldova/teamrun.core";
+import { DraftsMigration } from "@noldova/teamrun.core";
+
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class DraftsMigrationTests {
@@ -26,7 +28,7 @@ export class DraftsMigrationTests {
     Assert.isTrue(statements[0]?.includes("FOREIGN KEY (\"conversationId\") REFERENCES \"conversations\" (\"id\")") ?? false);
     Assert.isFalse(statements[0]?.includes("\"json\" TEXT NOT NULL") ?? true);
     using directory = new TemporaryDataDirectory();
-    await using context = await DatabaseContext.openAsync(directory.path);
+    await using context = await TestDatabase.openAsync(directory.path);
     await Assert.throwsAsync(() => context.database.connection.executeAsync(new SqlQuery(
       "INSERT INTO drafts (chatId, json, revision, updatedAt) VALUES ('missing', '{}', 1, 't')")), Error);
   }

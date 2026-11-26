@@ -9,7 +9,7 @@
 import "@noldova/context.core";
 import { ChangeOperation } from "@noldova/context.data";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ChangeEntity, DatabaseContext, OrganizationService } from "@noldova/teamrun.core";
+import { ChangeEntity, OrganizationService } from "@noldova/teamrun.core";
 import {
   ConversationCreateParams, type Department, DepartmentCreateParams, DepartmentIdParams, DepartmentMemberSetParams, DepartmentMoveParams, DepartmentUpdateParams, ErrorCode, Harness,
   NodeTypeCreateParams, NodeTypeIdParams, NodeTypeUpdateParams, type Organization, OrganizationChat, OrganizationCreateParams, OrganizationIdParams, OrganizationLayoutSaveParams, OrganizationNodeKind, OrganizationParent,
@@ -18,6 +18,7 @@ import {
 import { ServiceException } from "@noldova/teamrun.services";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class OrganizationServiceTests {
@@ -467,7 +468,7 @@ export class OrganizationServiceTests {
 
     await host.organization.deleteOrganizationAsync(new OrganizationIdParams(OrganizationServiceTests.mine));
     const left = (await host.organization.listAsync()).length;
-    await using restarted = await DatabaseContext.openAsync(host.directory.path);
+    await using restarted = await TestDatabase.openAsync(host.directory.path);
     const organizations = new OrganizationService(restarted);
     const atStart = (await organizations.listAsync()).length;
     const studio = await organizations.createOrganizationAsync(new OrganizationCreateParams("Studio", null));

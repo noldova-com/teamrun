@@ -14,7 +14,7 @@ import { mock } from "node:test";
 import { SqlQuery } from "@noldova/context.data.sql";
 import { ServiceException } from "@noldova/teamrun.services";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { AttachmentStore, ConversationsService, DatabaseContext, DraftsService, FolderCheckTimings, FolderProbe, ProjectsService } from "@noldova/teamrun.core";
+import { AttachmentStore, ConversationsService, DraftsService, FolderCheckTimings, FolderProbe, ProjectsService } from "@noldova/teamrun.core";
 import { ManualTimer } from "@noldova/teamrun.core/testing";
 import {
   AttachmentInput, ConversationCreateParams, ConversationIdParams, ConversationListParams, Draft, DraftDiscardParams, DraftSaveParams, ErrorCode, MessageAttachment,
@@ -26,6 +26,7 @@ import { CoreHost } from "../../fixtures/core-host.fixture.js";
 import { HeldFolderStat } from "../../fixtures/held-folder-stat.fixture.js";
 import { RecordingLog } from "../../fixtures/recording-log.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class DraftsServiceTests {
@@ -304,7 +305,7 @@ export class DraftsServiceTests {
     let conversationId: string;
     let path: string;
     {
-      await using context = await DatabaseContext.openAsync(directory.path);
+      await using context = await TestDatabase.openAsync(directory.path);
       const conversations = new ConversationsService(context);
       const folders = new FolderProbe(new HeldFolderStat().statAsync, new FolderCheckTimings(1_000, 500), new ManualTimer());
       const project = await new ProjectsService(context, conversations, null, null, folders, null).openAsync(new ProjectOpenParams(join(directory.path, "alpha")));
@@ -313,7 +314,7 @@ export class DraftsServiceTests {
         new DraftSaveParams(conversationId, "Keep me", [DraftsServiceTests.upload("a.txt", "a")]));
       path = DraftsServiceTests.pathOf(saved, 0);
     }
-    await using reopened = await DatabaseContext.openAsync(directory.path);
+    await using reopened = await TestDatabase.openAsync(directory.path);
 
     const draft = await new DraftsService(reopened, new AttachmentStore(directory.path), log).readAsync(new ConversationIdParams(conversationId));
 

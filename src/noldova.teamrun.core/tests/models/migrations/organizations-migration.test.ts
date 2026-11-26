@@ -10,11 +10,12 @@ import "@noldova/context.core";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { DatabaseContext, MigrationCatalog, OrganizationService, OrganizationsMigration, Resources } from "@noldova/teamrun.core";
+import { MigrationCatalog, OrganizationService, OrganizationsMigration, Resources } from "@noldova/teamrun.core";
 import { OrganizationIdParams } from "@noldova/teamrun.protocol";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../../fixtures/temporary-data-directory.fixture.js";
+import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class OrganizationsMigrationTests {
@@ -54,7 +55,7 @@ export class OrganizationsMigrationTests {
         ['{"teammateId":"t2","parent":{"kind":"Person","id":null},"order":0}']);
       await execute("INSERT INTO preferences (name, json, updatedAt) VALUES ('organizationLayout', '{\"collapsed\":[\"d2\"]}', 'u')");
     }
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
     const service = new OrganizationService(current);
     const organizations = await service.listAsync();
@@ -78,7 +79,7 @@ export class OrganizationsMigrationTests {
   @TestMethod
   public async startsAnEmptyDatabaseWithMyOrganizationAlone(): Promise<void> {
     using directory = new TemporaryDataDirectory();
-    await using current = await DatabaseContext.openAsync(directory.path);
+    await using current = await TestDatabase.openAsync(directory.path);
     const organizations = await new OrganizationService(current).listAsync();
 
     Assert.areEqual("My organization:0:0", organizations.map(t => `${t.name}:${t.departments.length}:${t.placements.length}`).join(","));

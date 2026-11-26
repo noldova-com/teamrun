@@ -75,6 +75,18 @@ class SwitchMark {
   }
 }
 
+class SwitchResult {
+  public readonly hides: number;
+  public readonly isShownFirst: boolean;
+  public readonly bounds: IRegion | null;
+
+  public constructor(hides: number, isShownFirst: boolean, bounds: IRegion | null) {
+    this.hides = hides;
+    this.isShownFirst = isShownFirst;
+    this.bounds = bounds;
+  }
+}
+
 declare global {
   var nolSwitchRecorder: ISwitchRecorder | undefined;
   var nolViewCalls: ICall[] | undefined;
@@ -170,6 +182,20 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
     }).observe(view, { attributes: true, attributeFilter: ["style"] });
     globalThis.nolViewCalls = calls;
   }, VIEW);
+
+  const clock = await app.electronApp.evaluate(async ({ webContents }, address) => {
+    const window = webContents.getAllWebContents().find(t => t.getURL() === address);
+    if (Object.isUndefined(window))
+      throw new Error(`No web contents shows ${address}.`);
+    let low = Number.NEGATIVE_INFINITY;
+    for (let index = 0; index < 50; index++) {
+      const at = Number(await window.executeJavaScript("performance.timeOrigin + performance.now()"));
+      const after = performance.timeOrigin + performance.now();
+      low = Math.max(low, at - after);
+    }
+
+    return { low };
+  }, page.url());
 
   const placeholder = page.locator("nol-teamrun-page-document .nol-teamrun-page-view");
   const lastCallShown = (): Promise<boolean | null> => page.evaluate(() => globalThis.nolViewCalls?.at(-1)?.isVisible ?? null);
@@ -290,7 +316,7 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   } finally {
     const kept = await readRecordAsync().catch((error: unknown) => String(error));
     const summary = Object.isString(kept) ? kept : { calls: kept.calls, frames: kept.frames, differences: kept.differences };
-    await testInfo.attach("switch-record.json", { body: JSON.stringify({ area, marks, record: summary }, null, 2), contentType: "application/json" });
+    await testInfo.attach("switch-record.json", { body: JSON.stringify({ area, clock, marks, record: summary }, null, 2), contentType: "application/json" });
     if (!Object.isString(kept)) {
       if (kept.differences.length > 0)
         await testInfo.attach("unmatched-frames.txt", { body: kept.differences.map((t, index) => `${String(index + 1)}. ${t}`).join("\n"), contentType: "text/plain" });
@@ -305,17 +331,15 @@ test("a switch from a chat's tab to its page's tab shows the page's view before 
   const bounds = area;
   expect(bounds, "the placeholder's measured area").not.toBeNull();
   const switches = marks.map(({ start, end }) => {
-    const calls = record.calls.filter(t => t.at >= start && t.at <= end);
+    const calls = record.calls.filter(t => t.at - clock.low >= start && t.at - clock.low <= end);
     const shown = calls.find(t => t.isVisible);
     const firstOfPage = record.frames.find(t => t.at >= start && t.at <= end && t.kind !== "chat");
-    return {
-      hides: calls.filter(t => !t.isVisible).length,
-      isShownFirst: !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at < firstOfPage.at,
-      bounds: shown?.bounds ?? null
-    };
+
+    return new SwitchResult(calls.filter(t => !t.isVisible).length,
+      !Object.isUndefined(shown) && !Object.isUndefined(firstOfPage) && shown.at - clock.low < firstOfPage.at, shown?.bounds ?? null);
   });
 
   expect(record.frames.filter(t => t.kind === "other").length, "frames that match neither the page's tab nor the chat's at rest").toBe(0);
-  expect(switches).toEqual(Array.from({ length: SWITCHES }, () => ({ hides: 0, isShownFirst: true, bounds })));
+  expect(switches).toEqual(Array.from({ length: SWITCHES }, () => new SwitchResult(0, true, bounds)));
   expect(app.unexpectedFailures).toEqual([]);
 });

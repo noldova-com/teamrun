@@ -19,12 +19,14 @@ import { ChangeEntity, DatabaseContext, MigrationCatalog, Resources } from "@nol
 import { ErrorCode } from "@noldova/teamrun.protocol";
 import { ServiceException } from "@noldova/teamrun.services";
 
+import { LegacyDatabaseContext } from "../fixtures/legacy-database-context.fixture.js";
 import { TemporaryDataDirectory } from "../fixtures/temporary-data-directory.fixture.js";
 
 @TestClass
 export class DatabaseContextTests {
   private static readonly EARLIER: string = "2026-11-01T00:00:00.000Z";
   private static readonly KEPT: string = "{\"kept\":true}";
+  private static readonly SYNCHRONOUS_FULL: number = 2;
   private static readonly SELECT_SCHEMA: string =
     "SELECT sql FROM sqlite_master AS t WHERE sql IS NOT NULL AND tbl_name NOT IN ('__migrations', '__changes', 'sqlite_sequence') "
     + "AND NOT EXISTS (SELECT 1 FROM sqlite_master AS v WHERE v.sql LIKE 'CREATE VIRTUAL TABLE %' AND substr(t.name, 1, length(v.name) + 1) = v.name || '_') "
@@ -98,6 +100,16 @@ export class DatabaseContextTests {
   }
 
   @TestMethod
+  public async flushesEveryCommitToDiskBeforeItReturns(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    await using context = await DatabaseContext.openAsync(directory.path);
+
+    const rows = await context.database.connection.queryAsync(new SqlQuery("PRAGMA synchronous"));
+
+    Assert.areEqual(DatabaseContextTests.SYNCHRONOUS_FULL, rows[0]?.readInteger("synchronous"));
+  }
+
+  @TestMethod
   public async rejectsABlankDataDirectory(): Promise<void> {
     await Assert.throwsAsync(() => DatabaseContext.openAsync(" "), ArgumentException);
   }
@@ -113,6 +125,21 @@ export class DatabaseContextTests {
 
     Assert.areEqual(1, (await reopened.database.changeFeed.readAfterAsync(0)).length);
     Assert.areEqual(MigrationCatalog.all.length, (await reopened.database.getAppliedMigrationsAsync()).length);
+  }
+
+  @TestMethod
+  public async opensADatabaseAtAnEarlierPrefixOfItsMigrationsAndAppliesTheRest(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    const earlier = MigrationCatalog.all.slice(0, Math.floor(MigrationCatalog.all.length / 2));
+    {
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, earlier);
+      Assert.areEqual(earlier.length, (await legacy.database.getAppliedMigrationsAsync()).length);
+    }
+
+    await using context = await DatabaseContext.openAsync(directory.path);
+
+    Assert.areEqual(MigrationCatalog.all.map(t => t.id).join(","), (await context.database.getAppliedMigrationsAsync()).join(","));
+    Assert.areEqual(0, (await context.database.getPendingMigrationsAsync()).length);
   }
 
   @TestMethod
