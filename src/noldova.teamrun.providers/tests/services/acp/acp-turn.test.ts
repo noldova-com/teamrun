@@ -8,17 +8,39 @@
 
 import { once } from "node:events";
 import { PassThrough } from "node:stream";
+import "@noldova/context.core";
 import { JsonReader, type JsonObject, type JsonValue } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import type { ApprovalAsk, QuestionAsk } from "@noldova/teamrun.core";
-import { ApprovalKind, DetailKind, ErrorCode, ObservedSettings, PlanStep, PlanStepStatus, QuestionAnswer, ReplyPlan, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
-import { AcpClient, AcpConnectionException, AcpMcpTool, AcpTurn, GrokToolGate, type IAcpPlanReader, Resources, SavedImage, StartedProcess }
+import type { ApprovalAsk, QuestionAsk, TurnDetail } from "@noldova/teamrun.core";
+import { ApprovalKind, DetailKind, ObservedSettings, PlanStep, PlanStepStatus, QuestionAnswer, ReplyPlan, Resources as ProtocolResources } from "@noldova/teamrun.protocol";
+import { AcpClient, AcpConnectionException, AcpMcpTool, AcpPlan, AcpTurn, GrokToolGate, type IAcpPlanReader, Resources, SavedImage, StartedProcess }
   from "@noldova/teamrun.providers";
+import { ClosedRunError } from "../../fixtures/closed-run-error.fixture.js";
 import { CopilotApprovedToolRecording } from "../../fixtures/copilot-approved-tool.recording.js";
 import { GrokApprovedToolRecording } from "../../fixtures/grok-approved-tool.recording.js";
 import { GrokTestHost } from "../../fixtures/grok-test-host.fixture.js";
 import { RecordingTurnListener } from "../../fixtures/recording-turn-listener.fixture.js";
 import { Wait } from "../../fixtures/wait.fixture.js";
+
+class ImageSaveCall {
+  public readonly tool: JsonObject;
+  public readonly sessionId: string;
+
+  public constructor(tool: JsonObject, sessionId: string) {
+    this.tool = tool;
+    this.sessionId = sessionId;
+  }
+}
+
+class ShownToolCall {
+  public readonly kind: DetailKind;
+  public readonly last: JsonReader;
+
+  public constructor(kind: DetailKind, last: JsonReader) {
+    this.kind = kind;
+    this.last = last;
+  }
+}
 
 @TestClass
 export class AcpTurnTests {
@@ -56,7 +78,7 @@ export class AcpTurnTests {
     const listener = new RecordingTurnListener();
     const turn = new AcpTurn("grok", "Grok", "Grok tool", listener, new AbortController().signal, 1);
     const echo = (meta: JsonValue | undefined, sessionId: string = "s"): Promise<void> => turn.onNotificationAsync("session/update", JsonReader.fromValue({ sessionId,
-      update: { sessionUpdate: "user_message_chunk", content: { type: "text", text: "Hi" }, ...(meta === undefined ? {} : { _meta: meta }) } }));
+      update: { sessionUpdate: "user_message_chunk", content: { type: "text", text: "Hi" }, ...(Object.isUndefined(meta) ? {} : { _meta: meta }) } }));
     await echo({ promptIndex: 1 });
     await turn.beginAsync("s", true, new ObservedSettings("grok", null, null, null));
     const before = turn.nativeTurnId;
@@ -154,7 +176,7 @@ export class AcpTurnTests {
     await update({ sessionUpdate: "tool_call_update", toolCallId: "r", title: "Read a.ts again" });
     await turn.finishAsync();
 
-    Assert.areEqual("pending|pending|completed|completed", listener.details.map(t => (t.payload as JsonObject)["status"]).join("|"));
+    Assert.areEqual("pending|pending|completed|completed", listener.details.map(t => AcpTurnTests.payloadOf(t).toJson()["status"]).join("|"));
   }
 
   @TestMethod
@@ -183,7 +205,7 @@ export class AcpTurnTests {
     const listener = new RecordingTurnListener();
     const mcpToolOf = (tool: JsonReader): AcpMcpTool | null => {
       const meta = tool.hasField("_meta") ? tool.readObject("_meta") : null;
-      return meta === null ? null : new AcpMcpTool(meta.readString("server"), meta.readString("tool"));
+      return Object.isNull(meta) ? null : new AcpMcpTool(meta.readString("server"), meta.readString("tool"));
     };
     const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, undefined, "use_tool", undefined, undefined, undefined, null, null,
       undefined, [], mcpToolOf);
@@ -224,16 +246,18 @@ export class AcpTurnTests {
     await update({ sessionUpdate: "tool_call", toolCallId: "f", kind: "edit", title: "Edit", status: "failed", content });
     await turn.finishAsync();
 
-    const [pending, completed, failed] = listener.details.map(t => t.payload as JsonObject);
+    const pending = AcpTurnTests.payloadOf(listener.details[0]);
+    const completed = AcpTurnTests.payloadOf(listener.details[1]).toJson();
+    const failed = AcpTurnTests.payloadOf(listener.details[2]);
     Assert.areEqual(DetailKind.FileChange, listener.details[1]?.kind);
-    Assert.isFalse("changes" in pending!);
+    Assert.isFalse(pending.hasField("changes"));
     Assert.areEqual(JSON.stringify([
       { path: "D:\\repo\\new.cs", kind: "add", diff: "+class A\n+{\n+}" },
       { path: "D:\\repo\\old.cs", kind: "update", diff: "-int x = 1;\n+int x = 2;\n+int y = 3;" },
       { path: "D:\\repo\\cut.cs", kind: "update", diff: "-gone" }
-    ]), JSON.stringify(completed!["changes"]));
-    Assert.areEqual(JSON.stringify(["D:\\repo\\new.cs"]), JSON.stringify(completed!["files"]));
-    Assert.isFalse("changes" in failed!);
+    ]), JSON.stringify(completed["changes"]));
+    Assert.areEqual(JSON.stringify(["D:\\repo\\new.cs"]), JSON.stringify(completed["files"]));
+    Assert.isFalse(failed.hasField("changes"));
   }
 
   @TestMethod
@@ -273,7 +297,7 @@ export class AcpTurnTests {
     controller.abort();
     held.resolve("yes");
     const late = await ask();
-    listener.decisionFailure = Object.assign(new Error("The message is not open."), { info: { name: ErrorCode.Conflict } });
+    listener.decisionFailure = new ClosedRunError("The message is not open.");
     const closed = await ask();
     const fromSubAgents = await Promise.all([{ "x.ai/requestingSessionId": "child" }, { "github.com/copilot": { agentId: "agent-1" } }].map(meta =>
       turn.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s", toolCall: { toolCallId: "u", title: "Run", _meta: meta },
@@ -315,7 +339,7 @@ export class AcpTurnTests {
       "stack:stack:Set up the project.:Angular,React:false:false", "parts:parts:Set up the project.:Attachments,s:true:false",
       "tests:Tests:Set up the project.:Yes,No:false:false", "port:port:Set up the project.::false:true"].join("|"),
       listener.questionAsks[0]?.questions.map(t => [t.id, t.header, t.text, t.options.map(u => u.label).join(","), t.multiple, t.other].join(":")).join("|"));
-    Assert.isFalse(listener.questionAsks[0]!.questions.some(t => t.secret));
+    Assert.isFalse(listener.questionAsks[0]?.questions.some(t => t.secret) ?? true);
     Assert.areEqual("Signals,", listener.questionAsks[0]?.questions[2]?.options.map(t => t.description).join(","));
   }
 
@@ -323,7 +347,7 @@ export class AcpTurnTests {
   public async opensNoApprovalForAPlanWhoseCancelArrivesWhileItsPlanIsShown(): Promise<void> {
     const listener = new RecordingTurnListener();
     const plans: IAcpPlanReader = { methods: ["plan/review"], nativeKind: "plan/review", leavesPlan: true,
-      read: () => ({ text: "Fix the bug", steps: [] }), reply: (_params, approved) => ({ approved }) };
+      read: () => new AcpPlan("Fix the bug", []), reply: (_params, approved) => ({ approved }) };
     const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined, null, plans);
     await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
     const held = Promise.withResolvers<void>();
@@ -345,9 +369,9 @@ export class AcpTurnTests {
   @TestMethod
   public async leavesAnApprovedPlanTheAgentLeavesByItselfAtItsNextModeUpdateNotingAFailureButNotAClosedRun(): Promise<void> {
     const refused = new Error("Mode refused");
-    const closed = Object.assign(new Error("The message is not open."), { info: { name: ErrorCode.Conflict } });
+    const closed = new ClosedRunError("The message is not open.");
     const plans: IAcpPlanReader = { methods: ["plan/review"], nativeKind: "plan/review", leavesPlan: true,
-      read: () => ({ text: "Fix the bug", steps: [] }), reply: (_params, approved) => ({ approved }) };
+      read: () => new AcpPlan("Fix the bug", []), reply: (_params, approved) => ({ approved }) };
     const modeUpdate = JsonReader.fromValue({ sessionId: "s", update: { sessionUpdate: "current_mode_update", currentModeId: "default" } });
     const seen: string[] = [];
     for (const failure of [refused, closed]) {
@@ -459,9 +483,9 @@ export class AcpTurnTests {
       const answered = once(input, "data");
       output.write(`${JSON.stringify({ jsonrpc: "2.0", id: 7, method: "elicitation/create", params: form })}\n`
         + `${JSON.stringify({ jsonrpc: "2.0", method: "$/cancel_request", params: { requestId: 7 } })}\n`);
-      const [line] = await answered as [Buffer];
+      const chunks: unknown[] = await answered;
 
-      Assert.areEqual(JSON.stringify({ jsonrpc: "2.0", id: 7, result: { action: "cancel" } }), line.toString("utf8").trim());
+      Assert.areEqual(JSON.stringify({ jsonrpc: "2.0", id: 7, result: { action: "cancel" } }), String(chunks[0]).trim());
       Assert.areEqual(0, listener.questionAsks.length);
     }
     finally {
@@ -584,7 +608,7 @@ export class AcpTurnTests {
     const ask = (toolCall: JsonObject): Promise<unknown> => turn.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s", toolCall,
       options }));
     const denials = (id: string): string => listener.details.filter(t => t.providerItemId === `agent-tool-${id}`)
-      .map(t => String((t.payload as JsonObject)["denied"] === true)).join(",");
+      .map(t => String(AcpTurnTests.payloadOf(t).toJson()["denied"] === true)).join(",");
     await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
     await update({ sessionUpdate: "tool_call", toolCallId: "shown", title: "rm -rf build", kind: "execute", status: "pending" });
     listener.decisions.push("no", "yes", "no", "no");
@@ -608,7 +632,7 @@ export class AcpTurnTests {
     const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1);
     const update = (value: JsonObject): Promise<void> => turn.onNotificationAsync("session/update", JsonReader.fromValue({ sessionId: "s", update: value }));
     const writes = (id: string): string => listener.details.filter(t => t.providerItemId === `agent-tool-${id}`).map(t => {
-      const payload = t.payload as JsonObject;
+      const payload = AcpTurnTests.payloadOf(t).toJson();
       return `${JSON.stringify(payload["writes"] ?? null)}:${JSON.stringify(payload["unnamedWrites"] ?? null)}`;
     }).join(",");
     await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
@@ -633,7 +657,10 @@ export class AcpTurnTests {
       await turn.beginAsync("s", false, new ObservedSettings(kindId, null, null, null));
       await turn.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s",
         toolCall: { toolCallId: "t", title: "task", kind: "think", rawInput }, options: [{ optionId: "yes", name: "Allow", kind: "allow_once" }] }));
-      return listener.asks[0]!.summary;
+      const asked = listener.asks[0];
+      if (Object.isUndefined(asked))
+        throw new Error("The turn asked nothing.");
+      return asked.summary;
     };
 
     Assert.areEqual("Start the sneak sub-agent: Run a command", await summaryOf("opencode", { description: "Run a command", subagent_type: "sneak" }));
@@ -667,7 +694,7 @@ export class AcpTurnTests {
     Assert.areEqual(["docs__search: arguments in /tmp/arguments.json", "docs__search: arguments in /tmp/arguments.json", "docs__search: {\"query\":\"x\"}",
       "docs__search   : arguments in /tmp/a b .json"].join("|"), listener.asks.slice(0, 4).map(t => t.summary).join("|"));
     Assert.areEqual("500…,500…", listener.asks.slice(4, 6).map(t => `${String(t.summary.length)}${t.summary.slice(-1)}`).join(","));
-    Assert.isTrue(listener.asks[4]!.summary.startsWith("docs__search: {\"query\":\"xxx"));
+    Assert.isTrue(listener.asks[4]?.summary.startsWith("docs__search: {\"query\":\"xxx") ?? false);
     Assert.areEqual("use_tool,use_tool,use_tool,use_tool", listener.asks.slice(6).map(t => t.summary).join(","));
   }
 
@@ -750,7 +777,7 @@ export class AcpTurnTests {
     const listener = new RecordingTurnListener();
     listener.decisions.push(Resources.acpApprovePlanOption);
     const plans: IAcpPlanReader = { methods: ["plan/review"], nativeKind: "plan/review", leavesPlan: false,
-      read: () => ({ text: "Fix the bug", steps: [] }), reply: (_params, approved) => ({ approved }) };
+      read: () => new AcpPlan("Fix the bug", []), reply: (_params, approved) => ({ approved }) };
     const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, undefined, null, undefined, undefined, undefined, null, plans,
       undefined, [], undefined, undefined, false, false, null, true);
     await turn.beginAsync("s", false, new ObservedSettings("agent", null, null, null));
@@ -773,10 +800,12 @@ export class AcpTurnTests {
     let failing = false;
     const turn = new AcpTurn("grok", "Grok", "Grok tool", listener, new AbortController().signal, 1, () => null, "use_tool",
       () => failing ? Promise.reject(new Error("Unavailable")) : Promise.resolve(["teamrun_open_panel"]));
-    const options = [{ optionId: "yes", name: "Allow", kind: "allow_once" }, { optionId: "no", name: "Deny", kind: "reject_once" }];
+    const allow: JsonObject = { optionId: "yes", name: "Allow", kind: "allow_once" };
+    const deny: JsonObject = { optionId: "no", name: "Deny", kind: "reject_once" };
+    const options = [allow, deny];
     const ask = async (toolCall: JsonObject, offered: JsonObject[] = options, asked: AcpTurn = turn): Promise<string> => {
-      const answer = (await asked.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s", toolCall, options: offered }))) as JsonObject;
-      const outcome = answer["outcome"] as JsonObject;
+      const answer = await asked.onRequest("id", "session/request_permission", JsonReader.fromValue({ sessionId: "s", toolCall, options: offered }));
+      const outcome = JsonReader.fromValue(answer).readObject("outcome").toJson();
       return String(outcome["optionId"] ?? outcome["outcome"]);
     };
     await turn.beginAsync("s", false, new ObservedSettings("grok", null, null, null));
@@ -788,7 +817,7 @@ export class AcpTurnTests {
       await ask({ toolCallId: "t3", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_erase" } }),
       await ask({ toolCallId: "t4", title: "Search", rawInput: { tool_name: "docs__search\n" } }),
       await ask({ title: "use_tool" }),
-      await ask({ toolCallId: "t6", title: "use_tool", rawInput: { tool_name: "docs__search" } }, [options[0]!]),
+      await ask({ toolCallId: "t6", title: "use_tool", rawInput: { tool_name: "docs__search" } }, [allow]),
       await ask({ toolCallId: "t7", title: "Use tool", rawInput: { file: "/tmp/call.json" } }),
       await ask({ toolCallId: "t8", title: "Use tool", rawInput: { tool_name: "docs__search", reason: "lookup" } }),
       await ask({ toolCallId: "t9", title: "Use tool", rawInput: { tool_name: "teamrun__teamrun_open_panel", reason: "show" } }),
@@ -810,8 +839,8 @@ export class AcpTurnTests {
       await ask({ toolCallId: "t17", title: "use_tool", rawInput: { tool_name: "teamrun_open_panel" } }, options, approved),
       await ask({ toolCallId: "t18", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_open_panel", file: "/tmp/call.json" } }, options, approved),
       await ask({ toolCallId: "t19", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_erase" } }, options, approved),
-      await ask({ toolCallId: "t20", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_open_panel" } }, [options[1]!], approved),
-      await ask({ toolCallId: "t21", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_erase" } }, [options[0]!], approved));
+      await ask({ toolCallId: "t20", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_open_panel" } }, [deny], approved),
+      await ask({ toolCallId: "t21", title: "use_tool", rawInput: { tool_name: "teamrun__teamrun_erase" } }, [allow], approved));
 
     Assert.areEqual("yes,yes,no,yes,yes,yes,yes,yes,yes,no,yes,yes,yes,no,no,yes,yes,no,no,no,cancelled", answers.join(","));
     Assert.areEqual(["teamrun__teamrun_open_panel: {\"panel\":\"Teammates\"}", "Run", "docs__search ", "use_tool", "docs__search", "Use tool", "Use tool", "Use tool",
@@ -860,9 +889,9 @@ export class AcpTurnTests {
   @TestMethod
   public async reportsASavedImageAndAnImageChunkAsGeneratedImagesAndKeepsAnyOtherToolsImageOnItsOwnRow(): Promise<void> {
     const listener = new RecordingTurnListener();
-    const saved: { tool: JsonObject; sessionId: string }[] = [];
+    const saved: ImageSaveCall[] = [];
     const turn = new AcpTurn("agent", "Agent", "Agent tool", listener, new AbortController().signal, 1, (tool, sessionId) => {
-      saved.push({ tool: tool.toJson() as JsonObject, sessionId });
+      saved.push(new ImageSaveCall(tool.toJson(), sessionId));
       return tool.readOptionalString("title") === "image_gen" ? new SavedImage("/home/u/1.jpg", "image/jpeg", "/9j/4A==") : null;
     });
     const update = (value: JsonObject): Promise<void> => turn.onNotificationAsync("session/update", JsonReader.fromValue({ sessionId: "s", update: value }));
@@ -891,13 +920,13 @@ export class AcpTurnTests {
       mediaType: "image/png" }), JSON.stringify(chunk?.payload));
     Assert.areEqual("image_gen", pending?.text);
     Assert.areEqual("Generated image: /home/u/1.jpg", generated?.text);
-    Assert.areEqual("/9j/4A==", (generated?.payload as JsonObject)["imageData"]);
+    Assert.areEqual("/9j/4A==", AcpTurnTests.payloadOf(generated).toJson()["imageData"]);
     Assert.areEqual(JSON.stringify([DetailKind.Note, "Draw", png, "image/png", undefined]), JSON.stringify([drawn?.kind, drawn?.text,
-      ...["imageData", "mediaType", "itemType"].map(t => (drawn?.payload as JsonObject)[t])]));
+      ...["imageData", "mediaType", "itemType"].map(t => AcpTurnTests.payloadOf(drawn).toJson()[t])]));
     Assert.areEqual("Draw", plain?.text);
-    Assert.isFalse("imageData" in (plain?.payload as JsonObject));
+    Assert.isFalse(AcpTurnTests.payloadOf(plain).hasField("imageData"));
     Assert.areEqual("Draw", failed?.text);
-    Assert.isFalse("imageData" in (failed?.payload as JsonObject));
+    Assert.isFalse(AcpTurnTests.payloadOf(failed).hasField("imageData"));
     Assert.areEqual(JSON.stringify(["g", "c", "n"]), JSON.stringify(saved.map(t => t.tool["toolCallId"])));
     Assert.isTrue(saved.every(t => t.sessionId === "s"));
   }
@@ -934,7 +963,7 @@ export class AcpTurnTests {
     Assert.areEqual(JSON.stringify([DetailKind.Note, "Generated image: /work/growing.png"]), JSON.stringify([growing?.kind, growing?.text]));
     Assert.areEqual(JSON.stringify({ itemType: "imageGeneration", status: "completed", savedPath: "/work/growing.png", revisedPrompt: null, failure: null,
       imageData: "iVBORw0KGgoAAAANSUhEUg==", mediaType: "image/png" }), JSON.stringify(growing?.payload));
-    Assert.areEqual("/work/later.png", (later?.payload as JsonObject)["savedPath"]);
+    Assert.areEqual("/work/later.png", AcpTurnTests.payloadOf(later).toJson()["savedPath"]);
     Assert.areEqual(Resources.formatGeneratedImage(null), never?.text);
     Assert.areEqual(JSON.stringify({ itemType: "imageGeneration", status: "failed", savedPath: null, revisedPrompt: null,
       failure: { message: Resources.formatUnreadImage("Cursor") }, imageData: null, mediaType: null }), JSON.stringify(never?.payload));
@@ -965,26 +994,31 @@ export class AcpTurnTests {
     await update({ sessionUpdate: "tool_call_update", toolCallId: "r", status: "completed" });
     await turn.finishAsync();
 
-    const [read, output, plain, text, edit, completed] = listener.details.map(t => t.payload as JsonObject);
-    const blocks = (payload: JsonObject | undefined): string => JSON.stringify((payload![Resources.contentField] as JsonObject[]).map(t => t["content"] ?? null));
+    const read = AcpTurnTests.payloadOf(listener.details[0]);
+    const output = AcpTurnTests.payloadOf(listener.details[1]);
+    const plain = AcpTurnTests.payloadOf(listener.details[2]);
+    const text = AcpTurnTests.payloadOf(listener.details[3]);
+    const edit = AcpTurnTests.payloadOf(listener.details[4]);
+    const completed = AcpTurnTests.payloadOf(listener.details[5]);
+    const blocks = (payload: JsonReader): string => JSON.stringify(payload.readObjectArray(Resources.contentField).map(t => t.hasField("content") ? t.readValue("content") : null));
     Assert.areEqual(6, listener.details.length);
     Assert.areEqual(JSON.stringify([{ type: "image", mimeType: "image/png", size: Math.floor((11 + 1024 * 1024) * 3 / 4) },
       { type: "audio", mimeType: "audio/wav", size: 4 },
       { type: "resource", resource: { uri: "file:///a.bin", mimeType: "application/octet-stream", size: 3 } },
       { type: "resource", resource: { uri: "file:///a.txt", text: "kept" } }, { type: "image", uri: "file:///b.png" }, null]), blocks(read));
     Assert.areEqual(JSON.stringify({ path: "a.png", lines: ["x".repeat(6000), 7, null, { text: "x".repeat(6000) }], flag: true }),
-      JSON.stringify(read!["rawInput"]));
+      JSON.stringify(read.readValue("rawInput")));
     Assert.areEqual(blocks(read), blocks(output));
-    Assert.areEqual(6000, (output!["rawOutput"] as string).length);
-    Assert.isTrue(JSON.stringify(output).length < 25_000);
-    Assert.areEqual("[7]", JSON.stringify(plain!["content"]));
-    Assert.areEqual("text", text!["content"]);
-    Assert.areEqual(long, ((edit!["content"] as JsonObject[])[0]!)["newText"]);
-    Assert.areEqual(`+${long}`, ((edit!["changes"] as JsonObject[])[0]!)["diff"]);
-    Assert.areEqual(6000, ((edit!["rawOutput"] as JsonObject)["text"] as string).length);
-    Assert.isFalse("imageData" in read! || "imageData" in output!);
+    Assert.areEqual(6000, output.readString("rawOutput").length);
+    Assert.isTrue(JSON.stringify(output.toJson()).length < 25_000);
+    Assert.areEqual("[7]", JSON.stringify(plain.readValue("content")));
+    Assert.areEqual("text", text.readString("content"));
+    Assert.areEqual(long, edit.readObjectArray("content")[0]?.readString("newText"));
+    Assert.areEqual(`+${long}`, edit.readObjectArray("changes")[0]?.readString("diff"));
+    Assert.areEqual(6000, edit.readObject("rawOutput").readString("text").length);
+    Assert.isFalse(read.hasField("imageData") || output.hasField("imageData"));
     Assert.areEqual(JSON.stringify(["Read", "agent-tool-r", image, "image/png"]), JSON.stringify([listener.details.at(-1)?.text,
-      listener.details.at(-1)?.providerItemId, completed!["imageData"], completed!["mediaType"]]));
+      listener.details.at(-1)?.providerItemId, completed.readValue("imageData"), completed.readValue("mediaType")]));
     Assert.areEqual(blocks(read), blocks(completed));
   }
 
@@ -1129,13 +1163,19 @@ export class AcpTurnTests {
     return ask;
   }
 
-  private static copilotToolCall(listener: RecordingTurnListener, id: string): { readonly kind: DetailKind; readonly last: JsonReader } {
+  private static copilotToolCall(listener: RecordingTurnListener, id: string): ShownToolCall {
     const details = listener.details.filter(t => t.providerItemId === `copilot-tool-${id}`);
     const first = details.at(0);
     const last = details.at(-1);
     if (Object.isUndefined(first) || Object.isUndefined(last))
       throw new Error(`The turn showed no tool call ${id}.`);
-    return { kind: first.kind, last: JsonReader.fromValue(last.payload) };
+    return new ShownToolCall(first.kind, JsonReader.fromValue(last.payload));
+  }
+
+  private static payloadOf(detail: TurnDetail | undefined): JsonReader {
+    if (Object.isUndefined(detail))
+      throw new Error("The turn showed no such detail.");
+    return JsonReader.fromValue(detail.payload);
   }
 
   private static async playCopilotApprovals(listener: RecordingTurnListener): Promise<JsonValue[]> {

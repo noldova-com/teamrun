@@ -22,6 +22,11 @@ import type { IAcpToDoListReader } from "../../interfaces/i-acp-to-do-list.reade
 import type { IAcpToolGate } from "../../interfaces/i-acp-tool-gate.js";
 import { AcpField } from "../../models/acp-field.js";
 import type { AcpMcpTool } from "../../models/acp-mcp-tool.js";
+import type { AcpPlan } from "../../models/acp-plan.js";
+import { AcpRoutedCall } from "../../models/acp-routed-call.js";
+import { AcpServedTool } from "../../models/acp-served-tool.js";
+import { AcpToolCall } from "../../models/acp-tool-call.js";
+import { AcpUnreadImage } from "../../models/acp-unread-image.js";
 import { SavedImage } from "../../models/saved-image.js";
 import type { WriteTargets } from "../../models/write-targets.js";
 import { Resources } from "../../resources.js";
@@ -67,7 +72,7 @@ export class AcpTurn implements IAcpClientListener {
   private readonly cancelled: Set<string> = new Set();
   private readonly tools: Map<string, JsonObject> = new Map();
   private readonly images: Map<string, SavedImage> = new Map();
-  private readonly unreadImages: Map<string, { readonly params: JsonReader; readonly sessionId: string }> = new Map();
+  private readonly unreadImages: Map<string, AcpUnreadImage> = new Map();
   private readonly denied: Set<string> = new Set();
   private readonly parents: Map<string, IAcpSubAgent> = new Map();
   private sessionId: string | null = null;
@@ -251,7 +256,7 @@ export class AcpTurn implements IAcpClientListener {
     if (Resources.cursorGenerateImageMethods.includes(method)) {
       const sessionId = params.readNullableString(Resources.sessionIdField);
       if (this.active && !Object.isNull(sessionId) && sessionId === this.sessionId)
-        this.unreadImages.set(`${this.kindId}-${++this.ordinal}`, { params, sessionId });
+        this.unreadImages.set(`${this.kindId}-${++this.ordinal}`, new AcpUnreadImage(params, sessionId));
       return;
     }
     const extension = Resources.xaiSessionNotificationMethods.includes(method);
@@ -318,20 +323,16 @@ export class AcpTurn implements IAcpClientListener {
         this.refused = refusal;
         return;
       }
-      if (this.contentKind !== kind) {
-        await this.flushContentAsync();
-        this.contentKind = kind;
-        this.contentId = `${this.kindId}-${++this.ordinal}`;
-      }
+      const contentId = this.contentKind === kind && !Object.isNull(this.contentId) ? this.contentId : await this.startContentAsync(kind);
       const detailKind = kind === Resources.acpThoughtChunk ? DetailKind.Reasoning : Object.isNull(speaker) ? DetailKind.Note : DetailKind.Text;
       const text = content.readString(Resources.textField);
-      this.stream.append(this.contentId!, detailKind, text);
+      this.stream.append(contentId, detailKind, text);
       if (detailKind === DetailKind.Text) {
-        this.said = this.saidId === this.contentId ? this.said + text : text;
-        this.saidId = this.contentId;
+        this.said = this.saidId === contentId ? this.said + text : text;
+        this.saidId = contentId;
       }
       if (detailKind === DetailKind.Text && this.kindId === Resources.copilotKindId)
-        this.background.noteText(this.contentId!, text);
+        this.background.noteText(contentId, text);
     }
     else if (kind === Resources.acpToolCall || kind === Resources.acpToolUpdate) {
       this.lastCompaction = undefined;
@@ -512,7 +513,7 @@ export class AcpTurn implements IAcpClientListener {
     return reader.reply(params, approved);
   }
 
-  private readPlanAsync(params: JsonReader, reader: IAcpPlanReader): Promise<{ readonly text: string; readonly steps: readonly PlanStep[] } | null> {
+  private readPlanAsync(params: JsonReader, reader: IAcpPlanReader): Promise<AcpPlan | null> {
     return this.readNotedAsync(() => reader.read(params), Resources.formatPlanUnread);
   }
 
@@ -594,6 +595,14 @@ export class AcpTurn implements IAcpClientListener {
     return this.sentText.includes(AcpTurn.spaced(title).replace(Resources.acpTitleCutEnd, String.empty));
   }
 
+  private async startContentAsync(kind: string): Promise<string> {
+    await this.flushContentAsync();
+    const contentId = `${this.kindId}-${++this.ordinal}`;
+    this.contentKind = kind;
+    this.contentId = contentId;
+    return contentId;
+  }
+
   private async flushContentAsync(): Promise<void> {
     await this.stream.flushAsync();
     if (!Object.isNull(this.contentId))
@@ -647,11 +656,13 @@ export class AcpTurn implements IAcpClientListener {
     if (!Object.isNull(parent))
       this.parents.set(id, parent);
     if (this.tools.size > Resources.acpMaximumPending) {
-      const oldest = this.tools.keys().next().value!;
-      this.tools.delete(oldest);
-      this.images.delete(oldest);
-      this.denied.delete(oldest);
-      this.parents.delete(oldest);
+      for (const oldest of this.tools.keys()) {
+        this.tools.delete(oldest);
+        this.images.delete(oldest);
+        this.denied.delete(oldest);
+        this.parents.delete(oldest);
+        break;
+      }
     }
     if (Object.isNull(parent) && Object.isNull(unnamed) && (this.subAgents.has(id) || AcpSubAgents.isSpawn(merged, this.kindId))) {
       this.background.mark(id);
@@ -664,7 +675,7 @@ export class AcpTurn implements IAcpClientListener {
       await this.readBackgroundAsync(id, reading, merged);
     const tool = JsonReader.fromValue(merged);
     const completed = tool.readOptionalString(Resources.statusField) === Resources.acpCompletedStatus;
-    const generated = completed ? this.savedImageOf(tool, this.sessionId!) : null;
+    const generated = completed && !Object.isNull(this.sessionId) ? this.savedImageOf(tool, this.sessionId) : null;
     if (!Object.isNull(generated)) {
       await this.recordImageAsync(generated, `${this.kindId}-tool-${id}`);
       return;
@@ -691,7 +702,7 @@ export class AcpTurn implements IAcpClientListener {
     };
     const detailKind = !Object.isNull(served) ? DetailKind.Note : kind === Resources.acpExecuteKind ? DetailKind.Command : kind === Resources.acpEditKind ? DetailKind.FileChange : DetailKind.Note;
     await this.listener.onDetailAsync(new TurnDetail(detailKind, title, payload, `${this.kindId}-tool-${id}`, parent?.itemId ?? null));
-    const steps = completed && Object.isNull(parent) && Object.isNull(unnamed) ? this.toDosOf(tool, this.sessionId!) : null;
+    const steps = completed && Object.isNull(parent) && Object.isNull(unnamed) && !Object.isNull(this.sessionId) ? this.toDosOf(tool, this.sessionId) : null;
     if (!Object.isNull(steps))
       await this.listener.onDetailAsync(PlanDetails.detail(steps, undefined, Resources.planDetailId));
   }
@@ -720,11 +731,13 @@ export class AcpTurn implements IAcpClientListener {
 
   private static compact(tool: JsonObject): JsonObject {
     const content = tool[Resources.contentField];
+    const input = tool[Resources.acpRawInputField];
+    const output = tool[Resources.acpRawOutputField];
     return {
       ...tool,
       ...(Array.isArray(content) ? { [Resources.contentField]: content.map(t => AcpTurn.withoutBytes(t)) } : {}),
-      ...(Object.isUndefined(tool[Resources.acpRawInputField]) ? {} : { [Resources.acpRawInputField]: AcpTurn.capped(tool[Resources.acpRawInputField]!) }),
-      ...(Object.isUndefined(tool[Resources.acpRawOutputField]) ? {} : { [Resources.acpRawOutputField]: AcpTurn.capped(tool[Resources.acpRawOutputField]!) })
+      ...(Object.isUndefined(input) ? {} : { [Resources.acpRawInputField]: AcpTurn.capped(input) }),
+      ...(Object.isUndefined(output) ? {} : { [Resources.acpRawOutputField]: AcpTurn.capped(output) })
     };
   }
 
@@ -739,9 +752,9 @@ export class AcpTurn implements IAcpClientListener {
       return { ...entry, [Resources.contentField]: { ...AcpTurn.without(block, Resources.dataField), [Resources.sizeField]: AcpTurn.byteLengthOf(data) } };
     const resource = AcpTurn.objectOf(block[Resources.acpResourceField]);
     const blob = resource?.[Resources.acpBlobField];
-    if (type !== Resources.acpResourceType || !Object.isString(blob))
+    if (Object.isNull(resource) || type !== Resources.acpResourceType || !Object.isString(blob))
       return item;
-    const kept = { ...AcpTurn.without(resource!, Resources.acpBlobField), [Resources.sizeField]: AcpTurn.byteLengthOf(blob) };
+    const kept = { ...AcpTurn.without(resource, Resources.acpBlobField), [Resources.sizeField]: AcpTurn.byteLengthOf(blob) };
     return { ...entry, [Resources.contentField]: { ...block, [Resources.acpResourceField]: kept } };
   }
 
@@ -783,9 +796,10 @@ export class AcpTurn implements IAcpClientListener {
   }
 
   private static blockImageOf(block: JsonObject): SavedImage | null {
-    const data = block[Resources.dataField];
-    const mediaType = ImageDataReader.mediaTypeOf(Object.isString(data) ? data : null);
-    return Object.isNull(mediaType) ? null : new SavedImage(null, mediaType, data as string);
+    const value = block[Resources.dataField];
+    const data = Object.isString(value) ? value : null;
+    const mediaType = ImageDataReader.mediaTypeOf(data);
+    return Object.isNull(mediaType) || Object.isNull(data) ? null : new SavedImage(null, mediaType, data);
   }
 
   private async isTeamRunTool(name: string | null): Promise<boolean> {
@@ -834,43 +848,43 @@ export class AcpTurn implements IAcpClientListener {
     return Object.isUndefined(reject) ? { outcome: { outcome: Resources.acpCancelled } } : { outcome: { outcome: Resources.acpSelected, optionId: reject.id } };
   }
 
-  private teamRunToolOf(tool: JsonObject): { readonly name: string; readonly input: JsonValue } | null {
+  private teamRunToolOf(tool: JsonObject): AcpServedTool | null {
     const input = tool[Resources.acpRawInputField] ?? {};
     const mcp = this.mcpToolOf(JsonReader.fromValue(tool));
     if (!Object.isNull(mcp))
-      return mcp.server === ProtocolResources.mcpServerName && Resources.teamRunToolNamePattern.test(mcp.tool) ? { name: mcp.tool, input } : null;
+      return mcp.server === ProtocolResources.mcpServerName && Resources.teamRunToolNamePattern.test(mcp.tool) ? new AcpServedTool(mcp.tool, input) : null;
     const routed = Object.isNull(this.routedMcpTool) ? undefined : AcpTurn.objectOf(input)?.[Resources.useToolNameField];
     const name = Object.isString(routed) ? routed : tool[Resources.titleField];
     const found = Object.isString(name) ? Resources.acpTeamRunToolPattern.exec(name)?.[1] : undefined;
     if (Object.isUndefined(found))
       return null;
-    return { name: found, input: Object.isString(routed) ? AcpTurn.objectOf(input)?.[Resources.useToolInputField] ?? {} : input };
+    return new AcpServedTool(found, Object.isString(routed) ? AcpTurn.objectOf(input)?.[Resources.useToolInputField] ?? {} : input);
   }
 
-  private static servedFieldsOf(served: { readonly name: string; readonly input: JsonValue }): JsonObject {
+  private static servedFieldsOf(served: AcpServedTool): JsonObject {
     return { [Resources.toolField]: Resources.formatTeamRunToolName(served.name), [Resources.inputField]: served.input,
       [ProtocolResources.servedToolField]: served.name, [ProtocolResources.servedInputField]: served.input };
   }
 
-  private static routedCallOf(tool: JsonReader, title: string | undefined, routedMcpTool: string): { readonly name: string | null; readonly shown: string } | null {
+  private static routedCallOf(tool: JsonReader, title: string | undefined, routedMcpTool: string): AcpRoutedCall | null {
     const input = AcpTurn.objectOf(tool.toJson()[Resources.acpRawInputField]);
     const name = input?.[Resources.useToolNameField];
     const file = input?.[Resources.useToolFileFormField];
     if (Object.isUndefined(name) && Object.isUndefined(file) && title !== routedMcpTool)
       return null;
-    return { name: Object.isString(name) && Object.isUndefined(file) ? name : null, shown: Object.isString(name) ? name : routedMcpTool };
+    return new AcpRoutedCall(Object.isString(name) && Object.isUndefined(file) ? name : null, Object.isString(name) ? name : routedMcpTool);
   }
 
-  private static useToolCallOf(tool: JsonReader): { readonly name: string; readonly summary: string } | null {
+  private static useToolCallOf(tool: JsonReader): AcpToolCall | null {
     const input = AcpTurn.objectOf(tool.toJson()[Resources.acpRawInputField]);
     const name = input?.[Resources.useToolNameField];
     const file = input?.[Resources.useToolFileField];
-    if (!Object.isString(name) || (!Object.isUndefined(file) && !Object.isString(file)) || Object.keys(input!).some(t => !Resources.useToolFields.includes(t)))
+    if (Object.isNull(input) || !Object.isString(name) || (!Object.isUndefined(file) && !Object.isString(file)) || Object.keys(input).some(t => !Resources.useToolFields.includes(t)))
       return null;
-    const args = input![Resources.useToolInputField];
+    const args = input[Resources.useToolInputField];
     const summary = Object.isString(file) ? Resources.formatToolArgumentsFile(name, file)
       : Object.isUndefined(args) ? name : Resources.formatToolWithCommand(name, JSON.stringify(args));
-    return { name, summary: AcpTurn.cleaned(summary) };
+    return new AcpToolCall(name, AcpTurn.cleaned(summary));
   }
 
   private static commandOf(tool: JsonReader): string | null {
@@ -884,7 +898,7 @@ export class AcpTurn implements IAcpClientListener {
   }
 
   private static objectOf(value: JsonValue | undefined): JsonObject | null {
-    return Object.isObject(value) && !Array.isArray(value) ? value as JsonObject : null;
+    return Object.isObject(value) && !Array.isArray(value) ? JsonReader.fromValue(value).toJson() : null;
   }
 
   private static readFields(params: JsonReader): readonly AcpField[] | null {
@@ -902,10 +916,13 @@ export class AcpTurn implements IAcpClientListener {
   }
 
   private static toContent(fields: readonly AcpField[], answers: readonly QuestionAnswer[]): JsonObject | null {
-    const values = answers.map(t => [t.questionId, fields.find(u => u.question.id === t.questionId)?.toValue(t)] as const);
-    if (values.some(t => Object.isUndefined(t[1])))
-      return null;
-
-    return Object.fromEntries(values) as JsonObject;
+    const content: Record<string, JsonValue> = {};
+    for (const answer of answers) {
+      const value = fields.find(t => t.question.id === answer.questionId)?.toValue(answer);
+      if (Object.isUndefined(value))
+        return null;
+      content[answer.questionId] = value;
+    }
+    return content;
   }
 }
