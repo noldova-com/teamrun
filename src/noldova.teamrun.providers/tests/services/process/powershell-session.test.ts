@@ -17,6 +17,7 @@ import { Wait } from "../../fixtures/wait.fixture.js";
 @TestClass
 export class PowershellSessionTests {
   private static readonly LIMIT: number = 30_000;
+  private static readonly MODULES: string = "modules ";
 
   @TestMethod
   public async runsEachScriptInTurnInOneShellOnItsEnvironmentAndAnswersWithWhatTheScriptWrote(): Promise<void> {
@@ -121,6 +122,21 @@ export class PowershellSessionTests {
     Assert.areEqual(String(process.ppid), entries[0]?.[0]);
     Assert.isTrue(Number(entries[0]?.[1]) > 0);
     Assert.areEqual(JSON.stringify([entries[0], undefined, entries[0]]), JSON.stringify(entries));
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async listsAndEndsWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
+    if (process.platform !== Resources.windowsPlatform)
+      return;
+    const session = new PowershellSession(Resources.powershellExecutable, Resources.powershellSessionArguments, process.env, 1);
+
+    const answer = await session.run(`${Resources.formatProcessEndScript([], [])}; '${PowershellSessionTests.MODULES}' + @(Get-Module).Count`,
+      Resources.processListTimeout);
+
+    const entry = [...answer.matchAll(Resources.processParentPattern)].find(t => Number(t[1]) === process.pid);
+    Assert.areEqual(String(process.ppid), entry?.[2]);
+    Assert.areEqual(`${PowershellSessionTests.MODULES}0`, answer.trimEnd().split(Resources.lineSeparator).at(-1)?.trimEnd());
   }
 
   @Category("ProcessListing")

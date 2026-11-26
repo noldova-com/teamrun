@@ -4258,7 +4258,7 @@ export declare class Resources {
   public static readonly processEnvironmentSeparator: string;
   public static readonly codexThreadEntryPrefix: string;
   /**
-   * How long one of `ProcessTree`'s listings may take by default, in milliseconds: 30 seconds, since one `Get-CimInstance` takes seconds on Windows.
+   * How long one of `ProcessTree`'s listings may take by default, in milliseconds: 30 seconds, since one Windows Management listing takes seconds on Windows.
    */
   public static readonly processListTimeout: number;
   /**
@@ -4267,7 +4267,7 @@ export declare class Resources {
    */
   public static readonly powershellSessionAnswerLimit: number;
   /**
-   * The process listings `ProcessTree` runs: `ps -A -o pid=,ppid=,lstart=` with `LC_ALL=C`, or one `Get-CimInstance Win32_Process` on Windows; and
+   * The process listings `ProcessTree` runs: `ps -A -o pid=,ppid=,lstart=` with `LC_ALL=C`, or one Windows Management query of `Win32_Process` on Windows; and
    * the pattern of their lines, a process id, its parent's, and its start: `ps`'s start time, to the second, or the milliseconds since the epoch.
    */
   public static readonly psExecutable: string;
@@ -4283,7 +4283,8 @@ export declare class Resources {
   public static readonly powershellCommandArguments: readonly string[];
   /**
    * The processes on Windows with their parents and starts, a line each, through one Windows Management listing, with `unknown` as the start
-   * of a process Windows Management gives none for.
+   * of a process Windows Management gives none for; it opens its own `CimSession` and calls no cmdlet from a PowerShell module, which Windows
+   * PowerShell on Windows arm64 takes about 22 seconds to load.
    */
   public static readonly powershellProcessListScript: string;
   public static readonly powershellProcessListArguments: readonly string[];

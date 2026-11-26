@@ -95,13 +95,16 @@ export class SharedMcpLauncher {
     ["denied", new HoldRefusal(126, "EACCES")]
   ]);
   private static readonly SPAWN_VERB: string = "spawn";
-  private static readonly WINDOWS_LISTING: string = "$all = @(Get-CimInstance Win32_Process | Where-Object { $_.CreationDate } | ForEach-Object { [pscustomobject]@{ "
-    + "ProcessId = $_.ProcessId; ParentProcessId = $_.ParentProcessId; Created = $_.CreationDate.ToUniversalTime() } }); ";
+  private static readonly WINDOWS_LISTING: string = "$cim = [Microsoft.Management.Infrastructure.CimSession]::Create([NullString]::Value); "
+    + "try { $all = @(foreach ($listed in $cim.QueryInstances('root/cimv2', 'WQL', 'SELECT ProcessId, ParentProcessId, CreationDate FROM Win32_Process')) { "
+    + "$properties = $listed.CimInstanceProperties; $created = $properties['CreationDate'].Value; if ($created) { [pscustomobject]@{ "
+    + "ProcessId = $properties['ProcessId'].Value; ParentProcessId = $properties['ParentProcessId'].Value; Created = $created.ToUniversalTime() } } }) } "
+    + "finally { $cim.Dispose() }; ";
   private static readonly WINDOWS_TREE_END: string = "while ($next.Count -gt 0) { $found = @($all | Where-Object { $next -contains $_.ParentProcessId "
     + "-and -not $tree.ContainsKey($_.ProcessId) -and $_.Created -ge $tree[$_.ParentProcessId] }); foreach ($child in $found) { $tree[$child.ProcessId] = $child.Created }; "
     + "$ending += $found; $next = @($found | ForEach-Object { $_.ProcessId }) }; "
     + `if ($ending.Count -eq 0) { exit ${SharedMcpLauncher.NOTHING_ENDED_EXIT} }; `
-    + "$ending | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+    + "foreach ($process in $ending) { try { [System.Diagnostics.Process]::GetProcessById([int]$process.ProcessId).Kill() } catch { } }";
 
   private readonly platform: string;
   private readonly environment: NodeJS.ProcessEnv;

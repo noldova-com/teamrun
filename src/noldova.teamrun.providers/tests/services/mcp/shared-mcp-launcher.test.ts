@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChildProcess, type SpawnOptions, spawn } from "node:child_process";
+import { ChildProcess, type SpawnOptions, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { constants } from "node:os";
@@ -31,6 +31,7 @@ export class SharedMcpLauncherTests {
   private static readonly POWERSHELL: string = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
   private static readonly HANDED: string = "4321\n";
   private static readonly EXITED: string = "4321\nexited\n";
+  private static readonly SELF_LISTED: string = "$self = ";
   private static readonly HOLD: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
     + "|| { echo missing >&3; exit 127; }; case $found in */*) [ -f \"$found\" ] && [ -x \"$found\" ] || { echo denied >&3; exit 126; };; esac; exec 3<&-; "
     + "exec /usr/bin/env";
@@ -333,7 +334,7 @@ export class SharedMcpLauncherTests {
     const script = Buffer.from(String(recorder.starts[0]?.args[3]), "base64").toString("utf16le");
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ", "$_.ProcessId -eq 5555 })", "$_.ProcessId -eq 6666 })",
       "$_.ParentProcessId -eq 6666 -and $_.ProcessId -ne 5555 -and $_.Created -ge $self[0].Created", "-and $_.Created -lt $by", "$tree[$root.ProcessId] = $root.Created",
-      "Stop-Process -Id $_.ProcessId -Force"].map(t => script.includes(t))));
+      "GetProcessById([int]$process.ProcessId).Kill()"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
@@ -516,6 +517,27 @@ export class SharedMcpLauncherTests {
   }
 
   @TestMethod
+  public async listsThisProcessUnderItsParentWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    const [powershell] = recorder.starts;
+    const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
+    const listing = script.slice(0, script.indexOf(SharedMcpLauncherTests.SELF_LISTED));
+    const answer = spawnSync(String(powershell?.command), ["-NoProfile", "-NonInteractive", "-Command", `${listing}$mine = @($all | Where-Object { $_.ProcessId -eq `
+      + `${String(process.pid)} }); [string]$mine[0].ParentProcessId + ' ' + @(Get-Module).Count`], { encoding: "utf8" });
+
+    Assert.isTrue(listing.length > 0);
+    Assert.areEqual(`${String(process.ppid)} 0`, answer.stdout.trim());
+  }
+
+  @TestMethod
   public async endsTheServerAndEachProcessUnderItThatStartedAfterTheWatchByTheKernelsTimesOnWindows(): Promise<void> {
     const host = new FakeLauncherHost();
     const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
@@ -531,10 +553,10 @@ export class SharedMcpLauncherTests {
       { cwd: "D:\\Windows\\System32", env: environment, stdio: "ignore", windowsHide: true }]),
       JSON.stringify([powershell?.command, powershell?.args.slice(0, 3), powershell?.options]));
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true, true, false, false]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ",
-      "Created = $_.CreationDate.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
+      "Created = $created.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
       "$ours = $true -and $holder.Count -gt 0 -and $holder[0].Created -ge $self[0].Created -and $holder[0].ParentProcessId -eq $self[0].ParentProcessId; ",
       "$_.ParentProcessId -eq 4321 -and $_.Created -ge $self[0].Created -and $_.Created -lt $before", "$_.Created -ge $tree[$_.ParentProcessId]",
-      "if ($ending.Count -eq 0) { exit 4 }; ", "Stop-Process -Id $_.ProcessId -Force", "FromUnixTimeMilliseconds", "LocalDateTime"].map(t => script.includes(t))));
+      "if ($ending.Count -eq 0) { exit 4 }; ", "GetProcessById([int]$process.ProcessId).Kill()", "FromUnixTimeMilliseconds", "LocalDateTime"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
