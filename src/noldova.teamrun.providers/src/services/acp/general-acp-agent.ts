@@ -9,7 +9,7 @@
 import { basename, delimiter, dirname } from "node:path";
 
 import "@noldova/context.core";
-import type { JsonObject, JsonReader, JsonValue } from "@noldova/context.json";
+import { type JsonObject, JsonReader } from "@noldova/context.json";
 import type { ProfileSearch, SharedMcpRefusal } from "@noldova/teamrun.core";
 import { type Provider, ProviderKind, ProviderMode, type ProviderModel, ProviderSignInCommand, type RequestedSettings, type SharedMcpTransport } from "@noldova/teamrun.protocol";
 
@@ -25,6 +25,7 @@ import { AcpConfigOption } from "../../models/acp-config-option.js";
 import { AcpLaunch } from "../../models/acp-launch.js";
 import { AcpMcpTool } from "../../models/acp-mcp-tool.js";
 import { AcpRegistryPackage } from "../../models/acp-registry-package.js";
+import { AcpSessionModes } from "../../models/acp-session-modes.js";
 import type { AcpModelMember } from "../../models/acp-model-member.js";
 import type { AcpPermissionSwitch } from "../../models/acp-permission-switch.js";
 import { CommandSource } from "../../models/command-source.js";
@@ -87,7 +88,7 @@ export class GeneralAcpAgent implements IAcpAgent {
     this.command = command;
     this.locate = locate;
     this.program = program;
-    this.variables = typeof variables === "function" ? variables : () => variables;
+    this.variables = Object.isFunction(variables) ? variables : () => variables;
     this.baseEnvironment = environment;
     this.homeDirectory = homeDirectory;
     this.toolTitle = Resources.formatGeneralAcpToolTitle(displayName);
@@ -111,7 +112,7 @@ export class GeneralAcpAgent implements IAcpAgent {
   }
 
   public readSession(session: JsonReader): void {
-    let learned: { readonly modes: readonly ProviderMode[]; readonly current: string | null } | null;
+    let learned: AcpSessionModes | null;
     try {
       learned = GeneralAcpAgent.modesOf(session);
     }
@@ -209,23 +210,28 @@ export class GeneralAcpAgent implements IAcpAgent {
   }
 
   private learn(modes: readonly ProviderMode[], current: string | null): void {
-    if (modes.length === 0)
+    const [first] = modes;
+    if (Object.isUndefined(first))
       return;
     this.learnedModes = modes;
     if (Object.isNull(this.learnedDefault) || !modes.some(t => t.id === this.learnedDefault))
-      this.learnedDefault = !Object.isNull(current) && modes.some(t => t.id === current) ? current : modes[0]!.id;
+      this.learnedDefault = !Object.isNull(current) && modes.some(t => t.id === current) ? current : first.id;
   }
 
-  private static modesOf(session: JsonReader): { readonly modes: readonly ProviderMode[]; readonly current: string | null } | null {
+  private static modesOf(session: JsonReader): AcpSessionModes | null {
     const option = AcpConfigOption.readAll(session)?.find(t => t.category === Resources.acpModeCategory);
     if (!Object.isUndefined(option))
-      return { modes: option.values.map((t, index) => new ProviderMode(t, option.names[index]!.trim().length === 0 ? t : option.names[index]!)), current: option.currentValue };
+      return new AcpSessionModes(option.values.map((t, index) => new ProviderMode(t, GeneralAcpAgent.nameOr(option.names[index], t))), option.currentValue);
     const modes = session.hasField(Resources.acpModesField) ? session.readNullableObject(Resources.acpModesField) : null;
     if (Object.isNull(modes))
       return null;
-    return { modes: modes.readObjectArray(Resources.acpAvailableModesField).map(t => new ProviderMode(t.readNonBlankString(Resources.idField),
+    return new AcpSessionModes(modes.readObjectArray(Resources.acpAvailableModesField).map(t => new ProviderMode(t.readNonBlankString(Resources.idField),
       GeneralAcpAgent.textOf(t, Resources.nameField) ?? t.readNonBlankString(Resources.idField), GeneralAcpAgent.textOf(t, Resources.descriptionField))),
-    current: modes.readOptionalString(Resources.acpCurrentModeField) ?? null };
+    modes.readOptionalString(Resources.acpCurrentModeField) ?? null);
+  }
+
+  private static nameOr(name: string | undefined, value: string): string {
+    return Object.isUndefined(name) || name.trim().length === 0 ? value : name;
   }
 
   private static textOf(reader: JsonReader, field: string): string | null {
@@ -235,10 +241,6 @@ export class GeneralAcpAgent implements IAcpAgent {
 
   private static isGemini(initialized: JsonReader): boolean {
     const info = initialized.toJson()[Resources.acpAgentInfoField];
-    return GeneralAcpAgent.isJsonObject(info) && info[Resources.nameField] === Resources.geminiCliAgentName;
-  }
-
-  private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && !Object.isNull(value) && !Array.isArray(value);
+    return Object.isPlainObject(info) && JsonReader.fromValue(info).toJson()[Resources.nameField] === Resources.geminiCliAgentName;
   }
 }

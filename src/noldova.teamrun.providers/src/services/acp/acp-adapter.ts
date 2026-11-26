@@ -37,10 +37,13 @@ import type { IProcessStarter } from "../../interfaces/i-process-starter.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
 import type { ISavedImageReader } from "../../interfaces/i-saved-image.reader.js";
 import { AcpConfigOption } from "../../models/acp-config-option.js";
+import { AcpConfiguredSettings } from "../../models/acp-configured-settings.js";
 import { AcpHeldSteer } from "../../models/acp-held-steer.js";
 import { AcpModelChoices } from "../../models/acp-model-choices.js";
 import { AcpSession } from "../../models/acp-session.js";
+import { AcpSpeedSelection } from "../../models/acp-speed-selection.js";
 import type { AppServerClientInfo } from "../../models/app-server-client-info.js";
+import { CurrentAcpClient } from "../../models/current-acp-client.js";
 import { LaunchedAcpClient } from "../../models/launched-acp-client.js";
 import { ProcessOrigin } from "../../models/process-origin.js";
 import type { ProviderTimings } from "../../models/provider-timings.js";
@@ -310,6 +313,7 @@ export class AcpAdapter implements IProviderAdapter {
     const request = this.plannedOf(asked);
     const kindId = this.descriptor.id;
     let client: AcpClient | null = null;
+    const turnClient = new CurrentAcpClient();
     let launchEnvironment: NodeJS.ProcessEnv = this.agent.baseEnvironment;
     let sessionId: string | null = null;
     let observed = new ObservedSettings(kindId, null, null, null);
@@ -367,7 +371,7 @@ export class AcpAdapter implements IProviderAdapter {
       return woken;
     },
       t => client?.notify(Resources.acpSessionCancel, { sessionId: t }), (reason, session, seen) => this.wakeResult(reason, session, seen), this.descriptor.displayName,
-      (t, u) => this.endTaskTree(client!, t, u), t => this.cancelSubAgent(client!, t), commands, terminals);
+      (t, u) => this.endTaskTree(turnClient.client, t, u), t => this.cancelSubAgent(turnClient.client, t), commands, terminals);
     const cancel = (): void => {
       if (!Object.isNull(client) && !Object.isNull(sessionId))
         client.notify(Resources.acpSessionCancel, { sessionId });
@@ -390,7 +394,7 @@ export class AcpAdapter implements IProviderAdapter {
       const taken = await this.take(key, request, sender);
       const launched = taken ?? await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
         titleArguments, !request.isolated, request.isolated);
-      client = launched.client;
+      client = turnClient.set(launched.client);
       launchEnvironment = launched.environment;
       const initialized = taken?.initialized ?? await this.initialize(client);
       observed = new ObservedSettings(kindId, null, null, this.agent.readVersion(initialized));
@@ -431,7 +435,7 @@ export class AcpAdapter implements IProviderAdapter {
           throw failure;
         const relaunched = await this.createClient(request.provider, request.requested, false, request.environment, request.workingDirectory, approvedTools, shutdowns,
           titleArguments, !request.isolated, request.isolated);
-        client = relaunched.client;
+        client = turnClient.set(relaunched.client);
         launchEnvironment = relaunched.environment;
         await this.initialize(client);
         await this.authenticate(client);
@@ -478,8 +482,11 @@ export class AcpAdapter implements IProviderAdapter {
         observed = await this.selectModel(client, sessionId, started, resumed, request.requested, observed);
         await this.selectMode(client, sessionId, started, [], resumed, request.requested);
       }
-      else
-        [observed, confirming] = await this.configure(client, sessionId, started, options, resumed, request.provider, request.requested, observed);
+      else {
+        const configured = await this.configure(client, sessionId, started, options, resumed, request.provider, request.requested, observed);
+        observed = configured.observed;
+        confirming = configured.confirming;
+      }
       await turn.beginAsync(sessionId, resumed, observed, Object.isNull(request.instructions) || !Object.isNull(command) ? null : RoleApplication.Prompt);
       channel.follow(sessionId, observed);
       const unlistedAtStart = !Object.isNull(awaited) && (listsFirst ? !awaited.isListed : taken?.toolsUnlisted === true);
@@ -897,7 +904,7 @@ export class AcpAdapter implements IProviderAdapter {
   }
 
   private async configure(client: AcpClient, sessionId: string, started: JsonReader, options: readonly AcpConfigOption[], resumed: boolean, provider: Provider | null,
-    requested: RequestedSettings, observed: ObservedSettings): Promise<[ObservedSettings, Promise<boolean> | null]> {
+    requested: RequestedSettings, observed: ObservedSettings): Promise<AcpConfiguredSettings> {
     let current = options;
     const model = this.modelOf(current);
     const choices = Object.isUndefined(model) ? null : this.choicesOf(model);
@@ -916,8 +923,8 @@ export class AcpAdapter implements IProviderAdapter {
       throw new SettingUnavailableException(Resources.formatUnknownEffort(level, modelName));
     if (!Object.isUndefined(effort) && !Object.isNull(level) && level !== effort.currentValue)
       current = await this.setOption(client, sessionId, current, effort, level);
-    const [speeded, speed] = await this.selectSpeed(client, sessionId, current, requested.speed);
-    current = speeded;
+    const speeded = await this.selectSpeed(client, sessionId, current, requested.speed);
+    current = speeded.options;
     current = await this.selectMode(client, sessionId, started, current, resumed, requested);
     const launched = this.agent.effortAtLaunch ? level : null;
     const check = Object.isNull(requested.model) ? null : this.checkUnavailableModel(provider, requested.model);
@@ -925,20 +932,20 @@ export class AcpAdapter implements IProviderAdapter {
     const unavailable = !Object.isNull(confirming);
     const served = this.modelOf(current)?.currentValue ?? null;
     const family = Object.isNull(served) || Object.isNull(choices) ? null : choices.familyOf(served);
-    return [new ObservedSettings(observed.kind, family ?? served ?? (unavailable ? null : this.launchedModel(requested)),
+    return new AcpConfiguredSettings(new ObservedSettings(observed.kind, family ?? served ?? (unavailable ? null : this.launchedModel(requested)),
       Object.isNull(family) ? current.find(t => t.category === Resources.acpThoughtLevelCategory)?.currentValue ?? launched : served, observed.harnessVersion,
-      unavailable, speed), confirming];
+      unavailable, speeded.served), confirming);
   }
 
   private async selectSpeed(client: AcpClient, sessionId: string, options: readonly AcpConfigOption[],
-    speed: string | null): Promise<[options: readonly AcpConfigOption[], served: string | null]> {
+    speed: string | null): Promise<AcpSpeedSelection> {
     const speeds = this.agent.speedOption ?? null;
     const option = speeds?.find(options);
     if (Object.isNull(speeds) || Object.isUndefined(option))
-      return [options, null];
+      return new AcpSpeedSelection(options, null);
     const value = Object.isNull(speed) ? null : speeds.valueOf(speed);
     const current = Object.isNull(value) || value === option.currentValue ? options : await this.setOption(client, sessionId, options, option, value);
-    return [current, speeds.servedIn(current)];
+    return new AcpSpeedSelection(current, speeds.servedIn(current));
   }
 
   private shownLevelOf(provider: Provider | null, model: string | null): string | null {

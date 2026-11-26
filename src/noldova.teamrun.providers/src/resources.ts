@@ -16,9 +16,11 @@ import { ShellDialect } from "./enums/shell-dialect.js";
 import { WriteKind } from "./enums/write-kind.js";
 import { AntigravityReleaseTarget } from "./models/antigravity-release-target.js";
 import { CmdletParameters } from "./models/cmdlet-parameters.js";
+import { CodexChildAnswer } from "./models/codex-child-answer.js";
 import { CommandFlags } from "./models/command-flags.js";
 import { CursorReleaseTarget } from "./models/cursor-release-target.js";
 import { GrokReleaseTarget } from "./models/grok-release-target.js";
+import type { ListedProcess } from "./models/listed-process.js";
 import { NameGroup } from "./models/name-group.js";
 
 export class Resources {
@@ -2210,16 +2212,16 @@ export class Resources {
   public static readonly allowForSessionLabel: string = "Allow for this session";
   public static readonly denyLabel: string = "Deny";
   public static readonly cancelDecision: string = "cancel";
-  public static readonly codexChildRequestAnswers: ReadonlyMap<string, { readonly cancel: JsonValue; readonly decline: JsonValue; readonly note: string }> = new Map([
-    [Resources.commandApprovalRequest, { cancel: { decision: Resources.cancelDecision }, decline: { decision: Resources.declineDecision },
-      note: "TeamRun declined its command without asking, since the reply had ended." }],
-    [Resources.fileChangeApprovalRequest, { cancel: { decision: Resources.cancelDecision }, decline: { decision: Resources.declineDecision },
-      note: "TeamRun declined its file change without asking, since the reply had ended." }],
-    [Resources.userInputRequest, { cancel: { [Resources.answersField]: {} }, decline: { [Resources.answersField]: {} },
-      note: "TeamRun skipped its question without asking, since the reply had ended." }],
-    [Resources.mcpElicitationRequest, { cancel: { [Resources.acpActionField]: Resources.acpCancelAction },
-      decline: { [Resources.acpActionField]: Resources.acpDeclineAction },
-      note: "TeamRun declined its MCP tool call without asking, since the reply had ended." }]
+  public static readonly codexChildRequestAnswers: ReadonlyMap<string, CodexChildAnswer> = new Map([
+    [Resources.commandApprovalRequest, new CodexChildAnswer({ decision: Resources.cancelDecision }, { decision: Resources.declineDecision },
+      "TeamRun declined its command without asking, since the reply had ended.")],
+    [Resources.fileChangeApprovalRequest, new CodexChildAnswer({ decision: Resources.cancelDecision }, { decision: Resources.declineDecision },
+      "TeamRun declined its file change without asking, since the reply had ended.")],
+    [Resources.userInputRequest, new CodexChildAnswer({ [Resources.answersField]: {} }, { [Resources.answersField]: {} },
+      "TeamRun skipped its question without asking, since the reply had ended.")],
+    [Resources.mcpElicitationRequest, new CodexChildAnswer({ [Resources.acpActionField]: Resources.acpCancelAction },
+      { [Resources.acpActionField]: Resources.acpDeclineAction },
+      "TeamRun declined its MCP tool call without asking, since the reply had ended.")]
   ]);
   public static readonly unsupportedServerRequestCode: number = -32601;
   public static readonly serverRequestFailedCode: number = -32000;
@@ -2576,6 +2578,7 @@ export class Resources {
   public static readonly codexSignInUnreadable: string = "Codex reported the end of the sign-in in a form TeamRun can't read.";
   public static readonly claudeNoResult: string = "Claude Code ended without a result message.";
   public static readonly claudeChatNotStarted: string = "The Claude chat has no Claude Code query yet, so it can't run a turn.";
+  public static readonly acpClientNotStarted: string = "The ACP turn has no agent client yet, so it can't answer its agent.";
   public static readonly claudeMessageWithoutId: string = "A message sent to Claude Code needs an id, which its turn's replies are matched by.";
   public static readonly claudeAnsweredInOwnTurn: string = "Claude Code answered this message inside a turn of its own, the one it started when a background task ended.";
   public static readonly turnNotSettled: string = "The turn has not ended yet, so it has no result.";
@@ -3608,9 +3611,9 @@ export class Resources {
     return `Ending a process tree on Windows stopped at round ${String(round)}, whose script failed (${failure}); the tree may still run.`;
   }
 
-  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string {
+  public static formatTreeLeftListed(processes: readonly ListedProcess[]): string {
     return `Ending a process tree on Windows ran its ${String(Resources.processTreeFreezeRounds)} rounds and still listed ` +
-      `${processes.map(([id, start]) => `${String(id)} (started ${new Date(start).toISOString()})`).join(", ")}.`;
+      `${processes.map(t => `${String(t.id)} (started ${new Date(t.start).toISOString()})`).join(", ")}.`;
   }
 
   public static formatTaskProcessGone(providerName: string): string {

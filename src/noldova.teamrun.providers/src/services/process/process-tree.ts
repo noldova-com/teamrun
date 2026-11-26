@@ -14,7 +14,10 @@ import type { ILog, ITimer } from "@noldova/teamrun.core";
 import type { IOrphanSweep } from "../../interfaces/i-orphan-sweep.js";
 import type { IPowershellSession } from "../../interfaces/i-powershell-session.js";
 import type { IProcessTree } from "../../interfaces/i-process-tree.js";
+import { ListedProcess } from "../../models/listed-process.js";
+import { OrphanSearch } from "../../models/orphan-search.js";
 import { ProcessCommand } from "../../models/process-command.js";
+import { ProcessListRow } from "../../models/process-list-row.js";
 import { Resources } from "../../resources.js";
 import type { CommandRunner } from "./command-runner.js";
 import { StopSession } from "./stop-session.js";
@@ -104,18 +107,22 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   public async endOrphaned(processId: number, isRunning: () => boolean, threadIds: readonly string[], stop: () => Promise<void>): Promise<readonly number[]> {
     const listing = await this.run().catch(() => null);
     const start = listing?.get(processId)?.start;
-    const roots = Object.isNullOrUndefined(listing) || Object.isUndefined(start) || !isRunning() ? new Set<number>()
-      : new Set([...listing].filter(([id, t]) => t.parent === processId && t.start >= start && threadIds.includes(this.threadOf(id) ?? String.empty)).map(([id]) => id));
+    if (Object.isNullOrUndefined(listing) || Object.isUndefined(start) || !isRunning()) {
+      await stop();
+      return [];
+    }
+    const roots = new Set([...listing].filter(([id, t]) => t.parent === processId && t.start >= start && threadIds.includes(this.threadOf(id) ?? String.empty))
+      .map(([id]) => id));
     if (roots.size === 0) {
       await stop();
       return [];
     }
-    const before = ProcessTree.treeOf(listing!, new Map([[processId, start!]]));
+    const before = ProcessTree.treeOf(listing, new Map([[processId, start]]));
     await stop();
-    let found = await this.orphansOf(processId, roots, listing!, before, { listing: listing!, orphans: new Map<number, number>(), rootsGone: false });
+    let found = await this.orphansOf(processId, roots, listing, before, new OrphanSearch(listing, new Map<number, number>(), false));
     for (let waited = 0; waited < this.grace && !Object.isNull(found) && !found.rootsGone; waited += Resources.processTreeGracePoll) {
       await this.timer.delayAsync(Resources.processTreeGracePoll, new AbortController().signal);
-      found = await this.orphansOf(processId, roots, listing!, before, found);
+      found = await this.orphansOf(processId, roots, listing, before, found);
     }
     if (Object.isNull(found) || found.orphans.size === 0)
       return [];
@@ -133,10 +140,8 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     }
   }
 
-  private async orphansOf(processId: number, roots: ReadonlySet<number>, first: ReadonlyMap<number, { readonly parent: number; readonly start: number }>,
-    before: ReadonlyMap<number, number>, last: { readonly listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>;
-      readonly orphans: Map<number, number>; readonly rootsGone: boolean }): Promise<{ readonly listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>;
-      readonly orphans: Map<number, number>; readonly rootsGone: boolean } | null> {
+  private async orphansOf(processId: number, roots: ReadonlySet<number>, first: ReadonlyMap<number, ProcessListRow>,
+    before: ReadonlyMap<number, number>, last: OrphanSearch): Promise<OrphanSearch | null> {
     const listing = await this.run().catch(() => null);
     if (Object.isNull(listing))
       return last;
@@ -146,7 +151,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     const gone = new Set([...roots].filter(id => !alive(id)));
     const orphans = new Map([...before].filter(([id]) => id !== processId && alive(id) && ProcessTree.under(first, processId, id, gone)
       && !ProcessTree.descends(listing, id, processId)));
-    return { listing, orphans, rootsGone: gone.size === roots.size };
+    return new OrphanSearch(listing, orphans, gone.size === roots.size);
   }
 
   private async end(frozen: ReadonlyMap<number, number>): Promise<void> {
@@ -166,43 +171,43 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
       await this.timer.delayAsync(Resources.processTreeGracePoll, new AbortController().signal);
   }
 
-  private async freeze(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>,
+  private async freeze(listing: ReadonlyMap<number, ProcessListRow>,
     known: ReadonlyMap<number, number>, spared: number | null = null): Promise<Map<number, number>> {
     const frozen = new Map<number, number>();
     const tried = new Map<number, number>();
     let tree = new Map(known);
-    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> | null = listing;
+    let current: ReadonlyMap<number, ProcessListRow> | null = listing;
     for (let round = 0; !Object.isNull(current) && round < Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found = ProcessTree.listed(current, tree).filter(([id, started]) => id !== spared && tried.get(id) !== started);
+      const found = ProcessTree.listed(current, tree).filter(t => t.id !== spared && tried.get(t.id) !== t.start);
       if (found.length === 0)
         break;
-      for (const [id, started] of found) {
-        tried.set(id, started);
-        if (this.signal(id, Resources.stopSignal))
-          frozen.set(id, started);
+      for (const listed of found) {
+        tried.set(listed.id, listed.start);
+        if (this.signal(listed.id, Resources.stopSignal))
+          frozen.set(listed.id, listed.start);
       }
       current = await this.run().catch(() => null);
     }
     return frozen;
   }
 
-  private async endOnWindows(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>,
+  private async endOnWindows(listing: ReadonlyMap<number, ProcessListRow>, known: ReadonlyMap<number, number>,
     stop: StopSession): Promise<void> {
     let tree = new Map(known);
-    let current: ReadonlyMap<number, { readonly parent: number; readonly start: number }> = listing;
+    let current: ReadonlyMap<number, ProcessListRow> = listing;
     for (let round = 1; round <= Resources.processTreeFreezeRounds; round++) {
       tree = ProcessTree.treeOf(current, tree);
-      const found: [number, number][] = ProcessTree.listed(current, tree);
+      const found = ProcessTree.listed(current, tree);
       if (found.length === 0)
         return;
-      const listed = await this.run(Resources.formatProcessEndScript(found.map(t => t[0]), found.map(t => t[1])), Resources.psProcessListArguments, stop)
-        .catch((error: unknown) => error instanceof Error ? error.name : typeof error);
-      if (typeof listed === "string") {
-        this.log?.write(Resources.formatTreeEndRoundFailed(round, listed));
+      try {
+        current = await this.run(Resources.formatProcessEndScript(found.map(t => t.id), found.map(t => t.start)), Resources.psProcessListArguments, stop);
+      }
+      catch (error: unknown) {
+        this.log?.write(Resources.formatTreeEndRoundFailed(round, error instanceof Error ? error.name : typeof error));
         return;
       }
-      current = listed;
     }
     const left = ProcessTree.listed(current, ProcessTree.treeOf(current, tree));
     if (left.length > 0)
@@ -210,7 +215,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
   }
 
   private async run(endScript: string | null = null, listArguments: readonly string[] = Resources.psProcessListArguments,
-    stop: StopSession = new StopSession(null)): Promise<ReadonlyMap<number, { readonly parent: number; readonly start: number }>> {
+    stop: StopSession = new StopSession(null)): Promise<ReadonlyMap<number, ProcessListRow>> {
     const windows = this.platform === Resources.windowsPlatform;
     const script = endScript ?? Resources.powershellProcessListScript;
     const fresh = async (timeout: number): Promise<string> => {
@@ -225,7 +230,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
       return fresh(this.timeout - limit);
     }) : await fresh(this.timeout);
     return new Map([...stdout.matchAll(Resources.processParentPattern)]
-      .map(t => [Number(t[1]), { parent: Number(t[2]), start: windows ? Number(t[3]) : Date.parse(t[3]!) }]));
+      .map(t => [Number(t[1]), new ProcessListRow(Number(t[2]), windows ? Number(t[3]) : Date.parse(String(t[3])))]));
   }
 
   private signal(processId: number, signal: NodeJS.Signals | 0): boolean {
@@ -238,7 +243,7 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     }
   }
 
-  private static treeOf(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, known: ReadonlyMap<number, number>): Map<number, number> {
+  private static treeOf(listing: ReadonlyMap<number, ProcessListRow>, known: ReadonlyMap<number, number>): Map<number, number> {
     const tree = new Map(known);
     for (const [id, started] of tree) {
       const listed = listing.get(id);
@@ -251,26 +256,26 @@ export class ProcessTree implements IProcessTree, IOrphanSweep {
     return tree;
   }
 
-  private static listed(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, tree: ReadonlyMap<number, number>): [number, number][] {
-    return [...tree].filter(([id, started]) => listing.get(id)?.start === started);
+  private static listed(listing: ReadonlyMap<number, ProcessListRow>, tree: ReadonlyMap<number, number>): ListedProcess[] {
+    return [...tree].filter(([id, started]) => listing.get(id)?.start === started).map(([id, started]) => new ListedProcess(id, started));
   }
 
-  private static under(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, processId: number, id: number,
+  private static under(listing: ReadonlyMap<number, ProcessListRow>, processId: number, id: number,
     roots: ReadonlySet<number>): boolean {
-    for (let current = listing.get(id)!.parent; current !== processId; current = listing.get(current)!.parent)
+    for (let current = listing.get(id)?.parent; !Object.isUndefined(current) && current !== processId; current = listing.get(current)?.parent)
       if (roots.has(current))
         return true;
     return false;
   }
 
-  private static descends(listing: ReadonlyMap<number, { readonly parent: number; readonly start: number }>, processId: number, ancestorId: number): boolean {
+  private static descends(listing: ReadonlyMap<number, ProcessListRow>, processId: number, ancestorId: number): boolean {
     const seen = new Set<number>();
-    for (let id = processId; !seen.has(id); id = listing.get(id)!.parent) {
+    for (let id = processId, entry = listing.get(id); !Object.isUndefined(entry) && !seen.has(id); id = entry.parent, entry = listing.get(id)) {
       seen.add(id);
-      const parent = listing.get(listing.get(id)!.parent);
-      if (Object.isUndefined(parent) || !(parent.start <= listing.get(id)!.start))
+      const parent = listing.get(entry.parent);
+      if (Object.isUndefined(parent) || !(parent.start <= entry.start))
         return false;
-      if (listing.get(id)!.parent === ancestorId)
+      if (entry.parent === ancestorId)
         return true;
     }
     return false;

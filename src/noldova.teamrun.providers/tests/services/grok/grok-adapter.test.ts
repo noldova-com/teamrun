@@ -64,6 +64,16 @@ class ModeCase {
   }
 }
 
+class BlockedServer {
+  public readonly server: string;
+  public readonly reason: string;
+
+  public constructor(server: string, reason: string) {
+    this.server = server;
+    this.reason = reason;
+  }
+}
+
 class HangCase {
   public readonly read: string;
   public readonly mode: string;
@@ -995,14 +1005,15 @@ export class GrokAdapterTests {
   @TestMethod
   public async reportsEachSharedServerGrokLoggedAsBlockedButNotTeamRunsOwnOrAServerTheTurnDidntPass(): Promise<void> {
     await using host = new GrokTestHost();
-    const blocks = (home: string, entries: readonly (readonly [string, string])[]): void => {
+    const blocks = (home: string, entries: readonly BlockedServer[]): void => {
       mkdirSync(join(home, "logs"), { recursive: true });
-      writeFileSync(join(home, "logs", "unified.jsonl"), entries.map(([server, reason]) =>
-        JSON.stringify({ ts: "2999-01-01T00:00:00.000Z", msg: Resources.grokMcpBlockedMessage, ctx: { server, reason } })).join("\n"));
+      writeFileSync(join(home, "logs", "unified.jsonl"), entries.map(t =>
+        JSON.stringify({ ts: "2999-01-01T00:00:00.000Z", msg: Resources.grokMcpBlockedMessage, ctx: { server: t.server, reason: t.reason } })).join("\n"));
     };
-    blocks(host.directory.resolve("person", ".grok"), [["teamrun", "locked down by policy"], ["docs", "not in allowed_mcp_servers"], ["other", "not passed"]]);
-    blocks(host.directory.resolve("added"), [["search", "denied by requirements.toml"]]);
-    blocks(host.directory.resolve("plain"), [["teamrun", "locked down by policy"], ["other", "not passed"]]);
+    blocks(host.directory.resolve("person", ".grok"), [new BlockedServer("teamrun", "locked down by policy"), new BlockedServer("docs", "not in allowed_mcp_servers"),
+      new BlockedServer("other", "not passed")]);
+    blocks(host.directory.resolve("added"), [new BlockedServer("search", "denied by requirements.toml")]);
+    blocks(host.directory.resolve("plain"), [new BlockedServer("teamrun", "locked down by policy"), new BlockedServer("other", "not passed")]);
     const adapter = host.createAdapter(GrokAdapterTests.offeringHttp(host));
     const tools = new TurnTools({ listToolsAsync: () => Promise.resolve([{ name: "teamrun_list_chats" }]), callToolAsync: () => Promise.resolve({}) }, [],
       GrokAdapterTests.endpoint());

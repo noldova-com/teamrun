@@ -5669,7 +5669,7 @@ export declare class Resources {
    * What a Codex sub-agent's request is answered with when its reply can no longer ask it, by request method: once the reply was stopped, and otherwise,
    * with the note shown under its row.
    */
-  public static readonly codexChildRequestAnswers: ReadonlyMap<string, { readonly cancel: JsonValue; readonly decline: JsonValue; readonly note: string }>;
+  public static readonly codexChildRequestAnswers: ReadonlyMap<string, CodexChildAnswer>;
   public static readonly unsupportedServerRequestCode: number;
   public static readonly serverRequestFailedCode: number;
   public static readonly claudeAllowDecision: string;
@@ -6063,6 +6063,10 @@ export declare class Resources {
    */
   public static readonly claudeChatNotStarted: string;
   /**
+   * Why a turn's current ACP client refuses a read before the turn started its agent.
+   */
+  public static readonly acpClientNotStarted: string;
+  /**
    * Why a Claude chat refuses to run a turn whose message has no id, which Claude Code's replies name it by.
    */
   public static readonly claudeMessageWithoutId: string;
@@ -6317,9 +6321,9 @@ export declare class Resources {
 
   /**
    * The line a Windows tree's end writes to its log when a process of the tree still shows after its last round.
-   * @param processes Each process still listed, as its id and its start in milliseconds since the epoch.
+   * @param processes Each process still listed.
    */
-  public static formatTreeLeftListed(processes: readonly (readonly [number, number])[]): string;
+  public static formatTreeLeftListed(processes: readonly ListedProcess[]): string;
 
   public static formatTaskProcessGone(providerName: string): string;
 
@@ -13442,6 +13446,33 @@ export declare class AcpConfigOption {
 }
 
 /**
+ * A process a listing still shows: its id and its start in milliseconds since the epoch, which tell it from a later process under the same id.
+ */
+export declare class ListedProcess {
+  public readonly id: number;
+  public readonly start: number;
+  public constructor(id: number, start: number);
+}
+
+/**
+ * The client an ACP turn talks to now, which a relaunch replaces.
+ */
+export declare class CurrentAcpClient {
+  /**
+   * The current client.
+   * @throws InvalidOperationException when no client was set yet.
+   */
+  public get client(): AcpClient;
+
+  /**
+   * Makes a client the current one.
+   * @param client The client.
+   * @returns The same client.
+   */
+  public set(client: AcpClient): AcpClient;
+}
+
+/**
  * A plan an ACP agent hands over for approval: its Markdown text and its to-dos as steps.
  */
 export declare class AcpPlan {
@@ -14710,6 +14741,17 @@ export declare class GrokRelease {
    * Returns the pinned build for a platform and architecture, as Node names them, or `null` when Grok ships none.
    */
   public static find(platform: string, architecture: string): GrokRelease | null;
+}
+
+/**
+ * How TeamRun answers one kind of request a Codex sub-agent sends when no one can be asked, a row of `Resources.codexChildRequestAnswers`: the
+ * answer once the turn was stopped, the answer once the reply had ended, and the note added to the sub-agent's details with that answer.
+ */
+export declare class CodexChildAnswer {
+  public readonly cancel: JsonValue;
+  public readonly decline: JsonValue;
+  public readonly note: string;
+  public constructor(cancel: JsonValue, decline: JsonValue, note: string);
 }
 
 /**

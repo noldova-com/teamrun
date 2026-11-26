@@ -8,7 +8,7 @@
 
 import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { type ITimer, NodeTimer, TimeoutException } from "@noldova/teamrun.core";
-import { CommandRunner, type IPowershellSession, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
+import { CommandRunner, type IPowershellSession, ListedProcess, NodeProcessStarter, PowershellSession, ProcessCommand, ProcessTerminator, ProcessTree, Resources } from "@noldova/teamrun.providers";
 
 import { FakeTaskTree, type FakeTaskTreeMode } from "../../fixtures/fake-task-tree.fixture.js";
 import { HeldDelayTimer } from "../../fixtures/held-delay-timer.fixture.js";
@@ -457,7 +457,7 @@ export class ProcessTreeTests {
     Assert.isTrue(ended);
     Assert.areEqual(JSON.stringify([Resources.powershellProcessListScript, ...Array.from({ length: Resources.processTreeFreezeRounds },
       () => Resources.formatProcessEndScript([task], [start + 10_000]))]), JSON.stringify(session.calls.map(t => t[0])));
-    Assert.areEqual(JSON.stringify([Resources.formatTreeLeftListed([[task, start + 10_000]])]), JSON.stringify(log.lines));
+    Assert.areEqual(JSON.stringify([Resources.formatTreeLeftListed([new ListedProcess(task, start + 10_000)])]), JSON.stringify(log.lines));
   }
 
   @TestMethod
