@@ -143,7 +143,7 @@ test("a fresh install opens Explorer on the left, Background tasks, Pages and Gi
   await page.emulateMedia({ colorScheme: null });
 
   await TeamRunApp.showTabAsync(page, "Pages");
-  await dragAsync(page, "view/teamrun.changes", "view/teamrun.subAgents");
+  await dragAsync(page, "view/teamrun.changes", "view/teamrun.plan");
   const sash = await page.getByRole("separator", { name: "Resize the right dock" }).boundingBox();
   if (Object.isNull(sash))
     throw new Error("The right dock's separator isn't shown.");
@@ -155,7 +155,7 @@ test("a fresh install opens Explorer on the left, Background tasks, Pages and Gi
     const moved = await placesAsync(page);
     return [groupOf(moved, "view/teamrun.pages").shown, groupOf(moved, "view/teamrun.changes").side, groupOf(moved, "view/teamrun.changes").tabs, groupOf(moved, "view/teamrun.changes").shown,
       groupOf(moved, "view/teamrun.activity").tabs, Math.abs(lower.left - groupOf(moved, "view/teamrun.plan").left - 48) <= 1];
-  }, TeamRunApp.pollOf(30_000)).toEqual(["view/teamrun.pages", "Right", ["view/teamrun.plan", "view/teamrun.subAgents", "view/teamrun.changes"], "view/teamrun.changes", ["view/teamrun.activity"], true]);
+  }, TeamRunApp.pollOf(30_000)).toEqual(["view/teamrun.pages", "Right", ["view/teamrun.plan", "view/teamrun.changes", "view/teamrun.subAgents"], "view/teamrun.changes", ["view/teamrun.activity"], true]);
   await page.keyboard.press("ControlOrMeta+Shift+KeyP");
   const search = page.getByRole("combobox", { name: /^Search / });
   await expect(search).toBeFocused();
