@@ -9,7 +9,7 @@
 import { type ChildProcess, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import "@noldova/context.core";
@@ -91,7 +91,7 @@ export class TeamRunApp {
 
   public constructor(isTraced: boolean = false) {
     this.isTraced = isTraced;
-    this.work = TeamRunApp.makeWork(process.platform === "win32" ? tmpdir() : "/tmp", work => TeamRunApp.prepareWork(process.platform, work));
+    this.work = TeamRunApp.makeWork(process.platform === "win32" ? homedir() : "/tmp", work => TeamRunApp.prepareWork(process.platform, work));
     this.home = path.join(this.work, "home");
     this.data = path.join(this.work, "data");
     this.device = path.join(this.work, "device");
