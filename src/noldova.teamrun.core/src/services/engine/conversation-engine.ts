@@ -1074,7 +1074,8 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
       mentions.push(await this.requireTeammateAsync(id));
     const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
     const matches = !Object.isNull(outside) ? mentions.length === 0
-      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender));
+      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender),
+        !Object.isNull(conversation.organizationChat));
     if (!matches)
       throw new ServiceException(ErrorCode.Conflict, Resources.mentionsChanged, []);
     const called = Object.isNull(sender) ? mentions : mentions.filter(t => t.id !== sender.teammateId);
