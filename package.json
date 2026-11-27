@@ -35,6 +35,7 @@
     "test": "node scripts/test.ts",
     "test:angular": "node scripts/test.ts angular",
     "test:docs": "npm run docs:test --workspace src/noldova.teamrun.docs",
+    "probe:image": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/probe/image-path.ps1",
     "probe:paths": "node -e \"const fs=require('fs');for(const p of [process.cwd(),'app',require('os').tmpdir()]){console.log('PROBE',p,'|',fs.realpathSync(p),'|',fs.realpathSync.native(p))}\"",
     "test:e2e": "node node_modules/playwright/cli.js test --config src/noldova.teamrun/tests/e2e/playwright.config.ts"
   },
