@@ -11,10 +11,10 @@ import { execFileSync, spawnSync } from "node:child_process";
 import "@noldova/context.core";
 
 export class SystemContrast {
-  private static readonly REGISTRY_KEY: string = "HKCU\\Control Panel\\Accessibility\\HighContrast";
-  private static readonly REGISTRY_FLAGS: RegExp = /^\s*Flags\s+REG_SZ\s+(\d+)\s*$/m;
   public static readonly FLAGS_VARIABLE: string = "TEAMRUN_CONTRAST_FLAGS";
   public static readonly SCHEME_VARIABLE: string = "TEAMRUN_CONTRAST_SCHEME";
+  private static readonly REGISTRY_KEY: string = "HKCU\\Control Panel\\Accessibility\\HighContrast";
+  private static readonly REGISTRY_FLAGS: RegExp = /^\s*Flags\s+REG_SZ\s+(\d+)\s*$/m;
   public static readonly SCRIPT: string = [
     "$marshal = [System.Runtime.InteropServices.Marshal]",
     "$assembly = [AppDomain]::CurrentDomain.DefineDynamicAssembly([System.Reflection.AssemblyName]::new('SystemContrast'), "
