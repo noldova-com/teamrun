@@ -1,3 +1,4 @@
+param([string[]]$Programs)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @"
 using System;
@@ -18,12 +19,12 @@ public static class ImagePathProbe {
   }
 }
 "@
-$electron = (Resolve-Path 'app\node_modules\electron\dist\electron.exe').Path
-$env:ELECTRON_RUN_AS_NODE = '1'
-$child = Start-Process -FilePath $electron -ArgumentList '-e', 'setTimeout(() => {}, 20000)' -PassThru -NoNewWindow
-Start-Sleep -Seconds 2
-Write-Output "PROBE started   $electron"
-Write-Output "PROBE win32     $([ImagePathProbe]::Read($child.Id, 0))"
-Write-Output "PROBE native    $([ImagePathProbe]::Read($child.Id, 1))"
-Write-Output "PROBE volume    $((Get-Item 'C:\a\teamrun').Target) $(mountvol 'C:\a\teamrun\' /L)"
-Stop-Process -Id $child.Id -Force
+foreach ($program in $Programs) {
+  $child = Start-Process -FilePath $program -ArgumentList '-e', 'setTimeout(() => {}, 15000)' -PassThru -NoNewWindow
+  Start-Sleep -Seconds 2
+  Write-Output "PROBE program  $program"
+  Write-Output "PROBE win32    $([ImagePathProbe]::Read($child.Id, 0))"
+  Write-Output "PROBE native   $([ImagePathProbe]::Read($child.Id, 1))"
+  Write-Output "PROBE stat     $(node -e "const fs=require('fs');const a=fs.statSync(process.argv[1],{bigint:true});console.log(a.dev,a.ino)" $program)"
+  Stop-Process -Id $child.Id -Force
+}
