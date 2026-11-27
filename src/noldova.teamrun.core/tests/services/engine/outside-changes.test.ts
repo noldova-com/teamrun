@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import "@noldova/context.core";
@@ -83,14 +83,22 @@ export class OutsideChangesTests {
     OutsideChangesTests.git(folder, "commit", "-q", "-m", "two");
     OutsideChangesTests.git(folder, "checkout", "-q", "-");
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    host.adapter.steps = [...OutsideChangesTests.tool(shape, "status"), () => {
+    const readings: Record<string, JsonValue> = {};
+    host.adapter.steps = [() => {
+      readings["beforeTool"] = Date.now();
+    }, ...OutsideChangesTests.tool(shape, "status"), () => {
+      readings["afterTool"] = Date.now();
       OutsideChangesTests.git(folder, "checkout", "-q", "next");
+      readings["folderBeforeLater"] = OutsideChangesTests.stampOf(folder);
       OutsideChangesTests.later([folder, join(folder, "kept.txt"), join(folder, "added.txt")]);
+      readings["folderAfterLater"] = OutsideChangesTests.stampOf(folder);
     }];
 
     const reply = await OutsideChangesTests.send(host, conversation.id);
+    const own = OutsideChangesTests.ownChanges(reply);
 
-    Assert.isUndefined(OutsideChangesTests.ownChanges(reply));
+    Assert.isUndefined(own, OutsideChangesTests.readingsOf(readings, folder, [...OutsideChangesTests.pathsOf(own, Resources.filesField),
+      ...OutsideChangesTests.outsideFiles(reply)]));
     Assert.areEqual(["added.txt", "gone.txt", "kept.txt"].map(t => join(folder, t)).join(), [...OutsideChangesTests.outsideFiles(reply)].sort().join());
   }
 
@@ -241,6 +249,26 @@ export class OutsideChangesTests {
     const time = new Date(Date.now() + 10 * Resources.toolWindowSlackMilliseconds);
     for (const path of paths)
       utimesSync(path, time, time);
+  }
+
+  private static readingsOf(readings: Readonly<Record<string, JsonValue>>, folder: string, paths: readonly string[]): string {
+    return `The reply listed changes of its own; readings: ${JSON.stringify({ ...readings, folderAtCheck: OutsideChangesTests.stampOf(folder),
+      slack: Resources.toolWindowSlackMilliseconds, paths: paths.map(t => [t, OutsideChangesTests.stampOf(t)]) })}`;
+  }
+
+  private static stampOf(path: string): JsonValue {
+    try {
+      for (let current = path; ; current = dirname(current)) {
+        const stats = statSync(current, { throwIfNoEntry: false });
+        if (!Object.isUndefined(stats))
+          return [current, stats.mtimeMs, stats.ctimeMs];
+        if (dirname(current) === current)
+          return null;
+      }
+    }
+    catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
   }
 
   private static ownChanges(reply: Message): MessageDetail | undefined {
