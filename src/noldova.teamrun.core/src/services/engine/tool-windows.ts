@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { statSync } from "node:fs";
+import { appendFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 
 import "@noldova/context.core";
@@ -70,11 +70,28 @@ export class ToolWindows {
     if (this.reportedKeys.some(t => key === t || key.startsWith(`${t}${sep}`)))
       return true;
     const written = ToolWindows.writtenAt(path, root);
-    if (Object.isNull(written))
-      return true;
     const slack = Resources.toolWindowSlackMilliseconds;
-    return this.spans.some(t => written >= t.start - slack && written <= t.end + slack)
+    const result = Object.isNull(written) || this.spans.some(t => written >= t.start - slack && written <= t.end + slack)
       || [...this.open.values()].some(t => written >= t - slack);
+    const file = process.env["TEAMRUN_PROBE_WINDOWS"];
+    if (!Object.isUndefined(file) && file !== "") {
+      const levels: unknown[] = [];
+      for (let current = path; ; current = dirname(current)) {
+        try {
+          const stats = statSync(current, { throwIfNoEntry: false });
+          levels.push(Object.isUndefined(stats) ? [current, "none"] : [current, stats.mtimeMs, stats.ctimeMs, stats.birthtimeMs]);
+          if (!Object.isUndefined(stats))
+            break;
+        }
+        catch (error: unknown) {
+          levels.push([current, error instanceof Error ? error.message : String(error)]);
+        }
+        if (current === root || dirname(current) === current)
+          break;
+      }
+      appendFileSync(file, JSON.stringify({ now: Date.now(), pid: process.pid, path, root, written, result, spans: this.spans, open: [...this.open.values()], levels }) + String.fromCharCode(10));
+    }
+    return result;
   }
 
   private reported(root: string): readonly string[] {

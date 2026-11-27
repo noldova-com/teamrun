@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import "@noldova/context.core";
@@ -241,6 +241,12 @@ export class OutsideChangesTests {
     const time = new Date(Date.now() + 10 * Resources.toolWindowSlackMilliseconds);
     for (const path of paths)
       utimesSync(path, time, time);
+    const file = process.env["TEAMRUN_PROBE_WINDOWS"];
+    if (!Object.isUndefined(file) && file !== "")
+      appendFileSync(file, JSON.stringify({ later: time.getTime(), now: Date.now(), pid: process.pid, paths, stats: paths.map(t => {
+        const stats = statSync(t);
+        return [stats.mtimeMs, stats.ctimeMs];
+      }) }) + String.fromCharCode(10));
   }
 
   private static ownChanges(reply: Message): MessageDetail | undefined {
