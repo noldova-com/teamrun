@@ -6,14 +6,14 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { ChildProcess, type SpawnOptions, spawn } from "node:child_process";
+import { ChildProcess, type SpawnOptions, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { constants } from "node:os";
 import path from "node:path";
 import { Duplex, PassThrough, Writable } from "node:stream";
 
-import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
+import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { SharedMcpLauncher } from "@noldova/teamrun.providers";
 
@@ -31,6 +31,13 @@ export class SharedMcpLauncherTests {
   private static readonly POWERSHELL: string = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
   private static readonly HANDED: string = "4321\n";
   private static readonly EXITED: string = "4321\nexited\n";
+  private static readonly SELF_LISTED: string = "$self = ";
+  private static readonly MODULES: string = "modules ";
+  private static readonly UNBOUNDED: number = Number.POSITIVE_INFINITY;
+  private static readonly END_LOOP: string = "foreach ($process in $ending)";
+  private static readonly CIM_SESSION: string = "$cim = ";
+  private static readonly LEAVING_SCRIPT: string = "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", process.argv[2]], "
+    + "{ stdio: \"ignore\", detached: true }); require(\"node:fs\").writeFileSync(process.argv[1], String(child.pid)); child.unref()";
   private static readonly HOLD: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
     + "|| { echo missing >&3; exit 127; }; case $found in */*) [ -f \"$found\" ] && [ -x \"$found\" ] || { echo denied >&3; exit 126; };; esac; exec 3<&-; "
     + "exec /usr/bin/env";
@@ -333,10 +340,11 @@ export class SharedMcpLauncherTests {
     const script = Buffer.from(String(recorder.starts[0]?.args[3]), "base64").toString("utf16le");
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ", "$_.ProcessId -eq 5555 })", "$_.ProcessId -eq 6666 })",
       "$_.ParentProcessId -eq 6666 -and $_.ProcessId -ne 5555 -and $_.Created -ge $self[0].Created", "-and $_.Created -lt $by", "$tree[$root.ProcessId] = $root.Created",
-      "Stop-Process -Id $_.ProcessId -Force"].map(t => script.includes(t))));
+      "GetProcessById([int]$process.ProcessId).Kill()"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
+  @Category("ProcessListing")
   @TestMethod
   public async endsTheServerAndWhatItStartedOnWindowsWhenItsLauncherDiedBeforeTellingItsWatch(): Promise<void> {
     if (process.platform !== "win32")
@@ -360,8 +368,8 @@ export class SharedMcpLauncherTests {
       const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host).runAsync(true, ["--watch"]);
       host.stdin.end();
       await running;
-      await Wait.until(() => !SharedMcpLauncherTests.runs(server), "The server process still ran.");
-      await Wait.until(() => !SharedMcpLauncherTests.runs(startedByServer), "The process the server started still ran.");
+      await Wait.until(() => !SharedMcpLauncherTests.runs(server), "The server process still ran.", SharedMcpLauncherTests.UNBOUNDED);
+      await Wait.until(() => !SharedMcpLauncherTests.runs(startedByServer), "The process the server started still ran.", SharedMcpLauncherTests.UNBOUNDED);
 
       Assert.isTrue(SharedMcpLauncherTests.runs(watch));
     }
@@ -515,6 +523,96 @@ export class SharedMcpLauncherTests {
     Assert.areEqual(JSON.stringify([[[-4321, "SIGTERM"], [-4321, "SIGKILL"]], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
+  @Category("ProcessListing")
+  @TestMethod
+  public async listsThisProcessUnderItsParentWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    const host = new FakeLauncherHost();
+    const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+
+    const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+    host.stdin.end(SharedMcpLauncherTests.HANDED);
+    await running;
+
+    const [powershell] = recorder.starts;
+    const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
+    const listing = script.slice(0, script.indexOf(SharedMcpLauncherTests.SELF_LISTED));
+    const answer = spawnSync(String(powershell?.command), ["-NoProfile", "-NonInteractive", "-Command", `${listing}$mine = @($all | Where-Object { $_.ProcessId -eq `
+      + `${String(process.pid)} }); [string]$mine[0].ParentProcessId + ' ' + @(Get-Module).Count`], { encoding: "utf8" });
+
+    Assert.isTrue(listing.length > 0);
+    Assert.areEqual(`${String(process.ppid)} 0`, answer.stdout.trim());
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsWhatAnExitedServerStartedThroughItsWholeScriptWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    using directory = new TemporaryDirectory();
+    const pidFile = directory.resolve("child.pid");
+    const server = spawnSync(process.execPath, ["-e", SharedMcpLauncherTests.LEAVING_SCRIPT, pidFile, SharedMcpLauncherTests.KEEP_SCRIPT], { windowsHide: true });
+    const child = Number(readFileSync(pidFile, "utf8"));
+    try {
+      const host = new FakeLauncherHost();
+      host.pid = process.pid;
+      host.ppid = process.ppid;
+      const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+      const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+      host.stdin.end(`${String(server.pid)}\n`);
+      await running;
+      const [powershell] = recorder.starts;
+      const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
+      const kept = SharedMcpLauncherTests.runs(child);
+
+      const answer = spawnSync(String(powershell?.command), ["-NoProfile", "-NonInteractive", "-Command",
+        `${script}; [Console]::Out.Write('${SharedMcpLauncherTests.MODULES}' + @(Get-Module).Count)`], { encoding: "utf8" });
+      await Wait.until(() => !SharedMcpLauncherTests.runs(child), "The exited server's child still ran.", SharedMcpLauncherTests.UNBOUNDED);
+
+      Assert.areEqual(JSON.stringify([0, false, true, 0, `${SharedMcpLauncherTests.MODULES}0`]),
+        JSON.stringify([server.status, SharedMcpLauncherTests.runs(Number(server.pid)), kept, answer.status, answer.stdout.trim()]));
+    }
+    finally {
+      if (SharedMcpLauncherTests.runs(child))
+        process.kill(child);
+    }
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async keepsEndingTheTreeAfterAProcessThatAlreadyExitedOnWindows(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    const exited = Number(spawnSync(process.execPath, ["-e", SharedMcpLauncherTests.EXIT_SCRIPT, "0"], { windowsHide: true }).pid);
+    const child = spawn(process.execPath, ["-e", SharedMcpLauncherTests.KEEP_SCRIPT], { stdio: "ignore", windowsHide: true });
+    const ended = once(child, "exit");
+    try {
+      const host = new FakeLauncherHost();
+      const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+      const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+      host.stdin.end(SharedMcpLauncherTests.HANDED);
+      await running;
+      const [powershell] = recorder.starts;
+      const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
+      const stop = script.slice(0, script.indexOf(SharedMcpLauncherTests.CIM_SESSION));
+      const loop = script.slice(script.indexOf(SharedMcpLauncherTests.END_LOOP));
+      const kept = SharedMcpLauncherTests.runs(Number(child.pid));
+
+      const answer = spawnSync(String(powershell?.command), ["-NoProfile", "-NonInteractive", "-Command",
+        `${stop}$ending = @([pscustomobject]@{ ProcessId = ${String(exited)} }, [pscustomobject]@{ ProcessId = ${String(child.pid)} }); ${loop}; `
+        + `[Console]::Out.Write('${SharedMcpLauncherTests.MODULES}' + @(Get-Module).Count)`], { encoding: "utf8" });
+      await ended;
+
+      Assert.areEqual(JSON.stringify([true, false, true, 0, `${SharedMcpLauncherTests.MODULES}0`]), JSON.stringify([stop.length > 0 && loop.length > 0,
+        SharedMcpLauncherTests.runs(exited), kept, answer.status, answer.stdout.trim()]));
+    }
+    finally {
+      if (SharedMcpLauncherTests.runs(Number(child.pid)))
+        child.kill();
+    }
+  }
+
   @TestMethod
   public async endsTheServerAndEachProcessUnderItThatStartedAfterTheWatchByTheKernelsTimesOnWindows(): Promise<void> {
     const host = new FakeLauncherHost();
@@ -531,10 +629,10 @@ export class SharedMcpLauncherTests {
       { cwd: "D:\\Windows\\System32", env: environment, stdio: "ignore", windowsHide: true }]),
       JSON.stringify([powershell?.command, powershell?.args.slice(0, 3), powershell?.options]));
     Assert.areEqual(JSON.stringify([true, true, true, true, true, true, true, true, false, false]), JSON.stringify(["$ErrorActionPreference = 'Stop'; ",
-      "Created = $_.CreationDate.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
+      "Created = $created.ToUniversalTime()", "$self = @($all | Where-Object { $_.ProcessId -eq 5555 }); if ($self.Count -eq 0) { exit 3 }; ",
       "$ours = $true -and $holder.Count -gt 0 -and $holder[0].Created -ge $self[0].Created -and $holder[0].ParentProcessId -eq $self[0].ParentProcessId; ",
       "$_.ParentProcessId -eq 4321 -and $_.Created -ge $self[0].Created -and $_.Created -lt $before", "$_.Created -ge $tree[$_.ParentProcessId]",
-      "if ($ending.Count -eq 0) { exit 4 }; ", "Stop-Process -Id $_.ProcessId -Force", "FromUnixTimeMilliseconds", "LocalDateTime"].map(t => script.includes(t))));
+      "if ($ending.Count -eq 0) { exit 4 }; ", "GetProcessById([int]$process.ProcessId).Kill()", "FromUnixTimeMilliseconds", "LocalDateTime"].map(t => script.includes(t))));
     Assert.areEqual(JSON.stringify([[], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
