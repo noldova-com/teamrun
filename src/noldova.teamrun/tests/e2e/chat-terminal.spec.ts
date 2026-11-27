@@ -12,6 +12,7 @@ import path from "node:path";
 import { type Locator, type Page, expect } from "playwright/test";
 
 import { CodexDouble } from "./fixtures/codex-double.ts";
+import { PowershellCommands } from "./fixtures/powershell-commands.ts";
 import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
 import { TerminalScreen } from "./fixtures/terminal-screen.ts";
 
@@ -50,14 +51,14 @@ const SH: IShellCommands = {
   writePid: file => `echo $$ > ${file}`
 };
 
-const powerShellProgramOf = (programFile: string, beatFile: string): string => Buffer.from(`Set-Content -LiteralPath '${programFile}' -Value $PID; $i = 0; ` +
-  `while ($true) { $i++; Set-Content -LiteralPath '${beatFile}.tmp' -Value $i; Move-Item -Force -LiteralPath '${beatFile}.tmp' -Destination '${beatFile}'; ` +
-  "Start-Sleep -Milliseconds 200 }", "utf16le").toString("base64");
+const powerShellProgramOf = (programFile: string, beatFile: string): string => Buffer.from([PowershellCommands.write(programFile, "$PID"), "$i = 0",
+  `while ($true) { $i++; ${PowershellCommands.write(`${beatFile}.tmp`, "$i")}; ${PowershellCommands.move(`${beatFile}.tmp`, beatFile)}; ${PowershellCommands.pause(200)} }`]
+  .join("; "), "utf16le").toString("base64");
 
 const POWERSHELL: IShellCommands = {
-  run: (shellFile, programFile, beatFile) =>
-    `echo e2e-ran; Set-Content -LiteralPath '${shellFile}' -Value $PID; powershell -NoProfile -EncodedCommand ${powerShellProgramOf(programFile, beatFile)}`,
-  writePid: file => `Set-Content -LiteralPath '${file}' -Value $PID`
+  run: (shellFile, programFile, beatFile) => [PowershellCommands.say("e2e-ran"), PowershellCommands.write(shellFile, "$PID"),
+    `powershell -NoProfile -EncodedCommand ${powerShellProgramOf(programFile, beatFile)}`].join("; "),
+  writePid: file => PowershellCommands.write(file, "$PID")
 };
 
 const SHELL: IShellCommands = process.platform === "win32" ? POWERSHELL : SH;

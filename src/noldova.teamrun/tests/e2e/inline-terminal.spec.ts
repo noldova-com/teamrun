@@ -13,6 +13,7 @@ import "@noldova/context.core";
 import { type Locator, type Page, expect } from "playwright/test";
 
 import { CodexDouble } from "./fixtures/codex-double.ts";
+import { PowershellCommands } from "./fixtures/powershell-commands.ts";
 import { TeamRunApp, test } from "./fixtures/teamrun-app.fixture.ts";
 import { TerminalScreen } from "./fixtures/terminal-screen.ts";
 import type { IFocusState } from "./interfaces/i-focus-state.ts";
@@ -72,9 +73,9 @@ const BASH: IBlockLanguage = {
 };
 const POWERSHELL: IBlockLanguage = {
   language: "powershell",
-  write: file => `Set-Content -LiteralPath '${file}' -Value $PID`,
-  type: file => `Set-Content -LiteralPath '${file}' -Value typed`,
-  compute: file => `Set-Content -LiteralPath '${file}' -Value ("typed-" + 42)`
+  write: file => PowershellCommands.write(file, "$PID"),
+  type: file => PowershellCommands.write(file, "'typed'"),
+  compute: file => PowershellCommands.write(file, "'typed-' + 42")
 };
 const COMPUTED: string = "typed-42";
 const BASH_PROFILES: readonly string[] = [".bash_profile", ".bashrc"];
