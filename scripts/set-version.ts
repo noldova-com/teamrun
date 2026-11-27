@@ -9,8 +9,6 @@
 import { execFileSync } from "node:child_process";
 import type { Writable } from "node:stream";
 
-import "@noldova/context.core";
-
 import { SetVersionException } from "./packages/set-version.exception.ts";
 import { VersionSetter } from "./packages/version-setter.ts";
 
@@ -32,14 +30,14 @@ export class SetVersion {
 
   public async runAsync(args: readonly string[]): Promise<number> {
     const [version, commit, ...rest] = args;
-    if (Object.isUndefined(version) || rest.length > 0 || (!Object.isUndefined(commit) && !SetVersion.COMMIT_PATTERN.test(commit))) {
+    if (version === undefined || rest.length > 0 || (commit !== undefined && !SetVersion.COMMIT_PATTERN.test(commit))) {
       this.output.write(SetVersion.USAGE);
       return SetVersion.USAGE_EXIT_CODE;
     }
     try {
-      const released = Object.isUndefined(commit) ? null : this.readCommitFile(commit, VersionSetter.CHANGELOG_FILE);
+      const released = commit === undefined ? null : this.readCommitFile(commit, VersionSetter.CHANGELOG_FILE);
       const previous = await new VersionSetter(this.root).setAsync(version, released);
-      this.output.write(Object.isUndefined(commit)
+      this.output.write(commit === undefined
         ? `Set the version from ${previous} to ${version}, and named it over the changelog's unreleased entries.\n`
         : `Set the version from ${previous} to ${version}, and named it over the changelog's entries that ${commit} released.\n`);
       return 0;

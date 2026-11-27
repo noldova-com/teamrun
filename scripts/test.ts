@@ -33,6 +33,7 @@ import type { ISelectableCheck } from "./checks/interfaces/i-selectable-check.ts
 import { OnPushCheck } from "./checks/on-push-check.ts";
 import { PackageCheck } from "./checks/package-check.ts";
 import { PackageTestCheck } from "./checks/package-test-check.ts";
+import { PreInstallImportCheck } from "./checks/pre-install-import-check.ts";
 import { ReadingChecks } from "./checks/reading-checks.ts";
 import { ReadingFilterCheck } from "./checks/reading-filter-check.ts";
 import { ScriptTestCheck } from "./checks/script-test-check.ts";
@@ -287,6 +288,7 @@ export class Test {
       new GitHubConfigurationCheck(this.root, files),
       new DependencyPinCheck(this.root, files),
       new OnPushCheck(this.root, async () => await files.listAsync()),
+      new PreInstallImportCheck(this.root),
       new VersionFileCheck(this.root)
     ];
   }
