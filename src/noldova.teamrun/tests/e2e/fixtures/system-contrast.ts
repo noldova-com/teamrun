@@ -10,6 +10,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 
 import "@noldova/context.core";
 
+import { WindowsProcesses } from "./windows-processes.ts";
+
 export class SystemContrast {
   public static readonly FLAGS_VARIABLE: string = "TEAMRUN_CONTRAST_FLAGS";
   public static readonly SCHEME_VARIABLE: string = "TEAMRUN_CONTRAST_SCHEME";
@@ -46,7 +48,7 @@ export class SystemContrast {
 
   public static apply(write: SystemContrast | null): SystemContrast {
     return SystemContrast.of(execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", SystemContrast.SCRIPT],
-      { encoding: "utf8", env: SystemContrast.environmentOf(write) }));
+      { encoding: "utf8", env: SystemContrast.environmentOf(write), timeout: WindowsProcesses.TIMEOUT, killSignal: "SIGKILL" }));
   }
 
   public static environmentOf(write: SystemContrast | null): NodeJS.ProcessEnv {
@@ -55,8 +57,16 @@ export class SystemContrast {
   }
 
   public static registeredFlags(): number {
-    const answer = spawnSync("reg", ["query", SystemContrast.REGISTRY_KEY, "/v", "Flags"], { encoding: "utf8" });
-    return Number(SystemContrast.REGISTRY_FLAGS.exec(answer.stdout)?.[1]);
+    const answer = spawnSync("reg", ["query", SystemContrast.REGISTRY_KEY, "/v", "Flags"],
+      { encoding: "utf8", timeout: WindowsProcesses.TIMEOUT, killSignal: "SIGKILL" });
+    return SystemContrast.registeredFlagsOf(answer.status, answer.stdout);
+  }
+
+  public static registeredFlagsOf(status: number | null, output: string): number {
+    const found = SystemContrast.REGISTRY_FLAGS.exec(output);
+    if (status !== 0 || Object.isNull(found))
+      throw new Error(`Reading ${SystemContrast.REGISTRY_KEY}'s Flags ended with status ${String(status)}: ${output}`);
+    return Number(found[1]);
   }
 
   public static of(output: string): SystemContrast {

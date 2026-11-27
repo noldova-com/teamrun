@@ -20,6 +20,7 @@ import { WindowsScriptChecks } from "./fixtures/windows-script-checks.ts";
 const SAID = "e2e-ran";
 const ON = 1;
 const DIGITS = /^\d+$/;
+const REGISTERED = "\r\nHKEY_CURRENT_USER\\Control Panel\\Accessibility\\HighContrast\r\n    Flags    REG_SZ    126\r\n\r\n";
 
 test.describe("PowerShell the specs type and run", () => {
   test.skip(process.platform !== "win32", "The specs run this PowerShell on Windows only.");
@@ -50,5 +51,23 @@ test.describe("PowerShell the specs type and run", () => {
 
     expect([read.status, read.lines.length, read.lines.at(-1), before.flags & ON, written.status, written.lines])
       .toEqual([0, 2, WindowsScriptChecks.NO_MODULES, SystemContrast.registeredFlags() & ON, 0, read.lines]);
+  });
+});
+
+test.describe("The registry's High Contrast flags", () => {
+  test("are read from reg's Flags value", () => {
+    expect(SystemContrast.registeredFlagsOf(0, REGISTERED)).toBe(126);
+  });
+
+  test("fail the read when reg fails", () => {
+    expect(() => SystemContrast.registeredFlagsOf(1, "ERROR: The system was unable to find the specified registry key or value.")).toThrow(/status 1: ERROR/);
+  });
+
+  test("fail the read when reg ends without a Flags value", () => {
+    expect(() => SystemContrast.registeredFlagsOf(0, String.empty)).toThrow(/status 0/);
+  });
+
+  test("fail the read when reg is stopped at its time limit", () => {
+    expect(() => SystemContrast.registeredFlagsOf(null, REGISTERED)).toThrow(/status null/);
   });
 });
