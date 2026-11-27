@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 import "@noldova/context.core";
 
 import { ScriptAnswer } from "./script-answer.ts";
+import { WindowsProcesses } from "./windows-processes.ts";
 
 export class WindowsScriptChecks {
   private static readonly MODULES: string = "modules ";
@@ -21,7 +22,7 @@ export class WindowsScriptChecks {
 
   public static answerOf(script: string, environment: NodeJS.ProcessEnv = process.env): ScriptAnswer {
     const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `${script}; '${WindowsScriptChecks.MODULES}' + @(Get-Module).Count`],
-      { encoding: "utf8", env: environment, maxBuffer: WindowsScriptChecks.BUFFER });
+      { encoding: "utf8", env: environment, timeout: WindowsProcesses.TIMEOUT, killSignal: "SIGKILL", maxBuffer: WindowsScriptChecks.BUFFER });
     return new ScriptAnswer(result.status, result.stdout.split(WindowsScriptChecks.LINE_BREAK).filter(t => t !== String.empty));
   }
 

@@ -16,7 +16,7 @@ import { ProcessStatus } from "./process-status.ts";
 export class WindowsProcesses {
   public static readonly WORK_VARIABLE: string = "TEAMRUN_E2E_WORK";
   public static readonly HOLDERS_WAIT_SECONDS: number = 10;
-  private static readonly TIMEOUT: number = 60_000;
+  public static readonly TIMEOUT: number = 60_000;
   private static readonly BUFFER: number = 64 * 1024 * 1024;
   private static readonly NO_SESSION: number = -1;
   private static readonly LISTING: string = "$cim = [Microsoft.Management.Infrastructure.CimSession]::Create([NullString]::Value); "
