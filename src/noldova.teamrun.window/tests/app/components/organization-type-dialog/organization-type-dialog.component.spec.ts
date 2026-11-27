@@ -119,6 +119,18 @@ describe("OrganizationTypeDialogComponent", () => {
       { organizationId: "my-organization", typeId: "team", name: "Squad", color: "red" }, []]);
   });
 
+  it("shows a stored icon outside the kit's set as no icon, and keeps it when only the name changes", async () => {
+    const old = new NodeType("old", "Old", "expand_more", null, SampleData.timestamp, SampleData.timestamp);
+    await create(old, t => t.answer(MethodName.NodeTypeUpdate, () => null));
+    const chosen = [...element().querySelectorAll(".nol-teamrun-type-icon [role=option][aria-selected=true]")].map(t => t.getAttribute("aria-label"));
+
+    await rename("Older");
+    save().click();
+    await Wait.until(() => expect(closes).toBe(1));
+
+    expect([chosen, context.parametersOf(MethodName.NodeTypeUpdate)]).toEqual([["No icon"], { organizationId: "my-organization", typeId: "old", name: "Older" }]);
+  });
+
   it("sends only the icon given to a type with no icon or color, and stays open saying why when the runtime refuses it", async () => {
     await create(plain, t => t.fail(MethodName.NodeTypeUpdate, "The runtime is busy."));
 

@@ -9,7 +9,7 @@
 import { Component, computed, effect, ElementRef, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, viewChild, type WritableSignal } from "@angular/core";
 import type { NodeType } from "@noldova/teamrun.protocol";
 import { ButtonComponent, ButtonVariant, ColorChooserComponent, DialogComponent, type DialogService, FieldMessageComponent, IconChooserComponent,
-  TextFieldComponent } from "@noldova/ui.components.angular";
+  type IconName, IconNames, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import type { OrganizationStoreService } from "../../services/organization-store.service";
@@ -22,11 +22,12 @@ import type { OrganizationStoreService } from "../../services/organization-store
 })
 export class OrganizationTypeDialogComponent {
   private readonly nameField: Signal<ElementRef<HTMLInputElement>> = viewChild.required<string, ElementRef<HTMLInputElement>>("field", { read: ElementRef });
+  private readonly shownIcon: Signal<IconName | null> = computed(() => IconNames.all.find(t => t === this.type()?.icon) ?? null);
 
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly name: WritableSignal<string> = signal(String.empty);
-  protected readonly icon: WritableSignal<string | null> = signal(null);
+  protected readonly icon: WritableSignal<IconName | null> = signal(null);
   protected readonly color: WritableSignal<string | null> = signal(null);
   protected readonly saving: WritableSignal<boolean> = signal(false);
   protected readonly title: Signal<string> = computed(() => Object.isNull(this.type()) ? Resources.organizationNewTypeTitle : Resources.organizationEditTypeTitle);
@@ -42,7 +43,7 @@ export class OrganizationTypeDialogComponent {
     effect(() => {
       const type = this.type();
       this.name.set(type?.name ?? String.empty);
-      this.icon.set(type?.icon ?? null);
+      this.icon.set(this.shownIcon());
       this.color.set(type?.color ?? null);
     });
   }
@@ -76,11 +77,11 @@ export class OrganizationTypeDialogComponent {
     }
     const icon = this.icon();
     const color = this.color()?.toLowerCase() ?? null;
-    if (name === type.name && icon === type.icon && color === type.color) {
+    if (name === type.name && icon === this.shownIcon() && color === type.color) {
       this.closed.emit();
       return;
     }
-    const saved = await this.organization().updateNodeType(type.id, name === type.name ? undefined : name, icon === type.icon ? undefined : icon,
+    const saved = await this.organization().updateNodeType(type.id, name === type.name ? undefined : name, icon === this.shownIcon() ? undefined : icon,
       color === type.color ? undefined : color);
     this.saving.set(false);
     if (saved)

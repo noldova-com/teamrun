@@ -9,6 +9,7 @@
 import "@noldova/context.core";
 import { KeyChord } from "@noldova/desktop.protocol";
 import type { PageEventName, PageMethodName } from "@noldova/teamrun.protocol";
+import type { IconName } from "@noldova/ui.components.angular";
 
 export class PageDocumentResources {
   public static readonly moduleId: string = "teamrun";
@@ -35,18 +36,18 @@ export class PageDocumentResources {
   public static readonly hourMinutes: number = 60;
   public static readonly dayHours: number = 24;
 
-  public static readonly reloadGlyph: string = "refresh";
-  public static readonly openGlyph: string = "open_in_new";
-  public static readonly saveGlyph: string = "download";
-  public static readonly printGlyph: string = "print";
-  public static readonly moreGlyph: string = "more_horiz";
-  public static readonly copyGlyph: string = "content_copy";
-  public static readonly folderGlyph: string = "folder_open";
-  public static readonly versionsGlyph: string = "history";
-  public static readonly zoomInGlyph: string = "zoom_in";
-  public static readonly zoomOutGlyph: string = "zoom_out";
-  public static readonly actualSizeGlyph: string = "fit_screen";
-  public static readonly closeGlyph: string = "close";
+  public static readonly reloadGlyph: IconName = "refresh";
+  public static readonly openGlyph: IconName = "open_in_new";
+  public static readonly saveGlyph: IconName = "download";
+  public static readonly printGlyph: IconName = "print";
+  public static readonly moreGlyph: IconName = "more_horiz";
+  public static readonly copyGlyph: IconName = "content_copy";
+  public static readonly folderGlyph: IconName = "folder_open";
+  public static readonly versionsGlyph: IconName = "history";
+  public static readonly zoomInGlyph: IconName = "zoom_in";
+  public static readonly zoomOutGlyph: IconName = "zoom_out";
+  public static readonly actualSizeGlyph: IconName = "fit_screen";
+  public static readonly closeGlyph: IconName = "close";
   public static readonly currentGlyph: string = "check";
   public static readonly updatedGlyph: string = "update";
   public static readonly stoppedGlyph: string = "sentiment_dissatisfied";
