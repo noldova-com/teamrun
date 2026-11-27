@@ -1230,8 +1230,10 @@ export class Resources {
   public static readonly psStartTolerance: number = 2000;
   public static readonly powershellExecutable: string = "powershell.exe";
   public static readonly powershellCommandArguments: readonly string[] = ["-NoProfile", "-NonInteractive", "-Command"];
-  public static readonly powershellProcessListScript: string = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, " +
-    "$_.ParentProcessId, $(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { 'unknown' }) }";
+  public static readonly powershellProcessListScript: string = "$cim = [Microsoft.Management.Infrastructure.CimSession]::Create([NullString]::Value); " +
+    "try { foreach ($listed in $cim.QueryInstances('root/cimv2', 'WQL', 'SELECT ProcessId, ParentProcessId, CreationDate FROM Win32_Process')) { " +
+    "$properties = $listed.CimInstanceProperties; $created = $properties['CreationDate'].Value; '{0} {1} {2}' -f $properties['ProcessId'].Value, " +
+    "$properties['ParentProcessId'].Value, $(if ($created) { ([DateTimeOffset]$created).ToUnixTimeMilliseconds() } else { 'unknown' }) } } finally { $cim.Dispose() }";
   public static readonly powershellProcessListArguments: readonly string[] = [...Resources.powershellCommandArguments, Resources.powershellProcessListScript];
   public static readonly powershellSessionArguments: readonly string[] = [...Resources.powershellCommandArguments, "-"];
   public static readonly powershellSessionIdle: number = 30_000;
