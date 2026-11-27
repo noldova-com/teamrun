@@ -161,6 +161,15 @@ describe("DocsLinksDirective", () => {
     expect(DocsCatalog.pages.filter(t => t.file === "home").flatMap(t => linksOf(t))).toContain(`${Resources.siteLink}getting-started`);
   });
 
+  it("ends Troubleshooting with Still stuck?, linking TeamRun's GitHub issues, and sends Release notes to the website's changelog instead of listing versions", () => {
+    const textOf = (file: string): string => DocsCatalog.pages.find(t => t.file === file)?.text ?? String.empty;
+    const sections = textOf("troubleshooting").split(/^## /mu);
+    const notes = textOf("release-notes");
+
+    expect([sections.at(-1)?.split("\n")[0], sections.at(-1)?.includes(`](${Resources.feedbackLink})`), notes.includes("](https://teamrun.noldova.com/releases/)"),
+      /^## /mu.test(notes)]).toEqual(["Still stuck?", true, true, false]);
+  });
+
   it("leaves no page's link to another page as a relative Markdown file the site can't open", () => {
     expect(DocsCatalog.pages.filter(t => /\]\([a-z0-9-]+\.md[#)]/u.test(t.text)).map(t => t.file)).toEqual([]);
   });

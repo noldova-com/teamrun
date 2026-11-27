@@ -29,7 +29,6 @@ export class DocsPageGenerator {
   private static readonly DOCUMENT_EXTENSION: string = ".md";
   private static readonly SITE_LINK: string = "https://teamrun.noldova.dev/";
   private static readonly HOME_FILE: string = "home";
-  private static readonly RELEASE_NOTES_FILE: string = "release-notes";
   private static readonly CHANGELOG_FILE: string = "CHANGELOG.md";
   private static readonly RELEASED_VERSION: RegExp = /^## (?!Unreleased$)(.+)$/mu;
   private static readonly DOCUMENT_TITLE: RegExp = /^# ([^\n]*)\n+/u;
@@ -52,7 +51,7 @@ export class DocsPageGenerator {
     for (const file of files) {
       const name = path.basename(file, DocsPageGenerator.DOCUMENT_EXTENSION);
       const text = await readFile(path.join(this.root, DocsPageGenerator.PAGES_FOLDER, file), DocsPageGenerator.TEXT_ENCODING);
-      pages.push(DocsPageGenerator.formatPage(name, name === DocsPageGenerator.RELEASE_NOTES_FILE ? `${text.trimEnd()}\n\n${await this.readReleasesAsync()}` : text));
+      pages.push(DocsPageGenerator.formatPage(name, text));
     }
     await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.PAGES_MODULE), DocsPageGenerator.PAGES_EXPORT, pages);
     return files.length;
@@ -66,11 +65,6 @@ export class DocsPageGenerator {
   public async writeReleaseAsync(): Promise<void> {
     const release = await this.findReleaseAsync();
     await this.writer.writeAsync(DocsPageGenerator.locate(DocsPageGenerator.RELEASE_MODULE), DocsPageGenerator.RELEASE_EXPORT, String(release[1]).trim());
-  }
-
-  private async readReleasesAsync(): Promise<string> {
-    const release = await this.findReleaseAsync();
-    return release.input.slice(release.index);
   }
 
   private async findReleaseAsync(): Promise<RegExpExecArray> {
