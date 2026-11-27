@@ -27,14 +27,14 @@ defaults:
 jobs:
   versions:
     name: Versions
-    uses: noldova-com/.github/.github/workflows/versions.yml@43df1a5296a892a1ed162a02ca2af77902d19bb8 # v2.51.2
+    uses: noldova-com/.github/.github/workflows/versions.yml@5db28bf7dc90b7e73f9eb3ec3b403d6692e20a68
     permissions: {}
     with:
       targets: linux-x64 linux-arm64 windows-x64 windows-arm64 macos-x64 macos-arm64
 
   build-and-test:
     name: Build and test
-    uses: noldova-com/.github/.github/workflows/build-and-test.yml@43df1a5296a892a1ed162a02ca2af77902d19bb8 # v2.51.2
+    uses: noldova-com/.github/.github/workflows/build-and-test.yml@5db28bf7dc90b7e73f9eb3ec3b403d6692e20a68
     permissions:
       contents: read
       packages: read
