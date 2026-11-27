@@ -18,7 +18,7 @@ public static class ImagePathProbe {
   }
 }
 "@
-$electron = (Resolve-Path 'node_modules\electron\dist\electron.exe').Path
+$electron = (Resolve-Path 'app\node_modules\electron\dist\electron.exe').Path
 $env:ELECTRON_RUN_AS_NODE = '1'
 $child = Start-Process -FilePath $electron -ArgumentList '-e', 'setTimeout(() => {}, 20000)' -PassThru -NoNewWindow
 Start-Sleep -Seconds 2
