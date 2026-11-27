@@ -99,3 +99,4 @@ jobs:
       runs: ${{ inputs.runs }}
       jobs: ${{ inputs.jobs }}
       targets: ${{ inputs.targets }}
+      reports: _build/e2e
