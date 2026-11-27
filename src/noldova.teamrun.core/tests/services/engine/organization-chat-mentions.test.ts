@@ -8,13 +8,14 @@
 
 import "@noldova/context.core";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { Resources } from "@noldova/teamrun.core";
+import { Resources, type TurnSteer } from "@noldova/teamrun.core";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
   type Conversation, ErrorCode, Harness, MessageAuthor, MessageDelivery, MessageListParams, MessageSendParams, OrganizationChat, OrganizationParent,
   RequestedSettings, type Teammate, TeammateCreateParams, TeammatePlaceParams, WaitingMessageAddParams
 } from "@noldova/teamrun.protocol";
 
+import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
 
 @TestClass
@@ -87,6 +88,45 @@ export class OrganizationChatMentionsTests {
     const replies = (await host.messages.listAsync(new MessageListParams(chat.id, null))).filter(t => t.author === MessageAuthor.Provider);
 
     Assert.areEqual(`${builder.id}:${reviewer.id}|${reviewer.id}:`, replies.map(t => `${t.teammateId ?? "none"}:${t.mentions.map(u => u.teammateId).join(",")}`).join("|"));
+  }
+
+  @TestMethod
+  public async storesAWaitingMessageWithIdsInAnOrganizationChatWithoutThemAndSteersItIntoTheChatsTeammateAsWritten(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const builder = await OrganizationChatMentionsTests.teammateAsync(host, "Builder");
+    const reviewer = await OrganizationChatMentionsTests.teammateAsync(host, "Reviewer");
+    const chat = await OrganizationChatMentionsTests.chatAsync(host, builder);
+    host.events.subscribe({ onEvent: () => ChangeSignal.notify() });
+    const steers: TurnSteer[] = [];
+    const gate = Promise.withResolvers<void>();
+    host.adapter.holdTurn = () => {
+      if (host.adapter.requests.length !== 1)
+        return Promise.resolve();
+      host.adapter.lastListener?.onSteerable?.(t => {
+        steers.push(t);
+        ChangeSignal.notify();
+        return Promise.resolve(true);
+      });
+      return gate.promise;
+    };
+    const first = await host.engine.sendAsync(new MessageSendParams(chat.id, "First", null, null, [], [], builder.id));
+    await host.adapter.requested(1);
+
+    const added = await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "@Reviewer look too.", null, null, [], [reviewer.id],
+      builder.id), MessageDelivery.Steer));
+    await host.until("the steered message", async () => (await host.messages.listAsync(new MessageListParams(chat.id, null)))
+      .some(t => t.details[0]?.text === "@Reviewer look too."));
+    gate.resolve();
+    await host.engine.waitForIdle();
+    const messages = await host.messages.listAsync(new MessageListParams(chat.id, null));
+    const steered = messages.find(t => t.details[0]?.text === "@Reviewer look too.");
+
+    Assert.areEqual(0, added.message.mentionedTeammateIds.length);
+    Assert.areEqual("@Reviewer look too.", steers.map(t => t.text).join("|"));
+    Assert.areEqual(JSON.stringify({ [Resources.steeredIntoField]: first.replies[0]?.id }), JSON.stringify(steered?.details[0]?.payload ?? null));
+    Assert.areEqual("", steered?.mentions.map(t => t.teammateId).join(",") ?? "missing");
+    Assert.areEqual(1, host.adapter.requests.length);
+    Assert.isFalse(messages.some(t => t.teammateId === reviewer.id));
   }
 
   private static async teammateAsync(host: CoreHost, name: string): Promise<Teammate> {
