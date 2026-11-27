@@ -6,11 +6,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 import "@noldova/context.core";
 
 export class SystemContrast {
+  private static readonly REGISTRY_KEY: string = "HKCU\\Control Panel\\Accessibility\\HighContrast";
+  private static readonly REGISTRY_FLAGS: RegExp = /^\s*Flags\s+REG_SZ\s+(\d+)\s*$/m;
   public static readonly FLAGS_VARIABLE: string = "TEAMRUN_CONTRAST_FLAGS";
   public static readonly SCHEME_VARIABLE: string = "TEAMRUN_CONTRAST_SCHEME";
   public static readonly SCRIPT: string = [
@@ -50,6 +52,11 @@ export class SystemContrast {
   public static environmentOf(write: SystemContrast | null): NodeJS.ProcessEnv {
     return { ...process.env, [SystemContrast.FLAGS_VARIABLE]: Object.isNull(write) ? String.empty : String(write.flags),
       [SystemContrast.SCHEME_VARIABLE]: write?.scheme ?? String.empty };
+  }
+
+  public static registeredFlags(): number {
+    const answer = spawnSync("reg", ["query", SystemContrast.REGISTRY_KEY, "/v", "Flags"], { encoding: "utf8" });
+    return Number(SystemContrast.REGISTRY_FLAGS.exec(answer.stdout)?.[1]);
   }
 
   public static of(output: string): SystemContrast {
