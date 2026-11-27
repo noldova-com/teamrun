@@ -58,6 +58,7 @@ import {
   FieldMessageComponent,
   FileBadgeComponent,
   IconButtonComponent,
+  type IconName,
   type IMentionCandidateOptions,
   type MentionCandidate,
   MentionFieldDirective,
@@ -278,7 +279,7 @@ export class ComposerComponent {
   protected readonly refusedModes: Signal<readonly RefusedMode[]>;
   protected readonly planFirst: Signal<boolean>;
   protected readonly accessName: Signal<string>;
-  protected readonly accessGlyph: Signal<string>;
+  protected readonly accessGlyph: Signal<IconName>;
   protected readonly providers: Signal<readonly ProviderChoice[]>;
   protected readonly otherProviders: Signal<readonly ProviderChoice[]>;
   protected readonly selectedProvider: Signal<ProviderChoice | undefined>;

@@ -8,8 +8,8 @@
 
 import { Component, computed, effect, ElementRef, type InputSignal, input, type OutputEmitterRef, output, type Signal, signal, viewChild, type WritableSignal } from "@angular/core";
 import type { NodeType } from "@noldova/teamrun.protocol";
-import { ButtonComponent, ButtonVariant, ColorChooserComponent, DialogComponent, type DialogService, FieldMessageComponent, IconChooserComponent,
-  TextFieldComponent } from "@noldova/ui.components.angular";
+import { ButtonComponent, ButtonVariant, ColorChooserComponent, DialogComponent, type DialogService, FieldMessageComponent,
+  IconChooserComponent, type IconName, IconNames, TextFieldComponent } from "@noldova/ui.components.angular";
 
 import { Resources } from "../../../resources";
 import type { OrganizationStoreService } from "../../services/organization-store.service";
@@ -26,7 +26,7 @@ export class OrganizationTypeDialogComponent {
   protected readonly resources: typeof Resources = Resources;
   protected readonly text: ButtonVariant = ButtonVariant.Text;
   protected readonly name: WritableSignal<string> = signal(String.empty);
-  protected readonly icon: WritableSignal<string | null> = signal(null);
+  protected readonly icon: WritableSignal<IconName | null> = signal(null);
   protected readonly color: WritableSignal<string | null> = signal(null);
   protected readonly saving: WritableSignal<boolean> = signal(false);
   protected readonly title: Signal<string> = computed(() => Object.isNull(this.type()) ? Resources.organizationNewTypeTitle : Resources.organizationEditTypeTitle);
@@ -42,7 +42,7 @@ export class OrganizationTypeDialogComponent {
     effect(() => {
       const type = this.type();
       this.name.set(type?.name ?? String.empty);
-      this.icon.set(type?.icon ?? null);
+      this.icon.set(IconNames.all.find(t => t === type?.icon) ?? null);
       this.color.set(type?.color ?? null);
     });
   }

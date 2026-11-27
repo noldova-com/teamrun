@@ -22,7 +22,7 @@
     "@angular/ssr": "22.3.0",
     "@noldova/context.core": "0.0.18",
     "@noldova/context.exceptions": "0.0.18",
-    "@noldova/ui.components.angular": "0.0.33",
+    "@noldova/ui.components.angular": "0.0.36",
     "@vitest/browser-playwright": "5.0.3",
     "@vitest/coverage-v8": "5.0.3",
     "playwright": "1.63.0",

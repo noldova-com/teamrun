@@ -13,7 +13,7 @@ import { GitNames } from "@noldova/git.protocol";
 import { ApprovalKind, AuthStatus, DetailKind, MessageDelivery, MessageStatus, MethodName, type NodeType, PlanStepStatus as ReplyPlanStepStatus, PlanWindowName,
   type ProviderKindInstallation, ReplyPanel, Resources as ProtocolResources, SharedMcpSetting, SharedMcpTransport, SharedMcpVariableSource, SubAgentStatus } from "@noldova/teamrun.protocol";
 import { TerminalShellKind } from "@noldova/terminal.window";
-import { PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
+import { type IconName, PlanStepStatus, ToolCallStatus } from "@noldova/ui.components.angular";
 
 import { BrowserStepPhase } from "./app/enums/browser-step-phase";
 import { ChatAction } from "./app/enums/chat-action";
@@ -146,19 +146,19 @@ export class Resources {
   public static readonly settingsMenuWidth: number = 15.75;
   public static readonly sendLabel: string = "Send";
   public static readonly stopLabel: string = "Stop";
-  public static readonly addGlyph: string = "add";
-  public static readonly removeGlyph: string = "close";
-  public static readonly permissionsGlyph: string = "shield";
-  public static readonly unrestrictedModeGlyph: string = "warning";
-  public static readonly planFirstGlyph: string = "checklist";
-  public static readonly expandGlyph: string = "expand_more";
-  public static readonly refreshGlyph: string = "refresh";
-  public static readonly sendGlyph: string = "arrow_upward";
-  public static readonly stopGlyph: string = "stop";
+  public static readonly addGlyph: IconName = "add";
+  public static readonly removeGlyph: IconName = "close";
+  public static readonly permissionsGlyph: IconName = "shield";
+  public static readonly unrestrictedModeGlyph: IconName = "warning";
+  public static readonly planFirstGlyph: IconName = "checklist";
+  public static readonly expandGlyph: IconName = "keyboard_arrow_down";
+  public static readonly refreshGlyph: IconName = "refresh";
+  public static readonly sendGlyph: IconName = "arrow_upward";
+  public static readonly stopGlyph: IconName = "stop";
   public static readonly projectsViewName: string = "teamrun.projects";
   public static readonly projectsViewTitle: string = "Projects";
   public static readonly explorerTitle: string = "Explorer";
-  public static readonly projectsViewIcon: string = "folder_open";
+  public static readonly projectsViewIcon: IconName = "folder_open";
   public static readonly conversationDocumentName: string = "teamrun.conversation";
   public static readonly imageDocumentName: string = "teamrun.image";
   public static readonly noChatPlaceholderName: string = "teamrun.noChat";
@@ -223,18 +223,18 @@ export class Resources {
     [ImageOpenMode.Popup]: "Open modal",
     [ImageOpenMode.Tab]: "Open in a new tab"
   };
-  public static readonly imageOpenActionGlyphs: Readonly<Record<ImageOpenMode, string>> = {
+  public static readonly imageOpenActionGlyphs: Readonly<Record<ImageOpenMode, IconName>> = {
     [ImageOpenMode.Popup]: "open_in_new",
     [ImageOpenMode.Tab]: "tab"
   };
   public static readonly imageMenuLabel: string = "Image";
   public static readonly copyImageLabel: string = "Copy Image";
   public static readonly downloadImageLabel: string = "Download Image";
-  public static readonly copyImageGlyph: string = "content_copy";
+  public static readonly copyImageGlyph: IconName = "content_copy";
   public static readonly copiedImageLabel: string = "Copied";
-  public static readonly copiedImageGlyph: string = "check";
+  public static readonly copiedImageGlyph: IconName = "check";
   public static readonly copiedDuration: number = 1500;
-  public static readonly downloadImageGlyph: string = "download";
+  public static readonly downloadImageGlyph: IconName = "download";
   public static readonly imageCopyFailed: string = "The image could not be copied. Try again.";
   public static readonly imageSaveFailed: string = "The image could not be saved. Try again.";
   public static readonly imageLoading: string = "Loading image…";
@@ -244,13 +244,13 @@ export class Resources {
   public static readonly imageNotShown: string = "The image couldn't be shown.";
   public static readonly previousImageLabel: string = "Previous image";
   public static readonly nextImageLabel: string = "Next image";
-  public static readonly previousImageGlyph: string = "arrow_back";
-  public static readonly nextImageGlyph: string = "arrow_forward";
+  public static readonly previousImageGlyph: IconName = "arrow_back";
+  public static readonly nextImageGlyph: IconName = "arrow_forward";
   public static readonly zoomInLabel: string = "Zoom in";
   public static readonly zoomOutLabel: string = "Zoom out";
   public static readonly fitImageLabel: string = "Fit image";
-  public static readonly zoomInGlyph: string = "add";
-  public static readonly zoomOutGlyph: string = "remove";
+  public static readonly zoomInGlyph: IconName = "add";
+  public static readonly zoomOutGlyph: IconName = "remove";
   public static readonly imageMinimumZoom: number = 0.1;
   public static readonly imageMaximumZoom: number = 4;
   public static readonly imageZoomStep: number = 1.25;
@@ -360,11 +360,11 @@ export class Resources {
   public static readonly collapsedDepartmentsField: string = "collapsedDepartments";
   public static readonly organizationCardsShowField: string = "cardsShow";
   public static readonly organizationCardsField: string = "cards";
-  public static readonly teammateGitIcon: string = "call_split";
-  public static readonly teammatePullRequestsIcon: string = "merge";
-  public static readonly teammateDocumentsIcon: string = "description";
-  public static readonly teammatePageIcon: string = "web";
-  public static readonly teammateCanvasIcon: string = "dashboard";
+  public static readonly teammateGitIcon: IconName = "call_split";
+  public static readonly teammatePullRequestsIcon: IconName = "merge";
+  public static readonly teammateDocumentsIcon: IconName = "description";
+  public static readonly teammatePageIcon: IconName = "web";
+  public static readonly teammateCanvasIcon: IconName = "dashboard";
   public static readonly teammateWorkReading: string = "Reading…";
   public static readonly teammateNoBranch: string = "No branch checked out";
   public static readonly teammateNoFolder: string = "No working folder yet";
@@ -409,12 +409,12 @@ export class Resources {
   public static readonly pinLabel: string = "Pin";
   public static readonly unpinLabel: string = "Unpin";
   public static readonly pinnedTitle: string = "Pinned";
-  public static readonly pinnedIcon: string = "keep";
-  public static readonly projectsIcon: string = "folder_copy";
+  public static readonly pinnedIcon: IconName = "keep";
+  public static readonly projectsIcon: IconName = "folder_copy";
   public static readonly chatsTitle: string = "Chats";
-  public static readonly chatsIcon: string = "chat";
+  public static readonly chatsIcon: IconName = "chat";
   public static readonly organizationsTitle: string = "Organizations";
-  public static readonly organizationsIcon: string = "corporate_fare";
+  public static readonly organizationsIcon: IconName = "corporate_fare";
   public static readonly departmentPathSeparator: string = " › ";
   public static readonly openOrganizationLabel: string = "Open organization";
   public static readonly renameOrganizationTitle: string = "Rename organization";
@@ -433,8 +433,8 @@ export class Resources {
   public static readonly workingLabel: string = "Working";
   public static readonly awaitingApprovalLabel: string = "Waiting for permission";
   public static readonly awaitingAnswerLabel: string = "Waiting for your answer";
-  public static readonly awaitingApprovalGlyph: string = "front_hand";
-  public static readonly awaitingAnswerGlyph: string = "help";
+  public static readonly awaitingApprovalGlyph: IconName = "front_hand";
+  public static readonly awaitingAnswerGlyph: IconName = "help";
   public static readonly rowMenuLabel: string = "More";
   public static readonly waitingMessagesLabel: string = "Waiting messages";
   public static readonly editWaitingLabel: string = "Edit";
@@ -445,9 +445,9 @@ export class Resources {
   public static readonly cancelEditingLabel: string = "Cancel";
   public static readonly editingWaitingNote: string = "Editing a waiting message. Its files stay as they are.";
   public static readonly editingFilesRefused: string = "Files can't be added to a waiting message. Send them in a new message once the edit is saved.";
-  public static readonly deliveryGlyphs: Readonly<Record<MessageDelivery, string>> = {
+  public static readonly deliveryGlyphs: Readonly<Record<MessageDelivery, IconName>> = {
     [MessageDelivery.Steer]: "subdirectory_arrow_right",
-    [MessageDelivery.Queue]: "queue",
+    [MessageDelivery.Queue]: "library_add",
     [MessageDelivery.StopAndSend]: "arrow_upward"
   };
   public static readonly steerTurnAction: string = "read a message during its reply";
@@ -472,18 +472,18 @@ export class Resources {
   public static readonly moveToFolderLabel: string = "Move to a folder…";
   public static readonly moveTitle: string = "Move chat to a project";
   public static readonly moveConfirmLabel: string = "Move";
-  public static readonly moveToProjectIcon: string = "drive_file_move";
+  public static readonly moveToProjectIcon: IconName = "drive_file_move";
   public static readonly attachFolderLabel: string = "Attach a folder…";
   public static readonly replaceFolderLabel: string = "Replace the folder…";
   public static readonly detachFolderLabel: string = "Detach the folder";
-  public static readonly attachFolderIcon: string = "folder_open";
-  public static readonly detachFolderIcon: string = "folder_off";
+  public static readonly attachFolderIcon: IconName = "folder_open";
+  public static readonly detachFolderIcon: IconName = "folder_off";
   public static readonly replaceFolderTitle: string = "Replace the attached folder";
   public static readonly replaceFolderConfirmLabel: string = "Replace";
   public static readonly forgetTitle: string = "Forget project";
   public static readonly forgetConfirmLabel: string = "Forget";
   public static readonly rewindLabel: string = "Rewind to here";
-  public static readonly rewindGlyph: string = "history";
+  public static readonly rewindGlyph: IconName = "history";
   public static readonly messageStatusLabels: Readonly<Record<MessageStatus, string | null>> = {
     [MessageStatus.Pending]: null,
     [MessageStatus.Running]: null,
@@ -506,23 +506,23 @@ export class Resources {
   public static readonly closeLabel: string = "Close";
   public static readonly saveLabel: string = "Save";
   public static readonly dismissLabel: string = "Dismiss";
-  public static readonly newConversationIcon: string = "edit_square";
-  public static readonly openProjectIcon: string = "folder_open";
-  public static readonly openBrowserIcon: string = "language";
-  public static readonly searchIcon: string = "search";
-  public static readonly moreIcon: string = "more_vert";
-  public static readonly expandedIcon: string = "expand_more";
-  public static readonly collapsedIcon: string = "chevron_right";
-  public static readonly addIcon: string = "add";
-  public static readonly forgetIcon: string = "delete";
-  public static readonly folderMissingIcon: string = "folder_off";
+  public static readonly newConversationIcon: IconName = "edit_square";
+  public static readonly openProjectIcon: IconName = "folder_open";
+  public static readonly openBrowserIcon: IconName = "language";
+  public static readonly searchIcon: IconName = "search";
+  public static readonly moreIcon: IconName = "more_vert";
+  public static readonly expandedIcon: IconName = "keyboard_arrow_down";
+  public static readonly collapsedIcon: IconName = "chevron_right";
+  public static readonly addIcon: IconName = "add";
+  public static readonly forgetIcon: IconName = "delete";
+  public static readonly folderMissingIcon: IconName = "folder_off";
   public static readonly folderMissingLabel: string = "Folder missing or unreachable";
-  public static readonly editIcon: string = "edit";
-  public static readonly pinIcon: string = "keep";
-  public static readonly unpinIcon: string = "keep_off";
-  public static readonly closeIcon: string = "close";
-  public static readonly providerMenuIcon: string = "more_horiz";
-  public static readonly enableProviderIcon: string = "check_circle";
+  public static readonly editIcon: IconName = "edit";
+  public static readonly pinIcon: IconName = "keep";
+  public static readonly unpinIcon: IconName = "keep_off";
+  public static readonly closeIcon: IconName = "close";
+  public static readonly providerMenuIcon: IconName = "more_horiz";
+  public static readonly enableProviderIcon: IconName = "check_circle";
   public static readonly approvalRequesterKind: string = "Teammate";
   public static readonly approvalDecidedBy: string = "You";
   public static readonly approvalHeadings: Readonly<Record<ApprovalKind, string>> = {
@@ -585,8 +585,8 @@ export class Resources {
   public static readonly planCardSelector: string = "nol-teamrun-plan-card";
   public static readonly markdownLinkSelector: string = "a.nol-markdown-link";
   public static readonly planUsageStatusItem: string = "teamrun.planUsage";
-  public static readonly planUsageGlyph: string = "data_usage";
-  public static readonly planLimitGlyph: string = "warning";
+  public static readonly planUsageGlyph: IconName = "data_usage";
+  public static readonly planLimitGlyph: IconName = "warning";
   public static readonly planWarningPercent: number = 75;
   public static readonly planCriticalPercent: number = 90;
   public static readonly wholePercent: number = 100;
@@ -611,7 +611,7 @@ export class Resources {
   public static readonly costDigits: number = 2;
   public static readonly compactCountOptions: Intl.NumberFormatOptions = { notation: "compact" };
   public static readonly newInputKinds: readonly string[] = ["claude", "codex"];
-  public static readonly statsGlyph: string = "query_stats";
+  public static readonly statsGlyph: IconName = "query_stats";
   public static readonly showStatsLabel: string = "Show stats";
   public static readonly replyStatsLabel: string = "Reply stats";
   public static readonly tokensInLabel: string = "Tokens in";
@@ -651,7 +651,7 @@ export class Resources {
     [PlanWindowName.Credits]: "Credits",
     [PlanWindowName.Quota]: "Quota"
   };
-  public static readonly replyErrorGlyph: string = "error";
+  public static readonly replyErrorGlyph: IconName = "error";
   public static readonly cancelReplyLabel: string = "Stop";
   public static readonly chooseModelLabel: string = "Choose a model";
   public static readonly programFocusOrigin: FocusOrigin = "program";
@@ -684,7 +684,7 @@ export class Resources {
   public static readonly organizationEveryoneTitle: string = "Everyone";
   public static readonly organizationDeletedDepartment: string = "Deleted unit";
   public static readonly organizationRemovedTeammate: string = "Removed teammate";
-  public static readonly organizationGroupIcon: string = "forum";
+  public static readonly organizationGroupIcon: IconName = "forum";
   public static readonly senderChatGone: string = "from a deleted chat";
   public static readonly wakeReceivedLabel: string = "Received a message from";
   public static readonly wakeEndedLabel: string = "No reply came back from";
@@ -709,7 +709,7 @@ export class Resources {
   public static readonly showMoreLabel: string = "Show more";
   public static readonly showLessLabel: string = "Show less";
   public static readonly previewLineCount: number = 6;
-  public static readonly stepGlyphs: Readonly<Record<StepCategory, string>> = {
+  public static readonly stepGlyphs: Readonly<Record<StepCategory, IconName>> = {
     [StepCategory.Command]: "terminal",
     [StepCategory.Edit]: "edit_document",
     [StepCategory.Read]: "description",
@@ -717,11 +717,11 @@ export class Resources {
     [StepCategory.Thought]: "psychology",
     [StepCategory.Other]: "build"
   };
-  public static readonly detailGlyphs: Readonly<Partial<Record<DetailKind, string>>> = {
+  public static readonly detailGlyphs: Readonly<Partial<Record<DetailKind, IconName>>> = {
     [DetailKind.Error]: "error",
     [DetailKind.Note]: "info"
   };
-  public static readonly textGlyph: string = "notes";
+  public static readonly textGlyph: IconName = "notes";
   public static readonly planStepStatuses: Readonly<Record<ReplyPlanStepStatus, PlanStepStatus>> = {
     [ReplyPlanStepStatus.Pending]: PlanStepStatus.Pending,
     [ReplyPlanStepStatus.InProgress]: PlanStepStatus.InProgress,
@@ -848,7 +848,7 @@ export class Resources {
   public static readonly browserNotAllowedNote: string = "not an allowed site";
   public static readonly browserStepSeparator: string = " \u00b7 ";
   public static readonly lowRiskLead: string = "Low risk, allowed without asking: ";
-  public static readonly lowRiskIcon: string = "verified_user";
+  public static readonly lowRiskIcon: IconName = "verified_user";
   public static readonly chatPageNotShown: string = "Couldn't bring the chat's page forward.";
   public static readonly imageDataField: string = "imageData";
   public static readonly mediaTypeField: string = "mediaType";
@@ -860,8 +860,8 @@ export class Resources {
   public static readonly workingTreeSource: string = "workingTree";
   public static readonly handOffSource: string = "handOff";
   public static readonly handedOffField: string = "handedOff";
-  public static readonly usageHandedOffGlyph: string = "arrow_forward";
-  public static readonly usageStoppedGlyph: string = "info";
+  public static readonly usageHandedOffGlyph: IconName = "arrow_forward";
+  public static readonly usageStoppedGlyph: IconName = "info";
   public static readonly steeredIntoField: string = "steeredInto";
   public static readonly wakeSource: string = "wake";
   public static readonly resumeSource: string = "resume";
@@ -884,7 +884,7 @@ export class Resources {
   public static readonly viewMoveEvents: readonly string[] = ["wheel", "touchstart", "pointerdown", "keydown"];
   public static readonly positionSaveMilliseconds: number = 2000;
   public static readonly shownFileCount: number = 3;
-  public static readonly editedFilesGlyph: string = "edit_document";
+  public static readonly editedFilesGlyph: IconName = "edit_document";
   public static readonly addedChangeKind: string = "add";
   public static readonly deletedChangeKind: string = "delete";
   public static readonly addedFileLabel: string = "Added";
@@ -899,20 +899,20 @@ export class Resources {
   public static readonly collapseDiffLabel: string = "Collapse diff";
   public static readonly enableWordWrapLabel: string = "Enable word wrap";
   public static readonly disableWordWrapLabel: string = "Disable word wrap";
-  public static readonly wordWrapIcon: string = "wrap_text";
-  public static readonly expandIcon: string = "expand_more";
-  public static readonly collapseIcon: string = "expand_less";
+  public static readonly wordWrapIcon: IconName = "wrap_text";
+  public static readonly expandIcon: IconName = "keyboard_arrow_down";
+  public static readonly collapseIcon: IconName = "keyboard_arrow_up";
   public static readonly teammatesDocumentName: string = "teamrun.teammates";
   public static readonly teammatesDocumentInstance: string = "teammates";
-  public static readonly teammatesViewIcon: string = "group";
+  public static readonly teammatesViewIcon: IconName = "group";
   public static readonly organizationDocumentName: string = "teamrun.organization";
   public static readonly organizationDocumentInstance: string = "my-organization";
   public static readonly organizationOldDocumentInstance: string = "organization";
   public static readonly organizationUnloadedTime: string = "1970-01-01T00:00:00.000Z";
-  public static readonly organizationViewIcon: string = "lan";
+  public static readonly organizationViewIcon: IconName = "lan";
   public static readonly providersDocumentName: string = "teamrun.providers";
   public static readonly providersDocumentInstance: string = "providers";
-  public static readonly providersViewIcon: string = "key";
+  public static readonly providersViewIcon: IconName = "key";
   public static readonly mcpServersDocumentName: string = "teamrun.mcpServers";
   public static readonly abilitiesPageName: string = "teamrun.abilities";
   public static readonly abilitiesProviderLabel: string = "Provider";
@@ -927,19 +927,19 @@ export class Resources {
   public static readonly abilityGroupCommands: string = "/ commands";
   public static readonly sentenceEnds: string = ".!?";
   public static readonly mcpServersDocumentInstance: string = "mcpServers";
-  public static readonly mcpServersViewIcon: string = "hub";
+  public static readonly mcpServersViewIcon: IconName = "hub";
   public static readonly computerUseGrantsDocumentName: string = "teamrun.computerUseGrants";
   public static readonly computerUseGrantsDocumentInstance: string = "computerUseGrants";
-  public static readonly computerUseGrantsViewIcon: string = "desktop_windows";
+  public static readonly computerUseGrantsViewIcon: IconName = "desktop_windows";
   public static readonly outsideDocumentName: string = "teamrun.outsideConnection";
   public static readonly outsideDocumentInstance: string = "outsideConnection";
-  public static readonly outsideViewIcon: string = "hub";
+  public static readonly outsideViewIcon: IconName = "hub";
   public static readonly changesViewName: string = "teamrun.changes";
   public static readonly changesTitle: string = "Changes";
-  public static readonly changesViewIcon: string = "difference";
+  public static readonly changesViewIcon: IconName = "difference";
   public static readonly activityViewName: string = "teamrun.activity";
   public static readonly activityTitle: string = "Activity";
-  public static readonly activityViewIcon: string = "list_alt";
+  public static readonly activityViewIcon: IconName = "list_alt";
   public static readonly planViewName: string = "teamrun.plan";
   public static readonly planTitle: string = "Plan";
   public static readonly planHeading: RegExp = /^\s*(?:#{1,6}(?:\s|$)|(?![-*+]\s|\d{1,9}[.)]\s)\S[^\n]*\n {0,3}(?:=+|-+)[ \t]*\r?(?:\n|$))/u;
@@ -947,13 +947,13 @@ export class Resources {
   public static readonly planNotApproved: string = "Not approved";
   public static readonly planApproved: string = "Approved";
   public static readonly approvePlanLabel: string = "Approve plan";
-  public static readonly planViewIcon: string = "checklist";
+  public static readonly planViewIcon: IconName = "checklist";
   public static readonly backgroundTasksViewName: string = "teamrun.backgroundTasks";
   public static readonly pagesViewName: string = "teamrun.pages";
   public static readonly pagesTitle: string = "Pages";
-  public static readonly pagesViewIcon: string = "web_asset";
+  public static readonly pagesViewIcon: IconName = "web_asset";
   public static readonly backgroundTasksTitle: string = "Background tasks";
-  public static readonly backgroundTasksViewIcon: string = "pending_actions";
+  public static readonly backgroundTasksViewIcon: IconName = "pending_actions";
   public static readonly noBackgroundTasksText: string = "No background tasks in this chat.";
   public static readonly backgroundTasksIdPrefix: string = "nol-teamrun-tasks-";
   public static readonly composerReachIdPrefix: string = "nol-teamrun-composer-reach-";
@@ -965,18 +965,18 @@ export class Resources {
   public static readonly backgroundTaskPageSize: number = 100;
   public static readonly showMoreTasksLabel: string = "Show more";
   public static readonly clearFinishedTasksLabel: string = "Clear finished tasks";
-  public static readonly clearFinishedTasksIcon: string = "clear_all";
+  public static readonly clearFinishedTasksIcon: IconName = "clear_all";
   public static readonly taskToggleSelector: string = ".nol-tool-call-toggle";
   public static readonly subAgentsViewName: string = "teamrun.subAgents";
   public static readonly subAgentsTitle: string = "Sub-agents";
-  public static readonly subAgentsViewIcon: string = "device_hub";
+  public static readonly subAgentsViewIcon: IconName = "device_hub";
   public static readonly noSubAgentsText: string = "No sub-agents in this chat.";
   public static readonly subAgentsIdPrefix: string = "nol-teamrun-sub-agents-";
   public static readonly openTranscriptLabel: string = "Open transcript";
   public static readonly backgroundSubAgentLabel: string = "Background";
   public static readonly stopSubAgentLabel: string = "Stop sub-agent";
   public static readonly subAgentStepSelector: string = "li.sub-agent-step";
-  public static readonly subAgentStatusGlyphs: Readonly<Record<SubAgentStatus, string>> = {
+  public static readonly subAgentStatusGlyphs: Readonly<Record<SubAgentStatus, IconName>> = {
     [SubAgentStatus.Running]: "progress_activity",
     [SubAgentStatus.Completed]: "check_circle",
     [SubAgentStatus.Failed]: "error",
@@ -1035,10 +1035,10 @@ export class Resources {
   public static readonly showOutsideSessionsTitle: string = "Connect outside agents";
   public static readonly showDataFolderCommand: string = "teamrun.showDataFolder";
   public static readonly showDataFolderTitle: string = "Show data folder";
-  public static readonly dataFolderIcon: string = "folder_open";
+  public static readonly dataFolderIcon: IconName = "folder_open";
   public static readonly newChatTerminalCommand: string = "teamrun.newChatTerminal";
   public static readonly newChatTerminalTitle: string = "New chat terminal";
-  public static readonly newChatTerminalIcon: string = "terminal";
+  public static readonly newChatTerminalIcon: IconName = "terminal";
   public static readonly newChatTerminalKey: string = "Mod+Alt+Backquote";
   public static readonly shellRunKinds: ReadonlyMap<string, readonly TerminalShellKind[]> = new Map([
     ["bash", [TerminalShellKind.Bash]],
@@ -1080,46 +1080,46 @@ export class Resources {
   public static readonly messagesSearchLabel: string = "Messages";
   public static readonly messagesPlaceholderName: string = "messages";
   public static readonly messagesSearchHeading: string = "In messages";
-  public static readonly messagesSearchIcon: string = "notes";
+  public static readonly messagesSearchIcon: IconName = "notes";
   public static readonly relativeTime: Intl.RelativeTimeFormat = new Intl.RelativeTimeFormat("en-US", { numeric: "always" });
   public static readonly relativeTimeUnits: readonly RelativeTimeUnit[] = [new RelativeTimeUnit("minute", 1), new RelativeTimeUnit("hour", 60),
     new RelativeTimeUnit("day", 1_440), new RelativeTimeUnit("month", 43_200), new RelativeTimeUnit("year", 525_600)];
   public static readonly focusComposerCommand: string = "teamrun.focusComposer";
   public static readonly focusComposerTitle: string = "Go to the message box";
-  public static readonly focusComposerIcon: string = "edit_note";
+  public static readonly focusComposerIcon: IconName = "edit_note";
   public static readonly focusComposerKey: string = "Mod+L";
   public static readonly openChatPageCommand: string = "teamrun.openChatPage";
   public static readonly openChatPageTitle: string = "Open the chat's Browser page";
-  public static readonly openChatPageIcon: string = "language";
+  public static readonly openChatPageIcon: IconName = "language";
   public static readonly noChatPageTitle: string = "Open a chat to open its Browser page";
   public static readonly stopReplyCommand: string = "teamrun.stopReply";
   public static readonly stopReplyTitle: string = "Stop the running reply";
-  public static readonly stopReplyIcon: string = "stop";
+  public static readonly stopReplyIcon: IconName = "stop";
   public static readonly stopReplyKey: string = "Mod+Period";
   public static readonly previousConversationCommand: string = "teamrun.previousConversation";
   public static readonly previousConversationTitle: string = "Previous recent chat";
-  public static readonly previousConversationIcon: string = "arrow_upward";
+  public static readonly previousConversationIcon: IconName = "arrow_upward";
   public static readonly previousConversationKey: string = "Alt+ArrowUp";
   public static readonly nextConversationCommand: string = "teamrun.nextConversation";
   public static readonly nextConversationTitle: string = "Next recent chat";
-  public static readonly nextConversationIcon: string = "arrow_downward";
+  public static readonly nextConversationIcon: IconName = "arrow_downward";
   public static readonly nextConversationKey: string = "Alt+ArrowDown";
   public static readonly moveRowUpCommand: string = "teamrun.moveRowUp";
   public static readonly moveRowUpTitle: string = "Move row up";
-  public static readonly moveRowUpIcon: string = "arrow_upward";
+  public static readonly moveRowUpIcon: IconName = "arrow_upward";
   public static readonly moveRowUpKey: string = "Mod+Shift+ArrowUp";
   public static readonly moveRowDownCommand: string = "teamrun.moveRowDown";
   public static readonly moveRowDownTitle: string = "Move row down";
-  public static readonly moveRowDownIcon: string = "arrow_downward";
+  public static readonly moveRowDownIcon: IconName = "arrow_downward";
   public static readonly moveRowDownKey: string = "Mod+Shift+ArrowDown";
   public static readonly openChatCommand: string = "teamrun.openChat";
   public static readonly openChatTitle: string = "Open chat";
-  public static readonly openChatIcon: string = "chat";
+  public static readonly openChatIcon: IconName = "chat";
   public static readonly enableProviderCommand: string = "teamrun.enableProvider";
   public static readonly enableProviderTitle: string = "Enable provider";
   public static readonly reloadCommand: string = "teamrun.reload";
   public static readonly reloadTitle: string = "Load TeamRun's data again";
-  public static readonly reloadIcon: string = "refresh";
+  public static readonly reloadIcon: IconName = "refresh";
   public static readonly tryAgainLabel: string = "Try again";
   public static readonly chatIdArgument: string = "chatId";
   public static readonly legacyChatIdArgument: string = "conversationId";
@@ -1252,14 +1252,14 @@ export class Resources {
   public static readonly organizationEmpty: string = "No units yet.";
   public static readonly organizationReportsToYou: string = "Reports to you";
   public static readonly organizationCardsShowLabel: string = "Cards show";
-  public static readonly organizationCardsShowIcon: string = "tune";
+  public static readonly organizationCardsShowIcon: IconName = "tune";
   public static readonly organizationEveryCardShows: string = "Every card shows";
   public static readonly organizationClearEveryCard: string = "Clear every card's own choice";
   public static readonly organizationUseEveryCard: string = "Use what every card shows";
-  public static readonly organizationResetIcon: string = "restart_alt";
+  public static readonly organizationResetIcon: IconName = "restart_alt";
   public static readonly organizationEditStructure: string = "Edit structure";
   public static readonly organizationDoneEditing: string = "Done editing";
-  public static readonly organizationEditIcon: string = "account_tree";
+  public static readonly organizationEditIcon: IconName = "account_tree";
   public static readonly organizationStatusKeyLabel: string = "Status key";
   public static readonly organizationStatusKey: readonly TeammateStatus[] = [TeammateStatus.Working, TeammateStatus.WaitingForYou, TeammateStatus.Idle,
     TeammateStatus.Stopped];
@@ -1269,13 +1269,13 @@ export class Resources {
   public static readonly organizationTeammateLabel: string = "Teammate";
   public static readonly organizationChooseTeammate: string = "Choose a teammate";
   public static readonly organizationAddLabel: string = "Add";
-  public static readonly organizationEditUnitIcon: string = "edit";
+  public static readonly organizationEditUnitIcon: IconName = "edit";
   public static readonly organizationUnitEditorLabel: string = "Edit unit";
   public static readonly organizationChooseUnit: string = "Select a unit to change its name, type, leader or who it reports to.";
   public static readonly organizationNoLeader: string = "No leader";
-  public static readonly organizationAddMemberIcon: string = "person_add";
+  public static readonly organizationAddMemberIcon: IconName = "person_add";
   public static readonly organizationAddDepartment: string = "Add unit";
-  public static readonly organizationAddDepartmentIcon: string = "add";
+  public static readonly organizationAddDepartmentIcon: IconName = "add";
   public static readonly organizationNewDepartment: string = "New unit";
   public static readonly organizationNewTeammateOption: string = "New teammate…";
   public static readonly organizationNewTeammateValue: string = "new-teammate";
@@ -1291,8 +1291,8 @@ export class Resources {
   public static readonly organizationTypesTitle: string = "Types";
   public static readonly organizationTypesButton: string = "Types…";
   public static readonly organizationNoTypes: string = "No types yet. Add one here, or when you add a unit.";
-  public static readonly organizationEditTypeIcon: string = "edit";
-  public static readonly organizationTypesIcon: string = "category";
+  public static readonly organizationEditTypeIcon: IconName = "edit";
+  public static readonly organizationTypesIcon: IconName = "category";
   public static readonly organizationDragType: string = "application/x-noldova-organization-node";
   public static readonly organizationDragEffect: "move" = "move";
   public static readonly organizationDraggable: string = "true";
@@ -1300,13 +1300,13 @@ export class Resources {
   public static readonly organizationCreateLabel: string = "Create";
   public static readonly organizationAddTeammate: string = "Add teammate";
   public static readonly organizationAddTeammateSearch: string = "Find a teammate";
-  public static readonly organizationAddTeammateSearchIcon: string = "search";
+  public static readonly organizationAddTeammateSearchIcon: IconName = "search";
   public static readonly organizationAddTeammateEmpty: string = "Type a teammate's name.";
-  public static readonly organizationDeleteIcon: string = "delete";
-  public static readonly organizationRemoveIcon: string = "person_remove";
-  public static readonly organizationLeaveUnitIcon: string = "group_remove";
-  public static readonly organizationNowRunningIcon: string = "progress_activity";
-  public static readonly organizationNowIdleIcon: string = "pause_circle";
+  public static readonly organizationDeleteIcon: IconName = "delete";
+  public static readonly organizationRemoveIcon: IconName = "person_remove";
+  public static readonly organizationLeaveUnitIcon: IconName = "group_remove";
+  public static readonly organizationNowRunningIcon: IconName = "progress_activity";
+  public static readonly organizationNowIdleIcon: IconName = "pause_circle";
   public static readonly organizationNothingRunning: string = "Nothing running";
   public static readonly organizationNowReplying: string = "Replying";
   public static readonly organizationDetailsStatus: string = "Status";
