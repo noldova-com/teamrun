@@ -19,7 +19,8 @@ public static class ImagePathProbe {
   }
 }
 "@
-foreach ($program in $Programs) {
+foreach ($program in ($Programs -join ',') -split ',') {
+  Write-Output "PROBE link     $((Get-Item (Split-Path (Split-Path $program))).LinkType) $((Get-Item (Split-Path (Split-Path $program))).Target)"
   $child = Start-Process -FilePath $program -ArgumentList '-e', 'setTimeout(() => {}, 15000)' -PassThru -NoNewWindow
   Start-Sleep -Seconds 2
   Write-Output "PROBE program  $program"
