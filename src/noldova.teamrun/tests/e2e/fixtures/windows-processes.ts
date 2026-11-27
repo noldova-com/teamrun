@@ -16,7 +16,6 @@ import { ProcessStatus } from "./process-status.ts";
 export class WindowsProcesses {
   public static readonly WORK_VARIABLE: string = "TEAMRUN_E2E_WORK";
   public static readonly HOLDERS_WAIT_SECONDS: number = 10;
-  private static readonly HOLDERS_EXIT_MILLISECONDS: number = 5_000;
   private static readonly TIMEOUT: number = 60_000;
   private static readonly BUFFER: number = 64 * 1024 * 1024;
   private static readonly NO_SESSION: number = -1;
@@ -40,10 +39,10 @@ export class WindowsProcesses {
     "function Stop-Listed($listed, $by) { $id = $listed.ProcessId; $key = \"$id $($listed.CreationDate.Ticks)\"; if ($seen.ContainsKey($key)) { return }; $seen[$key] = $true" +
       "; $process = $null; try { $process = [System.Diagnostics.Process]::GetProcessById([int]$id) } catch { }" +
       "; try { if ($process) { $null = $process.Handle; if ([Math]::Abs(($process.StartTime - $listed.CreationDate).TotalMilliseconds) -lt 1) { $process.Kill()" +
-      `; if (-not $process.WaitForExit(${WindowsProcesses.HOLDERS_EXIT_MILLISECONDS})) { throw "it still ran ${WindowsProcesses.HOLDERS_EXIT_MILLISECONDS} ms after it was stopped" }` +
+      "; $process.WaitForExit()" +
       "; \"stopped $id $($listed.Name)$by\" }" +
       " elseif (Test-Running $listed) { \"not stopped $id $($listed.Name)$($by): its start time differs from the listing's\"; return } } }" +
-      " catch { if (Test-Running $listed) { \"not stopped $id $($listed.Name)$($by): $($_.Exception.Message)\"; return } }" +
+      " catch { if (Test-Running $listed) { \"not stopped $id $($listed.Name)$($by): $($_.Exception.Message)\" } }" +
       "; $near = @(Get-Listed \" WHERE ProcessId = $id OR ParentProcessId = $id\")" +
       "; $before = @($near | Where-Object { $_.ProcessId -eq $id -and $_.CreationDate -ne $listed.CreationDate } | ForEach-Object { $_.CreationDate }) + [DateTime]::MaxValue" +
       "; $near | Where-Object { $_.ParentProcessId -eq $id -and $_.CreationDate -ge $listed.CreationDate -and $_.CreationDate -lt $before[0] }" +
