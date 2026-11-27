@@ -45,6 +45,7 @@ class AdoptingEndpoint extends McpEndpoint {
 
 class TreeWatchingListener extends RecordingTurnListener {
   public readonly runningAtEnd: number[] = [];
+  public readonly ended: PromiseWithResolvers<void> = Promise.withResolvers<void>();
   public tree: readonly number[] = [];
 
   public static runs(processId: number): boolean {
@@ -54,6 +55,7 @@ class TreeWatchingListener extends RecordingTurnListener {
   public override async onTaskEndedAsync(end: TaskEnd): Promise<void> {
     this.runningAtEnd.push(this.tree.filter(t => TreeWatchingListener.runs(t)).length);
     await super.onTaskEndedAsync(end);
+    this.ended.resolve();
   }
 }
 
@@ -81,10 +83,14 @@ class TreeEndTimer implements ITimer {
     return this.timer.now();
   }
 
+  // Lasts until the task's tree has ended, however long that takes, rather than for the delay asked.
   public async delayAsync(_milliseconds: number, signal: AbortSignal): Promise<void> {
-    await Wait.until(() => signal.aborted || !this.listener.tree.some(t => TreeWatchingListener.runs(t)), "The task tree still ran.");
+    while (!signal.aborted && this.listener.tree.some(t => TreeWatchingListener.runs(t)))
+      await Wait.delay(TreeEndTimer.POLL_INTERVAL);
     signal.throwIfAborted();
   }
+
+  private static readonly POLL_INTERVAL: number = 10;
 }
 
 @Category("ProcessListing")
@@ -661,14 +667,15 @@ export class AcpTasksTests {
     const starter = new NodeProcessStarter(host.terminator);
     const listener = new TreeWatchingListener();
     const adapter = host.createAdapter({ ...host.environment, TEAMRUN_FAKE_ACP_TASK_OUTLIVES: "1" }, host.command, host.terminator, host.timings, starter,
-      new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, new TreeEndTimer(listener), host.timings.stopGrace));
+      new ProcessTree(process.platform, new CommandRunner(starter), process.env, Resources.processListTimeout, new TreeEndTimer(listener), host.timings.stopGrace),
+      host.answerTimer);
 
     await adapter.runTurn(host.request("background"), listener, new AbortController().signal);
     listener.tree = await AcpTasksTests.tree(host);
     try {
       AcpTasksTests.endTask(host, { exit: true });
       await host.programs.endedAt(1);
-      await Wait.until(() => listener.taskEnds.length === 1, "The listener did not see a task end.");
+      await listener.ended.promise;
 
       Assert.areEqual(JSON.stringify([BackgroundTaskStatus.Ended]), JSON.stringify(listener.taskEnds.map(t => t.status)));
       Assert.areEqual(JSON.stringify([0]), JSON.stringify(listener.runningAtEnd));

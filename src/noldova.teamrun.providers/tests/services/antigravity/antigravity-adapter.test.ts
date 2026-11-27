@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import "@noldova/context.core";
 import { type JsonObject, JsonReader } from "@noldova/context.json";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { ForkRequest, Resources as CoreResources, SharedMcpValues, TurnOutcome, TurnRequest } from "@noldova/teamrun.core";
+import { ForkRequest, type ITimer, Resources as CoreResources, SharedMcpValues, TurnOutcome, TurnRequest } from "@noldova/teamrun.core";
 import { AuthStatus, Provider, ProviderAbility, ProviderModel, RequestedSettings, SharedMcpServerDefinition, SharedMcpTransport } from "@noldova/teamrun.protocol";
 import { type AcpAdapter, AntigravityAdapter, AntigravityAgent, AntigravityInstallation, AntigravityInstaller, AntigravityProfile, AntigravityServer, CommandRunner,
   ExecutableSource, type IProcessStarter, ProcessCommand, ProviderAbilityTable, type ProviderTimings, Resources,
@@ -348,7 +348,7 @@ export class AntigravityAdapterTests {
       Assert.areEqual("Antigravity 1.3.0 doesn't support signing out: its ACP server doesn't offer ACP's logout.", refused.message);
       Assert.isFalse(existsSync(join(provider.profileDir, "logout.txt")));
       Assert.isTrue(existsSync(join(provider.profileDir, ...Resources.antigravityTokenSegments)));
-    });
+    }, {}, process.platform, undefined, t => t.timings, () => ({}), t => t.answerTimer);
   }
 
   @TestMethod
@@ -644,7 +644,7 @@ export class AntigravityAdapterTests {
   private static async withAdapter(version: string,
     test: (adapter: AcpAdapter, host: GrokTestHost, provider: Provider) => Promise<void>, extra: NodeJS.ProcessEnv = {},
     platform: string = process.platform, starter?: IProcessStarter, timings: (host: GrokTestHost) => ProviderTimings = t => t.timings,
-    extraOf: (host: GrokTestHost) => NodeJS.ProcessEnv = () => ({})): Promise<void> {
+    extraOf: (host: GrokTestHost) => NodeJS.ProcessEnv = () => ({}), timer: (host: GrokTestHost) => ITimer = t => t.timer): Promise<void> {
     await using host = new GrokTestHost();
     const profile = host.directory.resolve("profile");
     const token = join(profile, "antigravity-acp", "acp_token.json");
@@ -657,7 +657,7 @@ export class AntigravityAdapterTests {
     const environment = { ...host.environment, TEAMRUN_FAKE_ACP_OPTIONS: JSON.stringify([model, mode]), TEAMRUN_FAKE_ACP_CAPABILITIES: JSON.stringify(capabilities),
       TEAMRUN_FAKE_ACP_REQUIRE_AUTH: "1", ...extra, ...extraOf(host) };
     const adapter = host.createAcpAdapter(new AntigravityAgent(() => new AntigravityServer(host.command, host.directory.resolve("harness")), platform, environment,
-      host.directory.resolve("default"), host.directory.resolve("tmp")), starter, timings(host));
+      host.directory.resolve("default"), host.directory.resolve("tmp")), starter, timings(host), null, timer(host));
     const provider = new Provider("a1", "antigravity", "Work", profile, AuthStatus.Unknown, null, null, null, null, "2026-09-09T00:00:00.000Z");
     await test(adapter, host, provider);
   }

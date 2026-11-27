@@ -37,6 +37,10 @@ export class GrokTestHost implements AsyncDisposable {
   public readonly hangingSignInTimings = new ProviderTimings(2000, 500, 10_000, 2000, 100, 100, 100, 4000, 100, 1, 10);
   public readonly stoppingTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 10_000, 100, 100, 4000, 100, 1, 10);
   public readonly timer = new HeldDelayTimer(this.timings.killWait);
+  // Holds the request and initialize limits too, and the version and sign-in check limits as long as the request's, for a
+  // test that checks the agent's answers rather than those limits, so it waits on the answers however slowly the machine
+  // starts the agent.
+  public readonly answerTimer = new HeldDelayTimer(this.timings.killWait, this.timings.requestTimeout, this.timings.initializeTimeout);
   public readonly idleTimer: ManualTimer = new ManualTimer();
   public readonly elapsedIdleTimer: ElapsedDelayTimer = new ElapsedDelayTimer(this.timings.idleLimit);
   public readonly info = new AppServerClientInfo("teamrun-tests", "TeamRun tests", "test");
