@@ -51,8 +51,7 @@ test.describe("Windows process scripts", () => {
     finally {
       if (Object.isNull(holder.exitCode) && Object.isNull(holder.signalCode))
         holder.kill();
-      if (WindowsScriptChecks.runs(Number(childId)))
-        process.kill(Number(childId));
+      WindowsScriptChecks.answerOf(WindowsProcesses.holdersScript(true), environment);
       rmSync(work, { recursive: true, force: true });
     }
   });
