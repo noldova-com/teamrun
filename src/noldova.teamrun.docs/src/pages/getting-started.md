@@ -6,6 +6,7 @@ If TeamRun isn't on your computer yet, start with [Install](install.md).
 ## 1. Add a provider
 
 A provider is one AI service TeamRun runs for you, such as Claude Code, Codex or GitHub Copilot, signed in on your own account.
+Plans, usage limits and charges are the provider's. TeamRun doesn't include an AI subscription.
 
 The first time you open TeamRun, it opens the **Providers** tab with a welcome line, and it already searches your computer for providers you use.
 The tab has three parts:
@@ -61,6 +62,13 @@ The teammate you mention is the one who answers.
 
 The composer's picker, the button that reads like `@Codex · <model> · <effort>`, shows who answers and lets you choose the **Model** and **Effort**, and **Speed** when the model has speeds.
 For a named teammate, those choices apply in this chat only; **Make it @<name>'s default** saves them to the teammate.
+
+Start with a small project you know well.
+Review the project's current state before asking an agent to change it.
+
+Ask a focused first question, such as:
+
+> Explain this project's structure and its main entry points. Don't change any files.
 
 ## 6. Approve its first step
 

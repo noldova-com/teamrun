@@ -158,3 +158,9 @@ Choose one in Pi itself, then refresh the provider.
 TeamRun checks the sign-in when Pi quits.
 
 Pi can't report plan usage, show sub-agents or run background commands in TeamRun, and a team's MCP servers stay off in Pi chats.
+
+## Still stuck?
+
+Ask on [TeamRun's GitHub issues](https://github.com/noldova-com/teamrun/issues), for help, ideas and bug reports.
+When reporting a problem, include your TeamRun version, operating system and steps to reproduce it.
+Remove personal information and credentials from screenshots or logs.

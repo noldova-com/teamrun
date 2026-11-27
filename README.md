@@ -305,12 +305,12 @@ The answer comes back the same way, and a chain of such messages, with the hand-
 
 TeamRun's documentation site, for people who use the app, is the private workspace `src/noldova.teamrun.docs`, served at teamrun.noldova.dev, with its staging at teamrun.staging.noldova.dev and its sandbox at teamrun.sandbox.noldova.dev.
 Its header and footer are the UI kit's site header and footer for a documentation site, the header showing the latest released version of [CHANGELOG.md](CHANGELOG.md) and the kit's theme switch, saved under `noldova-theme` as on every Noldova site; below 48rem a bar under the header opens the menu of pages, apart from the header's own menu.
-Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes add the released versions of [CHANGELOG.md](CHANGELOG.md) when the site is built.
+Each page is a Markdown file in `src/noldova.teamrun.docs/src/pages/`, listed in the menu's order in `src/app/models/docs-catalog.ts`; Release notes link to the website's changelog, teamrun.noldova.com/releases/, rather than keep a second list.
 A page kept off the site until it is ready waits in `src/noldova.teamrun.docs/drafts/`, outside the menu, the search and the build.
 `npm run build:docs` builds the static, prerendered site into `_build/docs/browser`, and `npm run test:docs` installs Playwright's headless Chromium, as the Angular tests do, runs its tests with coverage, checks their JSON report, `_build/docs-tests.json`, so that every spec file reported and no two tests share a name, then opens every page the menu links; CI runs it in its "Docs site tests" job.
 
 The "Docs" workflow, `.github/workflows/docs.yml`, runs on each push to `main`, as the UI kit's does: it builds the site with the organization's shared `docs-image.yml`, pinned at the `.github` repository's v2.51.2, whose image keeps no request log, running `npm ci --no-audit --no-fund && npm run build:docs`, into the image `ghcr.io/noldova-com/teamrun-angular-docs`, tagged with the commit, then moves the image's `latest` label to it, which the sandbox follows.
-Release notes show the versions [CHANGELOG.md](CHANGELOG.md) names as released at that commit.
+The header shows the latest version [CHANGELOG.md](CHANGELOG.md) names as released at that commit.
 
 The "Deploy" workflow, `.github/workflows/deploy.yml`, started by hand on `main` with `staging` or `production` and a TeamRun release tag, such as `teamrun-0.0.10`, reads that release in noldova-com/downloads, takes the one teamrun commit its "Built from" line names, checks that `main` holds it, finds the image tagged with that commit, waits on the `deploy-staging` or `deploy-production` environment, and moves that label to it, which staging or production follows; it refuses to run while the environment doesn't exist, since a run would create it unprotected:
 
