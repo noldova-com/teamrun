@@ -350,7 +350,7 @@ export class SharedMcpLauncherTests {
     if (process.platform !== "win32")
       return;
     using directory = new TemporaryDirectory();
-    const ids = directory.resolve("ids.json");
+    const ids = directory.resolve("ids.txt");
     const launcher = spawn(process.execPath, ["-e", SharedMcpLauncherTests.LAUNCHER_SCRIPT, ids, SharedMcpLauncherTests.KEEP_SCRIPT, SharedMcpLauncherTests.SERVER_SCRIPT],
       { stdio: "ignore", windowsHide: true });
     await Wait.until(() => existsSync(ids), "The launcher did not write its process ids.", SharedMcpLauncherTests.UNBOUNDED);
