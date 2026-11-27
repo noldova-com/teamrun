@@ -30,8 +30,7 @@ npm test
 `npm ci` installs the exact versions the root's `package-lock.json` records, for the root and for the Angular project in `src/`, the root's one npm workspace, where the window part compiles and its specs run; `npm run build` builds every package, and runs that `npm ci` itself first when the root has no `node_modules`, and `npm test` runs every check.
 
 The scripts in `scripts/` check a value's type or absence with the checks `@noldova/context.core` adds to `Object`, such as `Object.isNull`, `Object.isUndefined` and `Object.isString`, as the packages do, and each script that calls them imports `@noldova/context.core`.
-The one exception is `scripts/installs/root-install.ts`.
-`npm run build` runs it before that install, so it writes its checks out and imports only Node's own modules.
+The exceptions are `scripts/installs/root-install.ts`, which `npm run build` runs before that install, and `scripts/set-version.ts` with the files it imports, which a release runs before `npm ci`, so they write their checks out and import only Node's own modules.
 
 ## Starting the app
 

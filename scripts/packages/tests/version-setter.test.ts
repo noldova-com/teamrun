@@ -19,6 +19,7 @@ import { VersionSetter } from "../version-setter.ts";
 
 const folders: string[] = [];
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+const SCRIPTS = path.resolve(import.meta.dirname, "..", "..");
 const PREFACE = "# Changelog\n\nIntro.\n";
 const OLDER = "## 0.0.2\n\n- Older fix.\n";
 const CHANGELOG = `${PREFACE}\n## Unreleased\n\n### Fixed\n\n- **First fix:** it works.\n  In 0.0.2 it didn't.\n- **Second fix:** it works too.\n\n### Added\n\n- **A feature:** new.\n\n${OLDER}`;
@@ -162,5 +163,26 @@ describe("SetVersion", () => {
     assert.deepEqual(await runAsync(root, ["0.0.3", "main"]), { exitCode: 2, output: usage });
     assert.deepEqual(await runAsync(root, ["0.0.3", COMMIT, "more"]), { exitCode: 2, output: usage });
     assert.deepEqual(await runAsync(root, ["0.0.3"]), { exitCode: 1, output: "CHANGELOG.md has no \"## Unreleased\" section, so 0.0.3 would release nothing it names.\n" });
+  });
+
+  it("loads only Node's own modules and its own files, since a release runs it before npm ci", () => {
+    const outside: string[] = [];
+    const seen = new Set<string>();
+    const visit = (file: string): void => {
+      if (seen.has(file))
+        return;
+      seen.add(file);
+      for (const match of readFileSync(file, "utf8").matchAll(/^import\s(?:[^"]*\sfrom\s)?"([^"]+)";$/gm)) {
+        const specifier = match[1] ?? "";
+        if (specifier.startsWith("."))
+          visit(path.resolve(path.dirname(file), specifier));
+        else if (!specifier.startsWith("node:"))
+          outside.push(`${path.relative(SCRIPTS, file)}: ${specifier}`);
+      }
+    };
+
+    visit(path.join(SCRIPTS, "set-version.ts"));
+
+    assert.deepEqual([[...seen].map(t => path.relative(SCRIPTS, t).replaceAll("\\", "/")).sort(), outside], [["packages/set-version.exception.ts", "packages/version-setter.ts", "set-version.ts"], []]);
   });
 });
