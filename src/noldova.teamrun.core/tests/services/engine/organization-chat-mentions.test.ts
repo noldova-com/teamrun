@@ -12,7 +12,7 @@ import { Resources, type TurnSteer } from "@noldova/teamrun.core";
 import { ServiceException } from "@noldova/teamrun.services";
 import {
   type Conversation, ErrorCode, Harness, MessageAuthor, MessageDelivery, MessageListParams, MessageSendParams, OrganizationChat, OrganizationParent,
-  RequestedSettings, type Teammate, TeammateCreateParams, TeammatePlaceParams, WaitingMessageAddParams
+  RequestedSettings, type Teammate, TeammateCreateParams, TeammatePlaceParams, WaitingMessageAddParams, WaitingMessageEditParams
 } from "@noldova/teamrun.protocol";
 
 import { ChangeSignal } from "../../fixtures/change-signal.fixture.js";
@@ -127,6 +127,32 @@ export class OrganizationChatMentionsTests {
     Assert.areEqual("", steered?.mentions.map(t => t.teammateId).join(",") ?? "missing");
     Assert.areEqual(1, host.adapter.requests.length);
     Assert.isFalse(messages.some(t => t.teammateId === reviewer.id));
+  }
+
+  @TestMethod
+  public async editsAWaitingMessageInAnOrganizationChatToOneWithIdsAndStoresAndSendsItWithoutThem(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const builder = await OrganizationChatMentionsTests.teammateAsync(host, "Builder");
+    const reviewer = await OrganizationChatMentionsTests.teammateAsync(host, "Reviewer");
+    const chat = await OrganizationChatMentionsTests.chatAsync(host, builder);
+    const gate = Promise.withResolvers<void>();
+    host.adapter.holdTurn = () => host.adapter.requests.length === 1 ? gate.promise : Promise.resolve();
+    await host.engine.sendAsync(new MessageSendParams(chat.id, "First", null, null, [], [], builder.id));
+    await host.adapter.requested(1);
+    const added = await host.engine.addWaitingAsync(new WaitingMessageAddParams(new MessageSendParams(chat.id, "Then", null, null, [], [], builder.id),
+      MessageDelivery.Queue));
+
+    const edited = await host.engine.editWaitingAsync(new WaitingMessageEditParams(added.id, new MessageSendParams(chat.id, "Then hand it to @Reviewer.", null, null,
+      [], [reviewer.id], builder.id)));
+    gate.resolve();
+    await host.adapter.requested(2);
+    await host.engine.waitForIdle();
+    const messages = await host.messages.listAsync(new MessageListParams(chat.id, null));
+
+    Assert.areEqual(0, edited.message.mentionedTeammateIds.length);
+    Assert.areEqual("First:|Then hand it to @Reviewer.:", messages.filter(t => t.author === MessageAuthor.User)
+      .map(t => `${t.details[0]?.text}:${t.mentions.map(u => u.teammateId).join(",")}`).join("|"));
+    Assert.areEqual(`${builder.id},${builder.id}`, messages.filter(t => t.author === MessageAuthor.Provider).map(t => t.teammateId).join(","));
   }
 
   private static async teammateAsync(host: CoreHost, name: string): Promise<Teammate> {
