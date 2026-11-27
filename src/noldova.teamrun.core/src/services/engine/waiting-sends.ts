@@ -210,8 +210,10 @@ export class WaitingSends {
   private async refuseUnfitWaitingAsync(message: MessageSendParams, conversation: Conversation, transaction?: SqlTransaction): Promise<void> {
     if (!Object.isNull(message.senderToken))
       throw new ArgumentException(ProtocolResources.waitingFromPersonOnly, ProtocolResources.messageField);
+    if (!Object.isNull(conversation.organizationChat))
+      return;
     const available = (await this.teammates.listAsync(transaction)).map(t => new TeammateMention(t.id, t.name));
-    if (!MentionCheck.matches(message.text, message.mentionedTeammateIds, available, false, !Object.isNull(conversation.organizationChat)))
+    if (!MentionCheck.matches(message.text, message.mentionedTeammateIds, available, false))
       throw new ServiceException(ErrorCode.Conflict, Resources.waitingMentionsMismatch, []);
   }
 

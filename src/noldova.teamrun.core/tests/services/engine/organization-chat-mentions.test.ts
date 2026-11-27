@@ -74,6 +74,21 @@ export class OrganizationChatMentionsTests {
     Assert.areEqual(`${builder.id},${builder.id}`, messages.filter(t => t.author === MessageAuthor.Provider).map(t => t.teammateId).join(","));
   }
 
+  @TestMethod
+  public async handsOffToTheTeammateAnAtNameInATeammatesOwnReplyNamesInAnOrganizationChat(): Promise<void> {
+    await using host = await CoreHost.createAsync();
+    const builder = await OrganizationChatMentionsTests.teammateAsync(host, "Builder");
+    const reviewer = await OrganizationChatMentionsTests.teammateAsync(host, "Reviewer");
+    const chat = await OrganizationChatMentionsTests.chatAsync(host, builder);
+    host.adapter.turnTexts = [["Done, @Reviewer please look."]];
+
+    await host.engine.sendAsync(new MessageSendParams(chat.id, "Make the change.", null, null, [], [], builder.id));
+    await host.engine.waitForIdle();
+    const replies = (await host.messages.listAsync(new MessageListParams(chat.id, null))).filter(t => t.author === MessageAuthor.Provider);
+
+    Assert.areEqual(`${builder.id}:${reviewer.id}|${reviewer.id}:`, replies.map(t => `${t.teammateId ?? "none"}:${t.mentions.map(u => u.teammateId).join(",")}`).join("|"));
+  }
+
   private static async teammateAsync(host: CoreHost, name: string): Promise<Teammate> {
     const teammate = await host.teammates.createAsync(new TeammateCreateParams(name, null, (await host.providerOfAsync()).id, Harness.Provider, null, null));
     await host.organization.placeAsync(new TeammatePlaceParams(Resources.defaultOrganizationId, teammate.id, OrganizationParent.person, 0));

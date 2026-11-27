@@ -10,10 +10,7 @@ import "@noldova/context.core";
 import { MentionResolver, type TeammateMention } from "@noldova/teamrun.protocol";
 
 export class MentionCheck {
-  public static matches(text: string, mentionedIds: readonly string[], available: readonly TeammateMention[], isTeammateText: boolean,
-    isOrganizationChat: boolean): boolean {
-    if (isOrganizationChat && !isTeammateText && mentionedIds.length === 0)
-      return true;
+  public static matches(text: string, mentionedIds: readonly string[], available: readonly TeammateMention[], isTeammateText: boolean): boolean {
     const resolved = isTeammateText ? MentionResolver.resolveTeammateText(text, available) : MentionResolver.resolve(text, available);
     const mentioned = [...new Set(mentionedIds)];
     return resolved.length === mentioned.length && resolved.every((t, index) => t.teammateId === mentioned[index]);

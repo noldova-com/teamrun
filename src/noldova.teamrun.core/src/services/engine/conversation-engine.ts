@@ -1069,17 +1069,18 @@ export class ConversationEngine implements IConversationEngine, IOutsideMessages
     if (busy && (Object.isNull(group) || Object.isNull(sender)))
       throw new ServiceException(ErrorCode.Conflict, Resources.formatReplyInProgress(conversation.id), [conversation.id]);
 
+    const fixedTo = Object.isNull(sender) && Object.isNull(outside) ? conversation.organizationChat?.teammateId ?? null : null;
     const mentions: Teammate[] = [];
-    for (const id of new Set(params.mentionedTeammateIds))
+    for (const id of Object.isNull(fixedTo) ? new Set(params.mentionedTeammateIds) : [])
       mentions.push(await this.requireTeammateAsync(id));
     const available = (await this.teammates.listAsync()).map(t => new TeammateMention(t.id, t.name));
-    const matches = !Object.isNull(outside) ? mentions.length === 0
-      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender),
-        !Object.isNull(conversation.organizationChat));
+    const matches = !Object.isNull(fixedTo) || (!Object.isNull(outside) ? mentions.length === 0
+      : MentionCheck.matches(params.text, mentions.map(t => t.id), available, !Object.isNull(sender)));
     if (!matches)
       throw new ServiceException(ErrorCode.Conflict, Resources.mentionsChanged, []);
     const called = Object.isNull(sender) ? mentions : mentions.filter(t => t.id !== sender.teammateId);
-    const responder = called.length > 0 || Object.isNull(params.responderTeammateId) ? null : await this.requireTeammateAsync(params.responderTeammateId);
+    const responderId = params.responderTeammateId ?? fixedTo;
+    const responder = called.length > 0 || Object.isNull(responderId) ? null : await this.requireTeammateAsync(responderId);
     const answersItself = !Object.isNull(responder) && responder.id === sender?.teammateId;
     if (called.length === 0 && !Object.isNull(responder) && !answersItself
       && Object.isNull(await this.conversations.findMemberAsync(new ConversationMemberParams(conversation.id, responder.id))))
