@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import "@noldova/context.core";
@@ -18,12 +18,15 @@ import { BackgroundTaskStatus, ConversationRewindParams, DetailKind, type Messag
   from "@noldova/teamrun.protocol";
 
 import { CoreHost } from "../../fixtures/core-host.fixture.js";
+import { ToolCall } from "../../fixtures/tool-call.fixture.js";
 
 type ProviderShape = "claude" | "codex" | "acp" | "pi";
 type NoteToolShape = "acp-move" | "acp-delete" | "codex-mcp" | "claude-mcp" | "pi-mcp";
 
 @TestClass
 export class OutsideChangesTests {
+  private static readonly MISSING: string = "ENOENT";
+
   @TestMethod
   @TestData("claude")
   @TestData("codex")
@@ -33,7 +36,7 @@ export class OutsideChangesTests {
     await using host = await CoreHost.createAsync();
     const folder = OutsideChangesTests.folder(join(host.directory.path, "repo"), { "read.txt": "one\n", "pulled.txt": "before\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    host.adapter.steps = [...OutsideChangesTests.tool(shape, "read"), () => OutsideChangesTests.changeOutside(folder, { "pulled.txt": "after\n" })];
+    host.adapter.steps = [...OutsideChangesTests.tool(shape, "read").steps, () => OutsideChangesTests.changeOutside(folder, { "pulled.txt": "after\n" })];
 
     const reply = await OutsideChangesTests.send(host, conversation.id);
 
@@ -52,7 +55,7 @@ export class OutsideChangesTests {
     await using host = await CoreHost.createAsync();
     const folder = OutsideChangesTests.folder(join(host.directory.path, "repo"), { "own.txt": "one\n", "other.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    const [open, close] = OutsideChangesTests.tool(shape, "edit");
+    const { open, close } = OutsideChangesTests.tool(shape, "edit");
     host.adapter.steps = [open, () => writeFileSync(join(folder, "own.txt"), "two\n"), close,
       () => OutsideChangesTests.changeOutside(folder, { "other.txt": "two\n" })];
 
@@ -83,14 +86,24 @@ export class OutsideChangesTests {
     OutsideChangesTests.git(folder, "commit", "-q", "-m", "two");
     OutsideChangesTests.git(folder, "checkout", "-q", "-");
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    host.adapter.steps = [...OutsideChangesTests.tool(shape, "status"), () => {
+    const readings: Record<string, JsonValue> = {};
+    host.adapter.steps = [() => {
+      readings["beforeTool"] = Date.now();
+    }, ...OutsideChangesTests.tool(shape, "status").steps, () => {
+      readings["afterTool"] = Date.now();
       OutsideChangesTests.git(folder, "checkout", "-q", "next");
+      readings["folderBeforeLater"] = OutsideChangesTests.stampOf(folder);
+      readings["goneBeforeLater"] = OutsideChangesTests.outcomeOf(join(folder, "gone.txt"));
       OutsideChangesTests.later([folder, join(folder, "kept.txt"), join(folder, "added.txt")]);
+      readings["folderAfterLater"] = OutsideChangesTests.stampOf(folder);
+      readings["goneAfterLater"] = OutsideChangesTests.outcomeOf(join(folder, "gone.txt"));
     }];
 
     const reply = await OutsideChangesTests.send(host, conversation.id);
+    const own = OutsideChangesTests.ownChanges(reply);
 
-    Assert.isUndefined(OutsideChangesTests.ownChanges(reply));
+    Assert.isUndefined(own, OutsideChangesTests.readingsOf(readings, folder, [...OutsideChangesTests.pathsOf(own, Resources.filesField),
+      ...OutsideChangesTests.outsideFiles(reply)]));
     Assert.areEqual(["added.txt", "gone.txt", "kept.txt"].map(t => join(folder, t)).join(), [...OutsideChangesTests.outsideFiles(reply)].sort().join());
   }
 
@@ -104,7 +117,7 @@ export class OutsideChangesTests {
     await using host = await CoreHost.createAsync();
     const folder = OutsideChangesTests.folder(join(host.directory.path, "repo"), { "kept.txt": "one\n", "deleted.txt": "one\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    const [open, close] = OutsideChangesTests.noteTool(shape);
+    const { open, close } = OutsideChangesTests.noteTool(shape);
     host.adapter.steps = [open, () => {
       writeFileSync(join(folder, "written.txt"), "new\n");
       rmSync(join(folder, "deleted.txt"));
@@ -128,7 +141,7 @@ export class OutsideChangesTests {
     const old = new Date(Date.now() - 24 * 60 * 60 * 1_000);
     utimesSync(join(folder, "old.txt"), old, old);
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    const [open, close] = OutsideChangesTests.tool(shape, "mv", { writes: ["old.txt", "new.txt"], unnamedWrites: [] });
+    const { open, close } = OutsideChangesTests.tool(shape, "mv", { writes: ["old.txt", "new.txt"], unnamedWrites: [] });
     host.adapter.steps = [open, () => renameSync(join(folder, "old.txt"), join(folder, "new.txt")), close];
 
     const reply = await OutsideChangesTests.send(host, conversation.id);
@@ -175,7 +188,7 @@ export class OutsideChangesTests {
     await using host = await CoreHost.createAsync();
     const folder = OutsideChangesTests.folder(join(host.directory.path, "repo"), { "own.txt": "one\n", "pulled.txt": "before\n" });
     const conversation = await host.createConversationAsync(await host.openProjectAsync("repo"));
-    const [open, close] = OutsideChangesTests.tool("codex", "edit");
+    const { open, close } = OutsideChangesTests.tool("codex", "edit");
     host.adapter.steps = [open, () => writeFileSync(join(folder, "own.txt"), "two\n"), close,
       () => OutsideChangesTests.changeOutside(folder, { "pulled.txt": "after\n" })];
     const reply = await OutsideChangesTests.send(host, conversation.id);
@@ -190,41 +203,41 @@ export class OutsideChangesTests {
     Assert.isTrue(existsSync(join(folder, "later.txt")));
   }
 
-  private static tool(shape: ProviderShape, id: string, reports: JsonObject = {}): readonly [TurnDetail, TurnDetail] {
+  private static tool(shape: ProviderShape, id: string, reports: JsonObject = {}): ToolCall {
     switch (shape) {
       case "claude":
-        return [new TurnDetail(DetailKind.Command, "Bash", { tool: "Bash", input: { command: "true" }, toolUseId: `use-${id}`, ...reports }, `claude-${id}`),
-          new TurnDetail(DetailKind.Note, String.empty, { toolUseId: `use-${id}`, isError: false }, `claude-${id}-result`)];
+        return new ToolCall(new TurnDetail(DetailKind.Command, "Bash", { tool: "Bash", input: { command: "true" }, toolUseId: `use-${id}`, ...reports }, `claude-${id}`),
+          new TurnDetail(DetailKind.Note, String.empty, { toolUseId: `use-${id}`, isError: false }, `claude-${id}-result`));
       case "codex":
-        return [new TurnDetail(DetailKind.Command, "true", { command: "true", status: "inProgress", exitCode: null, ...reports }, `codex-${id}`),
-          new TurnDetail(DetailKind.Command, "true", { command: "true", status: "completed", exitCode: 0 }, `codex-${id}`)];
+        return new ToolCall(new TurnDetail(DetailKind.Command, "true", { command: "true", status: "inProgress", exitCode: null, ...reports }, `codex-${id}`),
+          new TurnDetail(DetailKind.Command, "true", { command: "true", status: "completed", exitCode: 0 }, `codex-${id}`));
       case "acp":
-        return [new TurnDetail(DetailKind.Command, "true", { tool: "execute", status: "in_progress", ...reports }, `acp-tool-${id}`),
-          new TurnDetail(DetailKind.Command, "true", { tool: "execute", status: "completed" }, `acp-tool-${id}`)];
+        return new ToolCall(new TurnDetail(DetailKind.Command, "true", { tool: "execute", status: "in_progress", ...reports }, `acp-tool-${id}`),
+          new TurnDetail(DetailKind.Command, "true", { tool: "execute", status: "completed" }, `acp-tool-${id}`));
       case "pi":
-        return [new TurnDetail(DetailKind.Command, "bash", { tool: "bash", input: { command: "true" }, toolUseId: `pi-${id}`, ...reports }, `pi-${id}`),
+        return new ToolCall(new TurnDetail(DetailKind.Command, "bash", { tool: "bash", input: { command: "true" }, toolUseId: `pi-${id}`, ...reports }, `pi-${id}`),
           new TurnDetail(DetailKind.Command, "bash", { tool: "bash", input: { command: "true" }, toolUseId: `pi-${id}`, output: String.empty, isError: false },
-            `pi-${id}`)];
+            `pi-${id}`));
     }
   }
 
-  private static noteTool(shape: NoteToolShape): readonly [TurnDetail, TurnDetail] {
+  private static noteTool(shape: NoteToolShape): ToolCall {
     switch (shape) {
       case "acp-move":
       case "acp-delete": {
         const tool = shape === "acp-move" ? "move" : "delete";
-        return [new TurnDetail(DetailKind.Note, tool, { tool, status: "in_progress", files: [] }, "acp-tool-note"),
-          new TurnDetail(DetailKind.Note, tool, { tool, status: "completed", files: [] }, "acp-tool-note")];
+        return new ToolCall(new TurnDetail(DetailKind.Note, tool, { tool, status: "in_progress", files: [] }, "acp-tool-note"),
+          new TurnDetail(DetailKind.Note, tool, { tool, status: "completed", files: [] }, "acp-tool-note"));
       }
       case "codex-mcp":
-        return [new TurnDetail(DetailKind.Note, "fs/write_file", { server: "fs", tool: "write_file", status: "inProgress" }, "codex-mcp"),
-          new TurnDetail(DetailKind.Note, "fs/write_file", { server: "fs", tool: "write_file", status: "completed" }, "codex-mcp")];
+        return new ToolCall(new TurnDetail(DetailKind.Note, "fs/write_file", { server: "fs", tool: "write_file", status: "inProgress" }, "codex-mcp"),
+          new TurnDetail(DetailKind.Note, "fs/write_file", { server: "fs", tool: "write_file", status: "completed" }, "codex-mcp"));
       case "claude-mcp":
-        return [new TurnDetail(DetailKind.Note, "write_file", { tool: "mcp__fs__write_file", input: {}, toolUseId: "use-mcp" }, "claude-mcp"),
-          new TurnDetail(DetailKind.Note, String.empty, { toolUseId: "use-mcp", isError: false }, "claude-mcp-result")];
+        return new ToolCall(new TurnDetail(DetailKind.Note, "write_file", { tool: "mcp__fs__write_file", input: {}, toolUseId: "use-mcp" }, "claude-mcp"),
+          new TurnDetail(DetailKind.Note, String.empty, { toolUseId: "use-mcp", isError: false }, "claude-mcp-result"));
       case "pi-mcp":
-        return [new TurnDetail(DetailKind.Note, "write_file", { tool: "fs_write_file", input: {}, toolUseId: "pi-mcp" }, "pi-mcp"),
-          new TurnDetail(DetailKind.Note, "write_file", { tool: "fs_write_file", input: {}, toolUseId: "pi-mcp", output: String.empty, isError: false }, "pi-mcp")];
+        return new ToolCall(new TurnDetail(DetailKind.Note, "write_file", { tool: "fs_write_file", input: {}, toolUseId: "pi-mcp" }, "pi-mcp"),
+          new TurnDetail(DetailKind.Note, "write_file", { tool: "fs_write_file", input: {}, toolUseId: "pi-mcp", output: String.empty, isError: false }, "pi-mcp"));
     }
   }
 
@@ -243,6 +256,36 @@ export class OutsideChangesTests {
       utimesSync(path, time, time);
   }
 
+  private static readingsOf(readings: Readonly<Record<string, JsonValue>>, folder: string, paths: readonly string[]): string {
+    return `The reply listed changes of its own; readings: ${JSON.stringify({ ...readings, folderAtCheck: OutsideChangesTests.stampOf(folder),
+      slack: Resources.toolWindowSlackMilliseconds, paths: paths.map(t => [t, OutsideChangesTests.stampOf(t)]) })}`;
+  }
+
+  private static outcomeOf(path: string): JsonValue {
+    try {
+      const stats = statSync(path, { throwIfNoEntry: false });
+      return Object.isUndefined(stats) ? OutsideChangesTests.MISSING : [stats.mtimeMs, stats.ctimeMs];
+    }
+    catch (error) {
+      return Resources.formatFailureReason(error);
+    }
+  }
+
+  private static stampOf(path: string): JsonValue {
+    try {
+      for (let current = path; ; current = dirname(current)) {
+        const stats = statSync(current, { throwIfNoEntry: false });
+        if (!Object.isUndefined(stats))
+          return [current, stats.mtimeMs, stats.ctimeMs];
+        if (dirname(current) === current)
+          return null;
+      }
+    }
+    catch (error) {
+      return Resources.formatFailureReason(error);
+    }
+  }
+
   private static ownChanges(reply: Message): MessageDetail | undefined {
     return reply.details.find(t => t.kind === DetailKind.FileChange && t.text.startsWith(Resources.formatWorkingTreeChanges(String.empty)));
   }
@@ -255,11 +298,11 @@ export class OutsideChangesTests {
   private static pathsOf(detail: MessageDetail | undefined, field: string): readonly string[] {
     const payload = detail?.payload;
     const files = OutsideChangesTests.isJsonObject(payload) ? payload[field] : undefined;
-    return Array.isArray(files) ? files.filter((t): t is string => typeof t === "string") : [];
+    return Array.isArray(files) ? files.filter((t): t is string => Object.isString(t)) : [];
   }
 
   private static isJsonObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return Object.isObject(value) && !Array.isArray(value);
   }
 
   private static async send(host: CoreHost, conversationId: string): Promise<Message> {
