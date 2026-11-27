@@ -120,7 +120,8 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Explorer:** Organizations come right after Pinned, before Projects and Chats, and the section headers stand as tall and as close to each other as New chat, Open folder and Open browser (#150, #43).
 - **The first launch's Skip for now and Continue:** they sit in a footer along the Providers tab's bottom edge, so they stay in view on a short window while the providers scroll above them (#350).
 - **A served call's approval card:** under its title, a card for a Git, GitHub or other module call that TeamRun serves names the module, the tool, the teammate and its chat, such as `Git · git_commit · Codex in "Gemini folder trust"`, as the approved design draws it (#19).
-- **Git 0.0.6:** TeamRun takes the Git and GitHub modules at 0.0.6, on Noldova Desktop 0.0.11 like TeamRun itself (#342).
+- **Git 0.0.6:** TeamRun takes the Git and GitHub modules at 0.0.6 (#342).
+- **Noldova Desktop 0.0.14, Browser 0.0.6, Terminal 0.0.7, `@noldova/ui.components.angular` 0.0.31 and Noldova's `context` packages 0.0.12:** TeamRun is built on these versions (#336, #469, #496, #503, #448, #470, #488, #341, #355, #363, #370, #422, #473, #167, #193, #328, #453).
 
 ## 0.0.8
 
