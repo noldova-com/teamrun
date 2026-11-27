@@ -6,8 +6,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import { DOCUMENT, Injector, type Provider } from "@angular/core";
 import type { ComponentFixture } from "@angular/core/testing";
 import type { Router } from "@angular/router";
+import { SiteStageService } from "@noldova/ui.components.angular/site";
 import { page } from "vitest/browser";
 
 import "@noldova/context.core";
@@ -26,6 +28,11 @@ export class DocsFixture {
 
   private static readonly POLL_INTERVAL: number = 1;
   private static readonly POLL_LIMIT: number = 15_000;
+
+  public static stageAt(hostname: string): Provider {
+    const service = Injector.create({ providers: [{ provide: DOCUMENT, useValue: { defaultView: { location: { hostname } } } }, SiteStageService] }).get(SiteStageService);
+    return { provide: SiteStageService, useValue: service };
+  }
 
   public static host(fixture: ComponentFixture<unknown>): HTMLElement {
     const host: unknown = fixture.nativeElement;

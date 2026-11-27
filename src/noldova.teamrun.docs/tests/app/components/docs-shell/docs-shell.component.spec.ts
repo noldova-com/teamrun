@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import type { Provider } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router, provideRouter, withComponentInputBinding } from "@angular/router";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
@@ -35,8 +36,8 @@ class FrameLink {
 }
 
 describe("DocsShellComponent", () => {
-  const renderAsync = async (url: string): Promise<ComponentFixture<DocsShellComponent>> => {
-    TestBed.configureTestingModule({ providers: [provideRouter([...routes, SamplePageFixture.ROUTE], withComponentInputBinding()), provideMarkdown(), TooltipFixture.atOnce] });
+  const renderAsync = async (url: string, providers: readonly Provider[] = []): Promise<ComponentFixture<DocsShellComponent>> => {
+    TestBed.configureTestingModule({ providers: [provideRouter([...routes, SamplePageFixture.ROUTE], withComponentInputBinding()), provideMarkdown(), TooltipFixture.atOnce, ...providers] });
     const fixture = TestBed.createComponent(DocsShellComponent);
     await TestBed.inject(Router).navigateByUrl(url);
     await fixture.whenStable();
@@ -509,6 +510,20 @@ describe("DocsShellComponent", () => {
       expect(header.getBoundingClientRect().top).toBe(0);
     });
   });
+
+  for (const stage of ["sandbox", "staging"] as const)
+    it(`gives the header's and footer's links to TeamRun's website at the ${stage} stage, and leaves the docs site's own and other sites' links as they are`, async () => {
+      const host = DocsFixture.host(await renderAsync("/", [DocsFixture.stageAt(`teamrun.${stage}.noldova.dev`)]));
+      const header = DocsFixture.one(host, "nol-site-header");
+      const website = `https://teamrun.${stage}.noldova.com`;
+
+      expect(DocsFixture.all(header, ".nol-site-nav-link").map(t => t.getAttribute("href"))).toEqual([`${website}/`, "/release-notes"]);
+      expect(DocsFixture.one(header, ".nol-site-download").getAttribute("href")).toBe(`${website}/download/`);
+      expect(DocsFixture.all(header, ".nol-site-social").map(t => t.getAttribute("href"))).toEqual(["https://github.com/noldova-com/teamrun", "https://x.com/noldova"]);
+      expect(DocsFixture.all(DocsFixture.one(host, "nol-site-footer"), ".nol-site-footer-group a").map(t => t.getAttribute("href"))).toEqual([
+        `${website}/`, `${website}/download/`, "/release-notes", "https://github.com/noldova-com/teamrun/issues", `${website}/privacy/`, "https://github.com/noldova-com/teamrun", "https://x.com/noldova"
+      ]);
+    });
 
   it("sets the root's header height as it first renders, before a frame lets the header's size be observed", () => {
     const root = document.documentElement;

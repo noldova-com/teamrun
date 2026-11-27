@@ -7,7 +7,7 @@ LICENSE file in the root directory of this source tree.
 -->
 
 <nol-site-header #header [wordmark]="resources.wordmarkFile" [name]="resources.siteName" [homeHref]="resources.homeLink" [version]="version" [versionHref]="releaseNotesLink"
-  [links]="links()" [social]="social" [downloadHref]="resources.downloadLink" [wide]="true" [contentId]="resources.mainId"
+  [links]="links()" [social]="social" [downloadHref]="downloadLink" [wide]="true" [contentId]="resources.mainId"
   [(menuOpen)]="isSiteMenuOpen" [(searchOpen)]="isSearchOpen" (click)="followLink($event)">
   <nol-docs-search nolSiteSearch />
 </nol-site-header>
