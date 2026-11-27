@@ -161,6 +161,6 @@ Pi can't report plan usage, show sub-agents or run background commands in TeamRu
 
 ## Still stuck?
 
-Ask on [TeamRun's GitHub issues](https://github.com/noldova-com/teamrun/issues), for help, ideas and bug reports.
+Ask for help, share an idea or report a bug in [TeamRun's GitHub issues](https://github.com/noldova-com/teamrun/issues).
 When reporting a problem, include your TeamRun version, operating system and steps to reproduce it.
 Remove personal information and credentials from screenshots or logs.
