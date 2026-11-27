@@ -6,6 +6,22 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+### Fixed
+
+- **Claude Code:** quitting while TeamRun reads Claude Code's models, account or plan usage stops those Claude Code processes and every Claude chat at once, waiting at most the interrupt timeout for each to answer its stop before ending it, rather than waiting for good, one after another (#222).
+- **Claude Code:** a background task that ends while a chat's query stops for other settings starts no wake turn on that query (#216).
+- **Claude Code:** a turn with other settings, such as another model, starts its new query only once the open one has stopped, waiting for its tasks' stops up to the interrupt timeout, so two Claude Code processes never hold the chat's session at once; a Claude Code process that doesn't answer the stop is closed once the interrupt timeout passes, and quitting stops every Claude chat at once rather than one after another (#44, #71).
+- **ACP agents:** when the next turn of a chat can't take the agent session it kept, because the turn's tools can't be served, the session's tools access ends and its agent process is stopped, rather than both staying until TeamRun restarts (#73).
+- **Organization:** a teammate is told who reports to it: its Organization line names everyone whose manager it is: a department one of them leads, with its leader, a department with no leader with its teammates who report to it, and each other teammate by name, or says no one reports to it; and `teamrun_list_teammates` gives each teammate's department and manager in each organization (#206).
+- **Providers:** Muse Code's sign-in reads the same everywhere: What each provider can do and the Providers page say the provider's **Sign in** runs `muse login` in a terminal, as its sign-in notice does, and no longer that TeamRun doesn't run it (#199).
+- **Providers:** Cancel in the add panel during a type's install no longer adds the provider once the install ends; pressing Add or Try again twice installs and adds the type once; and an install that ends without finishing shows its reason in the panel (#76).
+
+### Changed
+
+- **Default layout:** a fresh install and Reset the layout show Pages second in the right dock, after Background tasks, so it shows at the default window size of 1280×800; Git, now third, waits behind Show all tabs there (#111).
+
+## 0.0.9
+
 ### New
 
 - **Organization:** the Organization view is the Tree alone: the Board, Focus, the View switch and the list of Organization chats beside the chat are gone, and a layout kept with them opens the Tree.
@@ -38,12 +54,6 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Fixed
 
-- **Claude Code:** quitting while TeamRun reads Claude Code's models, account or plan usage stops those Claude Code processes and every Claude chat at once, waiting at most the interrupt timeout for each to answer its stop before ending it, rather than waiting for good, one after another (#222).
-- **Claude Code:** a background task that ends while a chat's query stops for other settings starts no wake turn on that query (#216).
-- **Claude Code:** a turn with other settings, such as another model, starts its new query only once the open one has stopped, waiting for its tasks' stops up to the interrupt timeout, so two Claude Code processes never hold the chat's session at once; a Claude Code process that doesn't answer the stop is closed once the interrupt timeout passes, and quitting stops every Claude chat at once rather than one after another (#44, #71).
-- **ACP agents:** when the next turn of a chat can't take the agent session it kept, because the turn's tools can't be served, the session's tools access ends and its agent process is stopped, rather than both staying until TeamRun restarts (#73).
-- **Organization:** a teammate is told who reports to it: its Organization line names everyone whose manager it is: a department one of them leads, with its leader, a department with no leader with its teammates who report to it, and each other teammate by name, or says no one reports to it; and `teamrun_list_teammates` gives each teammate's department and manager in each organization (#206).
-- **Providers:** Muse Code's sign-in reads the same everywhere: What each provider can do and the Providers page say the provider's **Sign in** runs `muse login` in a terminal, as its sign-in notice does, and no longer that TeamRun doesn't run it (#199).
 - **Approvals:** an added ACP agent's command approval whose title is its own command shows it with control and direction characters replaced and cut at the usual length, like every other approval (#187).
 - **Chats:** a reply that ends while the window has lost touch with TeamRun shows as ended once the window reads its state again: the composer reloads its models, and the Organization view and the teammate dialog see the reply end (#66).
 - **Chats:** a reply that ends while the window reads its state again is counted once: an Organization chat no longer shows two unread for one reply, and the composer reloads its models once (#182).
@@ -52,7 +62,6 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **Windows:** an added ACP agent's own command, its terminal commands and a shared stdio MCP server named without a folder are found only through `PATH`, never in the chat's folder, and refused when `PATH` doesn't hold them; the MCP launcher's watch runs Windows PowerShell from the system folder, in that folder (#186).
   Programs TeamRun starts, and the batch files and programs they start in turn, find such a command only on `PATH` too, and a batch file runs through `COMSPEC` only when it is an absolute path.
 - **Runtime:** a failure of the page server or of a shared MCP sign-in's listener after it starts is logged instead of ending Noldova Desktop's runtime; an attached file whose close fails after its copy keeps the copy; a page whose save fails to commit keeps the copy of the version still saved; and an outside session's wait reads its replies no more once it ends (#90).
-- **Providers:** Cancel in the add panel during a type's install no longer adds the provider once the install ends; pressing Add or Try again twice installs and adds the type once; and an install that ends without finishing shows its reason in the panel (#76).
 - **Organization:** a first message to a teammate whose Organization chat has just opened is sent, rather than Send staying unavailable while the window reads its chats again (#156).
 - **Organization:** the chat beside the tree shows a teammate's new Organization chat, your message and its reply, once the window has read its chats again, rather than staying empty (#175).
 - **Organization:** a message to a teammate still answering waits as Pending behind that reply and is sent when it ends, for one teammate and for each recipient of a group, whatever "while replying" says (#147).
@@ -85,8 +94,6 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **A reply's approvals:** an approval decided, withdrawn or asked just as a teammate's reply ends no longer puts the ended reply back to Running for good (#143).
 - **A chat tab's place:** a chat moved to another project, or from Chats into one, now shows its new project in its tab's breadcrumb, rather than the old one (#152).
 - **Claude Code on macOS:** a Claude Code signed in the usual way is listed as signed in, and its turns run, rather than showing `Sign-in required` (#338).
-- **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).
-- **A sub-agent's or command's wake:** when a sub-agent or a background command of a chat ends and wakes it, the chat shows a closed row naming the work and how it ended, such as `Sub-agent "Search" ended as completed ›`, rather than a message with its IDs; opening the row shows its summary or the command's last lines, and one TeamRun restarted before says it was stopped or didn't come back (#300).
 - **A chat's mentioned teammate:** a chat whose next answer goes to a teammate, after a message that mentions one, keeps that teammate when you open another chat or the new chat, or come back to it; the composer's settings no longer replace it with the default teammate, and a mode picked there is that teammate's mode (#326).
 - **Ending a sub-agent's processes on Windows:** a stop, deleting the chat, quitting, a sign-out or the provider's exit ends what a kept sub-agent started even when TeamRun's PowerShell stalls, within seconds rather than leaving it running (#309).
 - **Editing a waiting message:** an edit whose mentions aren't the teammates its new text names is refused when it's made, and the message stays as it was, rather than being saved and failing later as changed mentions when it's sent (#371).
@@ -104,7 +111,6 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ### Changed
 
-- **Default layout:** a fresh install and Reset the layout show Pages second in the right dock, after Background tasks, so it shows at the default window size of 1280×800; Git, now third, waits behind Show all tabs there (#111).
 - **Updates:** TeamRun's Linux AppImage and Debian package are signed for the update feed.
   On Linux, TeamRun installs only an update signed with its own key (#196).
 - **Codex:** the Codex chats TeamRun starts no longer show in the Codex and ChatGPT apps' recent chats, and TeamRun still continues them after a restart; to do this, TeamRun downloads the app server Codex publishes for your installed version, checked against its SHA-256, until Codex's own `codex app-server` can do it.
@@ -115,6 +121,16 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 - **The first launch's Skip for now and Continue:** they sit in a footer along the Providers tab's bottom edge, so they stay in view on a short window while the providers scroll above them (#350).
 - **A served call's approval card:** under its title, a card for a Git, GitHub or other module call that TeamRun serves names the module, the tool, the teammate and its chat, such as `Git · git_commit · Codex in "Gemini folder trust"`, as the approved design draws it (#19).
 - **Git 0.0.6:** TeamRun takes the Git and GitHub modules at 0.0.6, on Noldova Desktop 0.0.11 like TeamRun itself (#342).
+
+## 0.0.8
+
+### Fixed
+
+- **A chat's wake:** when work a chat sent to another chat ends, the chat shows a closed row, `Received a message from <chat> ›`, at the top of the reply it starts, rather than a message that read as the other teammate answering there, with the chat's IDs and a hint meant for the teammate; the chat's name opens that chat, and opening the row shows the replies; a wake that started no turn shows why below its row, one whose work never came back reads `No reply came back from <chat> ›`, and wakes from earlier versions show as the same row; deleting a chat whose replies already came back no longer drops them: they are delivered as received from a deleted chat and start the asking chat's turn (#296).
+- **A sub-agent's or command's wake:** when a sub-agent or a background command of a chat ends and wakes it, the chat shows a closed row naming the work and how it ended, such as `Sub-agent "Search" ended as completed ›`, rather than a message with its IDs; opening the row shows its summary or the command's last lines, and one TeamRun restarted before says it was stopped or didn't come back (#300).
+
+### Changed
+
 - **Noldova Desktop 0.0.10, `@noldova/ui.components.angular` 0.0.20 and Noldova's `context` packages 0.0.9:** TeamRun is built on these versions (#283, #288, #305, #314).
 
 ## 0.0.7
