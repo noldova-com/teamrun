@@ -80,7 +80,7 @@ export class OrganizationChatMentionsTests {
     const builder = await OrganizationChatMentionsTests.teammateAsync(host, "Builder");
     const reviewer = await OrganizationChatMentionsTests.teammateAsync(host, "Reviewer");
     const chat = await OrganizationChatMentionsTests.chatAsync(host, builder);
-    host.adapter.turnTexts = [["Done, @Reviewer please look."]];
+    host.adapter.turnTexts = [["@Reviewer please look, done."]];
 
     await host.engine.sendAsync(new MessageSendParams(chat.id, "Make the change.", null, null, [], [], builder.id));
     await host.engine.waitForIdle();
