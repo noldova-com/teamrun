@@ -18,6 +18,7 @@
   ],
   "scripts": {
     "probe:windows": "node probe/windows.mjs",
+    "probe:test": "node probe/run.mjs --no-sampler --ci-env",
     "build": "node scripts/installs/root-install.ts && node scripts/build.ts",
     "build:app": "node scripts/app.ts build",
     "build:docs": "npm run docs:build --workspace src/noldova.teamrun.docs",
