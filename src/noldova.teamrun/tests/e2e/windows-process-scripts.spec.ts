@@ -23,7 +23,7 @@ const LINE_BREAK = /\r?\n/;
 const STARTED_BY = / \(started by \d+\)$/;
 const DIGITS = /^\d+$/;
 const KEEP_SCRIPT = "setInterval(() => undefined, 1000)";
-const HOLDER_SCRIPT = "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", process.argv[1], process.argv[2]], { stdio: \"ignore\" }); "
+const HOLDER_SCRIPT = "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", process.argv[1], process.argv[2]], { stdio: \"ignore\", detached: true }); child.unref(); "
   + "process.stdout.write(String(child.pid) + String.fromCharCode(10)); setInterval(() => undefined, 1000)";
 
 const runs = (pid: number): boolean => {
