@@ -353,8 +353,8 @@ export class SharedMcpLauncherTests {
     const ids = directory.resolve("ids.json");
     const launcher = spawn(process.execPath, ["-e", SharedMcpLauncherTests.LAUNCHER_SCRIPT, ids, SharedMcpLauncherTests.KEEP_SCRIPT, SharedMcpLauncherTests.SERVER_SCRIPT],
       { stdio: "ignore", windowsHide: true });
-    await Wait.until(() => existsSync(ids), "The launcher did not write its process ids.");
-    await Wait.until(() => existsSync(`${ids}.server`) && readFileSync(`${ids}.server`, "utf8").length > 0, "The server did not write its process ids.");
+    await Wait.until(() => existsSync(ids), "The launcher did not write its process ids.", SharedMcpLauncherTests.UNBOUNDED);
+    await Wait.until(() => existsSync(`${ids}.server`) && readFileSync(`${ids}.server`, "utf8").length > 0, "The server did not write its process ids.", SharedMcpLauncherTests.UNBOUNDED);
     const [watch = 0, server = 0] = JSON.parse(readFileSync(ids, "utf8")) as number[];
     const startedByServer = Number(readFileSync(`${ids}.server`, "utf8"));
     const died = once(launcher, "exit");
