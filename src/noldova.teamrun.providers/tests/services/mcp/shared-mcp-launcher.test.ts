@@ -47,7 +47,7 @@ export class SharedMcpLauncherTests {
   private static readonly LAUNCHER_SCRIPT: string = "const [file, keep, server] = process.argv.slice(1); const { spawn } = require(\"node:child_process\"); "
     + "const watch = spawn(process.execPath, [\"-e\", keep], { stdio: \"ignore\", detached: true }); "
     + "const child = spawn(process.execPath, [\"-e\", server, `${file}.server`, keep], { stdio: \"ignore\" }); "
-    + "require(\"node:fs\").writeFileSync(file, JSON.stringify([watch.pid, child.pid])); setInterval(() => undefined, 1000)";
+    + "require(\"node:fs\").writeFileSync(file, `${watch.pid} ${child.pid}${String.fromCharCode(10)}`); setInterval(() => undefined, 1000)";
 
   @TestMethod
   public async doesNothingWhenItsScriptIsOnlyLoaded(): Promise<void> {
@@ -350,12 +350,12 @@ export class SharedMcpLauncherTests {
     if (process.platform !== "win32")
       return;
     using directory = new TemporaryDirectory();
-    const ids = directory.resolve("ids.json");
+    const ids = directory.resolve("ids.txt");
     const launcher = spawn(process.execPath, ["-e", SharedMcpLauncherTests.LAUNCHER_SCRIPT, ids, SharedMcpLauncherTests.KEEP_SCRIPT, SharedMcpLauncherTests.SERVER_SCRIPT],
       { stdio: "ignore", windowsHide: true });
-    await Wait.until(() => existsSync(ids), "The launcher did not write its process ids.");
-    await Wait.until(() => existsSync(`${ids}.server`) && readFileSync(`${ids}.server`, "utf8").length > 0, "The server did not write its process ids.");
-    const [watch = 0, server = 0] = JSON.parse(readFileSync(ids, "utf8")) as number[];
+    await Wait.until(() => existsSync(ids) && readFileSync(ids, "utf8").endsWith("\n"), "The launcher did not write its process ids.", SharedMcpLauncherTests.UNBOUNDED);
+    await Wait.until(() => existsSync(`${ids}.server`) && readFileSync(`${ids}.server`, "utf8").length > 0, "The server did not write its process ids.", SharedMcpLauncherTests.UNBOUNDED);
+    const [watch = 0, server = 0] = readFileSync(ids, "utf8").trimEnd().split(" ").map(Number);
     const startedByServer = Number(readFileSync(`${ids}.server`, "utf8"));
     const died = once(launcher, "exit");
     launcher.kill();
