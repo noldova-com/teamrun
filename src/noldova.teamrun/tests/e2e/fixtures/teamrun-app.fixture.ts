@@ -19,11 +19,11 @@ import type { IDesktopBridge } from "../interfaces/i-desktop-bridge.ts";
 import type { ITeamRunFixtures } from "../interfaces/i-team-run-fixtures.ts";
 import { CodexDouble } from "./codex-double.ts";
 import { CodexShim } from "./codex-shim.ts";
-import { HolderListing } from "./holder-listing.ts";
 import { PollTiming } from "./poll-timing.ts";
 import { ProcessStatus } from "./process-status.ts";
 import { StartedProcess } from "./started-process.ts";
 import { WindowSize } from "./window-size.ts";
+import { WindowsProcesses } from "./windows-processes.ts";
 
 declare global {
   interface Window {
@@ -64,39 +64,14 @@ export class TeamRunApp {
   private static readonly RUNTIME_ENTRY: string = "/desktop.runtime/services/runtime-entry.js";
   private static readonly DATA_ARGUMENT: string = "--data-dir";
   private static readonly ZOMBIE: string = "Z";
-  private static readonly NO_SESSION: number = -1;
-  private static readonly WINDOWS_PROCESSES_QUERY: string = "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | ForEach-Object { " +
-    "[pscustomobject]@{ pid = $_.ProcessId; parent = $_.ParentProcessId; name = $_.Name; start = [string]$_.CreationDate.ToUniversalTime().Ticks; command = [string]$_.CommandLine } })";
   private static readonly MAC_PROCESS_STATUS: string = "/bin/ps";
   private static readonly MAC_STATUS_ARGUMENTS: readonly string[] = ["-axww", "-o", "pid=,ppid=,pgid=,stat=,lstart=,ucomm="];
   private static readonly MAC_COMMAND_ARGUMENTS: readonly string[] = ["-axww", "-o", "pid=,args="];
   private static readonly MAC_STATUS_LINE: RegExp = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+([A-Z][a-z]{2} [A-Z][a-z]{2} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4})\s+(.*?)\s*$/;
   private static readonly MAC_COMMAND_LINE: RegExp = /^\s*(\d+) (.*)$/;
-  private static readonly WORK_VARIABLE: string = "TEAMRUN_E2E_WORK";
-  private static readonly HOLDERS_WAIT_SECONDS: number = 10;
-  private static readonly HOLDERS_EXIT_MILLISECONDS: number = 5_000;
   private static readonly HOLDERS_TIMEOUT: number = 60_000;
   private static readonly UNWRITTEN_CODES: readonly string[] = ["ENOENT", "EBUSY", "EPERM"];
   private static readonly PROCESSES_BUFFER: number = 64 * 1024 * 1024;
-  private static readonly HOLDERS_QUERY: string = `$ErrorActionPreference = "Stop"; $held = @(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and $_.CommandLine.IndexOf($env:${TeamRunApp.WORK_VARIABLE}, [StringComparison]::OrdinalIgnoreCase) -ge 0 })`;
-  private static readonly HOLDERS_LIST: string = "$held | ForEach-Object { \"$($_.ProcessId) $($_.Name)\" }";
-  private static readonly HOLDERS_END: string = [
-    `if ($held.Count -gt 0) { Wait-Process -Id $held.ProcessId -Timeout ${TeamRunApp.HOLDERS_WAIT_SECONDS} -ErrorAction SilentlyContinue }`,
-    "$seen = @{}",
-    "function Test-Running($listed) { @(Get-CimInstance Win32_Process -Filter \"ProcessId = $($listed.ProcessId)\" | Where-Object { $_.CreationDate -eq $listed.CreationDate }).Count -gt 0 }",
-    "function Stop-Listed($listed, $by) { $id = $listed.ProcessId; $key = \"$id $($listed.CreationDate.Ticks)\"; if ($seen.ContainsKey($key)) { return }; $seen[$key] = $true" +
-      "; $process = Get-Process -Id $id -ErrorAction SilentlyContinue" +
-      "; try { if ($process) { $null = $process.Handle; if ([Math]::Abs(($process.StartTime - $listed.CreationDate).TotalMilliseconds) -lt 1) { $process.Kill()" +
-      `; if (-not $process.WaitForExit(${TeamRunApp.HOLDERS_EXIT_MILLISECONDS})) { throw "it still ran ${TeamRunApp.HOLDERS_EXIT_MILLISECONDS} ms after it was stopped" }` +
-      "; \"stopped $id $($listed.Name)$by\" }" +
-      " elseif (Test-Running $listed) { \"not stopped $id $($listed.Name)$($by): its start time differs from the listing's\"; return } } }" +
-      " catch { if (Test-Running $listed) { \"not stopped $id $($listed.Name)$($by): $($_.Exception.Message)\"; return } }" +
-      "; $near = @(Get-CimInstance Win32_Process -Filter \"ProcessId = $id OR ParentProcessId = $id\")" +
-      "; $before = @($near | Where-Object { $_.ProcessId -eq $id -and $_.CreationDate -ne $listed.CreationDate } | ForEach-Object { $_.CreationDate }) + [DateTime]::MaxValue" +
-      "; $near | Where-Object { $_.ParentProcessId -eq $id -and $_.CreationDate -ge $listed.CreationDate -and $_.CreationDate -lt $before[0] }" +
-      " | ForEach-Object { Stop-Listed $_ \" (started by $id)\" } }",
-    "$held | ForEach-Object { Stop-Listed $_ \"\" }"
-  ].join("; ");
 
   public readonly work: string;
   public readonly home: string;
@@ -321,24 +296,11 @@ export class TeamRunApp {
 
   private static statusesOf(pids: readonly number[] | null): readonly ProcessStatus[] {
     if (process.platform === "win32" || process.platform === "darwin") {
-      const listed = process.platform === "win32" ? TeamRunApp.windowsProcesses() : TeamRunApp.macProcesses();
+      const listed = process.platform === "win32" ? WindowsProcesses.list() : TeamRunApp.macProcesses();
       return Object.isNull(pids) ? listed : listed.filter(t => pids.includes(t.pid));
     }
     const all = pids ?? readdirSync(TeamRunApp.PROCESSES).filter(t => /^\d+$/.test(t)).map(Number);
     return all.map(t => TeamRunApp.statusOf(t)).filter(t => !Object.isNull(t));
-  }
-
-  private static windowsProcesses(): readonly ProcessStatus[] {
-    const result = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", TeamRunApp.WINDOWS_PROCESSES_QUERY],
-      { encoding: "utf8", timeout: TeamRunApp.HOLDERS_TIMEOUT, killSignal: "SIGKILL", maxBuffer: TeamRunApp.PROCESSES_BUFFER });
-    if (result.status !== 0)
-      throw new Error(`Listing the processes failed with ${result.status}: ${result.error?.message ?? (result.stderr ?? "").trim()}`);
-    const parsed: unknown = JSON.parse(result.stdout);
-    if (!Array.isArray(parsed))
-      throw new Error("Listing the processes gave no list.");
-    const listed: readonly unknown[] = parsed;
-    return listed.filter(TeamRunApp.isRecord).map(t => new ProcessStatus(Number(t["pid"]), String(t["name"]), String(t["start"]), Number(t["parent"]), TeamRunApp.NO_SESSION, "",
-      String(t["command"])));
   }
 
   private static macProcesses(): readonly ProcessStatus[] {
@@ -610,31 +572,21 @@ export class TeamRunApp {
     return readFileSync(log, "utf8").split(/\r?\n/).filter(t => t.startsWith(TeamRunApp.REFUSED_PREFIX)).map(t => t.slice(TeamRunApp.REFUSED_PREFIX.length));
   }
 
-  private static holdersOf(work: string, end: boolean): HolderListing {
-    const script = [TeamRunApp.HOLDERS_QUERY, end ? TeamRunApp.HOLDERS_END : TeamRunApp.HOLDERS_LIST].join("; ");
-    const result = spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", script],
-      { encoding: "utf8", env: { ...process.env, [TeamRunApp.WORK_VARIABLE]: work }, timeout: TeamRunApp.HOLDERS_TIMEOUT, killSignal: "SIGKILL" });
-    const lines = (result.stdout ?? "").split(/\r?\n/).map(t => t.trim()).filter(t => t !== "");
-    if (!Object.isUndefined(result.error))
-      return new HolderListing(lines, result.error.message);
-    return new HolderListing(lines, result.status === 0 ? null : `PowerShell ended with ${result.status}: ${(result.stderr ?? "").trim()}`);
-  }
-
   private removeHeldWork(): void {
     if (process.platform !== "win32") {
       TeamRunApp.removeWork(this.work);
       return;
     }
-    const ended = TeamRunApp.holdersOf(this.work, true);
+    const ended = WindowsProcesses.holdersOf(this.work, true);
     if (ended.lines.length > 0)
-      process.stdout.write(`What still named the work folder ${TeamRunApp.HOLDERS_WAIT_SECONDS} s after the app ended, and what it started: ${ended.lines.join(", ")}\n`);
+      process.stdout.write(`What still named the work folder ${WindowsProcesses.HOLDERS_WAIT_SECONDS} s after the app ended, and what it started: ${ended.lines.join(", ")}\n`);
     if (!Object.isNull(ended.failure))
       process.stdout.write(`Waiting for what names the work folder failed: ${ended.failure}\n`);
     try {
       TeamRunApp.removeWork(this.work);
     }
     catch (error) {
-      const holders = TeamRunApp.holdersOf(this.work, false);
+      const holders = WindowsProcesses.holdersOf(this.work, false);
       const named = Object.isNull(holders.failure) ? holders.lines.join(", ") || "none" : `unknown, since listing them failed: ${holders.failure}`;
       throw new Error(`${error instanceof Error ? error.message : String(error)}; the processes that still name the folder: ${named}`, { cause: error });
     }
