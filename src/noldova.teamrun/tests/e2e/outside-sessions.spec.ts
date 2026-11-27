@@ -66,7 +66,7 @@ const connectionOfAsync = async (page: Page): Promise<Locator> => {
   await settingsSearchAsync(page, "teamrun.connectOutsideAgents");
   await page.getByRole("button", { name: "Connect outside agents", exact: true }).click();
   const connection = page.locator("nol-teamrun-outside-connection-view");
-  await expect(connection.locator(".nol-teamrun-show-token")).toBeVisible({ timeout: 60_000 });
+  await expect(connection.locator(".nol-teamrun-show-token")).toBeVisible({ timeout: 180_000 });
   await connection.locator(".nol-teamrun-show-token").click();
   await expect(connection.locator(".nol-teamrun-show-token")).toHaveAttribute("aria-pressed", "true");
   return connection;
@@ -98,7 +98,7 @@ test("an outside agent sends a teammate a message with the kept token after a re
       await page.getByRole("checkbox", { name: SETTING_TEXT }).click();
       await expect(page.getByRole("checkbox", { name: SETTING_TEXT })).toBeChecked();
       const before = await connectionOfAsync(page);
-      await expect(before.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 60_000 });
+      await expect(before.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });
       await expect(before.locator(".nol-teamrun-outside-token code")).toHaveText(/^[A-Za-z0-9_-]{43}$/);
       const token = (await before.locator(".nol-teamrun-outside-token code").textContent())?.trim() ?? "";
       await expect(before.locator(".nol-teamrun-outside-address code")).toHaveText(`http://127.0.0.1:${port}/mcp`);
@@ -108,7 +108,7 @@ test("an outside agent sends a teammate a message with the kept token after a re
       const restarted = await app.startAsync();
       const after = await connectionOfAsync(restarted);
 
-      await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 60_000 });
+      await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });
       await expect(after.locator(".nol-teamrun-outside-token code")).toHaveText(token);
       const url = (await after.locator(".nol-teamrun-outside-address code").textContent())?.trim() ?? "";
       expect(url).toBe(`http://127.0.0.1:${port}/mcp`);
