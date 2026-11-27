@@ -13,7 +13,7 @@ import { constants } from "node:os";
 import path from "node:path";
 import { Duplex, PassThrough, Writable } from "node:stream";
 
-import { Assert, TestClass, TestData, TestMethod } from "@noldova/context.testing";
+import { Assert, Category, TestClass, TestData, TestMethod } from "@noldova/context.testing";
 import { Resources as ProtocolResources } from "@noldova/teamrun.protocol";
 import { SharedMcpLauncher } from "@noldova/teamrun.providers";
 
@@ -32,6 +32,9 @@ export class SharedMcpLauncherTests {
   private static readonly HANDED: string = "4321\n";
   private static readonly EXITED: string = "4321\nexited\n";
   private static readonly SELF_LISTED: string = "$self = ";
+  private static readonly MODULES: string = "modules ";
+  private static readonly LEAVING_SCRIPT: string = "const child = require(\"node:child_process\").spawn(process.execPath, [\"-e\", process.argv[2]], "
+    + "{ stdio: \"ignore\", detached: true }); require(\"node:fs\").writeFileSync(process.argv[1], String(child.pid)); child.unref()";
   private static readonly HOLD: string = "IFS= read -r go <&3 || exit 1; case $0 in */*) found=$0; [ -e \"$found\" ];; *) found=$(command -v \"$0\" 2>/dev/null);; esac "
     + "|| { echo missing >&3; exit 127; }; case $found in */*) [ -f \"$found\" ] && [ -x \"$found\" ] || { echo denied >&3; exit 126; };; esac; exec 3<&-; "
     + "exec /usr/bin/env";
@@ -516,6 +519,7 @@ export class SharedMcpLauncherTests {
     Assert.areEqual(JSON.stringify([[[-4321, "SIGTERM"], [-4321, "SIGKILL"]], [0]]), JSON.stringify([host.signals, host.codes]));
   }
 
+  @Category("ProcessListing")
   @TestMethod
   public async listsThisProcessUnderItsParentWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
     if (process.platform !== "win32")
@@ -535,6 +539,40 @@ export class SharedMcpLauncherTests {
 
     Assert.isTrue(listing.length > 0);
     Assert.areEqual(`${String(process.ppid)} 0`, answer.stdout.trim());
+  }
+
+  @Category("ProcessListing")
+  @TestMethod
+  public async endsWhatAnExitedServerStartedThroughItsWholeScriptWithoutLoadingAPowershellModuleOnWindows(): Promise<void> {
+    if (process.platform !== "win32")
+      return;
+    using directory = new TemporaryDirectory();
+    const pidFile = directory.resolve("child.pid");
+    const server = spawnSync(process.execPath, ["-e", SharedMcpLauncherTests.LEAVING_SCRIPT, pidFile, SharedMcpLauncherTests.KEEP_SCRIPT], { windowsHide: true });
+    const child = Number(readFileSync(pidFile, "utf8"));
+    try {
+      const host = new FakeLauncherHost();
+      host.pid = process.pid;
+      host.ppid = process.ppid;
+      const recorder = SharedMcpLauncherTests.recorder(SharedMcpLauncherTests.exiting(0));
+      const running = new SharedMcpLauncher("win32", { ...process.env }, "node", "launch.js", host, recorder.start).runAsync(true, ["--watch"]);
+      host.stdin.end(`${String(server.pid)}\n`);
+      await running;
+      const [powershell] = recorder.starts;
+      const script = Buffer.from(String(powershell?.args[3]), "base64").toString("utf16le");
+      const kept = SharedMcpLauncherTests.runs(child);
+
+      const answer = spawnSync(String(powershell?.command), ["-NoProfile", "-NonInteractive", "-Command",
+        `${script}; [Console]::Out.Write('${SharedMcpLauncherTests.MODULES}' + @(Get-Module).Count)`], { encoding: "utf8" });
+      await Wait.until(() => !SharedMcpLauncherTests.runs(child), "The exited server's child still ran.");
+
+      Assert.areEqual(JSON.stringify([0, false, true, 0, `${SharedMcpLauncherTests.MODULES}0`]),
+        JSON.stringify([server.status, SharedMcpLauncherTests.runs(Number(server.pid)), kept, answer.status, answer.stdout.trim()]));
+    }
+    finally {
+      if (SharedMcpLauncherTests.runs(child))
+        process.kill(child);
+    }
   }
 
   @TestMethod
