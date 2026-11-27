@@ -517,7 +517,7 @@ export class ConversationEngineTests {
   }
 
   @TestMethod
-  public async givesTheOrganizationRoleLineOnlyToTheChatsTeammateBeforeTheWholeMessageWithItsAttachmentAndMentions(): Promise<void> {
+  public async givesTheOrganizationRoleLineToTheChatsTeammateAloneBeforeTheWholeMessageWithItsAttachmentReadingNoMentionsOrIds(): Promise<void> {
     await using host = await CoreHost.createAsync();
     const grokProvider = await host.createProviderAsync("fake", "Grok");
     const benProvider = await host.createProviderAsync("fake", "Ben");
@@ -529,16 +529,15 @@ export class ConversationEngineTests {
     const result = await host.engine.sendAsync(new MessageSendParams(chat.id, "@Grok @Ben look", null, null,
       [new AttachmentInput("notes.txt", "text/plain", Buffer.from("notes").toString("base64"), null)], [grok.id, ben.id]));
     await host.engine.waitForIdle();
-    const saved = (await host.messages.findAsync(result.sent.id))?.attachments[0];
-    const promptOf = (providerId: string): string => host.adapter.requests.find(t => t.provider?.id === providerId)?.prompt ?? String.empty;
+    const sent = await host.messages.findAsync(result.sent.id);
+    const prompt = host.adapter.requests[0]?.prompt ?? String.empty;
     const role = Resources.formatOrganizationRole(Resources.organizationNoDepartment, Resources.organizationReportsToPerson, []);
 
-    Assert.areEqual(2, host.adapter.requests.length);
-    Assert.isTrue(promptOf(grokProvider.id).includes(Resources.formatOrganizationRolePrompt(role, "@Grok @Ben look")));
-    Assert.isFalse(promptOf(benProvider.id).includes(role));
-    Assert.areEqual("true true true true", [grokProvider, benProvider]
-      .flatMap(t => [promptOf(t.id).includes("@Ben look"), promptOf(t.id).includes(JSON.stringify(saved?.path ?? "missing"))]).join(" "));
-    Assert.areEqual("@Grok @Ben look", (await host.messages.findAsync(result.sent.id))?.details[0]?.text);
+    Assert.areEqual(grokProvider.id, host.adapter.requests.map(t => t.provider?.id).join(","));
+    Assert.isTrue(prompt.includes(Resources.formatOrganizationRolePrompt(role, "@Grok @Ben look")));
+    Assert.isTrue(prompt.includes(JSON.stringify(sent?.attachments[0]?.path ?? "missing")));
+    Assert.areEqual("@Grok @Ben look:", `${sent?.details[0]?.text ?? "missing"}:${sent?.mentions.map(t => t.teammateId).join(",") ?? "missing"}`);
+    Assert.isFalse((await host.messages.listAsync(new MessageListParams(chat.id, null))).some(t => t.teammateId === ben.id));
   }
 
   @TestMethod

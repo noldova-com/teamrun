@@ -363,6 +363,22 @@ describe("OrganizationChatComponent", () => {
     expect(changes.map(t => [t.kind, t.id])).toEqual([[OrganizationTarget.teammate("bob").kind, "bob"]]);
   });
 
+  it.each([
+    { title: "a department", target: OrganizationTarget.department("d1"), expected: [["org-alice", "alice"], ["org-bob", "bob"]] },
+    { title: "one teammate", target: OrganizationTarget.teammate("alice"), expected: [["org-alice", "alice"]] }
+  ])("sends a message to $title with an at-name as written, with no mentions, answered by each recipient", async ({ target, expected }) => {
+    kept = [chatOf("alice"), chatOf("bob")];
+    await create(target);
+
+    await type("When you're done, hand your change to @Bob.");
+    await Wait.until(() => expect(element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.disabled).toBe(false));
+    element().querySelector<HTMLButtonElement>(".nol-teamrun-composer-send")?.click();
+    await Wait.until(() => expect(sent()).toHaveLength(expected.length));
+
+    expect(sent().map(t => [t.chatId, t.responderTeammateId, t.text, t.mentionedTeammateIds]))
+      .toEqual(expected.map(([chat, teammate]) => [chat, teammate, "When you're done, hand your change to @Bob.", []]));
+  });
+
   it("still sends to the other recipients when one's send fails, keeps the text and its draft, and retries only the recipient it didn't reach", async () => {
     organization = SampleData.organizationOf([design], placed("alice", "bob", "reviewer"));
     kept = [chatOf("alice"), chatOf("bob"), chatOf("reviewer")];
