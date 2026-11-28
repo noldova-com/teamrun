@@ -37,6 +37,7 @@ export class GrokTestHost implements AsyncDisposable {
   public readonly hangingSignInTimings = new ProviderTimings(2000, 500, 10_000, 2000, 100, 100, 100, 4000, 100, 1, 10);
   public readonly stoppingTimings = new ProviderTimings(2000, 2000, 10_000, 2000, 10_000, 100, 100, 4000, 100, 1, 10);
   public readonly timer = new HeldDelayTimer(this.timings.killWait);
+  public readonly answerTimer = new HeldDelayTimer(this.timings.killWait, this.timings.requestTimeout, this.timings.initializeTimeout);
   public readonly idleTimer: ManualTimer = new ManualTimer();
   public readonly elapsedIdleTimer: ElapsedDelayTimer = new ElapsedDelayTimer(this.timings.idleLimit);
   public readonly info = new AppServerClientInfo("teamrun-tests", "TeamRun tests", "test");

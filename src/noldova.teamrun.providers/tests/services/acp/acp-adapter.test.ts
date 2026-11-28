@@ -1121,17 +1121,17 @@ export class AcpAdapterTests {
     const agent = new TestAcpAgent(host.command, AcpAdapterTests.environment(host, [], { agentCapabilities: { mcpCapabilities: { http: true } } }),
       host.directory.path);
     agent.sharedServerTransports = [SharedMcpTransport.Stdio, SharedMcpTransport.Http];
-    const adapter = host.createAcpAdapter(agent, starter, undefined, log);
+    const adapter = host.createAcpAdapter(agent, starter, undefined, log, host.answerTimer);
     const listener = new RecordingTurnListener();
     const tools = AcpAdapterTests.toolsOf();
 
     const result = await adapter.runTurn(new TurnRequest(null, host.directory.path, "launch", new RequestedSettings("grok", null, null), null, [], null,
       null, {}, false, tools, AcpAdapterTests.sharedServers), listener, new AbortController().signal);
 
+    Assert.areEqual(`${TurnOutcome.Completed} null`, `${result.outcome} ${result.error}`);
     const sent = readFileSync(host.directory.resolve("mcp-servers.txt"), "utf8").trimEnd();
     const bearer = [...sent.matchAll(/Bearer ([^"]+)"/gu)].at(-1)?.[1] ?? String.empty;
     const launch = new SharedMcpLaunch();
-    Assert.areEqual(TurnOutcome.Completed, result.outcome);
     Assert.areEqual(JSON.stringify([
       { name: "search", command: launch.program, args: [launch.script, "--variables", "TEAMRUN_TEST_SHARED_KEY,TEAMRUN_TEST_SHARED_UNSET", "--", "npx", "-y", "search-server"],
         env: [{ name: "TEAMRUN_TEST_SHARED_KEY", value: "key-value-4711" }, { name: "TEAMRUN_TEST_SHARED_UNSET", value: "" }, { name: "ELECTRON_RUN_AS_NODE", value: "1" }] },

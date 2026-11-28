@@ -100,50 +100,59 @@ export class GeneralAcpAdapterTests {
   }
 
   @TestMethod
-  public async answersTheAgentsTerminalRequestsAndFollowsNoTerminalThatEndedWithinItsToolCall(): Promise<void> {
-    await using host = new GrokTestHost();
-    const adapter = host.createAcpAdapter(new GeneralAcpAgent("devin", "Devin", host.command, {}, host.environment, host.directory.path));
-    const answersOf = async (prompt: string, listener: RecordingTurnListener): Promise<readonly JsonReader[]> => {
-      await adapter.runTurn(host.request(prompt), listener, new AbortController().signal);
-      return JsonReader.parse(listener.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join("")).readObjectArray("answers");
-    };
+  public async answersAWaitedTerminalsExitAndOutputAndFollowsNoTerminalThatEndedWithinItsToolCall(): Promise<void> {
+    const waited = new RecordingTurnListener();
+    const [created, exit, output, released] = await GeneralAcpAdapterTests.answersOfAsync("terminal-wait", waited);
+    Assert.areEqual(JSON.stringify([true, { exitCode: 3, signal: null }, "fixture done", false, { exitCode: 3, signal: null }, {}, 0]),
+      JSON.stringify([!Object.isUndefined(created?.readOptionalString("terminalId")), exit?.toJson(), output?.readString("output").trim(), output?.readBoolean("truncated"),
+        output?.readObject("exitStatus").toJson(), released?.toJson(), waited.taskStarts.length]));
+  }
 
-    try {
-      const waited = new RecordingTurnListener();
-      const [created, exit, output, released] = await answersOf("terminal-wait", waited);
-      Assert.areEqual(JSON.stringify([true, { exitCode: 3, signal: null }, "fixture done", false, { exitCode: 3, signal: null }, {}, 0]),
-        JSON.stringify([!Object.isUndefined(created?.readOptionalString("terminalId")), exit?.toJson(), output?.readString("output").trim(), output?.readBoolean("truncated"),
-          output?.readObject("exitStatus").toJson(), released?.toJson(), waited.taskStarts.length]));
+  @TestMethod
+  public async killsATerminalTheAgentAsksToKillAndFollowsNoTerminalThatEndedWithinItsToolCall(): Promise<void> {
+    const killed = new RecordingTurnListener();
+    const [, running, kill, ended, freed] = await GeneralAcpAdapterTests.answersOfAsync("terminal-kill", killed);
+    Assert.areEqual(JSON.stringify([false, {}, true, {}, 0]),
+      JSON.stringify([running?.hasField("exitStatus"), kill?.toJson(), ended?.hasField("exitCode"), freed?.toJson(), killed.taskStarts.length]));
+  }
 
-      const killed = new RecordingTurnListener();
-      const [, running, kill, ended, freed] = await answersOf("terminal-kill", killed);
-      Assert.areEqual(JSON.stringify([false, {}, true, {}, 0]),
-        JSON.stringify([running?.hasField("exitStatus"), kill?.toJson(), ended?.hasField("exitCode"), freed?.toJson(), killed.taskStarts.length]));
+  @TestMethod
+  public async answersATerminalWhoseCommandIsMissing(): Promise<void> {
+    const [made, failed, said, dropped] = await GeneralAcpAdapterTests.answersOfAsync("terminal-missing");
+    if (process.platform === "win32")
+      Assert.areEqual(JSON.stringify([-32602, Resources.formatCommandNotOnPath("teamrun-missing-command")]),
+        JSON.stringify([made?.readNullableInteger("code"), made?.readString("message")]));
+    else
+      Assert.areEqual(JSON.stringify([true, { exitCode: null, signal: null }, true, {}]), JSON.stringify([!Object.isUndefined(made?.readOptionalString("terminalId")),
+        failed?.toJson(), said?.readString("output").includes("ENOENT"), dropped?.toJson()]));
+  }
 
-      const [made, failed, said, dropped] = await answersOf("terminal-missing", new RecordingTurnListener());
-      if (process.platform === "win32")
-        Assert.areEqual(JSON.stringify([-32602, Resources.formatCommandNotOnPath("teamrun-missing-command")]),
-          JSON.stringify([made?.readNullableInteger("code"), made?.readString("message")]));
-      else
-        Assert.areEqual(JSON.stringify([true, { exitCode: null, signal: null }, true, {}]), JSON.stringify([!Object.isUndefined(made?.readOptionalString("terminalId")),
-          failed?.toJson(), said?.readString("output").includes("ENOENT"), dropped?.toJson()]));
+  @TestMethod
+  public async answersATerminalRequestWhoseOptionalFieldsAreNull(): Promise<void> {
+    const [opened, stopped, closed, unbound] = await GeneralAcpAdapterTests.answersOfAsync("terminal-nulls");
+    Assert.areEqual(JSON.stringify([true, {}, true, {}]), JSON.stringify([!Object.isUndefined(opened?.readOptionalString("terminalId")), stopped?.toJson(),
+      closed?.hasField("exitCode"), unbound?.toJson()]));
+  }
 
-      const [opened, stopped, closed, unbound] = await answersOf("terminal-nulls", new RecordingTurnListener());
-      Assert.areEqual(JSON.stringify([true, {}, true, {}]), JSON.stringify([!Object.isUndefined(opened?.readOptionalString("terminalId")), stopped?.toJson(),
-        closed?.hasField("exitCode"), unbound?.toJson()]));
+  @TestMethod
+  public async cutsATerminalsOutputAtItsLimitAndRefusesItOnceReleased(): Promise<void> {
+    const [, , cut, , gone] = await GeneralAcpAdapterTests.answersOfAsync("terminal-released");
+    Assert.areEqual(JSON.stringify(["é\n", true, -32602, true]),
+      JSON.stringify([cut?.readString("output"), cut?.readBoolean("truncated"), gone?.readNullableInteger("code"), gone?.readString("message").startsWith("TeamRun has no terminal ")]));
+  }
 
-      const [, , cut, , gone] = await answersOf("terminal-released", new RecordingTurnListener());
-      const [outside] = await answersOf("terminal-outside", new RecordingTurnListener());
-      const [other] = await answersOf("terminal-other", new RecordingTurnListener());
-      Assert.areEqual(JSON.stringify(["é\n", true, -32602, true, -32602, true, -32602, true]),
-        JSON.stringify([cut?.readString("output"), cut?.readBoolean("truncated"),
-          gone?.readNullableInteger("code"), gone?.readString("message").startsWith("TeamRun has no terminal "),
-          outside?.readNullableInteger("code"), outside?.readString("message").includes("only inside the chat's folder"),
-          other?.readNullableInteger("code"), other?.readString("message").includes("other than the turn's")]));
-    }
-    finally {
-      await adapter.shutdown();
-    }
+  @TestMethod
+  public async refusesATerminalOutsideTheChatsFolder(): Promise<void> {
+    const [outside] = await GeneralAcpAdapterTests.answersOfAsync("terminal-outside");
+    Assert.areEqual(JSON.stringify([-32602, true]),
+      JSON.stringify([outside?.readNullableInteger("code"), outside?.readString("message").includes("only inside the chat's folder")]));
+  }
+
+  @TestMethod
+  public async refusesATerminalForASessionOtherThanTheTurns(): Promise<void> {
+    const [other] = await GeneralAcpAdapterTests.answersOfAsync("terminal-other");
+    Assert.areEqual(JSON.stringify([-32602, true]),
+      JSON.stringify([other?.readNullableInteger("code"), other?.readString("message").includes("other than the turn's")]));
   }
 
   @TestMethod
@@ -310,6 +319,18 @@ export class GeneralAcpAdapterTests {
 
     Assert.isTrue(terminals.length > 0);
     Assert.areEqual(String.empty, terminals.filter(t => GeneralAcpAdapterTests.isRunning(t.processId)).map(t => t.processId).join(","));
+  }
+
+  private static async answersOfAsync(prompt: string, listener: RecordingTurnListener = new RecordingTurnListener()): Promise<readonly JsonReader[]> {
+    await using host = new GrokTestHost();
+    const adapter = host.createAcpAdapter(new GeneralAcpAgent("devin", "Devin", host.command, {}, host.environment, host.directory.path));
+    try {
+      await adapter.runTurn(host.request(prompt), listener, new AbortController().signal);
+      return JsonReader.parse(listener.details.filter(t => t.kind === DetailKind.Text).map(t => t.text).join("")).readObjectArray("answers");
+    }
+    finally {
+      await adapter.shutdown();
+    }
   }
 
   private static isRunning(processId: number): boolean {
