@@ -1,6 +1,6 @@
 {
   "id": "teamrun",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "displayName": "TeamRun",
   "description": "Holds chats with AI agents from several providers as teammates, and lets people follow and approve their work.",
   "parts": ["runtime", "window", "cli"],
