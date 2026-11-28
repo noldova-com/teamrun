@@ -9,6 +9,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
+import { SqlQuery } from "@noldova/context.data.sql";
 import {
   TeammatesService,
   OrganizationService,
@@ -48,6 +49,7 @@ import {
   type Event,
   EventName,
   NodeTypeCreateParams,
+  Organization,
   type Project,
   ProjectOpenParams,
   ProviderCreateParams,
@@ -162,6 +164,9 @@ export class CoreHost implements AsyncDisposable {
     const directory = new TemporaryDataDirectory();
     try {
       const context = await TestDatabase.openAsync(directory.path);
+      const now = new Date().toISOString();
+      const mine = new Organization(Resources.defaultOrganizationId, Resources.defaultOrganizationName, null, 0, now, now, [], [], []);
+      await context.database.connection.executeAsync(new SqlQuery(Resources.insertOrganization, [mine.id, JSON.stringify(mine.toJson()), now, now]));
       return new CoreHost(directory, context, supportsFork, supportsSignIn, signInTimeout, readHopLimit, readCommand, tools, runsCommands, readTitleModel,
         readIdleCompaction);
     }

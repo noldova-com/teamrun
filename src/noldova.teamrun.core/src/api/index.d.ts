@@ -3118,8 +3118,6 @@ export declare class Resources {
   public static readonly teammatePlacementsTable: string;
   /** Copies each department membership to a placement under its department, numbered from 0 in the order the rows were added. */
   public static readonly copyDepartmentMembersToPlacements: string;
-  /** Places each teammate in no department under the person, numbered from 0 in the order the teammates were created. */
-  public static readonly placeUnplacedTeammatesUnderPerson: string;
   /** Drops the `departmentMembers` table. */
   public static readonly dropDepartmentMembers: string;
   /** Rewrites each department's JSON to hold its `parent` node in place of `parentId`. */
@@ -3140,13 +3138,13 @@ export declare class Resources {
   public static readonly organizationsMigrationId: string;
   /** The organizations table: each organization's id, name, folder and order as its JSON, with an empty tree. */
   public static readonly organizationsTable: string;
-  /** The name of the organization every database starts with: `My organization`. */
+  /** The name of the organization the organizations migration makes for a database that already has departments or placements: `My organization`. */
   public static readonly defaultOrganizationName: string;
   /** The node types migration's fixed id: `20261126090000_NodeTypes`. */
   public static readonly nodeTypesMigrationId: string;
   /** Gives each organization, stored and in the change feed, its node types: the Department type when it has departments, else none; and each department that type. */
   public static readonly addDefaultNodeTypes: readonly string[];
-  /** Inserts "My organization", with no folder, first in the list. */
+  /** Inserts "My organization", with no folder, first in the list, only when the database already has departments or placements, so a database with neither gets no organization. */
   public static readonly insertDefaultOrganization: string;
   /** Copies the departments aside while the table is made again with its organization. */
   public static readonly copyDepartments: string;

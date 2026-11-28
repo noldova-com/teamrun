@@ -20,6 +20,7 @@ import { TestDatabase } from "../../fixtures/test-database.fixture.js";
 
 @TestClass
 export class NodeTypesMigrationTests {
+  private static readonly mine: string = '{"id":"my-organization","name":"My organization","folder":null,"order":0,"createdAt":"c0","updatedAt":"c0","departments":[],"placements":[]}';
   private static readonly untyped: string = '{"id":"d1","name":"Top","parent":{"kind":"Person","id":null},"leaderId":null,"order":0,"createdAt":"c","updatedAt":"u"}';
 
   @TestMethod
@@ -45,6 +46,7 @@ export class NodeTypesMigrationTests {
       await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
       const execute = async (statement: string, parameters: readonly string[]): Promise<number> =>
         await legacy.database.connection.executeAsync(new SqlQuery(statement, parameters));
+      await execute("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('my-organization', ?, 'c0', 'c0')", [NodeTypesMigrationTests.mine]);
       await execute("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('studio', ?, 'c', 'u')", [studio]);
       await execute("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('o9', ?, 'c9', 'u9')", [old]);
       await execute("INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES ('d1', 'my-organization', NULL, ?, 'c', 'u')",

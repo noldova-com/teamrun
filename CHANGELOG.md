@@ -6,6 +6,10 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+### Fixed
+
+- **Organization:** updating from a version before organizations, 0.0.8 or earlier, no longer makes My organization with every teammate placed under you: an organization is made only for departments you already had, and every other teammate joins none, as on a new install, which now starts with no organization (#277).
+
 ## 0.0.10
 
 ### Fixed
