@@ -102,8 +102,10 @@ test("an outside agent sends a teammate a message with the kept token after a re
       await expect(before.locator(".nol-teamrun-outside-token code")).toHaveText(/^[A-Za-z0-9_-]{43}$/);
       const token = (await before.locator(".nol-teamrun-outside-token code").textContent())?.trim() ?? "";
       await expect(before.locator(".nol-teamrun-outside-address code")).toHaveText(`http://127.0.0.1:${port}/mcp`);
+      await page.getByRole("tab", { name: "Outside sessions" }).getByRole("button", { name: "Close Outside sessions" }).click();
+      await expect(page.getByRole("tab", { name: "Outside sessions" })).toHaveCount(0);
 
-      const runtimes = (): string => `${new Date().toISOString()} ${app.runtimeProcesses().map(t => t.pid).join(" ")}`;
+      const runtimes =(): string => `${new Date().toISOString()} ${app.runtimeProcesses().map(t => t.pid).join(" ")}`;
       const notes = [`before quit: ${runtimes()}`];
       const quit = app.quit();
       notes.push(`quit: ${quit}`, `after quit: ${runtimes()}`);
