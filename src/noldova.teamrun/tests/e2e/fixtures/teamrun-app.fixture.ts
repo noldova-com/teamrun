@@ -9,7 +9,7 @@
 import { type ChildProcess, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import "@noldova/context.core";
@@ -91,7 +91,7 @@ export class TeamRunApp {
 
   public constructor(isTraced: boolean = false) {
     this.isTraced = isTraced;
-    this.work = TeamRunApp.makeWork(process.platform === "win32" ? tmpdir() : "/tmp", work => TeamRunApp.prepareWork(process.platform, work));
+    this.work = TeamRunApp.makeWork(process.platform === "win32" ? homedir() : "/tmp", work => TeamRunApp.prepareWork(process.platform, work));
     this.home = path.join(this.work, "home");
     this.data = path.join(this.work, "data");
     this.device = path.join(this.work, "device");
@@ -534,7 +534,7 @@ export class TeamRunApp {
     }
     await testInfo.attach("main-output.txt", { body: this.output.join(""), contentType: "text/plain" });
     await testInfo.attach("console.txt", { body: this.console.join("\n"), contentType: "text/plain" });
-    for (const file of [this.codexLog, this.registryLog, path.join(this.data, "logs", "runtime.log"), path.join(this.data, "logs", "main.log")])
+    for (const file of [this.codexLog, this.registryLog, path.join(this.data, "logs", "runtime.log"), path.join(this.data, "logs", "runtime.previous.log"), path.join(this.data, "logs", "main.log")])
       if (existsSync(file)) {
         await testInfo.attach(path.basename(file), { body: readFileSync(file), contentType: "text/plain" });
         if (failed)

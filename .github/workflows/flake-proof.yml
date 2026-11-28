@@ -86,7 +86,7 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ inputs.ref || github.ref_name }}-${{ needs.group.outputs.inputs }}
       cancel-in-progress: false
-    uses: noldova-com/.github/.github/workflows/flake-proof.yml@43df1a5296a892a1ed162a02ca2af77902d19bb8 # v2.51.2
+    uses: noldova-com/.github/.github/workflows/flake-proof.yml@c249caf9feda8b21e833b4f1c961cf7990d06bd0
     permissions:
       contents: read
       packages: read
@@ -99,3 +99,4 @@ jobs:
       runs: ${{ inputs.runs }}
       jobs: ${{ inputs.jobs }}
       targets: ${{ inputs.targets }}
+      reports: _build/e2e

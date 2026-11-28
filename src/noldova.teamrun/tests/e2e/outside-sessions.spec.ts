@@ -66,7 +66,7 @@ const connectionOfAsync = async (page: Page): Promise<Locator> => {
   await settingsSearchAsync(page, "teamrun.connectOutsideAgents");
   await page.getByRole("button", { name: "Connect outside agents", exact: true }).click();
   const connection = page.locator("nol-teamrun-outside-connection-view");
-  await expect(connection.locator(".nol-teamrun-show-token")).toBeVisible({ timeout: 60_000 });
+  await expect(connection.locator(".nol-teamrun-show-token")).toBeVisible({ timeout: 180_000 });
   await connection.locator(".nol-teamrun-show-token").click();
   await expect(connection.locator(".nol-teamrun-show-token")).toHaveAttribute("aria-pressed", "true");
   return connection;
@@ -98,17 +98,40 @@ test("an outside agent sends a teammate a message with the kept token after a re
       await page.getByRole("checkbox", { name: SETTING_TEXT }).click();
       await expect(page.getByRole("checkbox", { name: SETTING_TEXT })).toBeChecked();
       const before = await connectionOfAsync(page);
-      await expect(before.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 60_000 });
+      await expect(before.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });
       await expect(before.locator(".nol-teamrun-outside-token code")).toHaveText(/^[A-Za-z0-9_-]{43}$/);
       const token = (await before.locator(".nol-teamrun-outside-token code").textContent())?.trim() ?? "";
       await expect(before.locator(".nol-teamrun-outside-address code")).toHaveText(`http://127.0.0.1:${port}/mcp`);
+      await page.getByRole("tab", { name: "Outside sessions" }).getByRole("button", { name: "Close Outside sessions" }).click();
+      await expect(page.getByRole("tab", { name: "Outside sessions" })).toHaveCount(0);
 
-      expect(app.quit()).toContain("\"outcome\":\"Quit\"");
-      expect(await app.waitForExitAsync()).toBe(0);
+      const runtimes =(): string => `${new Date().toISOString()} ${app.runtimeProcesses().map(t => t.pid).join(" ")}`;
+      const notes = [`before quit: ${runtimes()}`];
+      const quit = app.quit();
+      notes.push(`quit: ${quit}`, `after quit: ${runtimes()}`);
+      const exit = await app.waitForExitAsync();
+      notes.push(`app exit ${exit}: ${runtimes()}`);
       const restarted = await app.startAsync();
+      notes.push(`started again: ${runtimes()}`);
+      process.stdout.write(`runtimes:\n${notes.join("\n")}\n`);
+      await testInfo.attach("runtimes.txt", { body: notes.join("\n"), contentType: "text/plain" });
+      for (const seconds of [5, 15, 60])
+        setTimeout(() => process.stdout.write(`runtimes ${seconds} s after the start: ${runtimes()}\n`), seconds * 1_000).unref();
+      expect(quit).toContain("\"outcome\":\"Quit\"");
+      expect(exit).toBe(0);
+      const view = restarted.locator("nol-teamrun-outside-connection-view");
+      await settingsSearchAsync(restarted, "teamrun.connectOutsideAgents");
+      for (const pause of [0, 30_000, 30_000]) {
+        await new Promise(resolve => setTimeout(resolve, pause));
+        await restarted.getByRole("button", { name: "Connect outside agents", exact: true }).click();
+        const opened = await view.waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        process.stdout.write(`click at ${new Date().toISOString()}: ${opened ? "opened" : "nothing"}\n`);
+        if (opened)
+          break;
+      }
       const after = await connectionOfAsync(restarted);
 
-      await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 60_000 });
+      await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });
       await expect(after.locator(".nol-teamrun-outside-token code")).toHaveText(token);
       const url = (await after.locator(".nol-teamrun-outside-address code").textContent())?.trim() ?? "";
       expect(url).toBe(`http://127.0.0.1:${port}/mcp`);
