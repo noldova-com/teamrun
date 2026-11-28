@@ -27,6 +27,7 @@ import {
   IssuedFileGrants,
   type IDocumentUpdate,
   type ISelectionSource,
+  type IUndoProvider,
   type IViewDialogOptions,
   type IViewInstanceOptions,
   type IViewUpdate,
@@ -44,11 +45,13 @@ import {
   type SettingsRow,
   StatusBarItem,
   type StatusBarItemContribution,
+  type TimeFormatService,
   TopBarAction,
   type TopBarActionContribution,
   type ViewBadge,
   type ViewContribution
 } from "@noldova/desktop.window";
+import { FakeTimeFormats } from "@noldova/desktop.window/testing";
 import declaration from "@noldova/teamrun/module.json";
 
 import { Resources } from "../../src/resources";
@@ -116,6 +119,8 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   public readonly documentClosedListeners: Set<(instance: string) => void> = new Set();
   public openInstances: readonly string[] | null = null;
   public readonly secretStore: FakeWindowSecrets = new FakeWindowSecrets();
+  public readonly undoProviders: Set<IUndoProvider> = new Set();
+  public readonly timeFormats: TimeFormatService = new FakeTimeFormats().service;
 
   public registerView(view: ViewContribution): void {
     if (!declaration.contributes.views.includes(view.name))
@@ -253,6 +258,11 @@ export class RecordingWindowPartContext implements IWindowPartContext {
   public provideSettingOptions(setting: string, provider: (values: JsonObject) => readonly SettingOption[] | null): () => void {
     this.settingOptions.set(setting, provider);
     return () => this.settingOptions.delete(setting);
+  }
+
+  public provideUndo(provider: IUndoProvider): () => void {
+    this.undoProviders.add(provider);
+    return () => this.undoProviders.delete(provider);
   }
 
   public refreshSettingOptions(setting: string): void {

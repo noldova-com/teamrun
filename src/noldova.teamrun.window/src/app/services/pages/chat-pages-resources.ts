@@ -7,19 +7,20 @@
  */
 
 import { PageEventName, PageMethodName } from "@noldova/teamrun.protocol";
+import type { IconName } from "@noldova/ui.components.angular";
 
 export class ChatPagesResources {
   public static readonly moduleId: string = "teamrun";
   public static readonly nameSeparator: string = ".";
   public static readonly viewTitle: string = "Pages";
   public static readonly viewName: string = "teamrun.pages";
-  public static readonly pageIcon: string = "web_asset";
-  public static readonly closeIcon: string = "close";
-  public static readonly moreIcon: string = "more_horiz";
-  public static readonly openIcon: string = "open_in_new_down";
-  public static readonly browserIcon: string = "open_in_new";
-  public static readonly saveIcon: string = "download";
-  public static readonly copyIcon: string = "content_copy";
+  public static readonly pageIcon: IconName = "web_asset";
+  public static readonly closeIcon: IconName = "close";
+  public static readonly moreIcon: IconName = "more_horiz";
+  public static readonly openIcon: IconName = "open_in_new_down";
+  public static readonly browserIcon: IconName = "open_in_new";
+  public static readonly saveIcon: IconName = "download";
+  public static readonly copyIcon: IconName = "content_copy";
   public static readonly showPageTool: string = "teamrun_show_page";
   public static readonly editPageTool: string = "teamrun_edit_page";
   public static readonly listPagesTool: string = "teamrun_list_pages";

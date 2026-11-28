@@ -36,14 +36,14 @@
     "@noldova/context.core": ">=0.0.18 <0.1.0",
     "@noldova/context.exceptions": ">=0.0.18 <0.1.0",
     "@noldova/context.json": ">=0.0.18 <0.1.0",
-    "@noldova/desktop.window": ">=0.0.16 <0.1.0",
+    "@noldova/desktop.window": ">=0.0.18 <0.1.0",
     "@noldova/git.github.protocol": "0.0.6",
     "@noldova/git.github.window": "0.0.6",
     "@noldova/git.hosting.protocol": "0.0.6",
     "@noldova/git.protocol": "0.0.6",
     "@noldova/git.window": "0.0.6",
     "@noldova/terminal.window": "0.0.7",
-    "@noldova/ui.components.angular": ">=0.0.33 <0.1.0"
+    "@noldova/ui.components.angular": ">=0.0.38 <0.1.0"
   },
   "peerDependenciesMeta": {
     "@angular/cdk": {

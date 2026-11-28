@@ -492,7 +492,7 @@ describe("HistoryMessageComponent", () => {
     await click(toggle);
     const blocks = element().querySelectorAll("nol-teamrun-activity-block");
     expect(toggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(textOf(".activity-chevron")).toBe("expand_more");
+    expect(textOf(".activity-chevron")).toBe("keyboard_arrow_down");
     expect(blocks).toHaveLength(1);
     expect([...element().querySelectorAll("nol-teamrun-activity-block .nol-tool-call-title")].map(t => t.textContent)).toEqual(["> ls", "Edit: D:\\other\\a.ts"]);
     await Wait.until(() => expect(blocks[0]?.querySelector(".step-text strong")?.textContent).toBe("the"), MarkdownWait.coldImport);

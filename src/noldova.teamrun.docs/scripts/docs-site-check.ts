@@ -38,6 +38,7 @@ export class DocsSiteCheck implements ICheck {
   private static readonly SHOWN: string = "JSON.stringify({ titles: [...document.querySelectorAll('h1')].map(t => (t.textContent ?? '').trim()) })";
   private static readonly BROKEN_WORDS: string =
     "JSON.stringify({ words: [...document.querySelectorAll('.nol-markdown-table th, .nol-markdown-table td')].flatMap(cell => { const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT); const words = []; for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) for (const word of (node.textContent ?? '').matchAll(/[\\p{L}\\p{N}_]+/gu)) { const range = document.createRange(); range.setStart(node, word.index); range.setEnd(node, word.index + word[0].length); if (new Set([...range.getClientRects()].filter(t => t.width > 0).map(t => Math.round(t.top))).size > 1) words.push(word[0]); } return words; }), names: [...document.querySelectorAll('.nol-docs-page .nol-markdown-table code')].filter(t => t.getClientRects().length > 1).map(t => t.textContent ?? '') })";
+  private static readonly SITE_STYLES: string = "getComputedStyle(document.documentElement).getPropertyValue('--nol-site-shell-gutter').trim()";
   private static readonly NEXT_FRAME: string = "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(0))))";
   private static readonly WIDTHS: readonly number[] = [1280, 375];
   private static readonly VIEW_HEIGHT: number = 800;
@@ -86,6 +87,8 @@ export class DocsSiteCheck implements ICheck {
       const icons = JsonFields.parse(String(await page.evaluate(DocsSiteCheck.ICONS)), DocsSiteCheck.HOME).objects("icons");
       if (icons.length === 0)
         findings.push(DocsSiteCheck.noIcons());
+      if (String(await page.evaluate(DocsSiteCheck.SITE_STYLES)) === "")
+        findings.push(DocsSiteCheck.noSiteStyles());
       for (const icon of icons.filter(t => t.count("status") !== DocsSiteCheck.OK_STATUS || !t.text("type").startsWith(DocsSiteCheck.IMAGE_TYPE)))
         findings.push(DocsSiteCheck.iconNotServed(icon.text("link"), icon.count("status"), icon.text("type")));
       const menu = JsonFields.parse(String(await page.evaluate(DocsSiteCheck.MENU_LINKS)), DocsSiteCheck.HOME);
@@ -153,6 +156,10 @@ export class DocsSiteCheck implements ICheck {
 
   private static noIcons(): string {
     return `${DocsSiteCheck.HOME} links no favicon.`;
+  }
+
+  private static noSiteStyles(): string {
+    return `${DocsSiteCheck.HOME} has none of the kit's site styles, such as --nol-site-shell-gutter from its styles/site.css, so the build took a kit older than the docs site's pin.`;
   }
 
   private static iconNotServed(link: string, status: number, type: string): string {
