@@ -119,6 +119,16 @@ test("an outside agent sends a teammate a message with the kept token after a re
         setTimeout(() => process.stdout.write(`runtimes ${seconds} s after the start: ${runtimes()}\n`), seconds * 1_000).unref();
       expect(quit).toContain("\"outcome\":\"Quit\"");
       expect(exit).toBe(0);
+      const view = restarted.locator("nol-teamrun-outside-connection-view");
+      await settingsSearchAsync(restarted, "teamrun.connectOutsideAgents");
+      for (const pause of [0, 30_000, 30_000]) {
+        await new Promise(resolve => setTimeout(resolve, pause));
+        await restarted.getByRole("button", { name: "Connect outside agents", exact: true }).click();
+        const opened = await view.waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        process.stdout.write(`click at ${new Date().toISOString()}: ${opened ? "opened" : "nothing"}\n`);
+        if (opened)
+          break;
+      }
       const after = await connectionOfAsync(restarted);
 
       await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });
