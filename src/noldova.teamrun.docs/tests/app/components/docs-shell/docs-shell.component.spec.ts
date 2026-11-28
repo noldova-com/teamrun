@@ -10,7 +10,7 @@ import type { Provider } from "@angular/core";
 import { type ComponentFixture, TestBed } from "@angular/core/testing";
 import { Router, provideRouter, withComponentInputBinding } from "@angular/router";
 import { provideMarkdown } from "@noldova/ui.components.angular/markdown";
-import { TooltipFixture } from "@noldova/ui.components.angular/testing";
+import { AppearanceFixture, TooltipFixture } from "@noldova/ui.components.angular/testing";
 import { commands, userEvent } from "vitest/browser";
 
 import "@noldova/context.core";
@@ -105,12 +105,12 @@ describe("DocsShellComponent", () => {
   });
 
   describe.each([
-    ["Light", DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT, 1.5],
-    ["Dark", DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT, 1.5],
-    ["Light", 1920, 1080, 1.5],
-    ["Light", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT, 1],
-    ["Dark", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT, 1]
-  ])("in the %s mode at %i by %i CSS pixels, the site's header and footer", (mode, width, height, inset) => {
+    ["Light", DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT, "site-header-height"],
+    ["Dark", DocsFixture.DESKTOP_WIDTH, DocsFixture.DESKTOP_HEIGHT, "site-header-height"],
+    ["Light", 1920, 1080, "site-header-height"],
+    ["Light", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT, "site-header-height-phone"],
+    ["Dark", DocsFixture.PHONE_WIDTH, DocsFixture.PHONE_HEIGHT, "site-header-height-phone"]
+  ])("in the %s mode at %i by %i CSS pixels, the site's header and footer", (mode, width, height, headerHeight) => {
     const renderSiteAsync = async (url: string): Promise<HTMLElement> => {
       DocsFixture.setMode(mode);
       await DocsFixture.viewAsync(width, height);
@@ -153,7 +153,7 @@ describe("DocsShellComponent", () => {
       expect(linksOf(DocsFixture.one(host, "nol-site-footer"), "a.nol-site-footer-link").filter(t => t.current === "page").map(t => t.text)).toEqual(["Release notes"]);
     });
 
-    it("lays the header 3.5rem high across the window at its top, its wordmark at the site's inset inside 108rem and its parts centered on its line", async () => {
+    it("lays the header at the kit's site header height across the window at its top, its wordmark at the start of the kit's site shell, 108rem at most and its gutter in from the window's sides, and its parts centered on its line", async () => {
       const host = await renderSiteAsync("/");
       const rem = DocsFixture.rem();
       const header = DocsFixture.one(host, "nol-site-header");
@@ -162,15 +162,16 @@ describe("DocsShellComponent", () => {
       const wordmark = DocsFixture.one(header, ".nol-site-header-bar .nol-site-wordmark").getBoundingClientRect();
       const end = DocsFixture.one(header, width === DocsFixture.PHONE_WIDTH ? ".nol-site-menu-button" : ".nol-site-download").getBoundingClientRect();
       const middle = box.top + box.height / 2;
+      const shellStart = (edge - Math.min(108 * rem, edge - 2 * AppearanceFixture.measureLook("site-shell-gutter"))) / 2;
 
-      expect(box.height / rem).toBeCloseTo(3.5, 2);
+      AppearanceFixture.expectPixels(box.height, AppearanceFixture.measureLook(headerHeight));
       expect([box.top, box.left, box.right]).toEqual([0, 0, edge]);
-      expect((wordmark.left - contentStart()) / rem).toBeCloseTo(inset, 2);
+      AppearanceFixture.expectPixels(wordmark.left, shellStart);
       expect(Math.abs(wordmark.top + wordmark.height / 2 - middle) / rem).toBeLessThanOrEqual(0.05);
       expect(Math.abs(end.top + end.height / 2 - middle) / rem).toBeLessThanOrEqual(0.05);
       expect(end.right).toBeLessThanOrEqual(edge - contentStart());
       if (width !== DocsFixture.PHONE_WIDTH)
-        expect((edge - contentStart() - end.right) / rem).toBeCloseTo(inset, 2);
+        AppearanceFixture.expectPixels(edge - end.right, shellStart);
       expect(DocsFixture.overflowWidth()).toBe(0);
     });
 
@@ -289,8 +290,8 @@ describe("DocsShellComponent", () => {
 
       expect(pagesButton.getAttribute("aria-expanded")).toBe("false");
       expect(getComputedStyle(DocsFixture.one(host, "#nol-docs-menu")).display).toBe("none");
-      expect(box.left / rem).toBeCloseTo(1, 2);
-      expect((document.documentElement.clientWidth - box.right) / rem).toBeCloseTo(1, 2);
+      AppearanceFixture.expectPixels(box.left, AppearanceFixture.measureLook("site-padding-inline-phone"));
+      AppearanceFixture.expectPixels(document.documentElement.clientWidth - box.right, AppearanceFixture.measureLook("site-padding-inline-phone"));
       expect(box.height / rem).toBeCloseTo(2.75, 2);
       expect(box.bottom).toBeLessThanOrEqual(header.getBoundingClientRect().bottom);
 
@@ -301,7 +302,6 @@ describe("DocsShellComponent", () => {
 
     it("opens the docs search across the bar from its search button with the focus in its field, and closes it on reaching a page", async () => {
       const host = await phoneAsync();
-      const rem = DocsFixture.rem();
       const header = DocsFixture.one(host, "nol-site-header");
       const button = DocsFixture.one(header, ".nol-site-search-button");
       const field = DocsFixture.one(header, "input[type=search]");
@@ -311,8 +311,8 @@ describe("DocsShellComponent", () => {
       await DocsFixture.untilAsync(() => expect(document.activeElement).toBe(field));
       const box = DocsFixture.one(header, "nol-docs-search").getBoundingClientRect();
 
-      expect(box.left / rem).toBeCloseTo(1, 2);
-      expect((document.documentElement.clientWidth - box.right) / rem).toBeCloseTo(1, 2);
+      AppearanceFixture.expectPixels(box.left, AppearanceFixture.measureLook("site-padding-inline-phone"));
+      AppearanceFixture.expectPixels(document.documentElement.clientWidth - box.right, AppearanceFixture.measureLook("site-padding-inline-phone"));
       await userEvent.fill(field, "acp");
       await userEvent.click(await DocsFixture.untilAsync(() => DocsFixture.byText(header, ".nol-docs-search-result", "ACP agents")));
 
@@ -335,7 +335,7 @@ describe("DocsShellComponent", () => {
       expect(bar.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
     });
 
-    it("puts the pages bar right under the header, 3.5rem high, its button centered on it with its glyph at the site's 1rem inset", async () => {
+    it("puts the pages bar right under the header, as high as the kit's phone header, its button centered on it with its glyph at the site's phone inset", async () => {
       const host = await phoneAsync();
       const rem = DocsFixture.rem();
       const bar = DocsFixture.one(host, ".nol-docs-pages-bar").getBoundingClientRect();
@@ -344,8 +344,8 @@ describe("DocsShellComponent", () => {
       const icon = DocsFixture.one(button, "[nolButtonIcon]").getBoundingClientRect();
 
       expect(bar.top).toBe(DocsFixture.one(host, "nol-site-header").getBoundingClientRect().bottom);
-      expect(bar.height / rem).toBeCloseTo(3.5, 2);
-      expect(icon.left / rem).toBeCloseTo(1, 1);
+      AppearanceFixture.expectPixels(bar.height, AppearanceFixture.measureLook("site-header-height-phone"));
+      AppearanceFixture.expectPixels(icon.left, AppearanceFixture.measureLook("site-padding-inline-phone"));
       expect(button.textContent.trim()).toContain("Pages");
       expect(Math.abs(box.top + box.height / 2 - (bar.top + bar.height / 2)) / rem).toBeLessThanOrEqual(0.05);
     });
@@ -770,7 +770,7 @@ describe("DocsShellComponent", () => {
       expectInView();
     });
 
-    it("lays the menu, the page and the list across at most 108rem centered in the window, 0.5rem in from its sides from 48rem wide, the page filling the space between them", async () => {
+    it("lays the menu, the page and the list centered in the window, from 48rem wide across the kit's site shell and the links' 1rem inset past it on each side, the page filling the space between them", async () => {
       const host = await pageAsync();
       const rem = DocsFixture.rem();
       const body = DocsFixture.one(host, ".nol-docs-body");
@@ -780,11 +780,13 @@ describe("DocsShellComponent", () => {
       const mainBox = main.getBoundingClientRect();
       const mainStyle = getComputedStyle(main);
       const page = DocsFixture.one(host, ".nol-docs-page").getBoundingClientRect();
-      const inset = width >= 48 * rem ? 0.5 : 0;
+      const edge = document.documentElement.clientWidth;
+      const linkInset = AppearanceFixture.measureLook("space-4");
+      const across = width >= 48 * rem ? Math.min(108 * rem, edge - 2 * AppearanceFixture.measureLook("site-shell-gutter")) + 2 * linkInset : edge;
 
-      expect(box.width / rem).toBeLessThanOrEqual(108 + 0.01);
-      expect(Math.abs(box.left - (document.documentElement.clientWidth - box.right)) / rem).toBeLessThanOrEqual(0.01);
-      expect([Number.parseFloat(style.paddingInlineStart) / rem, Number.parseFloat(style.paddingInlineEnd) / rem]).toEqual([inset, inset]);
+      AppearanceFixture.expectPixels(box.width, across);
+      expect(Math.abs(box.left - (edge - box.right)) / rem).toBeLessThanOrEqual(0.01);
+      expect([style.paddingInlineStart, style.paddingInlineEnd]).toEqual(["0px", "0px"]);
       expect(Math.abs(page.left - mainBox.left - Number.parseFloat(mainStyle.paddingInlineStart)) / rem).toBeLessThanOrEqual(0.01);
       expect(Math.abs(mainBox.right - Number.parseFloat(mainStyle.paddingInlineEnd) - page.right) / rem).toBeLessThanOrEqual(0.01);
       expect(DocsFixture.overflowWidth()).toBe(0);

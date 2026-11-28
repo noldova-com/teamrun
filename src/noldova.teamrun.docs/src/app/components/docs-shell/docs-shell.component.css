@@ -96,7 +96,8 @@
 @media (min-width: 48rem) {
   .nol-docs-body {
     grid-template-columns: 14rem minmax(0, 1fr);
-    padding-inline: calc(var(--nol-site-padding-inline) - var(--nol-space-4));
+    inline-size: min(calc(var(--nol-site-content-width-wide) + 2 * var(--nol-space-4)), calc(100% - 2 * (var(--nol-site-shell-gutter) - var(--nol-space-4))));
+    max-inline-size: none;
   }
 
   .nol-docs-menu {
