@@ -72,6 +72,7 @@ class HeldTaskEndListener extends RecordingTurnListener {
 }
 
 class TreeEndTimer implements ITimer {
+  private static readonly POLL_INTERVAL: number = 10;
   private readonly listener: TreeWatchingListener;
   private readonly timer: ITimer = new NodeTimer();
 
@@ -83,14 +84,11 @@ class TreeEndTimer implements ITimer {
     return this.timer.now();
   }
 
-  // Lasts until the task's tree has ended, however long that takes, rather than for the delay asked.
   public async delayAsync(_milliseconds: number, signal: AbortSignal): Promise<void> {
     while (!signal.aborted && this.listener.tree.some(t => TreeWatchingListener.runs(t)))
       await Wait.delay(TreeEndTimer.POLL_INTERVAL);
     signal.throwIfAborted();
   }
-
-  private static readonly POLL_INTERVAL: number = 10;
 }
 
 @Category("ProcessListing")
