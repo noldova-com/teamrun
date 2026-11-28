@@ -25,7 +25,6 @@ export class TeammatePlacementsMigration extends SqlMigration {
       constraints => constraints.addPrimaryKey(t => t.teammateId)
         .addForeignKey<Teammate>(t => t.teammateId, Resources.teammatesTable, t => t.id));
     builder.executeSql(Resources.copyDepartmentMembersToPlacements);
-    builder.executeSql(Resources.placeUnplacedTeammatesUnderPerson);
     builder.executeSql(Resources.dropDepartmentMembers);
     builder.executeSql(Resources.moveDepartmentParentsIntoJson);
   }

@@ -10,7 +10,7 @@ import "@noldova/context.core";
 import { MigrationBuilder, SqlQuery } from "@noldova/context.data.sql";
 import { SQLiteDialect } from "@noldova/context.data.sql.sqlite";
 import { Assert, TestClass, TestMethod } from "@noldova/context.testing";
-import { MigrationCatalog, OrganizationService, OrganizationsMigration, Resources } from "@noldova/teamrun.core";
+import { MigrationCatalog, OrganizationService, OrganizationsMigration, Resources, TeammatePlacementsMigration } from "@noldova/teamrun.core";
 import { OrganizationIdParams } from "@noldova/teamrun.protocol";
 
 import { LegacyDatabaseContext } from "../../fixtures/legacy-database-context.fixture.js";
@@ -77,11 +77,28 @@ export class OrganizationsMigrationTests {
   }
 
   @TestMethod
-  public async startsAnEmptyDatabaseWithMyOrganizationAlone(): Promise<void> {
+  public async makesNoOrganizationForADatabaseWithTeammatesAndNoDepartments(): Promise<void> {
+    using directory = new TemporaryDataDirectory();
+    {
+      const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof TeammatePlacementsMigration));
+      await using legacy = await LegacyDatabaseContext.openAsync(directory.path, before);
+      for (const id of ["t1", "t2"])
+        await legacy.database.connection.executeAsync(new SqlQuery("INSERT INTO teammates (id, name, json, createdAt, updatedAt) VALUES (?, ?, '{}', 't', 't')", [id, id]));
+    }
+    await using current = await TestDatabase.openAsync(directory.path);
+    const connection = current.database.connection;
+
+    Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
+    Assert.areEqual(0, (await new OrganizationService(current).listAsync()).length);
+    Assert.areEqual(0, (await connection.queryAsync(new SqlQuery("SELECT teammateId FROM teammatePlacements"))).length);
+    Assert.areEqual(2, (await connection.queryAsync(new SqlQuery("SELECT id FROM teammates"))).length);
+  }
+
+  @TestMethod
+  public async startsAnEmptyDatabaseWithNoOrganization(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     await using current = await TestDatabase.openAsync(directory.path);
-    const organizations = await new OrganizationService(current).listAsync();
 
-    Assert.areEqual("My organization:0:0", organizations.map(t => `${t.name}:${t.departments.length}:${t.placements.length}`).join(","));
+    Assert.areEqual(0, (await new OrganizationService(current).listAsync()).length);
   }
 }

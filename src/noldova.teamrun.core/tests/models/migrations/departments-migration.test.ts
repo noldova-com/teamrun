@@ -45,6 +45,7 @@ export class DepartmentsMigrationTests {
     await using current = await TestDatabase.openAsync(directory.path);
     const connection = current.database.connection;
     await connection.executeAsync(new SqlQuery("INSERT INTO teammates (id, name, json, createdAt, updatedAt) VALUES ('t1', 'ada', '{}', 't', 't')"));
+    await connection.executeAsync(new SqlQuery("INSERT INTO organizations (id, json, createdAt, updatedAt) VALUES ('my-organization', '{}', 't', 't')"));
     await connection.executeAsync(new SqlQuery("INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) VALUES ('d1', 'my-organization', NULL, '{}', 't', 't')"));
 
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);

@@ -29,12 +29,12 @@ export class TeammatePlacementsMigrationTests {
     Assert.isTrue(statements[0]?.includes("\"teammatePlacements\"") ?? false);
     Assert.isTrue(statements[0]?.includes("PRIMARY KEY (\"teammateId\")") ?? false);
     Assert.isTrue(statements[0]?.includes("FOREIGN KEY (\"teammateId\") REFERENCES \"teammates\" (\"id\")") ?? false);
-    Assert.areEqual([Resources.copyDepartmentMembersToPlacements, Resources.placeUnplacedTeammatesUnderPerson, Resources.dropDepartmentMembers,
-      Resources.moveDepartmentParentsIntoJson].join("\n"), statements.slice(-4).join("\n"));
+    Assert.areEqual([Resources.copyDepartmentMembersToPlacements, Resources.dropDepartmentMembers, Resources.moveDepartmentParentsIntoJson].join("\n"),
+      statements.slice(-3).join("\n"));
   }
 
   @TestMethod
-  public async placesEachMemberUnderItsDepartmentInTheOrderItJoinedEachTeammateInNoneUnderThePersonAndGivesEachDepartmentItsParentNode(): Promise<void> {
+  public async placesEachMemberUnderItsDepartmentInTheOrderItJoinedLeavesEachTeammateInNoneUnplacedAndGivesEachDepartmentItsParentNode(): Promise<void> {
     using directory = new TemporaryDataDirectory();
     {
       const before = MigrationCatalog.all.slice(0, MigrationCatalog.all.findIndex(t => t instanceof TeammatePlacementsMigration));
@@ -59,11 +59,10 @@ export class TeammatePlacementsMigrationTests {
     Assert.areEqual(MigrationCatalog.all.length, (await current.database.getAppliedMigrationsAsync()).length);
     Assert.areEqual("t1:d2:0,t3:d1:0,t2:d1:1", organization?.placements.filter(t => t.parent.kind === OrganizationNodeKind.Department)
       .map(t => `${t.teammateId}:${t.parent.id ?? ""}:${t.order}`).join(","));
-    Assert.areEqual("t4:0,t5:1", organization?.placementsUnder(OrganizationParent.person).toSorted((a, b) => a.order - b.order)
-      .map(t => `${t.teammateId}:${t.order}`).join(","));
+    Assert.areEqual(0, organization?.placementsUnder(OrganizationParent.person).length);
     Assert.areEqual("d1:Person:,d2:Department:d1", organization?.departments.map(t => `${t.id}:${t.parent.kind}:${t.parent.id ?? ""}`).join(","));
     Assert.areEqual("t2", organization?.departments[0]?.leaderId);
-    Assert.areEqual("", organization?.unplaced(["t1", "t2", "t3", "t4", "t5"]).join(","));
+    Assert.areEqual("t4,t5", organization?.unplaced(["t1", "t2", "t3", "t4", "t5"]).join(","));
     Assert.areEqual(0, tables.length);
     Assert.isFalse((await connection.queryAsync(new SqlQuery("SELECT json FROM departments"))).some(t => t.readString("json").includes("parentId")));
     await Assert.throwsAsync(() => connection.executeAsync(new SqlQuery("INSERT INTO teammatePlacements (organizationId, teammateId, json) VALUES ('my-organization', 't1', '{}')")), Error);

@@ -490,9 +490,6 @@ export class Resources {
   public static readonly copyDepartmentMembersToPlacements: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT teammateId, "
     + "json_object('teammateId', teammateId, 'parent', json_object('kind', 'Department', 'id', departmentId), "
     + "'order', ROW_NUMBER() OVER (PARTITION BY departmentId ORDER BY rowid) - 1) FROM departmentMembers";
-  public static readonly placeUnplacedTeammatesUnderPerson: string = "INSERT INTO teammatePlacements (teammateId, json) SELECT id, "
-    + "json_object('teammateId', id, 'parent', json_object('kind', 'Person', 'id', NULL), 'order', ROW_NUMBER() OVER (ORDER BY createdAt, rowid) - 1) "
-    + "FROM teammates WHERE id NOT IN (SELECT teammateId FROM departmentMembers)";
   public static readonly dropDepartmentMembers: string = "DROP TABLE departmentMembers";
   public static readonly moveDepartmentParentsIntoJson: string = "UPDATE departments SET json = json_remove(json_set(json, '$.parent', "
     + "CASE WHEN parentId IS NULL THEN json_object('kind', 'Person', 'id', NULL) ELSE json_object('kind', 'Department', 'id', parentId) END), "
@@ -509,7 +506,8 @@ export class Resources {
   public static readonly insertDefaultOrganization: string = "INSERT INTO organizations (id, json, createdAt, updatedAt) "
     + "SELECT 'my-organization', json_object('id', 'my-organization', 'name', 'My organization', 'folder', NULL, 'order', 0, "
     + "'createdAt', now, 'updatedAt', now, 'departments', json_array(), 'placements', json_array()), now, now "
-    + "FROM (SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS now)";
+    + "FROM (SELECT strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS now) "
+    + "WHERE EXISTS (SELECT 1 FROM departments) OR EXISTS (SELECT 1 FROM teammatePlacements)";
   public static readonly copyDepartments: string = "CREATE TABLE departmentsCopy AS SELECT id, parentId, json, createdAt, updatedAt FROM departments";
   public static readonly dropDepartments: string = "DROP TABLE departments";
   public static readonly restoreDepartments: string = "INSERT INTO departments (id, organizationId, parentId, json, createdAt, updatedAt) "
