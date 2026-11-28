@@ -103,9 +103,20 @@ test("an outside agent sends a teammate a message with the kept token after a re
       const token = (await before.locator(".nol-teamrun-outside-token code").textContent())?.trim() ?? "";
       await expect(before.locator(".nol-teamrun-outside-address code")).toHaveText(`http://127.0.0.1:${port}/mcp`);
 
-      expect(app.quit()).toContain("\"outcome\":\"Quit\"");
-      expect(await app.waitForExitAsync()).toBe(0);
+      const runtimes = (): string => `${new Date().toISOString()} ${app.runtimeProcesses().map(t => t.pid).join(" ")}`;
+      const notes = [`before quit: ${runtimes()}`];
+      const quit = app.quit();
+      notes.push(`quit: ${quit}`, `after quit: ${runtimes()}`);
+      const exit = await app.waitForExitAsync();
+      notes.push(`app exit ${exit}: ${runtimes()}`);
       const restarted = await app.startAsync();
+      notes.push(`started again: ${runtimes()}`);
+      process.stdout.write(`runtimes:\n${notes.join("\n")}\n`);
+      await testInfo.attach("runtimes.txt", { body: notes.join("\n"), contentType: "text/plain" });
+      for (const seconds of [5, 15, 60])
+        setTimeout(() => process.stdout.write(`runtimes ${seconds} s after the start: ${runtimes()}\n`), seconds * 1_000).unref();
+      expect(quit).toContain("\"outcome\":\"Quit\"");
+      expect(exit).toBe(0);
       const after = await connectionOfAsync(restarted);
 
       await expect(after.locator(".nol-teamrun-outside-state td").first()).toHaveText("On", { timeout: 180_000 });

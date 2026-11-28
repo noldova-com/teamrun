@@ -534,7 +534,7 @@ export class TeamRunApp {
     }
     await testInfo.attach("main-output.txt", { body: this.output.join(""), contentType: "text/plain" });
     await testInfo.attach("console.txt", { body: this.console.join("\n"), contentType: "text/plain" });
-    for (const file of [this.codexLog, this.registryLog, path.join(this.data, "logs", "runtime.log"), path.join(this.data, "logs", "main.log")])
+    for (const file of [this.codexLog, this.registryLog, path.join(this.data, "logs", "runtime.log"), path.join(this.data, "logs", "runtime.previous.log"), path.join(this.data, "logs", "main.log")])
       if (existsSync(file)) {
         await testInfo.attach(path.basename(file), { body: readFileSync(file), contentType: "text/plain" });
         if (failed)
