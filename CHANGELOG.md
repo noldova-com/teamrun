@@ -6,6 +6,8 @@ A pull request that changes what a person gets adds its entry under `## Unreleas
 
 ## Unreleased
 
+## 0.0.10
+
 ### Fixed
 
 - **Claude Code:** quitting while TeamRun reads Claude Code's models, account or plan usage stops those Claude Code processes and every Claude chat at once, waiting at most the interrupt timeout for each to answer its stop before ending it, rather than waiting for good, one after another (#222).
