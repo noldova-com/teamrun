@@ -10,7 +10,7 @@ import { Component, DOCUMENT, DestroyRef, ElementRef, Injector, type Signal, typ
 import { toSignal } from "@angular/core/rxjs-interop";
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 import { SectionHeaderComponent } from "@noldova/ui.components.angular";
-import { SiteFooterComponent, SiteHeaderComponent, SiteLink, SiteLinkGroup, SiteSearchDirective, SiteSocialLink } from "@noldova/ui.components.angular/site";
+import { SiteFooterComponent, SiteHeaderComponent, SiteLink, SiteLinkGroup, SiteSearchDirective, SiteSocialLink, SiteStageService } from "@noldova/ui.components.angular/site";
 import { filter, map } from "rxjs";
 
 import "@noldova/context.core";
@@ -47,6 +47,7 @@ export class DocsShellComponent {
   private readonly document: Document = inject(DOCUMENT);
   private readonly injector: Injector = inject(Injector);
   private readonly router: Router = inject(Router);
+  private readonly stage: SiteStageService = inject(SiteStageService);
   private readonly pagesBarButton: Signal<DocsPagesBarComponent> = viewChild.required(DocsPagesBarComponent);
   private readonly header: Signal<ElementRef<HTMLElement>> = viewChild.required("header", { read: ElementRef });
   private readonly pagesBar: Signal<ElementRef<HTMLElement>> = viewChild.required("pagesBar", { read: ElementRef });
@@ -65,10 +66,11 @@ export class DocsShellComponent {
     new SiteSocialLink(Resources.repositoryLabel, Resources.repositoryLink, Resources.repositoryIcon),
     new SiteSocialLink(Resources.xLabel, Resources.xLink, Resources.xIcon)
   ];
+  protected readonly downloadLink: string = this.stage.address(Resources.downloadLink);
   protected readonly links: Signal<readonly SiteLink[]> = computed(() => [
     new SiteLink(Resources.websiteLabel, Resources.websiteLink),
     new SiteLink(Resources.releaseNotesTitle, this.releaseNotesLink, this.path() === this.releaseNotesLink)
-  ]);
+  ].map(t => this.stage.link(t)));
   protected readonly footerGroups: Signal<readonly SiteLinkGroup[]> = computed(() => [
     new SiteLinkGroup(Resources.productGroupLabel, [
       new SiteLink(Resources.websiteFooterLabel, Resources.websiteLink),
@@ -77,7 +79,7 @@ export class DocsShellComponent {
     ]),
     new SiteLinkGroup(Resources.helpGroupLabel, [new SiteLink(Resources.feedbackLabel, Resources.feedbackLink), new SiteLink(Resources.privacyLabel, Resources.privacyLink)]),
     new SiteLinkGroup(Resources.followGroupLabel, this.social.map(t => new SiteLink(t.label, t.href)))
-  ]);
+  ].map(t => new SiteLinkGroup(t.title, t.links.map(u => this.stage.link(u)))));
 
   public constructor() {
     const navigations = this.router.events.subscribe(event => {
